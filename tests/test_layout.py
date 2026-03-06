@@ -15,6 +15,7 @@ class TestRepoLayout(unittest.TestCase):
             "docs/setup_wsl.md",
             "docs/roadmap.md",
             "docs/architecture.md",
+            "docs/cpmemu.md",
             "docs/spec.md",
             "src/compiler",
             "src/vm",
@@ -23,10 +24,13 @@ class TestRepoLayout(unittest.TestCase):
             "tools/env_check.sh",
             "tools/setup_wsl.sh",
             "tools/path_probe.py",
+            "tools/cpmemu_runner.py",
+            "tools/build_cpm65_notes.sh",
             "pytest/__main__.py",
             "tools",
             "examples",
             "tests",
+            "tests/test_cpmemu_available.py",
         ]
 
         missing = [path for path in required if not (root / path).exists()]

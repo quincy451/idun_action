@@ -27,3 +27,4 @@ Release disk image (C64 CP/M-65) with tools + examples + automated verification.
 
 - 2026-03-03: Bootstrap repository created with initial structure, docs seeds, inspiration copy script, and smoke tests.
 - 2026-03-06: Added WSL2 environment probe/setup scripts, local path validation, and non-destructive tooling tests.
+- 2026-03-06: Added a cpmemu runner, CP/M-65 build notes, and skip-aware host harness tests for adjacent cpm65-u64 builds.
