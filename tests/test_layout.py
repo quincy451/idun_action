@@ -17,9 +17,12 @@ class TestRepoLayout(unittest.TestCase):
             "docs/architecture.md",
             "docs/cpmemu.md",
             "docs/cpm65_abi.md",
+            "docs/acheron.md",
+            "docs/blockers.md",
             "docs/spec.md",
             "src/compiler",
             "src/vm",
+            "src/vm/vmhello/vmhello.asm",
             "src/runtime",
             "src/tools_cpm",
             "src/tools_cpm/hello/hello.asm",
@@ -30,12 +33,14 @@ class TestRepoLayout(unittest.TestCase):
             "tools/cpmemu_runner.py",
             "tools/build_cpm65_notes.sh",
             "tools/build_hello.sh",
+            "tools/build_vmhello.sh",
             "pytest/__main__.py",
             "tools",
             "examples",
             "tests",
             "tests/test_cpmemu_available.py",
             "tests/test_hello_com.py",
+            "tests/test_vmhello.py",
         ]
 
         missing = [path for path in required if not (root / path).exists()]
