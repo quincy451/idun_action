@@ -41,6 +41,39 @@ Useful options:
 - `--debug`: start in the `cpmemu` debugger when the local build advertises `-d`
 - `--print-command`: show the resolved host command line before execution
 
+## Hello.COM Smoke Test
+
+ActionC64U includes a minimal smoke program under
+`src/tools_cpm/hello/hello.asm`. The preferred bootstrap path is:
+
+1. build CP/M-65 so `bin/cpmemu` exists
+2. build or otherwise surface `asm.com`
+3. assemble `hello.asm` under `cpmemu`
+4. run the resulting `hello.com`
+
+That native `asm.com` flow is still the long-term target, but it is not yet
+guaranteed in this workspace because `cpmemu` is currently missing here.
+
+For now, `./tools/build_hello.sh` does this:
+
+- prefers native assembly via `cpmemu` plus `asm.com`
+- falls back to `mos-cpm65-clang` with a tiny host-buildable source when the
+  native assembler path is unavailable
+- writes the output to `build/hello.com`
+
+Commands:
+
+```bash
+./tools/build_hello.sh
+python3 tools/cpmemu_runner.py --cwd build hello.com
+```
+
+Expected output contains:
+
+```text
+HELLO FROM ACTIONC64U
+```
+
 ## Building CP/M-65
 
 If `../cpm65-u64/bin/cpmemu` is missing, build the adjacent CP/M-65 checkout.
