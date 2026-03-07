@@ -3,8 +3,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_DIR="$ROOT_DIR/build"
-SRC="$ROOT_DIR/src/vm/vmrun/vm.c"
-OUT_COM="$BUILD_DIR/vm.com"
+SRC="$ROOT_DIR/src/tools_cpm/actc/actc.c"
+OUT_COM="$BUILD_DIR/actc.com"
 LLVM_BIN="$($ROOT_DIR/tools/find_llvm_mos.sh)"
 
 mkdir -p "$BUILD_DIR"

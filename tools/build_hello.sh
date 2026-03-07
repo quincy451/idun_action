@@ -28,6 +28,15 @@ find_asm_com() {
 }
 
 find_mos_clang() {
+  if [[ -x "$ROOT_DIR/tools/find_llvm_mos.sh" ]]; then
+    local llvm_bin
+    llvm_bin="$("$ROOT_DIR/tools/find_llvm_mos.sh" || true)"
+    if [[ -n "$llvm_bin" && -x "$llvm_bin/mos-cpm65-clang" ]]; then
+      printf '%s\n' "$llvm_bin/mos-cpm65-clang"
+      return 0
+    fi
+  fi
+
   if [[ -n "${LLVM:-}" ]]; then
     local llvm_bin="${LLVM%/}"
     if [[ -x "$llvm_bin/mos-cpm65-clang" ]]; then
