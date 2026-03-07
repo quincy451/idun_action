@@ -61,14 +61,24 @@ The harness in [tools/vice_harness.py](/mnt/c/test/action/actionc64u/tools/vice_
 The current harness uses the binary monitor because it is documented and easier
 to parse reliably than scraping the interactive text monitor.
 
+For post-boot automation, the reliable path is CP/M submit-file autorun:
+
+- inject `$$$.sub` into the disk image
+- let CCP consume it on boot
+- verify the resulting screen transcript
+
+Direct post-`A>` keyboard injection was not reliable enough for unattended
+verification on this target.
+
 ## Screen Validation
 
 Current smoke validation target:
 
 - wait for a stable CP/M fragment such as `A>`
 
-Future program-run validation can feed additional keys after the prompt, for
-example `HELLO`.
+Release verification uses `$$$.sub` to autorun `VM HELLO.AVM` and waits for:
+
+- `HELLO FROM ACTIONC64U`
 
 ## Manual REU Validation
 
@@ -104,7 +114,7 @@ c1541 \
 python3 tools/vice_harness.py --disk-image /mnt/c/test/action/cpm65-u64/images/c64cpm.d64
 ```
 
-4. At the `A>` prompt, run:
+4. Inject a submit file or type manually:
 
 ```text
 actc reu_demo.act
