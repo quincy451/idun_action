@@ -1,33 +1,156 @@
 # ActionC64U - Action! Commodore 64 Ultimate Edition
 
-ActionC64U is an early-stage, clean-room project to build an Action-like language toolchain for the Commodore 64 Ultimate ecosystem.
+ActionC64U is a clean-room Action!-style toolchain for the Commodore 64
+Ultimate CP/M-65 environment. The current alpha ships:
 
-The language direction keeps the Action! vibe (compact, practical, Algol-60-ish syntax and workflows) while avoiding direct code reuse.
+- `actc.com`: on-target compiler
+- `vm.com`: VM runner for `.avm` payloads
+- `actmon.com`: monitor-style front end
+- dead-strip linkable runtime modules
+- REAL, REU, and overlay bootstrap support
+- a reproducible C64 release disk image plus VICE verification
 
-## Targets and Core Components
+## Prerequisites
 
-- Target OS/runtime environment: **CP/M-65**, sourced locally from `../cpm65-u64`
-- VM backend: **AcheronVM**, sourced locally from `../acheronvm`
-- Backend policy: project-specific backend extensions are allowed where needed
+Required local sibling trees:
 
-## Planned Feature Deltas
+- `../cpm65-u64`
+- `../acheronvm`
 
-- `REAL32` type support: `1 sign bit, 8 exponent bits, 24 mantissa bits`
-- REU-aware memory model for Commodore 64 Ultimate:
-  - 16MB far-data support
-  - overlay loading model
-- Dead-strip linker behavior to reduce final program footprint
+Required host tools:
 
-## Build and Test Strategy
+- `python3`
+- `git`
+- `make`
+- a C compiler and C++ compiler
+- `pytest`
+- `llvm-mos` with `mos-cpm65-clang`
 
-1. Start with host-based, headless tests.
-2. Use `cpm65-u64/bin/cpmemu` for early execution and rapid iteration.
-3. Validate true C64 behavior under **VICE**, since CP/M-65 C64-port verification needs full machine emulation.
+The repo also carries a minimal `pytest` shim for constrained environments, but
+a normal `pytest` install is still recommended.
 
-## Workflow
+Release-image and C64 verification tools:
 
-Development follows a prompt chain (`prompt-1.txt` through `prompt-n.txt`) with deterministic, testable increments.
+- `cpmtools` (`cpmcp`, `cpmls`, `cpmchattr`)
+- `x64sc` from VICE for automated C64 validation
 
-## Status
+Quick environment check:
 
-Bootstrap only. This repository currently contains structure, docs seeds, and smoke tests.
+```sh
+./tools/env_check.sh
+```
+
+Strict required-dependency check:
+
+```sh
+./tools/env_check.sh --strict
+```
+
+WSL setup notes live in [docs/setup_wsl.md](/mnt/c/test/action/actionc64u/docs/setup_wsl.md).
+
+## Host Tests
+
+Run the full host-side suite:
+
+```sh
+python3 -m pytest -q
+```
+
+This covers:
+
+- host compiler/linker behavior
+- CP/M-65 `cpmemu` integration
+- on-target `actc.com` / `vm.com` flows under `cpmemu`
+- release-image build checks
+- VICE verification when `x64sc` is installed
+
+## Build CP/M Tools
+
+Build the three shipped CP/M executables:
+
+```sh
+./tools/build_actc.sh
+./tools/build_vmrun.sh
+./tools/build_actmon.sh
+```
+
+Or use the one-command build:
+
+```sh
+./tools/build_all.sh
+```
+
+`build_all.sh` does not run `sudo`. If a dependency is missing, it fails with
+instructions and points back to `./tools/env_check.sh`.
+
+## Build The Release Disk Image
+
+Build the distributable C64 CP/M-65 disk image:
+
+```sh
+python3 tools/build_release_image.py
+```
+
+Output:
+
+- `build/actionc64u_c64.d64`
+- `build/actionc64u_c64.dir.txt`
+
+The build output directory is ignored by git, so generated release images stay
+out of version control.
+
+## Run Automated VICE Verification
+
+Run the release verification harness:
+
+```sh
+python3 tools/verify_release.py
+```
+
+This:
+
+- builds or reuses the release image
+- injects a host-built `HELLO.AVM`
+- injects `$$$.SUB` so CP/M autoruns `VM HELLO.AVM`
+- waits for `HELLO FROM ACTIONC64U` on the C64 screen
+- writes `build/verify_transcript.txt`
+
+The automated VICE path uses CP/M submit-file autorun because that is more
+reliable than live post-boot keyboard typing on this target.
+
+## One-Command Smoke Pass
+
+For a quick end-to-end sanity check:
+
+```sh
+./tools/smoke.sh
+```
+
+This runs:
+
+- `env_check`
+- `pytest`
+- release-image build
+- optional VICE verification when `x64sc` is available
+
+## Documentation Map
+
+Key docs:
+
+- [docs/cpmemu.md](/mnt/c/test/action/actionc64u/docs/cpmemu.md)
+- [docs/vice.md](/mnt/c/test/action/actionc64u/docs/vice.md)
+- [docs/spec.md](/mnt/c/test/action/actionc64u/docs/spec.md)
+- [docs/linker.md](/mnt/c/test/action/actionc64u/docs/linker.md)
+- [docs/real32.md](/mnt/c/test/action/actionc64u/docs/real32.md)
+- [docs/reu.md](/mnt/c/test/action/actionc64u/docs/reu.md)
+- [docs/overlays.md](/mnt/c/test/action/actionc64u/docs/overlays.md)
+- [docs/disk_layout.md](/mnt/c/test/action/actionc64u/docs/disk_layout.md)
+- [docs/release.md](/mnt/c/test/action/actionc64u/docs/release.md)
+- [docs/blockers.md](/mnt/c/test/action/actionc64u/docs/blockers.md)
+- [docs/prompt_chain.md](/mnt/c/test/action/actionc64u/docs/prompt_chain.md)
+
+## Prompt Chain
+
+The repo was built through `prompt-1.txt` through `prompt-18.txt` from the
+workspace root. The workflow is documented in
+[docs/prompt_chain.md](/mnt/c/test/action/actionc64u/docs/prompt_chain.md).

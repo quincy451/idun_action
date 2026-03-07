@@ -42,3 +42,4 @@ Release disk image (C64 CP/M-65) with tools + examples + automated verification.
 - 2026-03-06: Added actmon.com, on-target disk-backed dead-strip module manifests with map output, and cpmemu coverage for embedded COMPILE/RUN/BUILD workflows.
 - 2026-03-06: Added on-target REAL32, sparse simulated REU support, overlay tracking, backend-selection docs, and cpmemu tests for the prompt-16 feature set.
 - 2026-03-07: Added a reproducible C64 release disk builder plus VICE verification that boots CP/M-65, autoruns `VM HELLO.AVM` through `$$$.sub`, and writes a screen transcript.
+- 2026-03-07: Polished the repo into a shareable alpha with reproducible build/smoke scripts, prompt-chain documentation, and README instructions for host tests, release-image creation, and VICE verification.
