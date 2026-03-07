@@ -172,6 +172,11 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
         action="store_true",
         help="Print the resolved command line before execution",
     )
+    parser.add_argument(
+        "--stdin-text",
+        default=None,
+        help="Text to pass to the emulated program on stdin",
+    )
     return parser.parse_args(argv)
 
 
@@ -206,6 +211,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         result = subprocess.run(
             command,
             cwd=cwd,
+            input=args.stdin_text,
             text=True,
             capture_output=True,
             check=False,

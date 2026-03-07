@@ -16,7 +16,10 @@ ACTIONC64U_REU_BACKEND=hw
 Current defaults:
 
 - `sim` for local `cpmemu` builds
-- `hw` is reserved for VICE / real C64 validation builds
+- `hw` for VICE / real C64 validation builds
+
+The build scripts currently default to `-Oz` when `ACTIONC64U_REU_BACKEND=hw`
+so the on-target tools keep fitting inside the CP/M transient program area.
 
 ## Stable C API
 
@@ -45,6 +48,19 @@ This is the backend used by prompt-16 on-target tests under `cpmemu`.
 
 ## Hardware Backend
 
-`src/runtime/reu_hw.c` currently preserves the API and backend-selection path
-for VICE / real C64 work, but the transfer implementation is still a bootstrap
-stub pending fuller VM runtime integration.
+`src/runtime/reu_hw.c` now performs real C64 REU register transfers:
+
+- REU registers at `$df00-$df0a`
+- trigger at `$ff00`
+- I/O visible while programming registers
+- all-RAM memory configuration during the transfer trigger
+
+Current implementation limits:
+
+- `4` live handles
+- monotonic bump allocation with simple tail-pop reclaim
+- `reu_copy()` is currently implemented as repeated `peek8` / `poke8`
+  operations to keep code size under control
+
+This backend is now linkable into `actc.com`, `vm.com`, and `actmon.com`, and
+the repo test suite exercises those build paths.

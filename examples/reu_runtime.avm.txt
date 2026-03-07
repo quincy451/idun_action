@@ -1,0 +1,34 @@
+entry start
+
+start:
+  push16 4
+  calln reu_alloc
+  store 0
+
+  load 0
+  push16 0
+  push16 65
+  calln reu_poke8
+
+  load 0
+  push16 0
+  calln reu_peek8
+  dup
+  push16 65
+  eq
+  jz fail
+
+  calln printie
+  load 0
+  calln reu_free
+  calln exit
+
+fail:
+  setp16 fail_msg
+  calln printe
+  load 0
+  calln reu_free
+  calln exit
+
+fail_msg:
+  stringz "REU FAIL"

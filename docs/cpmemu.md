@@ -40,6 +40,7 @@ Useful options:
 - `--drive A=/path/to/files`: map a CP/M drive when supported by the local build
 - `--debug`: start in the `cpmemu` debugger when the local build advertises `-d`
 - `--print-command`: show the resolved host command line before execution
+- `--stdin-text '...\r'`: feed scripted console input to interactive CP/M tools
 
 ## Hello.COM Smoke Test
 

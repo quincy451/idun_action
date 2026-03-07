@@ -1,40 +1,49 @@
-# VM ABI for Minimal ActionC64U Intrinsics
+# VM ABI for Bootstrap ActionC64U Runtime
 
-This ABI is intentionally tiny and stable for the first compiler bootstrap.
+This ABI is still intentionally small, but `vm.com` is now a real stack
+interpreter rather than a print-only placeholder.
 
-## Register Convention
+## VM State
 
-- `rP` carries the single argument for string-print intrinsics.
-- The value in `rP` is a **payload-relative offset** to a NUL-terminated ASCII
-  string inside the current `.avm` payload.
-- The current payload base address is owned by `vm.com`, which will translate
-  the relative offset into a real host address before printing.
+- one 16-bit data stack (`32` cells in the current runner)
+- `16` 16-bit local slots
+- one current string pointer set by `setp16`
+
+All immediate addresses are payload-relative offsets inside the active `.avm`.
 
 ## Intrinsic Pseudo-Targets
 
-The compiler emits `calln` with reserved pseudo-addresses:
+`calln` uses reserved pseudo-addresses:
 
 - `0xff00`: `Print`
 - `0xff10`: `PrintE`
 - `0xff20`: `Exit`
+- `0xff30`: `PrintI`
+- `0xff31`: `PrintIE`
+- `0xff40`: `ReuAlloc`
+- `0xff41`: `ReuFree`
+- `0xff42`: `ReuPeek8`
+- `0xff43`: `ReuPoke8`
+- `0xff44`: `ReuPeek16`
+- `0xff45`: `ReuPoke16`
+- `0xff50`: `ConIn`
+- `0xff51`: `ConOut`
 
-These are not final machine addresses. `vm.com` is expected to recognize or
-rewrite them to the actual native helper entry points in its own process image
-before execution.
+These are not final machine addresses. `vm.com` recognizes them directly.
 
 ## Semantics
 
 ### `Print`
 
-- input: `rP = offset of NUL-terminated string`
+- input: current string pointer from `setp16`
 - effect: print the string with no newline
-- return: returns to the next Acheron instruction
+- return: continue execution
 
 ### `PrintE`
 
-- input: `rP = offset of NUL-terminated string`
+- input: current string pointer from `setp16`
 - effect: print the string followed by the standard CP/M newline sequence
-- return: returns to the next Acheron instruction
+- return: continue execution
 
 ### `Exit`
 
@@ -42,22 +51,36 @@ before execution.
 - effect: terminate the current payload/program cleanly
 - return: does not return to the caller
 
-## Integer Printing
+### `PrintI` / `PrintIE`
 
-For the current host-side reference compiler, `PrintI(expr)` and `PrintIE(expr)`
-are lowered at compile time into ordinary `Print` / `PrintE` string operations.
-That keeps the VM ABI stable while the CP/M-65 runner is still blocked.
+- input: pop one 16-bit value from the stack
+- effect: print signed decimal, with `PrintIE` adding a newline
+- return: continue execution
 
-## Minimal Compiler Pattern
+### REU Intrinsics
 
-For each emitted print action, the compiler writes:
+- `ReuAlloc`: pop `size`, push `handle`
+- `ReuFree`: pop `handle`
+- `ReuPeek8`: pop `offset`, `handle`; push zero-extended byte
+- `ReuPoke8`: pop `value`, `offset`, `handle`
+- `ReuPeek16`: pop `offset`, `handle`; push 16-bit value
+- `ReuPoke16`: pop `value`, `offset`, `handle`
+
+Current stack operands are 16-bit, so the first runtime REU path is aimed at
+buffers and offsets within the low 64 KiB of a handle. The underlying backend
+API remains 32-bit for future expansion.
+
+### Console Intrinsics
+
+- `ConIn`: push one input character from the CP/M console
+- `ConOut`: pop one byte and write it to the CP/M console
+
+## Bootstrap Compiler Pattern
+
+`actc.com` still emits the older print-oriented pattern:
 
 1. `setp16 <string_offset>`
-2. `calln <pseudo-target>`
+2. `calln 0xff00` or `calln 0xff10`
+3. `calln 0xff20`
 
-At the end of `main`, the compiler emits:
-
-1. `calln 0xff20`
-
-This keeps the payload format compact while deferring machine-address fixups to
-`vm.com`.
+Direct AVM assembly can now use the wider opcode/intrinsic subset.

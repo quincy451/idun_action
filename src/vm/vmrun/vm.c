@@ -7,17 +7,47 @@
 
 #define MAX_AVM_BYTES 4096
 #define AVM_HEADER_SIZE 10
+#define VM_STACK_SIZE 32
+#define VM_LOCAL_COUNT 16
+
+#define OPCODE_PUSH8 0x10
+#define OPCODE_PUSH16 0x11
+#define OPCODE_STORE 0x12
+#define OPCODE_LOAD 0x13
+#define OPCODE_ADD 0x14
+#define OPCODE_SUB 0x15
+#define OPCODE_EQ 0x16
+#define OPCODE_NE 0x17
+#define OPCODE_JZ 0x18
+#define OPCODE_JMP 0x19
+#define OPCODE_DUP 0x1A
+#define OPCODE_DROP 0x1B
+#define OPCODE_LT 0x1C
+#define OPCODE_GT 0x1D
+#define OPCODE_NATIVE 0x2D
 #define OPCODE_CALLN 0x49
-#define OPCODE_NATIVE 0x2d
 #define OPCODE_SETP16 0x61
+
 #define INTR_EXAMPLE_HELLO 0x0000
-#define INTR_PRINT 0xff00
-#define INTR_PRINTE 0xff10
-#define INTR_EXIT 0xff20
+#define INTR_PRINT 0xFF00
+#define INTR_PRINTE 0xFF10
+#define INTR_EXIT 0xFF20
+#define INTR_PRINTI 0xFF30
+#define INTR_PRINTIE 0xFF31
+#define INTR_REU_ALLOC 0xFF40
+#define INTR_REU_FREE 0xFF41
+#define INTR_REU_PEEK8 0xFF42
+#define INTR_REU_POKE8 0xFF43
+#define INTR_REU_PEEK16 0xFF44
+#define INTR_REU_POKE16 0xFF45
+#define INTR_CONIN 0xFF50
+#define INTR_CONOUT 0xFF51
 
 static uint8_t avm_data[MAX_AVM_BYTES];
-static uint8_t current_string_offset_lo;
-static uint8_t current_string_offset_hi;
+static uint16_t current_string_offset;
+static uint16_t vm_stack[VM_STACK_SIZE];
+static uint16_t vm_locals[VM_LOCAL_COUNT];
+static uint8_t vm_sp;
 
 static void print_cstr(const char* s)
 {
@@ -62,7 +92,7 @@ static void primary_fcb_to_name(char* out, const char* fallback)
     uint8_t pos = 0;
     for (uint8_t i = 0; i < 8; i++)
     {
-        uint8_t ch = cpm_fcb.f[i] & 0x7f;
+        uint8_t ch = cpm_fcb.f[i] & 0x7F;
         if (ch == ' ')
             break;
         if ((ch >= 'A') && (ch <= 'Z'))
@@ -75,7 +105,7 @@ static void primary_fcb_to_name(char* out, const char* fallback)
         out[pos++] = '.';
         for (uint8_t i = 8; i < 11; i++)
         {
-            uint8_t ch = cpm_fcb.f[i] & 0x7f;
+            uint8_t ch = cpm_fcb.f[i] & 0x7F;
             if (ch == ' ')
                 break;
             if ((ch >= 'A') && (ch <= 'Z'))
@@ -93,7 +123,7 @@ static uint16_t load_u16(const uint8_t* ptr)
 
 static uint16_t round_up_128(uint16_t value)
 {
-    return (uint16_t)((value + 127u) & 0xff80u);
+    return (uint16_t)((value + 127u) & 0xFF80u);
 }
 
 static uint16_t read_avm_file(const char* filename)
@@ -167,6 +197,163 @@ static void print_payload_string(const uint8_t* payload, uint16_t payload_len, u
     fatal("unterminated payload string");
 }
 
+static void print_i16(int16_t value)
+{
+    char buf[7];
+    uint8_t pos = 0;
+    uint16_t magnitude;
+
+    if (value < 0)
+    {
+        cpm_conout('-');
+        magnitude = (uint16_t)(0u - (uint16_t)value);
+    }
+    else
+    {
+        magnitude = (uint16_t)value;
+    }
+
+    do
+    {
+        buf[pos++] = (char)('0' + (magnitude % 10u));
+        magnitude /= 10u;
+    } while (magnitude);
+
+    while (pos)
+        cpm_conout((uint8_t)buf[--pos]);
+}
+
+static void stack_push(uint16_t value)
+{
+    if (vm_sp >= VM_STACK_SIZE)
+        fatal("stack overflow");
+    vm_stack[vm_sp++] = value;
+}
+
+static uint16_t stack_pop(void)
+{
+    if (vm_sp == 0)
+        fatal("stack underflow");
+    return vm_stack[--vm_sp];
+}
+
+static uint16_t stack_peek(void)
+{
+    if (vm_sp == 0)
+        fatal("stack underflow");
+    return vm_stack[vm_sp - 1];
+}
+
+static const uint8_t* resolve_target(const uint8_t* payload, uint16_t payload_len, uint16_t target)
+{
+    if (target > payload_len)
+        fatal("jump target outside payload");
+    return payload + target;
+}
+
+static void run_intrinsic(uint16_t target, const uint8_t* payload, uint16_t payload_len)
+{
+    uint16_t handle_word;
+    uint16_t offset;
+    uint16_t value;
+    uint8_t byte_value;
+    uint16_t word_value;
+    ReuHandle handle;
+
+    if (target == INTR_PRINT)
+    {
+        print_payload_string(payload, payload_len, current_string_offset, false);
+        return;
+    }
+    if (target == INTR_PRINTE)
+    {
+        print_payload_string(payload, payload_len, current_string_offset, true);
+        return;
+    }
+    if (target == INTR_EXAMPLE_HELLO)
+    {
+        print_cstr("HELLO FROM AVM FILE");
+        crlf();
+        return;
+    }
+    if (target == INTR_EXIT)
+        return;
+    if (target == INTR_PRINTI)
+    {
+        print_i16((int16_t)stack_pop());
+        return;
+    }
+    if (target == INTR_PRINTIE)
+    {
+        print_i16((int16_t)stack_pop());
+        crlf();
+        return;
+    }
+    if (target == INTR_REU_ALLOC)
+    {
+        value = stack_pop();
+        if (!reu_alloc(value, &handle))
+            fatal("reu alloc failed");
+        stack_push(handle);
+        return;
+    }
+    if (target == INTR_REU_FREE)
+    {
+        handle_word = stack_pop();
+        if (!reu_free((ReuHandle)handle_word))
+            fatal("reu free failed");
+        return;
+    }
+    if (target == INTR_REU_PEEK8)
+    {
+        offset = stack_pop();
+        handle_word = stack_pop();
+        if (!reu_peek8((ReuHandle)handle_word, offset, &byte_value))
+            fatal("reu peek8 failed");
+        stack_push(byte_value);
+        return;
+    }
+    if (target == INTR_REU_POKE8)
+    {
+        value = stack_pop();
+        offset = stack_pop();
+        handle_word = stack_pop();
+        if (!reu_poke8((ReuHandle)handle_word, offset, (uint8_t)value))
+            fatal("reu poke8 failed");
+        return;
+    }
+    if (target == INTR_REU_PEEK16)
+    {
+        offset = stack_pop();
+        handle_word = stack_pop();
+        if (!reu_peek16((ReuHandle)handle_word, offset, &word_value))
+            fatal("reu peek16 failed");
+        stack_push(word_value);
+        return;
+    }
+    if (target == INTR_REU_POKE16)
+    {
+        value = stack_pop();
+        offset = stack_pop();
+        handle_word = stack_pop();
+        if (!reu_poke16((ReuHandle)handle_word, offset, value))
+            fatal("reu poke16 failed");
+        return;
+    }
+    if (target == INTR_CONIN)
+    {
+        stack_push(cpm_conin());
+        return;
+    }
+    if (target == INTR_CONOUT)
+    {
+        cpm_conout((uint8_t)stack_pop());
+        return;
+    }
+
+    fatal("unknown intrinsic");
+}
+
 int vm_run_filename(const char* filename)
 {
     reu_backend_reset();
@@ -177,18 +364,143 @@ int vm_run_filename(const char* filename)
     const uint8_t* ip = payload + entry_offset;
     const uint8_t* end = payload + payload_len;
 
-    current_string_offset_lo = 0;
-    current_string_offset_hi = 0;
+    current_string_offset = 0;
+    vm_sp = 0;
+    memset(vm_locals, 0, sizeof(vm_locals));
 
     while (ip < end)
     {
         uint8_t opcode = *ip++;
+        uint8_t slot;
+        uint16_t lhs;
+        uint16_t rhs;
+        uint16_t target;
+
+        if (opcode == OPCODE_PUSH8)
+        {
+            if (ip >= end)
+                fatal("truncated push8");
+            stack_push(*ip++);
+            continue;
+        }
+
+        if (opcode == OPCODE_PUSH16)
+        {
+            if ((uint16_t)(end - ip) < 2)
+                fatal("truncated push16");
+            stack_push(load_u16(ip));
+            ip += 2;
+            continue;
+        }
+
+        if (opcode == OPCODE_STORE)
+        {
+            if (ip >= end)
+                fatal("truncated store");
+            slot = *ip++;
+            if (slot >= VM_LOCAL_COUNT)
+                fatal("local index out of range");
+            vm_locals[slot] = stack_pop();
+            continue;
+        }
+
+        if (opcode == OPCODE_LOAD)
+        {
+            if (ip >= end)
+                fatal("truncated load");
+            slot = *ip++;
+            if (slot >= VM_LOCAL_COUNT)
+                fatal("local index out of range");
+            stack_push(vm_locals[slot]);
+            continue;
+        }
+
+        if (opcode == OPCODE_ADD)
+        {
+            rhs = stack_pop();
+            lhs = stack_pop();
+            stack_push((uint16_t)(lhs + rhs));
+            continue;
+        }
+
+        if (opcode == OPCODE_SUB)
+        {
+            rhs = stack_pop();
+            lhs = stack_pop();
+            stack_push((uint16_t)(lhs - rhs));
+            continue;
+        }
+
+        if (opcode == OPCODE_EQ)
+        {
+            rhs = stack_pop();
+            lhs = stack_pop();
+            stack_push(lhs == rhs ? 1u : 0u);
+            continue;
+        }
+
+        if (opcode == OPCODE_NE)
+        {
+            rhs = stack_pop();
+            lhs = stack_pop();
+            stack_push(lhs != rhs ? 1u : 0u);
+            continue;
+        }
+
+        if (opcode == OPCODE_LT)
+        {
+            rhs = stack_pop();
+            lhs = stack_pop();
+            stack_push(((int16_t)lhs < (int16_t)rhs) ? 1u : 0u);
+            continue;
+        }
+
+        if (opcode == OPCODE_GT)
+        {
+            rhs = stack_pop();
+            lhs = stack_pop();
+            stack_push(((int16_t)lhs > (int16_t)rhs) ? 1u : 0u);
+            continue;
+        }
+
+        if (opcode == OPCODE_DUP)
+        {
+            stack_push(stack_peek());
+            continue;
+        }
+
+        if (opcode == OPCODE_DROP)
+        {
+            (void)stack_pop();
+            continue;
+        }
+
+        if (opcode == OPCODE_JZ)
+        {
+            if ((uint16_t)(end - ip) < 2)
+                fatal("truncated jz");
+            target = load_u16(ip);
+            ip += 2;
+            if (stack_pop() == 0)
+                ip = resolve_target(payload, payload_len, target);
+            continue;
+        }
+
+        if (opcode == OPCODE_JMP)
+        {
+            if ((uint16_t)(end - ip) < 2)
+                fatal("truncated jmp");
+            target = load_u16(ip);
+            ip = resolve_target(payload, payload_len, target);
+            continue;
+        }
+
         if (opcode == OPCODE_SETP16)
         {
             if ((uint16_t)(end - ip) < 2)
                 fatal("truncated setp16");
-            current_string_offset_lo = *ip++;
-            current_string_offset_hi = *ip++;
+            current_string_offset = load_u16(ip);
+            ip += 2;
             continue;
         }
 
@@ -196,29 +508,12 @@ int vm_run_filename(const char* filename)
         {
             if ((uint16_t)(end - ip) < 2)
                 fatal("truncated calln");
-            uint16_t target = load_u16(ip);
+            target = load_u16(ip);
             ip += 2;
-            if (target == INTR_PRINT)
-            {
-                uint16_t string_offset = (uint16_t)current_string_offset_lo | ((uint16_t)current_string_offset_hi << 8);
-                print_payload_string(payload, payload_len, string_offset, false);
-                continue;
-            }
-            if (target == INTR_PRINTE)
-            {
-                uint16_t string_offset = (uint16_t)current_string_offset_lo | ((uint16_t)current_string_offset_hi << 8);
-                print_payload_string(payload, payload_len, string_offset, true);
-                continue;
-            }
-            if (target == INTR_EXAMPLE_HELLO)
-            {
-                print_cstr("HELLO FROM AVM FILE");
-                crlf();
-                continue;
-            }
             if (target == INTR_EXIT)
                 return 0;
-            fatal("unknown intrinsic");
+            run_intrinsic(target, payload, payload_len);
+            continue;
         }
 
         if (opcode == OPCODE_NATIVE)
