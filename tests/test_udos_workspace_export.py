@@ -1,0 +1,62 @@
+from __future__ import annotations
+
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+
+class TestUdosWorkspaceExport(unittest.TestCase):
+    def test_export_creates_udos_tree_with_guides_examples_and_libs(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        tool = root / "tools" / "export_udos_workspace.py"
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output = Path(tmpdir) / "out"
+            result = subprocess.run(
+                [sys.executable, str(tool), "--output", str(output)],
+                cwd=root,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+
+            image_root = output / "IMAGES" / "ACTION.DNP"
+            self.assertTrue(image_root.is_dir())
+
+            expected_dirs = ["BIN", "DOC", "LIB", "SRC"]
+            for name in expected_dirs:
+                self.assertTrue((image_root / name).is_dir(), name)
+
+            self.assertTrue((image_root / "README.TXT").is_file())
+            self.assertIn("D BIN", (image_root / "UDOSDIR.TXT").read_text(encoding="ascii"))
+            self.assertIn("F README.TXT", (image_root / "UDOSDIR.TXT").read_text(encoding="ascii"))
+
+            docs_dir = image_root / "DOC"
+            self.assertTrue((docs_dir / "OPERATOR.TXT").is_file())
+            self.assertTrue((docs_dir / "LANGUAGE.TXT").is_file())
+            self.assertTrue((docs_dir / "VMABI.TXT").is_file())
+            self.assertTrue((docs_dir / "UDOSRESM.TXT").is_file())
+            self.assertIn("ActionC64U Operator Guide", (docs_dir / "OPERATOR.TXT").read_text(encoding="ascii"))
+
+            src_dir = image_root / "SRC"
+            self.assertTrue((src_dir / "HELLO.ACT").is_file())
+            self.assertTrue((src_dir / "MATH.ACT").is_file())
+            self.assertIn("PROC main()", (src_dir / "HELLO.ACT").read_text(encoding="ascii"))
+
+            bin_dir = image_root / "BIN"
+            for name in ["HELLO.AVM", "REURUN.AVM", "VMECHO.AVM", "FILECOPY.AVM"]:
+                self.assertEqual((bin_dir / name).read_bytes()[:4], b"AVM1", name)
+            self.assertTrue((bin_dir / "HELLO.AVT").is_file())
+
+            lib_dir = image_root / "LIB"
+            bundle = (lib_dir / "LIBMODS.DAT").read_text(encoding="ascii")
+            self.assertIn("FILE libpstr.mod", bundle)
+            self.assertTrue((lib_dir / "LIBPSTR.MOD").is_file())
+            self.assertTrue((lib_dir / "UDOSDIR.TXT").is_file())
+
+
+if __name__ == "__main__":
+    unittest.main()

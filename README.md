@@ -1,7 +1,12 @@
 # ActionC64U - Action! Commodore 64 Ultimate Edition
 
-ActionC64U is a clean-room Action!-style toolchain for the Commodore 64
-Ultimate CP/M-65 environment. The current alpha ships:
+ActionC64U is a clean-room Action!-style toolchain project for the Commodore 64.
+
+The current checked-in toolchain is still the older CP/M-65 bootstrap path. It
+remains in the repo as a language/runtime reference and regression target while
+the UDOS-native tool replacements are built.
+
+The current alpha ships:
 
 - `alink.com`: on-target dead-strip linker for `.avo` objects
 - `actc.com`: on-target compiler
@@ -101,6 +106,22 @@ Output:
 The build output directory is ignored by git, so generated release images stay
 out of version control.
 
+## Export A UDOS Workspace
+
+Build a UDOS-compatible Action workspace tree with guides, sample sources,
+sample `AVM1` payloads, and runtime manifests:
+
+```sh
+python3 tools/export_udos_workspace.py
+```
+
+Default output:
+
+- `build/udos-action-fs/IMAGES/ACTION.DNP`
+
+This export is the current bridge artifact from the bootstrap Action repo into
+the UDOS shell/runtime.
+
 ## Run Automated VICE Verification
 
 Run the release verification harness:
@@ -148,6 +169,7 @@ Key docs:
 - [docs/overlays.md](/mnt/c/test/action/actionc64u/docs/overlays.md)
 - [docs/disk_layout.md](/mnt/c/test/action/actionc64u/docs/disk_layout.md)
 - [docs/release.md](/mnt/c/test/action/actionc64u/docs/release.md)
+- [docs/udos_resume.md](/mnt/c/test/action/actionc64u/docs/udos_resume.md)
 - [docs/blockers.md](/mnt/c/test/action/actionc64u/docs/blockers.md)
 - [docs/prompt_chain.md](/mnt/c/test/action/actionc64u/docs/prompt_chain.md)
 
