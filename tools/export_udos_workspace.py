@@ -59,7 +59,7 @@ def export_docs(root: Path, docs_dir: Path) -> None:
         (docs_dir / name).write_text(out, encoding="ascii", errors="ignore")
 
 
-def export_examples(root: Path, src_dir: Path, bin_dir: Path) -> None:
+def export_examples(root: Path, image_root: Path, src_dir: Path, bin_dir: Path) -> None:
     for source in sorted((root / "examples").glob("*.act")):
         shutil.copy2(source, src_dir / source.name.upper())
 
@@ -69,6 +69,7 @@ def export_examples(root: Path, src_dir: Path, bin_dir: Path) -> None:
     ]
     for existing, out_name in avm_specs:
         shutil.copy2(existing, bin_dir / out_name)
+        shutil.copy2(existing, image_root / out_name)
 
     text_specs = [
         ((root / "examples" / "hello.avm.txt"), "HELLO.AVT", "HELLO.AVM"),
@@ -88,17 +89,22 @@ def export_examples(root: Path, src_dir: Path, bin_dir: Path) -> None:
 
 
 def export_udos_tools(root: Path, image_root: Path, bin_dir: Path) -> None:
-    build_tool = root / "tools" / "build_actinfo_udos.sh"
-    result = subprocess.run(
-        [str(build_tool)],
-        cwd=root,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    built = Path(result.stdout.strip().splitlines()[-1])
-    shutil.copy2(built, bin_dir / "ACTINFO.PRG")
-    shutil.copy2(built, image_root / "ACTINFO.PRG")
+    tool_specs = [
+        ("build_actinfo_udos.sh", "ACTINFO.PRG"),
+        ("build_avminfo_udos.sh", "AVMINFO.PRG"),
+    ]
+    for script_name, out_name in tool_specs:
+        build_tool = root / "tools" / script_name
+        result = subprocess.run(
+            ["bash", str(build_tool)],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        built = Path(result.stdout.strip().splitlines()[-1])
+        shutil.copy2(built, bin_dir / out_name)
+        shutil.copy2(built, image_root / out_name)
 
 
 def export_libs(root: Path, lib_dir: Path) -> None:
@@ -137,7 +143,7 @@ def main(argv: list[str] | None = None) -> int:
         directory.mkdir(parents=True, exist_ok=True)
 
     export_docs(root, docs_dir)
-    export_examples(root, src_dir, bin_dir)
+    export_examples(root, image_root, src_dir, bin_dir)
     if args.build_udos_tools:
         export_udos_tools(root, image_root, bin_dir)
     export_libs(root, lib_dir)

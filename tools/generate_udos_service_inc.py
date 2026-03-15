@@ -10,10 +10,18 @@ FIXED_SERVICES = {
     "svc_program_get_cmdline_ptr": 0xCF09,
     "svc_program_get_cmdline_len": 0xCF0C,
     "svc_program_exit": 0xCF0F,
+    "svc_file_load_sc0": 0xCF12,
 }
 
 FIXED_DATA = {
     "program_cmdline_buffer": 0xCF80,
+}
+
+FIXED_CONSTANTS = {
+    "tool_file_status_fail": 0,
+    "tool_file_status_ok": 1,
+    "tool_file_status_too_large": 2,
+    "tool_file_status_nofile": 3,
 }
 
 
@@ -52,6 +60,9 @@ def main(argv: list[str] | None = None) -> int:
     lines.append("")
     for name, addr in FIXED_DATA.items():
         lines.append(f"{name} = ${addr:04X}")
+    lines.append("")
+    for name, value in FIXED_CONSTANTS.items():
+        lines.append(f"{name} = {value}")
     lines.append("")
     out.write_text("\n".join(lines), encoding="ascii")
     return 0

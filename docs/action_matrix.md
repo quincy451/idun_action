@@ -17,6 +17,7 @@ Legend:
 | `ACTC` compiler | Yes | No | No | Yes | Current compiler is only a legacy bootstrap reference. |
 | `ALINK` dead-strip linker | Yes | No | No | Yes | Current linker exists only as a legacy bootstrap reference. |
 | `ACTINFO` tool proof | No | Yes | Yes | N/A | First UDOS-native external Action-side tool proof. It launches from `ACTION.DNP`, prints through the preserved launch-safe UDOS ABI, and returns to the UDOS prompt. |
+| `AVMINFO` tool proof | No | Yes | Yes | N/A | Loads an `.AVM` file through the preserved UDOS file-load service, prints header fields, and returns to the UDOS prompt. |
 | `VM` `AVM1` runner | Yes | Sample payloads only | No | Yes | The bridge exports sample `.AVM` assets, but no UDOS-native runner exists yet. |
 | `ACTMON` front end | Yes | No | No | No | Historical bootstrap front end only. UDOS already owns the shell role. |
 | Integrated editor | No | Guides only | No | Yes | No UDOS-native editor exists yet. |
@@ -34,6 +35,7 @@ Legend:
 | Link `.AVO` -> `AVM1` with dead-strip | Yes | No | No | Yes | Current implementation exists only as a legacy bootstrap reference. |
 | Run `AVM1` payloads | Yes | Sample payloads only | No | Yes | Next immediate tool target on UDOS. |
 | Launch UDOS-native external Action tools | No | Yes | Yes | Yes | `ACTINFO.PRG` proves external-tool launch/return through the preserved launch-safe UDOS ABI. |
+| Load tool-side files through UDOS ABI | No | Yes | Yes | Yes | `AVMINFO.PRG` proves mounted-workspace file loading from a UDOS-native external tool. |
 | REAL / REU / overlay language reference | Yes | Partial | No | Yes | Semantics exist in legacy/reference form; exported guides and examples are available under UDOS. |
 | File I/O runtime examples | Yes | Yes | No | Yes | `FILECOPY.AVM` is exported, but no UDOS-native runner exists yet. |
 | Sample `.ACT` programs | Yes | Yes | N/A | N/A | Exported for shell browsing and later tool bring-up. |
@@ -43,8 +45,8 @@ Legend:
 ## Immediate Next Tool Steps
 
 1. add a UDOS-native `AVM1` runner so the exported `BIN/*.AVM` payloads are executable from UDOS
-2. expand the preserved UDOS external-tool ABI beyond console/cmdline/exit into file and directory services
-3. use that ABI to move from `ACTINFO` into a real Action-side runner/tool surface
+2. expand the preserved UDOS external-tool ABI beyond console/cmdline/exit/file-load into directory and write-side services
+3. use that ABI to move from `ACTINFO` and `AVMINFO` into a real Action-side runner/tool surface
 4. then port linker and compiler behavior onto UDOS-native tools
 
 ## Relationship To UDOS Utilities

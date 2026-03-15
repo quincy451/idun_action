@@ -50,6 +50,7 @@ class TestUdosWorkspaceExport(unittest.TestCase):
             for name in ["HELLO.AVM", "REURUN.AVM", "VMECHO.AVM", "FILECOPY.AVM"]:
                 self.assertEqual((bin_dir / name).read_bytes()[:4], b"AVM1", name)
             self.assertTrue((bin_dir / "HELLO.AVT").is_file())
+            self.assertEqual((image_root / "HELLO.AVM").read_bytes()[:4], b"AVM1")
 
             lib_dir = image_root / "LIB"
             bundle = (lib_dir / "LIBMODS.DAT").read_text(encoding="ascii")
@@ -78,6 +79,8 @@ class TestUdosWorkspaceExport(unittest.TestCase):
             image_root = output / "IMAGES" / "ACTION.DNP"
             self.assertTrue((image_root / "ACTINFO.PRG").is_file())
             self.assertTrue((image_root / "BIN" / "ACTINFO.PRG").is_file())
+            self.assertTrue((image_root / "AVMINFO.PRG").is_file())
+            self.assertTrue((image_root / "BIN" / "AVMINFO.PRG").is_file())
 
 
 if __name__ == "__main__":

@@ -41,19 +41,25 @@ This does not make the old bootstrap tools runnable inside UDOS. It gives UDOS a
 real Action workspace with guides, sample programs, and runtime assets while
 the UDOS-native tool replacements are built.
 
-The first UDOS-native external Action-side tool proof now exists:
+The first UDOS-native external Action-side tool proofs now exist:
 
 - `ACTINFO.PRG`
+- `AVMINFO.PRG`
 
-It is exported into `ACTION.DNP` root and `BIN/`, launches from the UDOS shell,
-prints through the preserved launch-safe UDOS external-tool ABI, and returns to
-the prompt through the UDOS-aware external program return trampoline.
+They are exported into `ACTION.DNP` root and `BIN/`.
+
+- `ACTINFO.PRG` launches from the UDOS shell, prints through the preserved
+  launch-safe UDOS external-tool ABI, and returns to the prompt through the
+  UDOS-aware external program return trampoline.
+- `AVMINFO.PRG` uses the preserved UDOS file-load service to read `HELLO.AVM`
+  from the mounted Action workspace, prints the `AVM1` header fields, and
+  returns to the prompt.
 
 ## Immediate Follow-On Work
 
 1. add a UDOS-native VM runner for `AVM1` payloads
-2. expand the preserved UDOS external-tool ABI beyond console/cmdline/exit into
-   file and directory services
+2. expand the preserved UDOS external-tool ABI beyond
+   console/cmdline/exit/file-load into directory and write-side services
 3. define the broader UDOS program ABI expected by Action tools
 4. port compiler, linker, editor, and debugger behavior onto UDOS-native tools
 
