@@ -19,7 +19,7 @@ Legend:
 | `ACTDIR` tool proof | No | Yes | Yes | N/A | Enumerates the current mounted directory through the preserved UDOS directory ABI and returns to the prompt. |
 | `ACTINFO` tool proof | No | Yes | Yes | N/A | First UDOS-native external Action-side tool proof. It launches from `ACTION.DNP`, prints through the preserved launch-safe UDOS ABI, and returns to the UDOS prompt. |
 | `ACTWRITE` tool proof | No | Yes | Yes | N/A | Writes a text file into the current mounted directory through the preserved UDOS file-save ABI and returns to the prompt. |
-| `AVMINFO` tool proof | No | Yes | Yes | N/A | Loads an `.AVM` file through the preserved UDOS file-load service, prints header fields, and returns to the UDOS prompt. |
+| `AVMINFO` tool proof | No | Yes | Yes | N/A | Loads an `.AVM` file through the preserved UDOS file-load service, validates the `AVM1` header, prints `AVM OK`, and returns to the UDOS prompt. |
 | `VM` `AVM1` runner | Yes | Yes | Partial | Yes | `AVMRUN.PRG` now runs a flagged Acheron-backed `AVM1` subset from the mounted Action workspace. Current proof surface is intentionally small but real: `setp16`, `calln`, `native`, `stringz`, `jump`, `call`, and `ret`. |
 | `ACTMON` front end | Yes | No | No | No | Historical bootstrap front end only. UDOS already owns the shell role. |
 | Integrated editor | No | Guides only | No | Yes | No UDOS-native editor exists yet. |

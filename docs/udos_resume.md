@@ -59,8 +59,8 @@ They are exported into `ACTION.DNP` root and `BIN/`.
 - `ACTWRITE.PRG` writes a text file into the current mounted directory through
   the preserved UDOS file-save ABI and returns to the prompt.
 - `AVMINFO.PRG` uses the preserved UDOS file-load service to read `HELLO.AVM`
-  from the mounted Action workspace, prints the `AVM1` header fields, and
-  returns to the prompt.
+  from the mounted Action workspace, validates the `AVM1` header, prints
+  `AVM OK`, and returns to the prompt.
 - `AVMRUN.PRG` executes a constrained flagged `AVM1` subset on top of
   AcheronVM. The current proof payloads are `UDOSHELLO.AVM`, which prints
   `UDOS AVM OK`, and `UDOSFLOW.AVM`, which proves `jump`, `call`, and `ret`
