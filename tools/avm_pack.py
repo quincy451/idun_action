@@ -12,6 +12,7 @@ import tempfile
 MAGIC = b"AVM1"
 VERSION = 1
 HEADER = struct.Struct("<4sBHHB")
+AVM_FLAG_ACHERON = 0x01
 
 OPCODE_PUSH8 = 0x10
 OPCODE_PUSH16 = 0x11
@@ -45,6 +46,13 @@ INTRINSICS = {
     "reu_poke16": 0xFF45,
     "conin": 0xFF50,
     "conout": 0xFF51,
+    "fopenr": 0xFF60,
+    "fcloser": 0xFF61,
+    "fread8": 0xFF62,
+    "fopenw": 0xFF63,
+    "fclosew": 0xFF64,
+    "fwrite8": 0xFF65,
+    "fdelete": 0xFF66,
 }
 
 ZERO_ARG_OPS = {
@@ -398,6 +406,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("input", nargs="?", help="input payload file")
     parser.add_argument("-o", "--output", help="output .avm file")
     parser.add_argument("--entry-offset", type=parse_number, default=None, help="entry offset within the payload")
+    parser.add_argument("--flags", type=parse_number, default=0, help="header flags byte to store in the packed AVM")
     parser.add_argument("--text", action="store_true", help="treat input as AVM assembly-like text")
     parser.add_argument("--selftest", action="store_true", help="run pack/unpack self-test and exit")
     return parser
@@ -425,7 +434,7 @@ def main(argv: list[str] | None = None) -> int:
         payload = input_path.read_bytes()
         entry_offset = args.entry_offset if args.entry_offset is not None else 0
 
-    packed = pack_avm(payload, entry_offset=entry_offset)
+    packed = pack_avm(payload, entry_offset=entry_offset, flags=args.flags)
     output_path.write_bytes(packed)
     print(f"wrote {output_path} ({len(payload)} payload bytes)")
     return 0

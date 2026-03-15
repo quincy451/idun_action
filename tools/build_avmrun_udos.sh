@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+UDOS_DIR="$ROOT_DIR/../udos"
+ACHERON_DIR="$ROOT_DIR/../acheronvm"
+BUILD_DIR="$ROOT_DIR/build/udos_tools"
+SRC="$ROOT_DIR/src/tools_udos/avmrun/avmrun.asm"
+CFG="$ROOT_DIR/src/tools_udos/avmrun/avmrun.cfg"
+LABELS="$UDOS_DIR/build/udos-resident.labels"
+RELEASE_LABELS="$UDOS_DIR/build/release/udos-resident.labels"
+INC="$BUILD_DIR/udos_services.inc"
+OBJ="$BUILD_DIR/avmrun.o"
+BIN="$BUILD_DIR/avmrun.bin"
+PRG="$BUILD_DIR/AVMRUN.PRG"
+
+mkdir -p "$BUILD_DIR"
+
+if [[ ! -f "$LABELS" ]]; then
+  if [[ -f "$RELEASE_LABELS" ]]; then
+    LABELS="$RELEASE_LABELS"
+  else
+    make -C "$UDOS_DIR" resident >/dev/null
+  fi
+fi
+
+make -C "$ACHERON_DIR" acheron >/dev/null
+python3 "$ROOT_DIR/tools/generate_udos_service_inc.py" --labels "$LABELS" --output "$INC"
+
+ca65 -g -o "$OBJ" "$SRC" -I "$BUILD_DIR" -I "$ACHERON_DIR/bin"
+ld65 -C "$CFG" -o "$BIN" "$OBJ" "$ACHERON_DIR/obj/acheron.o"
+printf '\x00\x09' > "$PRG"
+cat "$BIN" >> "$PRG"
+printf '%s\n' "$PRG"

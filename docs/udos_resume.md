@@ -45,6 +45,7 @@ The first UDOS-native external Action-side tool proofs now exist:
 
 - `ACTINFO.PRG`
 - `AVMINFO.PRG`
+- `AVMRUN.PRG`
 
 They are exported into `ACTION.DNP` root and `BIN/`.
 
@@ -54,10 +55,13 @@ They are exported into `ACTION.DNP` root and `BIN/`.
 - `AVMINFO.PRG` uses the preserved UDOS file-load service to read `HELLO.AVM`
   from the mounted Action workspace, prints the `AVM1` header fields, and
   returns to the prompt.
+- `AVMRUN.PRG` executes a constrained flagged `AVM1` subset on top of
+  AcheronVM. The current proof payload is `UDOSHELLO.AVM`, which prints
+  `UDOS AVM OK` and returns to the prompt.
 
 ## Immediate Follow-On Work
 
-1. add a UDOS-native VM runner for `AVM1` payloads
+1. expand `AVMRUN.PRG` beyond the current flagged Acheron-backed proof subset
 2. expand the preserved UDOS external-tool ABI beyond
    console/cmdline/exit/file-load into directory and write-side services
 3. define the broader UDOS program ABI expected by Action tools

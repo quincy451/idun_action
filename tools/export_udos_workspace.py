@@ -71,6 +71,27 @@ def export_examples(root: Path, image_root: Path, src_dir: Path, bin_dir: Path) 
         shutil.copy2(existing, bin_dir / out_name)
         shutil.copy2(existing, image_root / out_name)
 
+    packed_specs = [
+        ((root / "examples" / "udos_hello.avm.txt"), "UDOSHELLO.AVM", 1),
+    ]
+    for source, out_name, flags in packed_specs:
+        built = bin_dir / out_name
+        subprocess.run(
+            [
+                "python3",
+                str(root / "tools" / "avm_pack.py"),
+                "--text",
+                "--flags",
+                str(flags),
+                str(source),
+                "--output",
+                str(built),
+            ],
+            cwd=root,
+            check=True,
+        )
+        shutil.copy2(built, image_root / out_name)
+
     text_specs = [
         ((root / "examples" / "hello.avm.txt"), "HELLO.AVT", "HELLO.AVM"),
         ((root / "examples" / "reu_runtime.avm.txt"), "REURUN.AVT", "REURUN.AVM"),
@@ -92,6 +113,7 @@ def export_udos_tools(root: Path, image_root: Path, bin_dir: Path) -> None:
     tool_specs = [
         ("build_actinfo_udos.sh", "ACTINFO.PRG"),
         ("build_avminfo_udos.sh", "AVMINFO.PRG"),
+        ("build_avmrun_udos.sh", "AVMRUN.PRG"),
     ]
     for script_name, out_name in tool_specs:
         build_tool = root / "tools" / script_name

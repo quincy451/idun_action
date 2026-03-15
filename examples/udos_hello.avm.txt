@@ -1,0 +1,10 @@
+entry start
+
+start:
+  setp16 msg
+  calln printe
+  calln exit
+  native
+
+msg:
+  stringz "UDOS AVM OK"
