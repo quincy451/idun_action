@@ -57,6 +57,28 @@ class TestUdosWorkspaceExport(unittest.TestCase):
             self.assertTrue((lib_dir / "LIBPSTR.MOD").is_file())
             self.assertTrue((lib_dir / "UDOSDIR.TXT").is_file())
 
+    def test_export_with_udos_tools_builds_actinfo_when_prereqs_exist(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        tool = root / "tools" / "export_udos_workspace.py"
+        udos_labels = root.parent / "udos" / "build" / "udos-resident.labels"
+        if not udos_labels.is_file():
+            self.skipTest("UDOS resident labels not built")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output = Path(tmpdir) / "out"
+            result = subprocess.run(
+                [sys.executable, str(tool), "--output", str(output), "--build-udos-tools"],
+                cwd=root,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+
+            image_root = output / "IMAGES" / "ACTION.DNP"
+            self.assertTrue((image_root / "ACTINFO.PRG").is_file())
+            self.assertTrue((image_root / "BIN" / "ACTINFO.PRG").is_file())
+
 
 if __name__ == "__main__":
     unittest.main()

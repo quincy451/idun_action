@@ -87,6 +87,20 @@ def export_examples(root: Path, src_dir: Path, bin_dir: Path) -> None:
         )
 
 
+def export_udos_tools(root: Path, image_root: Path, bin_dir: Path) -> None:
+    build_tool = root / "tools" / "build_actinfo_udos.sh"
+    result = subprocess.run(
+        [str(build_tool)],
+        cwd=root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    built = Path(result.stdout.strip().splitlines()[-1])
+    shutil.copy2(built, bin_dir / "ACTINFO.PRG")
+    shutil.copy2(built, image_root / "ACTINFO.PRG")
+
+
 def export_libs(root: Path, lib_dir: Path) -> None:
     libmods = root / "src" / "tools_cpm" / "libmods"
     (lib_dir / "LIBMODS.DAT").write_text(build_manifest_bundle(libmods), encoding="ascii")
@@ -100,6 +114,11 @@ def main(argv: list[str] | None = None) -> int:
         "--output",
         default="build/udos-action-fs",
         help="output directory that will receive IMAGES/ACTION.DNP/...",
+    )
+    parser.add_argument(
+        "--build-udos-tools",
+        action="store_true",
+        help="build and export UDOS-native external tool proofs when prerequisites are available",
     )
     args = parser.parse_args(argv)
 
@@ -119,6 +138,8 @@ def main(argv: list[str] | None = None) -> int:
 
     export_docs(root, docs_dir)
     export_examples(root, src_dir, bin_dir)
+    if args.build_udos_tools:
+        export_udos_tools(root, image_root, bin_dir)
     export_libs(root, lib_dir)
 
     (image_root / "README.TXT").write_text(

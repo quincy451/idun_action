@@ -2,10 +2,10 @@
 
 This repo currently contains two distinct layers.
 
-## Bootstrap Reference
+## Legacy Reference
 
 The existing `actc.com`, `alink.com`, `vm.com`, and `actmon.com` flow is the
-older CP/M-65 bootstrap/toolchain path. It remains useful as:
+older bootstrap/toolchain reference. It remains useful as:
 
 - a language and runtime reference
 - a source of examples and manifests
@@ -15,13 +15,13 @@ It is not the target operating environment going forward.
 
 ## UDOS Target Boundary
 
-The current target environment is UDOS, not CP/M-65.
+The current target environment is UDOS.
 
 That means:
 
 - shell and resident services live in the `udos` repo
 - Action development tools need UDOS-native entry points
-- the old CP/M binaries are reference implementations, not the final on-target
+- the old bootstrap binaries are reference implementations, not the final on-target
   tools
 
 ## First Bridge Artifact
@@ -37,15 +37,24 @@ backend can mount and inspect. The export contains:
 - `BIN/` sample `AVM1` binaries and source text
 - `LIB/` packed `LIBMODS.DAT` plus source manifests
 
-This does not make the old CP/M tools runnable inside UDOS. It gives UDOS a
+This does not make the old bootstrap tools runnable inside UDOS. It gives UDOS a
 real Action workspace with guides, sample programs, and runtime assets while
 the UDOS-native tool replacements are built.
+
+The first UDOS-native external Action-side tool proof now exists:
+
+- `ACTINFO.PRG`
+
+It is exported into `ACTION.DNP` root and `BIN/`, launches from the UDOS shell,
+prints a banner plus command-line arguments, and returns to the prompt through
+the UDOS-aware external program return trampoline.
 
 ## Immediate Follow-On Work
 
 1. add a UDOS-native VM runner for `AVM1` payloads
-2. define the UDOS program ABI expected by Action tools
-3. replace CP/M-specific file/process assumptions in the toolchain surface
+2. replace the current ad hoc external-tool console path with a preserved
+   always-live UDOS launch ABI
+3. define the broader UDOS program ABI expected by Action tools
 4. port compiler, linker, editor, and debugger behavior onto UDOS-native tools
 
 ## Current Practical Use
