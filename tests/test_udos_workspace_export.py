@@ -85,6 +85,7 @@ class TestUdosWorkspaceExport(unittest.TestCase):
             image_root = output / "IMAGES" / "ACTION.DNP"
             self.assertTrue((image_root / "ACTDIR.PRG").is_file())
             self.assertTrue((image_root / "BIN" / "ACTDIR.PRG").is_file())
+            self.assertTrue((image_root / "ACTFLOW.BAT").is_file())
             self.assertTrue((image_root / "ACTINFO.PRG").is_file())
             self.assertTrue((image_root / "BIN" / "ACTINFO.PRG").is_file())
             self.assertTrue((image_root / "ACTCOPY.PRG").is_file())

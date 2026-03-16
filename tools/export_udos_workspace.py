@@ -136,6 +136,20 @@ def export_udos_tools(root: Path, image_root: Path, bin_dir: Path) -> None:
         shutil.copy2(built, bin_dir / out_name)
         shutil.copy2(built, image_root / out_name)
 
+    (image_root / "ACTFLOW.BAT").write_text(
+        "\n".join(
+            [
+                "ACTWRITE OUT.TXT",
+                "ACTCOPY OUT.TXT COPY.TXT",
+                "ACTMOVE COPY.TXT NEXT.TXT",
+                "ACTDEL NEXT.TXT",
+                "ECHO ACTFLOW OK",
+                "",
+            ]
+        ),
+        encoding="ascii",
+    )
+
 
 def export_libs(root: Path, lib_dir: Path) -> None:
     libmods = root / "src" / "tools_cpm" / "libmods"
