@@ -116,6 +116,7 @@ def export_udos_tools(root: Path, image_root: Path, bin_dir: Path) -> None:
         ("build_actinfo_udos.sh", "ACTINFO.PRG"),
         ("build_actdel_udos.sh", "ACTDEL.PRG"),
         ("build_actmkdir_udos.sh", "ACTMKDIR.PRG"),
+        ("build_actren_udos.sh", "ACTMOVE.PRG"),
         ("build_actrmdir_udos.sh", "ACTRMDIR.PRG"),
         ("build_actwrite_udos.sh", "ACTWRITE.PRG"),
         ("build_avminfo_udos.sh", "AVMINFO.PRG"),

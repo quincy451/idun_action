@@ -47,6 +47,7 @@ The first UDOS-native external Action-side tool proofs now exist:
 - `ACTINFO.PRG`
 - `ACTDEL.PRG`
 - `ACTMKDIR.PRG`
+- `ACTMOVE.PRG`
 - `ACTRMDIR.PRG`
 - `ACTWRITE.PRG`
 - `AVMINFO.PRG`
@@ -63,6 +64,9 @@ They are exported into `ACTION.DNP` root and `BIN/`.
   preserved UDOS file-delete ABI and returns to the prompt.
 - `ACTMKDIR.PRG` creates a directory in the current mounted workspace through
   the preserved UDOS directory-mutation ABI and returns to the prompt.
+- `ACTMOVE.PRG` renames a file in the current mounted workspace through the
+  preserved UDOS file-rename ABI. Success is validated by shell-side readback
+  of the renamed file after return.
 - `ACTRMDIR.PRG` removes an empty directory in the current mounted workspace
   through the preserved UDOS directory-mutation ABI and returns to the prompt.
 - `ACTWRITE.PRG` writes a text file into the current mounted directory through

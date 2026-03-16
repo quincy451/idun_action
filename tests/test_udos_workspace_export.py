@@ -91,6 +91,8 @@ class TestUdosWorkspaceExport(unittest.TestCase):
             self.assertTrue((image_root / "BIN" / "ACTDEL.PRG").is_file())
             self.assertTrue((image_root / "ACTMKDIR.PRG").is_file())
             self.assertTrue((image_root / "BIN" / "ACTMKDIR.PRG").is_file())
+            self.assertTrue((image_root / "ACTMOVE.PRG").is_file())
+            self.assertTrue((image_root / "BIN" / "ACTMOVE.PRG").is_file())
             self.assertTrue((image_root / "ACTRMDIR.PRG").is_file())
             self.assertTrue((image_root / "BIN" / "ACTRMDIR.PRG").is_file())
             self.assertTrue((image_root / "ACTWRITE.PRG").is_file())
