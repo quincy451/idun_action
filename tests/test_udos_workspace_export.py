@@ -85,8 +85,12 @@ class TestUdosWorkspaceExport(unittest.TestCase):
             image_root = output / "IMAGES" / "ACTION.DNP"
             self.assertTrue((image_root / "ACTDIR.PRG").is_file())
             self.assertTrue((image_root / "BIN" / "ACTDIR.PRG").is_file())
+            self.assertTrue((image_root / "ACTADD.PRG").is_file())
+            self.assertTrue((image_root / "BIN" / "ACTADD.PRG").is_file())
             self.assertTrue((image_root / "ACTFLOW.BAT").is_file())
             self.assertTrue((image_root / "ACTNEW.BAT").is_file())
+            self.assertTrue((image_root / "ACTNEW.PRG").is_file())
+            self.assertTrue((image_root / "BIN" / "ACTNEW.PRG").is_file())
             self.assertTrue((image_root / "PROJECT.TXT").is_file())
             self.assertTrue((image_root / "MAIN.ACT").is_file())
             actnew_lines = (image_root / "ACTNEW.BAT").read_text(encoding="ascii").splitlines()

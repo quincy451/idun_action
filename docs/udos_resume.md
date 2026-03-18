@@ -44,8 +44,10 @@ the UDOS-native tool replacements are built.
 The first UDOS-native external Action-side tool proofs now exist:
 
 - `ACTDIR.PRG`
+- `ACTADD.PRG`
 - `ACTFLOW.BAT`
 - `ACTNEW.BAT`
+- `ACTNEW.PRG`
 - `ACTINFO.PRG`
 - `ACTCOPY.PRG`
 - `ACTDEL.PRG`
@@ -60,6 +62,9 @@ They are exported into `ACTION.DNP` root and `BIN/`.
 
 - `ACTDIR.PRG` enumerates the current mounted directory through the preserved
   UDOS directory ABI and returns to the prompt.
+- `ACTADD.PRG` validates a project marker file in the current directory, writes
+  `SRC/<NAME>.ACT` through the preserved UDOS file-save ABI, and returns to the
+  prompt. The current proof is create-or-replace, not overwrite-protected.
 - `ACTFLOW.BAT` is the first composite workspace flow proof. It exercises the
   preserved UDOS file write/copy/move/delete services through the existing
   Action-side proof tools, prints `ACTFLOW OK`, and returns to the prompt.
@@ -67,6 +72,10 @@ They are exported into `ACTION.DNP` root and `BIN/`.
   stable UDOS shell `MD`/`CD`/`COPY` commands with root-absolute template files to
   create `SRC/`, `BIN/`, `OBJ/`, `README.TXT`, and `MAIN.ACT`, prints
   `ACTNEW OK`, and leaves the shell in the new project directory.
+- `ACTNEW.PRG` is the first non-trivial UDOS-native workspace tool proof. It
+  uses the preserved directory-change and file-save services to create the same
+  project skeleton directly from a native tool instead of routing through shell
+  batch composition.
 - `ACTINFO.PRG` launches from the UDOS shell, prints through the preserved
   launch-safe UDOS external-tool ABI, and returns to the prompt through the
   UDOS-aware external program return trampoline.

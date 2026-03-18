@@ -112,8 +112,10 @@ def export_examples(root: Path, image_root: Path, src_dir: Path, bin_dir: Path) 
 
 def export_udos_tools(root: Path, image_root: Path, bin_dir: Path) -> None:
     tool_specs = [
+        ("build_actadd_udos.sh", "ACTADD.PRG"),
         ("build_actdir_udos.sh", "ACTDIR.PRG"),
         ("build_actinfo_udos.sh", "ACTINFO.PRG"),
+        ("build_actnew_udos.sh", "ACTNEW.PRG"),
         ("build_actcopy_udos.sh", "ACTCOPY.PRG"),
         ("build_actdel_udos.sh", "ACTDEL.PRG"),
         ("build_actmkdir_udos.sh", "ACTMKDIR.PRG"),
