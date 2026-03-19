@@ -17,7 +17,7 @@ Legend:
 | `ACTC` compiler | Yes | No | No | Yes | Current compiler is only a legacy bootstrap reference. |
 | `ALINK` dead-strip linker | Yes | No | No | Yes | Current linker exists only as a legacy bootstrap reference. |
 | `ACTDIR` tool proof | No | Yes | Yes | N/A | Enumerates the current mounted directory through the preserved UDOS directory ABI and returns to the prompt. |
-| `ACTADD` tool proof | No | Yes | Yes | N/A | Adds `SRC/<NAME>.ACT` inside an Action project root marked by `ACTION.PROJ` through the preserved UDOS file-save ABI. Current proof is create-or-replace; overwrite refusal is not implemented yet. |
+| `ACTADD` tool proof | No | Yes | Yes | N/A | Adds `SRC/<NAME>.ACT` inside an Action project root marked by `ACTION.PROJ` through the preserved UDOS file-save ABI. Current proof refuses duplicate module creation with `EXISTS`. |
 | `ACTFLOW.BAT` composite workspace proof | No | Yes | Yes | N/A | Batch-driven composite workspace flow proof that exercises preserved file write/copy/move/delete services in one UDOS run and returns control to the prompt. |
 | `ACTNEW.BAT` project workflow proof | No | Yes | Yes | N/A | Batch-driven project skeleton proof that composes stable UDOS shell `MD`/`CD`/`COPY` commands with root-absolute template copies to create `SRC/`, `BIN/`, `OBJ/`, `ACTION.PROJ`, `README.TXT`, and `MAIN.ACT`. |
 | `ACTNEW` tool proof | No | Yes | Yes | N/A | First non-trivial UDOS-native workspace tool proof. It creates a project directory, makes `SRC/`, `BIN/`, and `OBJ/`, writes `ACTION.PROJ`, `README.TXT`, and `SRC/MAIN.ACT`, prints `ACTNEW OK`, and returns control to UDOS. |
@@ -50,7 +50,7 @@ Legend:
 | Compose multiple file services through one workflow | No | Yes | Yes | Yes | `ACTFLOW.BAT` composes preserved save/copy/move/delete services in one UDOS workflow instead of proving each service only in isolation. |
 | Create a starter Action project workspace | No | Yes | Yes | Yes | `ACTNEW.BAT` composes shell `MD`/`CD`/`COPY` with root-absolute template files to create a minimal project skeleton, including `ACTION.PROJ`, from inside UDOS while staying within the resident shell line limit. |
 | Create a starter Action project workspace from a native tool | No | Yes | Yes | Yes | `ACTNEW.PRG` proves preserved directory and file-save services are sufficient for a native project skeleton tool that emits `ACTION.PROJ` alongside the starter source tree. |
-| Add a starter module inside a native Action project | No | Yes | Yes | Yes | `ACTADD.PRG` proves a native tool can validate `ACTION.PROJ`, create `SRC/<NAME>.ACT`, and persist the new source file on the host-backed VICE workspace. |
+| Add a starter module inside a native Action project | No | Yes | Yes | Yes | `ACTADD.PRG` proves a native tool can validate `ACTION.PROJ`, create `SRC/<NAME>.ACT`, refuse duplicate creation with `EXISTS`, and persist the new source file on the host-backed VICE workspace. |
 | Make/remove directories through UDOS ABI | No | Yes | Yes | Yes | `ACTMKDIR.PRG` and `ACTRMDIR.PRG` prove current-directory directory creation/removal from a UDOS-native external tool. |
 | Copy files through UDOS ABI | No | Yes | Yes | Yes | `ACTCOPY.PRG` proves current-directory file copy from a UDOS-native external tool, with shell-side readback validating the copied file content after return. |
 | Delete files through UDOS ABI | No | Yes | Yes | Yes | `ACTDEL.PRG` proves current-directory file deletion from a UDOS-native external tool. |

@@ -9,6 +9,8 @@ svc_retptr:
     .res 2
 file_params:
     .res 9
+query_params:
+    .res 9
 save_params:
     .res 5
 src_ptr:
@@ -51,6 +53,29 @@ name_ok:
 project_ok:
     jsr build_target_path
     jsr build_content
+    jsr probe_target_path
+    lda query_params+6
+    cmp #tool_file_status_nofile
+    beq save_file
+    cmp #tool_file_status_fail
+    beq target_fail_status
+    cmp #tool_file_status_ok
+    beq target_exists
+    cmp #tool_file_status_too_large
+    beq target_exists
+    lda #<msg_load_fail
+    ldy #>msg_load_fail
+    jmp fail_with_ptr
+
+target_exists:
+    lda #<msg_exists
+    ldy #>msg_exists
+    jmp fail_with_ptr
+
+target_fail_status:
+    lda #<msg_probe_fail
+    ldy #>msg_probe_fail
+    jmp fail_with_ptr
 
 save_file:
     lda #<target_path
@@ -157,6 +182,22 @@ verify_project_root:
 verify_project_root_fail:
     sec
     rts
+
+probe_target_path:
+    lda #<target_path
+    sta query_params+0
+    lda #>target_path
+    sta query_params+1
+    lda #$00
+    sta query_params+2
+    sta query_params+3
+    sta query_params+4
+    sta query_params+5
+    sta query_params+6
+    sta query_params+7
+    sta query_params+8
+    ldx #query_params
+    jmp svc_file_load_sc0
 
 build_target_path:
     lda #'S'
@@ -269,6 +310,12 @@ msg_bad_name:
     .asciiz "BAD NAME"
 msg_no_project:
     .asciiz "NO PROJECT"
+msg_exists:
+    .asciiz "EXISTS"
+msg_probe_fail:
+    .asciiz "PROBE FAIL"
+msg_load_fail:
+    .asciiz "LOAD FAIL"
 msg_save_fail:
     .asciiz "SAVE FAIL"
 msg_ok:

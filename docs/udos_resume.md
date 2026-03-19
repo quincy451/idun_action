@@ -64,7 +64,7 @@ They are exported into `ACTION.DNP` root and `BIN/`.
   UDOS directory ABI and returns to the prompt.
 - `ACTADD.PRG` validates `ACTION.PROJ` in the current directory, writes
   `SRC/<NAME>.ACT` through the preserved UDOS file-save ABI, and returns to the
-  prompt. The current proof is create-or-replace, not overwrite-protected.
+  prompt. The current proof refuses duplicate module creation with `EXISTS`.
 - `ACTFLOW.BAT` is the first composite workspace flow proof. It exercises the
   preserved UDOS file write/copy/move/delete services through the existing
   Action-side proof tools, prints `ACTFLOW OK`, and returns to the prompt.
