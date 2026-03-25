@@ -63,6 +63,7 @@ start:
     jsr load_object_or_fail
     jsr parse_exports_or_fail
     jsr parse_imports_or_fail
+    jsr build_live_set
     jsr resolve_import_closure
     jsr build_map_target_path
     jsr build_map_content
@@ -361,6 +362,70 @@ parse_import_symbol_advanced:
 parse_imports_done:
     rts
 
+build_live_set:
+    lda #$00
+    ldx #$00
+build_live_set_clear_loop:
+    cpx #8
+    beq build_live_set_seed
+    sta live_flags,x
+    inx
+    bne build_live_set_clear_loop
+build_live_set_seed:
+    lda export_count
+    beq build_live_set_done
+    lda #$01
+    sta live_flags+0
+    lda #<marker_calls
+    sta const_ptr
+    lda #>marker_calls
+    sta const_ptr+1
+    jsr find_pattern_at_const_ptr
+    bcs build_live_set_done
+    jsr advance_scan_ptr_by_const_ptr
+build_live_set_loop:
+    jsr skip_import_delimiters
+    ldy #$00
+    lda (scan_ptr),y
+    cmp #']'
+    beq build_live_set_done
+    cmp #'"'
+    bne build_live_set_bad
+    jsr advance_scan_ptr
+    ldy #$00
+build_live_set_symbol_loop:
+    lda (scan_ptr),y
+    beq build_live_set_bad
+    cmp #'"'
+    beq build_live_set_symbol_done
+    sta symbol_buffer,y
+    iny
+    cpy #24
+    bcc build_live_set_symbol_loop
+build_live_set_bad:
+    lda #<msg_bad_avo
+    ldy #>msg_bad_avo
+    jmp fail_with_ptr
+build_live_set_symbol_done:
+    lda #$00
+    sta symbol_buffer,y
+build_live_set_symbol_advance_loop:
+    cpy #$00
+    beq build_live_set_symbol_advanced
+    jsr advance_scan_ptr
+    dey
+    bne build_live_set_symbol_advance_loop
+build_live_set_symbol_advanced:
+    jsr find_export_index_from_symbol_buffer
+    bcs build_live_set_skip_mark
+    lda #$01
+    sta live_flags,x
+build_live_set_skip_mark:
+    jsr advance_scan_ptr
+    jmp build_live_set_loop
+build_live_set_done:
+    rts
+
 resolve_import_closure:
     lda main_flags_lo
     and #IMPORT_PRINT_LINE
@@ -495,6 +560,33 @@ map_symbol_unresolved:
     ldy #>msg_unresolved
     jmp fail_with_ptr
 
+find_export_index_from_symbol_buffer:
+    ldx #$00
+find_export_index_from_symbol_buffer_loop:
+    cpx export_count
+    beq find_export_index_from_symbol_buffer_fail
+    stx compare_char
+    jsr set_export_ptr_from_x
+    ldx compare_char
+    ldy #$00
+find_export_index_from_symbol_buffer_compare_loop:
+    lda (export_ptr),y
+    cmp symbol_buffer,y
+    bne find_export_index_from_symbol_buffer_next
+    lda symbol_buffer,y
+    beq find_export_index_from_symbol_buffer_done
+    iny
+    bne find_export_index_from_symbol_buffer_compare_loop
+find_export_index_from_symbol_buffer_next:
+    inx
+    bne find_export_index_from_symbol_buffer_loop
+find_export_index_from_symbol_buffer_fail:
+    sec
+    rts
+find_export_index_from_symbol_buffer_done:
+    clc
+    rts
+
 set_import_ptr_from_x:
     lda import_name_ptr_lo,x
     sta const_ptr
@@ -613,6 +705,7 @@ build_map_content:
 
     jsr append_export_lines
     jsr append_call_lines
+    jsr append_live_lines
     jsr append_import_include_lines
     jsr append_main_resolve_lines
     lda #$00
@@ -740,6 +833,37 @@ append_call_lines_symbol_done:
     jsr advance_scan_ptr
     jmp append_call_lines_loop
 append_call_lines_done:
+    rts
+
+append_live_lines:
+    lda #$00
+    sta export_index
+append_live_lines_loop:
+    ldx export_index
+    cpx export_count
+    beq append_live_lines_done
+    lda live_flags,x
+    beq append_live_lines_next
+    lda #<map_live_prefix
+    sta const_ptr
+    lda #>map_live_prefix
+    sta const_ptr+1
+    jsr append_const_ptr
+    ldx export_index
+    jsr set_export_ptr_from_x
+    ldy #$00
+append_live_lines_symbol_loop:
+    lda (export_ptr),y
+    beq append_live_lines_symbol_done
+    jsr append_char
+    iny
+    bne append_live_lines_symbol_loop
+append_live_lines_symbol_done:
+    jsr append_newline
+append_live_lines_next:
+    inc export_index
+    jmp append_live_lines_loop
+append_live_lines_done:
     rts
 
 append_module_symbol_lower:
@@ -962,6 +1086,8 @@ map_export_prefix:
     .byte "EXPORT ",0
 map_call_prefix:
     .byte "CALL ",0
+map_live_prefix:
+    .byte "LIVE ",0
 map_resolve_prefix:
     .byte "RESOLVE ",0
 
@@ -981,3 +1107,5 @@ manifest_buffer:
     .res MANIFEST_LIMIT+1
 export_names:
     .res 200
+live_flags:
+    .res 8

@@ -91,11 +91,12 @@ They are exported into `ACTION.DNP` root and `BIN/`.
   parser or code generator.
 - `ALINK.PRG` is now the first UDOS-native linker slice. The current proof
   loads a deterministic `OBJ/<NAME>.AVO` object stub, parses its export, call,
-  and import metadata, resolves the current small runtime closure, and emits
+  and import metadata, builds a first local live-set approximation from
+  entry-plus-call metadata, resolves the current small runtime closure, and emits
   `BIN/<NAME>.MAP` on the host fs tree. The current map proof now includes
-  export, call, include, and resolve lines. The focused headless VICE proof is
-  green through `make vice-action-alink`, with host-side verification of the
-  generated map file because the current linker slice is still a
+  export, call, live, include, and resolve lines. The focused headless VICE
+  proof is green through `make vice-action-alink`, with host-side verification
+  of the generated map file because the current linker slice is still a
   planning/map emitter, not a full object merger or final AVM linker.
 - `ACTFLOW.BAT` is the first composite workspace flow proof. It exercises the
   preserved UDOS file write/copy/move/delete services through the existing
