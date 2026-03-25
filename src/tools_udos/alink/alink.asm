@@ -488,6 +488,30 @@ map_symbol_unresolved:
     ldy #>msg_unresolved
     jmp fail_with_ptr
 
+set_import_ptr_from_x:
+    lda import_name_ptr_lo,x
+    sta const_ptr
+    lda import_name_ptr_hi,x
+    sta const_ptr+1
+    rts
+
+load_current_import_bits_from_x:
+    lda import_bits_lo,x
+    sta current_bit_lo
+    lda import_bits_hi,x
+    sta current_bit_hi
+    rts
+
+import_selected_from_x:
+    jsr load_current_import_bits_from_x
+    lda main_flags_lo
+    and current_bit_lo
+    sta compare_char
+    lda main_flags_hi
+    and current_bit_hi
+    ora compare_char
+    rts
+
 symbol_buffer_matches_const_ptr:
     ldy #$00
 symbol_buffer_matches_const_ptr_loop:
@@ -608,116 +632,46 @@ build_map_content:
     jmp append_char
 
 append_import_include_lines:
-    lda main_flags_lo
-    and #IMPORT_FORMAT_INT
-    beq append_import_include_lines_skip_format_int
-    lda #<map_include_prefix
-    sta const_ptr
-    lda #>map_include_prefix
-    sta const_ptr+1
-    jsr append_const_ptr
-    jsr append_rt_format_int_literal
-    jsr append_newline
-append_import_include_lines_skip_format_int:
-    lda main_flags_hi
-    and #IMPORT_OVL_CALL
-    beq append_import_include_lines_skip_ovl_call
-    lda #<map_include_prefix
-    sta const_ptr
-    lda #>map_include_prefix
-    sta const_ptr+1
-    jsr append_const_ptr
-    jsr append_rt_ovl_call_literal
-    jsr append_newline
-append_import_include_lines_skip_ovl_call:
-    lda main_flags_hi
-    and #IMPORT_OVL_LOAD
-    beq append_import_include_lines_skip_ovl_load
-    lda #<map_include_prefix
-    sta const_ptr
-    lda #>map_include_prefix
-    sta const_ptr+1
-    jsr append_const_ptr
-    jsr append_rt_ovl_load_literal
-    jsr append_newline
-append_import_include_lines_skip_ovl_load:
-    lda main_flags_lo
-    and #IMPORT_PRINT_F
-    beq append_import_include_lines_skip_print_f
-    lda #<map_include_prefix
-    sta const_ptr
-    lda #>map_include_prefix
-    sta const_ptr+1
-    jsr append_const_ptr
-    jsr append_rt_print_f_literal
-    jsr append_newline
-append_import_include_lines_skip_print_f:
-    lda main_flags_lo
-    and #IMPORT_PRINT_LINE
-    beq append_import_include_lines_skip_print_line
-    lda #<map_include_prefix
-    sta const_ptr
-    lda #>map_include_prefix
-    sta const_ptr+1
-    jsr append_const_ptr
-    jsr append_rt_print_line_literal
-    jsr append_newline
-append_import_include_lines_skip_print_line:
-    lda main_flags_lo
-    and #IMPORT_PRINT_STR
+    ldx #$00
+append_import_include_lines_loop:
+    cpx #IMPORT_TABLE_COUNT
     beq append_import_include_lines_done
+    jsr import_selected_from_x
+    beq append_import_include_lines_next
+    stx compare_char
     lda #<map_include_prefix
     sta const_ptr
     lda #>map_include_prefix
     sta const_ptr+1
     jsr append_const_ptr
-    jsr append_rt_print_str_literal
+    ldx compare_char
+    jsr set_import_ptr_from_x
+    jsr append_const_ptr
     jsr append_newline
+    ldx compare_char
+append_import_include_lines_next:
+    inx
+    bne append_import_include_lines_loop
 append_import_include_lines_done:
     rts
 
 append_main_resolve_lines:
-    lda main_flags_lo
-    and #IMPORT_FORMAT_INT
-    beq append_main_resolve_lines_skip_format_int
-    jsr append_main_resolve_prefix
-    jsr append_rt_format_int_literal
-    jsr append_newline
-append_main_resolve_lines_skip_format_int:
-    lda main_flags_hi
-    and #IMPORT_OVL_CALL
-    beq append_main_resolve_lines_skip_ovl_call
-    jsr append_main_resolve_prefix
-    jsr append_rt_ovl_call_literal
-    jsr append_newline
-append_main_resolve_lines_skip_ovl_call:
-    lda main_flags_hi
-    and #IMPORT_OVL_LOAD
-    beq append_main_resolve_lines_skip_ovl_load
-    jsr append_main_resolve_prefix
-    jsr append_rt_ovl_load_literal
-    jsr append_newline
-append_main_resolve_lines_skip_ovl_load:
-    lda main_flags_lo
-    and #IMPORT_PRINT_F
-    beq append_main_resolve_lines_skip_print_f
-    jsr append_main_resolve_prefix
-    jsr append_rt_print_f_literal
-    jsr append_newline
-append_main_resolve_lines_skip_print_f:
-    lda main_flags_lo
-    and #IMPORT_PRINT_LINE
-    beq append_main_resolve_lines_skip_print_line
-    jsr append_main_resolve_prefix
-    jsr append_rt_print_line_literal
-    jsr append_newline
-append_main_resolve_lines_skip_print_line:
-    lda main_flags_lo
-    and #IMPORT_PRINT_STR
+    ldx #$00
+append_main_resolve_lines_loop:
+    cpx #IMPORT_TABLE_COUNT
     beq append_main_resolve_lines_done
+    jsr import_selected_from_x
+    beq append_main_resolve_lines_next
+    stx compare_char
     jsr append_main_resolve_prefix
-    jsr append_rt_print_str_literal
+    ldx compare_char
+    jsr set_import_ptr_from_x
+    jsr append_const_ptr
     jsr append_newline
+    ldx compare_char
+append_main_resolve_lines_next:
+    inx
+    bne append_main_resolve_lines_loop
 append_main_resolve_lines_done:
     rts
 
@@ -795,158 +749,6 @@ append_const_ptr_done:
 
 append_newline:
     lda #10
-    jmp append_char
-
-append_rt_format_int_literal:
-    lda #'r'
-    jsr append_char
-    lda #'t'
-    jsr append_char
-    lda #'.'
-    jsr append_char
-    lda #'f'
-    jsr append_char
-    lda #'o'
-    jsr append_char
-    lda #'r'
-    jsr append_char
-    lda #'m'
-    jsr append_char
-    lda #'a'
-    jsr append_char
-    lda #'t'
-    jsr append_char
-    lda #'_'
-    jsr append_char
-    lda #'i'
-    jsr append_char
-    lda #'n'
-    jsr append_char
-    lda #'t'
-    jmp append_char
-
-append_rt_ovl_call_literal:
-    lda #'r'
-    jsr append_char
-    lda #'t'
-    jsr append_char
-    lda #'.'
-    jsr append_char
-    lda #'o'
-    jsr append_char
-    lda #'v'
-    jsr append_char
-    lda #'l'
-    jsr append_char
-    lda #'_'
-    jsr append_char
-    lda #'c'
-    jsr append_char
-    lda #'a'
-    jsr append_char
-    lda #'l'
-    jsr append_char
-    lda #'l'
-    jmp append_char
-
-append_rt_ovl_load_literal:
-    lda #'r'
-    jsr append_char
-    lda #'t'
-    jsr append_char
-    lda #'.'
-    jsr append_char
-    lda #'o'
-    jsr append_char
-    lda #'v'
-    jsr append_char
-    lda #'l'
-    jsr append_char
-    lda #'_'
-    jsr append_char
-    lda #'l'
-    jsr append_char
-    lda #'o'
-    jsr append_char
-    lda #'a'
-    jsr append_char
-    lda #'d'
-    jmp append_char
-
-append_rt_print_f_literal:
-    lda #'r'
-    jsr append_char
-    lda #'t'
-    jsr append_char
-    lda #'.'
-    jsr append_char
-    lda #'p'
-    jsr append_char
-    lda #'r'
-    jsr append_char
-    lda #'i'
-    jsr append_char
-    lda #'n'
-    jsr append_char
-    lda #'t'
-    jsr append_char
-    lda #'_'
-    jsr append_char
-    lda #'f'
-    jmp append_char
-
-append_rt_print_line_literal:
-    lda #'r'
-    jsr append_char
-    lda #'t'
-    jsr append_char
-    lda #'.'
-    jsr append_char
-    lda #'p'
-    jsr append_char
-    lda #'r'
-    jsr append_char
-    lda #'i'
-    jsr append_char
-    lda #'n'
-    jsr append_char
-    lda #'t'
-    jsr append_char
-    lda #'_'
-    jsr append_char
-    lda #'l'
-    jsr append_char
-    lda #'i'
-    jsr append_char
-    lda #'n'
-    jsr append_char
-    lda #'e'
-    jmp append_char
-
-append_rt_print_str_literal:
-    lda #'r'
-    jsr append_char
-    lda #'t'
-    jsr append_char
-    lda #'.'
-    jsr append_char
-    lda #'p'
-    jsr append_char
-    lda #'r'
-    jsr append_char
-    lda #'i'
-    jsr append_char
-    lda #'n'
-    jsr append_char
-    lda #'t'
-    jsr append_char
-    lda #'_'
-    jsr append_char
-    lda #'s'
-    jsr append_char
-    lda #'t'
-    jsr append_char
-    lda #'r'
     jmp append_char
 
 append_char:
@@ -1065,6 +867,57 @@ import_rt_reu_poke16:
     .asciiz "rt.reu_poke16"
 import_rt_reu_poke8:
     .asciiz "rt.reu_poke8"
+
+IMPORT_TABLE_COUNT = 11
+
+import_bits_lo:
+    .byte IMPORT_FORMAT_INT
+    .byte $00
+    .byte $00
+    .byte IMPORT_PRINT_F
+    .byte IMPORT_PRINT_LINE
+    .byte IMPORT_PRINT_STR
+    .byte IMPORT_REU_ALLOC
+    .byte IMPORT_REU_PEEK16
+    .byte IMPORT_REU_PEEK8
+    .byte $00
+    .byte IMPORT_REU_POKE8
+import_bits_hi:
+    .byte $00
+    .byte IMPORT_OVL_CALL
+    .byte IMPORT_OVL_LOAD
+    .byte $00
+    .byte $00
+    .byte $00
+    .byte $00
+    .byte $00
+    .byte $00
+    .byte IMPORT_REU_POKE16
+    .byte $00
+import_name_ptr_lo:
+    .byte <import_rt_format_int
+    .byte <import_rt_ovl_call
+    .byte <import_rt_ovl_load
+    .byte <import_rt_print_f
+    .byte <import_rt_print_line
+    .byte <import_rt_print_str
+    .byte <import_rt_reu_alloc
+    .byte <import_rt_reu_peek16
+    .byte <import_rt_reu_peek8
+    .byte <import_rt_reu_poke16
+    .byte <import_rt_reu_poke8
+import_name_ptr_hi:
+    .byte >import_rt_format_int
+    .byte >import_rt_ovl_call
+    .byte >import_rt_ovl_load
+    .byte >import_rt_print_f
+    .byte >import_rt_print_line
+    .byte >import_rt_print_str
+    .byte >import_rt_reu_alloc
+    .byte >import_rt_reu_peek16
+    .byte >import_rt_reu_peek8
+    .byte >import_rt_reu_poke16
+    .byte >import_rt_reu_poke8
 
 map_header:
     .byte "ALINK1",10,"MODULE ",0
