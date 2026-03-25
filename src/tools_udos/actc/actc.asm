@@ -63,6 +63,7 @@ start:
     ldy #>msg_load_fail
     jmp fail_with_ptr
 source_loaded:
+    jsr parse_module_header_or_fail
     jsr build_object_target_path
     jsr probe_target_save_mode_or_fail
     jsr detect_runtime_imports
@@ -130,6 +131,117 @@ require_source_present_missing:
     ldy #>msg_no_file
     jmp fail_with_ptr
 require_source_present_done:
+    rts
+
+parse_module_header_or_fail:
+    lda #<source_buffer
+    sta scan_ptr
+    lda #>source_buffer
+    sta scan_ptr+1
+    jsr skip_source_whitespace
+    lda #<pattern_module
+    sta const_ptr
+    lda #>pattern_module
+    sta const_ptr+1
+    jsr pattern_matches_scan_ptr
+    bcc :+
+    lda #<msg_bad_module
+    ldy #>msg_bad_module
+    jmp fail_with_ptr
+:   ldy #$00
+parse_module_header_keyword_advance:
+    lda (const_ptr),y
+    beq parse_module_header_keyword_done
+    jsr advance_scan_ptr
+    iny
+    bne parse_module_header_keyword_advance
+parse_module_header_keyword_done:
+    jsr skip_source_spaces
+    jsr copy_declared_module_or_fail
+    jsr compare_declared_module_or_fail
+    rts
+
+skip_source_whitespace:
+    ldy #$00
+skip_source_whitespace_loop:
+    lda (scan_ptr),y
+    cmp #' '
+    beq skip_source_whitespace_advance
+    cmp #9
+    beq skip_source_whitespace_advance
+    cmp #10
+    beq skip_source_whitespace_advance
+    cmp #13
+    beq skip_source_whitespace_advance
+    rts
+skip_source_whitespace_advance:
+    jsr advance_scan_ptr
+    jmp skip_source_whitespace_loop
+
+skip_source_spaces:
+    ldy #$00
+skip_source_spaces_loop:
+    lda (scan_ptr),y
+    cmp #' '
+    beq skip_source_spaces_advance
+    cmp #9
+    beq skip_source_spaces_advance
+    rts
+skip_source_spaces_advance:
+    jsr advance_scan_ptr
+    jmp skip_source_spaces_loop
+
+copy_declared_module_or_fail:
+    ldy #$00
+copy_declared_module_or_fail_loop:
+    lda (scan_ptr),y
+    beq copy_declared_module_or_fail_bad
+    jsr uppercase_ascii
+    cmp #'A'
+    bcc copy_declared_module_or_fail_done
+    cmp #'Z'+1
+    bcc copy_declared_module_or_fail_store
+    cmp #'0'
+    bcc copy_declared_module_or_fail_symbol
+    cmp #'9'+1
+    bcc copy_declared_module_or_fail_store
+copy_declared_module_or_fail_symbol:
+    cmp #'_'
+    bne copy_declared_module_or_fail_done
+copy_declared_module_or_fail_store:
+    sta declared_module_name,y
+    iny
+    cpy #24
+    bcc copy_declared_module_or_fail_loop
+copy_declared_module_or_fail_bad:
+    lda #<msg_bad_module
+    ldy #>msg_bad_module
+    jmp fail_with_ptr
+copy_declared_module_or_fail_done:
+    cpy #$00
+    beq copy_declared_module_or_fail_bad
+    lda #$00
+    sta declared_module_name,y
+    rts
+
+compare_declared_module_or_fail:
+    ldy #$00
+compare_declared_module_or_fail_loop:
+    lda declared_module_name,y
+    sta compare_char
+    lda module_name,y
+    jsr uppercase_ascii
+    cmp compare_char
+    bne compare_declared_module_or_fail_bad
+    lda compare_char
+    beq compare_declared_module_or_fail_done
+    iny
+    bne compare_declared_module_or_fail_loop
+compare_declared_module_or_fail_bad:
+    lda #<msg_bad_module
+    ldy #>msg_bad_module
+    jmp fail_with_ptr
+compare_declared_module_or_fail_done:
     rts
 
 detect_runtime_imports:
@@ -577,6 +689,8 @@ msg_probe_fail:
     .asciiz "PROBE FAIL"
 msg_load_fail:
     .asciiz "LOAD FAIL"
+msg_bad_module:
+    .asciiz "BAD MODULE"
 msg_save_fail:
     .asciiz "SAVE FAIL"
 msg_created:
@@ -591,6 +705,8 @@ default_module_name:
 project_marker:
     .asciiz "ACTION.PROJ"
 
+pattern_module:
+    .asciiz "MODULE"
 pattern_print:
     .asciiz "PRINT("
 pattern_printe:
@@ -651,6 +767,8 @@ avo_suffix:
     .byte 34,",",34,"version",34,":1}",10,0
 
 module_name:
+    .res 25
+declared_module_name:
     .res 25
 manifest_entry:
     .res 32

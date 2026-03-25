@@ -77,8 +77,9 @@ They are exported into `ACTION.DNP` root and `BIN/`.
   created or updated the module file.
 - `ACTC.PRG` is the first UDOS-native compiler front-end slice. The current
   proof validates `ACTION.PROJ`, requires a tracked module entry, verifies the
-  corresponding `SRC/<NAME>.ACT` source exists, scans the loaded source text
-  for the current runtime-call marker set, and emits a deterministic
+  corresponding `SRC/<NAME>.ACT` source exists, checks that the source
+  `MODULE` header matches the requested module name, scans the loaded source
+  text for the current runtime-call marker set, and emits a deterministic
   `OBJ/<NAME>.AVO` text object stub with `AVO1`, module/export/import
   metadata, and a placeholder payload. The focused headless VICE proof is
   green through `make vice-action-actc`, with host-side verification of the
