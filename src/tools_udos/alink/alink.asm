@@ -176,16 +176,23 @@ load_object_done:
 parse_exports_or_fail:
     lda #$00
     sta export_count
+    lda #<marker_calls
+    sta const_ptr
+    lda #>marker_calls
+    sta const_ptr+1
+    jsr find_pattern_at_const_ptr
+    bcc parse_exports_limit_ready
     lda #<marker_imports
     sta const_ptr
     lda #>marker_imports
     sta const_ptr+1
     jsr find_pattern_at_const_ptr
-    bcc :+
+    bcc parse_exports_limit_ready
     lda #<msg_bad_avo
     ldy #>msg_bad_avo
     jmp fail_with_ptr
-:   lda scan_ptr
+parse_exports_limit_ready:
+    lda scan_ptr
     sta src_ptr
     lda scan_ptr+1
     sta src_ptr+1
@@ -605,30 +612,10 @@ build_map_content:
     jsr append_const_ptr
 
     jsr append_export_lines
+    jsr append_call_lines
     jsr append_import_include_lines
     jsr append_main_resolve_lines
-    lda main_flags_lo
-    and #IMPORT_PRINT_LINE
-    beq :+
-    lda #<map_resolve_prefix
-    sta const_ptr
-    lda #>map_resolve_prefix
-    sta const_ptr+1
-    jsr append_const_ptr
-    lda #<import_rt_print_line
-    sta const_ptr
-    lda #>import_rt_print_line
-    sta const_ptr+1
-    jsr append_const_ptr
-    lda #' '
-    jsr append_char
-    lda #<import_rt_print_str
-    sta const_ptr
-    lda #>import_rt_print_str
-    sta const_ptr+1
-    jsr append_const_ptr
-    jsr append_newline
-:   lda #$00
+    lda #$00
     jmp append_char
 
 append_import_include_lines:
@@ -711,6 +698,48 @@ append_export_lines_symbol_done:
     inc export_index
     jmp append_export_lines_loop
 append_export_lines_done:
+    rts
+
+append_call_lines:
+    lda #<marker_calls
+    sta const_ptr
+    lda #>marker_calls
+    sta const_ptr+1
+    jsr find_pattern_at_const_ptr
+    bcs append_call_lines_done
+    jsr advance_scan_ptr_by_const_ptr
+append_call_lines_loop:
+    jsr skip_import_delimiters
+    ldy #$00
+    lda (scan_ptr),y
+    cmp #']'
+    beq append_call_lines_done
+    cmp #'"'
+    bne append_call_lines_done
+    jsr advance_scan_ptr
+    lda #<map_call_prefix
+    sta const_ptr
+    lda #>map_call_prefix
+    sta const_ptr+1
+    jsr append_const_ptr
+    jsr append_module_symbol_lower
+    lda #' '
+    jsr append_char
+append_call_lines_symbol_loop:
+    ldy #$00
+    lda (scan_ptr),y
+    beq append_call_lines_done
+    cmp #'"'
+    beq append_call_lines_symbol_done
+    jsr lowercase_ascii
+    jsr append_char
+    jsr advance_scan_ptr
+    jmp append_call_lines_symbol_loop
+append_call_lines_symbol_done:
+    jsr append_newline
+    jsr advance_scan_ptr
+    jmp append_call_lines_loop
+append_call_lines_done:
     rts
 
 append_module_symbol_lower:
@@ -844,6 +873,8 @@ marker_imports:
     .byte 34,"imports",34,":[",0
 marker_exports:
     .byte 34,"exports",34,":[",0
+marker_calls:
+    .byte 34,"calls",34,":[",0
 
 import_rt_format_int:
     .asciiz "rt.format_int"
@@ -929,6 +960,8 @@ map_include_prefix:
     .byte "INCLUDE ",0
 map_export_prefix:
     .byte "EXPORT ",0
+map_call_prefix:
+    .byte "CALL ",0
 map_resolve_prefix:
     .byte "RESOLVE ",0
 
