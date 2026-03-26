@@ -216,7 +216,6 @@ parse_exports_loop:
     beq parse_export_symbol
     jsr advance_scan_ptr
     jmp parse_exports_loop
-
 parse_export_symbol:
     jsr advance_scan_ptr
     jsr copy_export_symbol_or_fail
@@ -367,8 +366,12 @@ build_live_set_seed:
     lda export_count
     bne :+
     jmp build_live_set_done
-:   lda #$01
-    sta live_flags+0
+:   jsr find_export_index_from_module_name
+    bcc :+
+    jmp build_live_set_bad
+: 
+    lda #$01
+    sta live_flags,x
     lda #<marker_calls
     sta const_ptr
     lda #>marker_calls
@@ -447,6 +450,34 @@ build_live_set_bad:
     lda #<msg_bad_avo
     ldy #>msg_bad_avo
     jmp fail_with_ptr
+
+find_export_index_from_module_name:
+    ldx #$00
+find_export_index_from_module_name_loop:
+    cpx export_count
+    beq find_export_index_from_module_name_fail
+    stx compare_char
+    jsr set_export_ptr_from_x
+    ldx compare_char
+    ldy #$00
+find_export_index_from_module_name_compare_loop:
+    lda module_name,y
+    jsr lowercase_ascii
+    cmp (export_ptr),y
+    bne find_export_index_from_module_name_next
+    lda (export_ptr),y
+    beq find_export_index_from_module_name_done
+    iny
+    bne find_export_index_from_module_name_compare_loop
+find_export_index_from_module_name_next:
+    inx
+    bne find_export_index_from_module_name_loop
+find_export_index_from_module_name_fail:
+    sec
+    rts
+find_export_index_from_module_name_done:
+    clc
+    rts
 
 resolve_import_closure:
     lda main_flags_lo
