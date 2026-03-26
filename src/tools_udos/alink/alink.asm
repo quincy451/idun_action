@@ -220,6 +220,7 @@ parse_exports_loop:
 parse_export_symbol:
     jsr advance_scan_ptr
     jsr copy_export_symbol_or_fail
+    jsr parse_export_offset_or_fail
     jmp parse_exports_loop
 
 parse_exports_done_check:
@@ -265,6 +266,17 @@ copy_export_symbol_or_fail_advance_loop:
     bne copy_export_symbol_or_fail_advance_loop
 copy_export_symbol_or_fail_advanced:
     jsr advance_scan_ptr
+    rts
+
+parse_export_offset_or_fail:
+    ldy #$00
+    lda (scan_ptr),y
+    cmp #','
+    bne parse_exports_bad
+    jsr advance_scan_ptr
+    jsr parse_decimal_byte_or_fail
+    ldx export_count
+    sta export_offsets,x
     inc export_count
     rts
 
@@ -364,47 +376,51 @@ parse_payload_bytes_or_fail:
     ldy #>msg_bad_avo
     jmp fail_with_ptr
 :   jsr advance_scan_ptr_by_const_ptr
-    lda #$00
+    jsr parse_decimal_byte_or_fail
     sta payload_bytes_data
+    rts
+
+parse_decimal_byte_or_fail:
+    lda #$00
+    sta current_bit_lo
     sta compare_char
-parse_payload_bytes_loop:
+parse_decimal_byte_or_fail_loop:
     ldy #$00
     lda (scan_ptr),y
     cmp #'0'
-    bcc parse_payload_bytes_done_check
+    bcc parse_decimal_byte_or_fail_done_check
     cmp #'9'+1
-    bcs parse_payload_bytes_done_check
+    bcs parse_decimal_byte_or_fail_done_check
     sec
     sbc #'0'
     pha
-    lda payload_bytes_data
-    sta current_bit_lo
+    lda current_bit_lo
     asl a
     sta current_bit_hi
     asl a
     asl a
     clc
     adc current_bit_hi
-    bcs parse_payload_bytes_bad
-    sta payload_bytes_data
+    bcs parse_decimal_byte_or_fail_bad
+    sta current_bit_lo
     pla
     clc
-    adc payload_bytes_data
-    bcs parse_payload_bytes_bad
-    sta payload_bytes_data
+    adc current_bit_lo
+    bcs parse_decimal_byte_or_fail_bad
+    sta current_bit_lo
     lda #$01
     sta compare_char
     jsr advance_scan_ptr
-    jmp parse_payload_bytes_loop
-parse_payload_bytes_done_check:
+    jmp parse_decimal_byte_or_fail_loop
+parse_decimal_byte_or_fail_done_check:
     lda compare_char
-    bne parse_payload_bytes_done
-parse_payload_bytes_bad:
+    beq parse_decimal_byte_or_fail_bad
+    lda current_bit_lo
+    rts
+parse_decimal_byte_or_fail_bad:
     lda #<msg_bad_avo
     ldy #>msg_bad_avo
     jmp fail_with_ptr
-parse_payload_bytes_done:
-    rts
 
 build_live_set:
     lda #$00
@@ -865,6 +881,11 @@ append_export_lines_symbol_loop:
     iny
     bne append_export_lines_symbol_loop
 append_export_lines_symbol_done:
+    lda #' '
+    jsr append_char
+    ldx export_index
+    lda export_offsets,x
+    jsr append_decimal_a
     jsr append_newline
     inc export_index
     jmp append_export_lines_loop
@@ -965,45 +986,48 @@ append_image_line:
 
 append_payload_bytes_decimal:
     lda payload_bytes_data
+    jmp append_decimal_a
+
+append_decimal_a:
     ldx #$00
     cmp #200
-    bcc append_payload_bytes_check_100
+    bcc append_decimal_a_check_100
     sec
     sbc #200
     ldx #'2'
-    bne append_payload_bytes_emit_hundreds
-append_payload_bytes_check_100:
+    bne append_decimal_a_emit_hundreds
+append_decimal_a_check_100:
     cmp #100
-    bcc append_payload_bytes_tens
+    bcc append_decimal_a_tens
     sec
     sbc #100
     ldx #'1'
-append_payload_bytes_emit_hundreds:
+append_decimal_a_emit_hundreds:
     stx compare_char
     pha
     txa
     jsr append_char
     pla
-append_payload_bytes_tens:
+append_decimal_a_tens:
     ldx #'0'
-append_payload_bytes_tens_loop:
+append_decimal_a_tens_loop:
     cmp #10
-    bcc append_payload_bytes_tens_done
+    bcc append_decimal_a_tens_done
     sec
     sbc #10
     inx
-    jmp append_payload_bytes_tens_loop
-append_payload_bytes_tens_done:
+    jmp append_decimal_a_tens_loop
+append_decimal_a_tens_done:
     sta current_bit_lo
     txa
     cmp #'0'
-    bne append_payload_bytes_emit_tens
+    bne append_decimal_a_emit_tens
     lda compare_char
-    beq append_payload_bytes_units
+    beq append_decimal_a_units
     txa
-append_payload_bytes_emit_tens:
+append_decimal_a_emit_tens:
     jsr append_char
-append_payload_bytes_units:
+append_decimal_a_units:
     lda current_bit_lo
     clc
     adc #'0'
@@ -1218,6 +1242,8 @@ export_names:
 live_flags:
     .res 8
 call_edge_masks:
+    .res 8
+export_offsets:
     .res 8
 payload_bytes_data:
     .res 1
