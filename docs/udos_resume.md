@@ -83,7 +83,8 @@ They are exported into `ACTION.DNP` root and `BIN/`.
   source text for the current runtime-call marker set, and emits a
   deterministic `OBJ/<NAME>.AVO` text object stub with `AVO1`,
   module/export/call/import metadata plus a minimal local control-flow
-  `payload_hex` skeleton (`CALL` local proc, `RET`). The focused
+  `payload_hex` skeleton (`CALL` local proc, `RET`) plus explicit
+  `payload_bytes`. The focused
   headless VICE proof is
   green through `make vice-action-actc`, with host-side verification of the
   generated object file because `OBJ/UDOSDIR.TXT` is not yet refreshed

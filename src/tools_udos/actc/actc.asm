@@ -726,9 +726,17 @@ build_avo_content:
     jsr append_const_ptr
     jsr append_payload_hex
 
-    lda #<avo_suffix
+    lda #<avo_prefix_6
     sta const_ptr
-    lda #>avo_suffix
+    lda #>avo_prefix_6
+    sta const_ptr+1
+    jsr append_const_ptr
+    lda payload_offset
+    jsr append_small_decimal
+
+    lda #<avo_suffix_numeric
+    sta const_ptr
+    lda #>avo_suffix_numeric
     sta const_ptr+1
     jsr append_const_ptr
 
@@ -1104,8 +1112,10 @@ avo_prefix_4:
     .byte "],",34,"module",34,":",34,0
 avo_prefix_5:
     .byte 34,",",34,"payload_hex",34,":",34,0
-avo_suffix:
-    .byte 34,",",34,"version",34,":1}",10,0
+avo_prefix_6:
+    .byte 34,",",34,"payload_bytes",34,":",0
+avo_suffix_numeric:
+    .byte ",",34,"version",34,":1}",10,0
 
 module_name:
     .res 25
