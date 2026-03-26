@@ -791,100 +791,118 @@ build_avm_text_content_or_fail:
     lda #>avm_txt_entry_prefix
     sta const_ptr+1
     jsr append_const_ptr
-    lda #<marker_entry_offset
-    sta const_ptr
-    lda #>marker_entry_offset
-    sta const_ptr+1
-    jsr find_pattern_at_const_ptr
-    bcc :+
-    lda #<msg_bad_avo
-    ldy #>msg_bad_avo
-    jmp fail_with_ptr
-:   jsr advance_scan_ptr_by_const_ptr
-    lda #$00
-    sta compare_char
-build_avm_text_entry_loop:
-    ldy #$00
-    lda (scan_ptr),y
-    bne :+
-    jmp build_avm_text_bad
-: 
-    cmp #','
-    beq build_avm_text_entry_done
-    jsr append_char
-    lda #$01
-    sta compare_char
-    jsr advance_scan_ptr
-    jmp build_avm_text_entry_loop
-build_avm_text_entry_done:
-    lda compare_char
-    bne :+
-    jmp build_avm_text_bad
-:
+    jsr append_module_symbol_lower
     jsr append_newline
-    lda #<avm_txt_db_prefix
-    sta const_ptr
-    lda #>avm_txt_db_prefix
-    sta const_ptr+1
-    jsr append_const_ptr
-    lda #<marker_payload_hex
-    sta const_ptr
-    lda #>marker_payload_hex
-    sta const_ptr+1
-    jsr find_pattern_at_const_ptr
-    bcc :+
-    lda #<msg_bad_avo
-    ldy #>msg_bad_avo
-    jmp fail_with_ptr
-:   jsr advance_scan_ptr_by_const_ptr
     lda #$00
-    sta compare_char
-build_avm_text_payload_loop:
-    ldy #$00
-    lda (scan_ptr),y
-    bne :+
-    jmp build_avm_text_bad
-:
-    cmp #'"'
-    beq build_avm_text_payload_done_check
-    lda #'$'
-    jsr append_char
-    lda (scan_ptr),y
-    jsr append_char
-    jsr advance_scan_ptr
-    ldy #$00
-    lda (scan_ptr),y
-    bne :+
-    jmp build_avm_text_bad
-:
-    cmp #'"'
-    bne :+
-    jmp build_avm_text_bad
-:
-    jsr append_char
-    lda #$01
-    sta compare_char
-    jsr advance_scan_ptr
-    ldy #$00
-    lda (scan_ptr),y
-    cmp #'"'
-    beq build_avm_text_payload_done
-    lda #','
-    jsr append_char
-    jmp build_avm_text_payload_loop
-build_avm_text_payload_done_check:
-    lda compare_char
-    bne :+
-    jmp build_avm_text_bad
-:
-build_avm_text_payload_done:
-    jsr append_newline
+    sta main_flags_hi
+build_avm_text_proc_scan_loop:
+    lda main_flags_hi
+    cmp payload_bytes_data
+    beq build_avm_text_done
+    jsr find_live_export_at_current_offset
+    bcs build_avm_text_proc_next
+    stx export_index
+    jsr append_export_label_from_x
+    ldx export_index
+    jsr append_live_call_lines_for_export_x
+    jsr append_ret_line
+build_avm_text_proc_next:
+    inc main_flags_hi
+    bne build_avm_text_proc_scan_loop
+build_avm_text_done:
     lda #$00
     jmp append_char
-build_avm_text_bad:
-    lda #<msg_bad_avo
-    ldy #>msg_bad_avo
-    jmp fail_with_ptr
+
+find_live_export_at_current_offset:
+    ldx #$00
+find_live_export_at_current_offset_loop:
+    cpx export_count
+    beq find_live_export_at_current_offset_fail
+    lda live_flags,x
+    beq find_live_export_at_current_offset_next
+    lda export_offsets,x
+    cmp main_flags_hi
+    beq find_live_export_at_current_offset_done
+find_live_export_at_current_offset_next:
+    inx
+    bne find_live_export_at_current_offset_loop
+find_live_export_at_current_offset_fail:
+    sec
+    rts
+find_live_export_at_current_offset_done:
+    clc
+    rts
+
+append_module_symbol_lower:
+    ldy #$00
+append_module_symbol_lower_loop:
+    lda module_name,y
+    beq append_module_symbol_lower_done
+    jsr lowercase_ascii
+    jsr append_char
+    iny
+    bne append_module_symbol_lower_loop
+append_module_symbol_lower_done:
+    rts
+
+append_export_label_from_x:
+    jsr set_export_ptr_from_x
+    jsr append_export_ptr_lower
+    lda #':'
+    jsr append_char
+    jmp append_newline
+
+append_export_ptr_lower:
+    ldy #$00
+append_export_ptr_lower_loop:
+    lda (export_ptr),y
+    beq append_export_ptr_lower_done
+    jsr lowercase_ascii
+    jsr append_char
+    iny
+    bne append_export_ptr_lower_loop
+append_export_ptr_lower_done:
+    rts
+
+append_live_call_lines_for_export_x:
+    stx export_index
+    lda call_edge_masks,x
+    sta edge_mask
+    ldy #$00
+append_live_call_lines_for_export_x_loop:
+    cpy export_count
+    beq append_live_call_lines_for_export_x_done
+    lda edge_mask
+    and bit_masks,y
+    beq append_live_call_lines_for_export_x_next
+    lda live_flags,y
+    beq append_live_call_lines_for_export_x_next
+    tya
+    sta compare_char
+    lda #<avm_txt_call_prefix
+    sta const_ptr
+    lda #>avm_txt_call_prefix
+    sta const_ptr+1
+    jsr append_const_ptr
+    ldx compare_char
+    jsr set_export_ptr_from_x
+    jsr append_export_ptr_lower
+    jsr append_newline
+    ldy compare_char
+    ldx export_index
+append_live_call_lines_for_export_x_next:
+    iny
+    bne append_live_call_lines_for_export_x_loop
+append_live_call_lines_for_export_x_done:
+    rts
+
+append_ret_line:
+    lda #<avm_txt_ret
+    sta const_ptr
+    lda #>avm_txt_ret
+    sta const_ptr+1
+    jsr append_const_ptr
+    jmp append_newline
 
 append_const_ptr:
     ldy #$00
@@ -934,7 +952,6 @@ build_module_stub_content:
 .include "../common/action_project_entry_guard.inc"
 .include "../common/action_project_avm_text_path.inc"
 .include "../common/action_project_object_path.inc"
-.include "../common/action_project_map_path.inc"
 .include "../common/action_project_path.inc"
 .include "../common/action_project_save_mode.inc"
 .include "../common/action_project_save_write.inc"
@@ -997,12 +1014,8 @@ marker_exports:
     .byte 34,"exports",34,":[",0
 marker_calls:
     .byte 34,"calls",34,":[",0
-marker_entry_offset:
-    .byte 34,"entry_offset",34,":",0
 marker_payload_bytes:
     .byte 34,"payload_bytes",34,":",0
-marker_payload_hex:
-    .byte 34,"payload_hex",34,":",34,0
 
 import_rt_format_int:
     .asciiz "rt.format_int"
@@ -1029,26 +1042,12 @@ import_name_ptr_hi:
     .byte >import_rt_print_line
     .byte >import_rt_print_str
 
-map_header:
-    .byte "ALINK1",10,"MODULE ",0
-map_include_prefix:
-    .byte "INCLUDE ",0
-map_export_prefix:
-    .byte "EXPORT ",0
-map_call_prefix:
-    .byte "CALL ",0
-map_live_prefix:
-    .byte "LIVE ",0
-map_entry_prefix:
-    .byte "ENTRY ",0
-map_image_prefix:
-    .byte "IMAGE ",0
-map_resolve_prefix:
-    .byte "RESOLVE ",0
 avm_txt_entry_prefix:
     .byte "entry ",0
-avm_txt_db_prefix:
-    .byte "db ",0
+avm_txt_call_prefix:
+    .byte "call ",0
+avm_txt_ret:
+    .byte "ret",0
 
 module_name:
     .res 25
