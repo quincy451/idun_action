@@ -36,6 +36,10 @@ hex_work:
     .res 1
 list_started:
     .res 1
+payload_offset:
+    .res 1
+proc_index:
+    .res 1
 
 export_index = list_started
 export_ptr = src_ptr
@@ -58,6 +62,7 @@ source_loaded:
     jsr parse_module_header_or_fail
     jsr collect_proc_exports_or_fail
     jsr collect_local_calls
+    jsr compute_payload_layout
     jsr build_object_target_path
     jsr probe_target_save_mode_or_fail
     jsr detect_runtime_imports
@@ -359,6 +364,40 @@ collect_local_calls_bad_proc:
     ldy #>msg_bad_proc
     jmp fail_with_ptr
 collect_local_calls_done:
+    rts
+
+compute_payload_layout:
+    lda #$00
+    sta payload_offset
+    sta proc_index
+compute_payload_layout_loop:
+    ldx proc_index
+    cpx export_count_data
+    beq compute_payload_layout_done
+    lda payload_offset
+    sta export_offsets,x
+    ldy #$00
+compute_payload_layout_call_loop:
+    cpy call_count_data
+    beq compute_payload_layout_ret
+    lda call_from_indices,y
+    cmp proc_index
+    bne compute_payload_layout_next_call
+    clc
+    lda payload_offset
+    adc #3
+    sta payload_offset
+compute_payload_layout_next_call:
+    iny
+    bne compute_payload_layout_call_loop
+compute_payload_layout_ret:
+    clc
+    lda payload_offset
+    adc #1
+    sta payload_offset
+    inc proc_index
+    jmp compute_payload_layout_loop
+compute_payload_layout_done:
     rts
 
 call_pair_already_recorded:
@@ -685,9 +724,7 @@ build_avo_content:
     lda #>avo_prefix_5
     sta const_ptr+1
     jsr append_const_ptr
-    jsr append_module_symbol_hex_lower
-    lda #$00
-    jsr append_hex_byte
+    jsr append_payload_hex
 
     lda #<avo_suffix
     sta const_ptr
@@ -772,8 +809,9 @@ append_export_list_symbol_done:
     jsr append_char
     lda #','
     jsr append_char
-    lda #'0'
-    jsr append_char
+    ldx export_index
+    lda export_offsets,x
+    jsr append_small_decimal
     lda #']'
     jsr append_char
     inc export_index
@@ -840,6 +878,39 @@ append_call_list_callee_done:
 append_call_list_done:
     rts
 
+append_payload_hex:
+    lda #$00
+    sta proc_index
+append_payload_hex_proc_loop:
+    ldx proc_index
+    cpx export_count_data
+    beq append_payload_hex_done
+    ldy #$00
+append_payload_hex_call_loop:
+    cpy call_count_data
+    beq append_payload_hex_ret
+    lda call_from_indices,y
+    cmp proc_index
+    bne append_payload_hex_next_call
+    lda #$45
+    jsr append_hex_byte
+    lda call_to_indices,y
+    tax
+    lda export_offsets,x
+    jsr append_hex_byte
+    lda #$00
+    jsr append_hex_byte
+append_payload_hex_next_call:
+    iny
+    bne append_payload_hex_call_loop
+append_payload_hex_ret:
+    lda #$48
+    jsr append_hex_byte
+    inc proc_index
+    jmp append_payload_hex_proc_loop
+append_payload_hex_done:
+    rts
+
 append_module_symbol_lower:
     ldy #$00
 append_module_symbol_lower_loop:
@@ -863,6 +934,29 @@ append_module_symbol_hex_lower_loop:
     bne append_module_symbol_hex_lower_loop
 append_module_symbol_hex_lower_done:
     rts
+
+append_small_decimal:
+    cmp #10
+    bcc append_small_decimal_ones
+    ldx #$00
+append_small_decimal_tens_loop:
+    cmp #10
+    bcc append_small_decimal_tens_done
+    sec
+    sbc #10
+    inx
+    bne append_small_decimal_tens_loop
+append_small_decimal_tens_done:
+    pha
+    txa
+    clc
+    adc #'0'
+    jsr append_char
+    pla
+append_small_decimal_ones:
+    clc
+    adc #'0'
+    jmp append_char
 
 append_const_ptr:
     ldy #$00
@@ -1037,6 +1131,8 @@ call_list_started:
     .res 1
 export_names:
     .res 200
+export_offsets:
+    .res 8
 call_from_indices:
     .res 8
 call_to_indices:
