@@ -202,6 +202,12 @@ def parse_operands(text: str) -> tuple[str, list[str]]:
 
 
 def parse_string_literal(token: str, *, lineno: int) -> bytes:
+    token = token.strip()
+    if token and token[0] not in {'"', "'"}:
+        try:
+            return token.encode("ascii")
+        except UnicodeEncodeError as exc:
+            raise ValueError(f"line {lineno}: strings must be ASCII") from exc
     try:
         value = ast.literal_eval(token)
     except (SyntaxError, ValueError) as exc:

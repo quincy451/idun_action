@@ -27,9 +27,6 @@ build_avm_text_target_path_suffix:
     lda #'M'
     sta target_path+4,y
     iny
-    lda #'.'
-    sta target_path+4,y
-    iny
     lda #'T'
     sta target_path+4,y
     iny
