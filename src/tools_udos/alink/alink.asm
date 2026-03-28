@@ -60,7 +60,6 @@ start:
     jsr require_manifest_entry_tracked
     lda #$13
     sta ALINK_TRACE
-    jsr build_avm_text_target_path
     jsr build_object_target_path
     jsr load_object_or_fail
     lda #$14
@@ -92,8 +91,8 @@ start:
     jsr resolve_import_closure
     lda #$1D
     sta ALINK_TRACE
-    jsr build_avm_text_target_path
     jsr build_avm_text_content_or_fail
+    jsr build_avm_text_target_path
     lda #$1E
     sta ALINK_TRACE
     tsx
@@ -193,29 +192,79 @@ load_object_missing:
     ldy #>msg_no_object
     jmp fail_with_ptr
 load_object_loaded:
+    jsr require_loaded_source_not_truncated_or_fail
+    jsr require_avo1_header_or_fail
+    rts
+
+append_external_object_from_x_or_fail:
+    lda #$60
+    sta ALINK_TRACE
+    txa
+    pha
+    jsr save_module_name
+    pla
+    tax
+    jsr copy_external_symbol_to_module_name_from_x
+    txa
+    pha
+    lda #$61
+    sta ALINK_TRACE
+    jsr build_object_target_path
+    lda #$62
+    sta ALINK_TRACE
+    jsr load_object_or_fail
+    jsr require_loaded_source_not_truncated_or_fail
+    jsr require_avo1_header_or_fail
+    lda #$63
+    sta ALINK_TRACE
+    jsr parse_exports_or_fail
+    lda #$64
+    sta ALINK_TRACE
+    jsr parse_body_ops_or_fail
+    jsr require_local_only_body_ops_or_fail
+    lda #$65
+    sta ALINK_TRACE
+    jsr compute_code_bytes
+    lda #$66
+    sta ALINK_TRACE
+    jsr build_live_set
+    lda #$67
+    sta ALINK_TRACE
+    jsr append_current_object_live_code_only
+    lda #$68
+    sta ALINK_TRACE
+    jsr restore_module_name
+    pla
+    tax
+    rts
+
+require_loaded_source_not_truncated_or_fail:
     lda truncated_flag
-    beq load_object_check_header
+    beq require_loaded_source_not_truncated_or_fail_done
     lda #<msg_too_large
     ldy #>msg_too_large
     jmp fail_with_ptr
-load_object_check_header:
+require_loaded_source_not_truncated_or_fail_done:
+    rts
+
+require_avo1_header_or_fail:
     lda source_buffer+0
     cmp #'A'
-    bne load_object_bad
+    bne require_avo1_header_bad
     lda source_buffer+1
     cmp #'V'
-    bne load_object_bad
+    bne require_avo1_header_bad
     lda source_buffer+2
     cmp #'O'
-    bne load_object_bad
+    bne require_avo1_header_bad
     lda source_buffer+3
     cmp #'1'
-    beq load_object_done
-load_object_bad:
+    beq require_avo1_header_done
+require_avo1_header_bad:
     lda #<msg_bad_avo
     ldy #>msg_bad_avo
     jmp fail_with_ptr
-load_object_done:
+require_avo1_header_done:
     rts
 
 parse_exports_or_fail:
@@ -711,6 +760,38 @@ parse_decimal_byte_or_fail_bad:
     ldy #>msg_bad_avo
     jmp fail_with_ptr
 
+require_local_only_body_ops_or_fail:
+    ldx #$00
+require_local_only_body_ops_or_fail_export_loop:
+    cpx export_count
+    beq require_local_only_body_ops_or_fail_done
+    txa
+    pha
+    jsr set_body_ptr_from_x
+    ldy #$00
+require_local_only_body_ops_or_fail_body_loop:
+    lda (body_ptr),y
+    beq require_local_only_body_ops_or_fail_next_export
+    cmp #'u'
+    beq require_local_only_body_ops_or_fail_bad
+    cmp #'s'
+    beq require_local_only_body_ops_or_fail_bad
+    cmp #'i'
+    beq require_local_only_body_ops_or_fail_bad
+    iny
+    bne require_local_only_body_ops_or_fail_body_loop
+require_local_only_body_ops_or_fail_bad:
+    lda #<msg_bad_avo
+    ldy #>msg_bad_avo
+    jmp fail_with_ptr
+require_local_only_body_ops_or_fail_next_export:
+    pla
+    tax
+    inx
+    bne require_local_only_body_ops_or_fail_export_loop
+require_local_only_body_ops_or_fail_done:
+    rts
+
 build_live_set:
     lda #$00
     ldx #$00
@@ -1002,38 +1083,13 @@ build_avm_text_content_or_fail:
     jsr append_newline
     lda #$00
     sta string_use_mask
-    sta main_flags_hi
-build_avm_text_proc_scan_loop:
-    lda main_flags_hi
-    cmp payload_bytes_data
-    beq build_avm_text_externals
-    jsr find_live_export_at_current_offset
-    bcs build_avm_text_gap
-    stx export_index
-    jsr append_export_label_from_x
-    ldx export_index
-    jsr append_live_call_lines_for_export_x
-    clc
-    lda main_flags_hi
-    adc proc_sizes,x
-    sta main_flags_hi
-    bcc build_avm_text_proc_scan_loop
-    beq build_avm_text_done
-    jmp build_avm_text_proc_scan_loop
-build_avm_text_gap:
-    inc main_flags_hi
-    bne build_avm_text_proc_scan_loop
+    jsr append_current_object_live_code_only
 build_avm_text_externals:
     ldx #$00
 build_avm_text_external_loop:
     cpx external_count
     beq build_avm_text_strings
-    txa
-    pha
-    jsr append_external_label_from_x
-    jsr append_ret_line
-    pla
-    tax
+    jsr append_external_object_from_x_or_fail
     inx
     bne build_avm_text_external_loop
 build_avm_text_strings:
@@ -1056,16 +1112,31 @@ build_avm_text_done:
     lda #$00
     jmp append_char
 
-build_fixed_content_for_save_diag:
-    lda #<content_buffer
-    sta content_ptr
-    lda #>content_buffer
-    sta content_ptr+1
-    lda #<diag_content
-    sta const_ptr
-    lda #>diag_content
-    sta const_ptr+1
-    jmp append_const_ptr
+append_current_object_live_code_only:
+    lda #$00
+    sta main_flags_hi
+append_current_object_live_code_only_proc_scan_loop:
+    lda main_flags_hi
+    cmp payload_bytes_data
+    beq append_current_object_live_code_only_done
+    jsr find_live_export_at_current_offset
+    bcs append_current_object_live_code_only_gap
+    stx export_index
+    jsr append_export_label_from_x
+    ldx export_index
+    jsr append_live_call_lines_for_export_x
+    clc
+    lda main_flags_hi
+    adc proc_sizes,x
+    sta main_flags_hi
+    bcc append_current_object_live_code_only_proc_scan_loop
+    beq append_current_object_live_code_only_done
+    jmp append_current_object_live_code_only_proc_scan_loop
+append_current_object_live_code_only_gap:
+    inc main_flags_hi
+    bne append_current_object_live_code_only_proc_scan_loop
+append_current_object_live_code_only_done:
+    rts
 
 find_live_export_at_current_offset:
     ldx #$00
@@ -1408,6 +1479,45 @@ append_char:
     inc content_ptr+1
 :   rts
 
+save_module_name:
+    ldy #$00
+save_module_name_loop:
+    lda module_name,y
+    sta saved_module_name,y
+    beq save_module_name_done
+    iny
+    cpy #25
+    bcc save_module_name_loop
+save_module_name_done:
+    rts
+
+restore_module_name:
+    ldy #$00
+restore_module_name_loop:
+    lda saved_module_name,y
+    sta module_name,y
+    beq restore_module_name_done
+    iny
+    cpy #25
+    bcc restore_module_name_loop
+restore_module_name_done:
+    rts
+
+copy_external_symbol_to_module_name_from_x:
+    jsr set_external_ptr_from_x
+    ldy #$00
+copy_external_symbol_to_module_name_from_x_loop:
+    lda (export_ptr),y
+    sta module_name,y
+    beq copy_external_symbol_to_module_name_from_x_done
+    iny
+    cpy #25
+    bcc copy_external_symbol_to_module_name_from_x_loop
+copy_external_symbol_to_module_name_from_x_done:
+    lda #$00
+    sta module_name+24
+    rts
+
 lowercase_ascii:
     cmp #'A'
     bcc lowercase_ascii_done
@@ -1539,19 +1649,6 @@ avm_txt_stringz_prefix:
     .byte "stringz ",0
 avm_txt_stringz_suffix:
     .byte 0
-diag_content:
-    .byte "entry main",10
-    .byte "main:",10
-    .byte "setp16 main_str0",10
-    .byte "calln print",10
-    .byte "call helper",10
-    .byte "push16 42",10
-    .byte "calln printie",10
-    .byte "ret",10
-    .byte "main_str0:",10
-    .byte "stringz HELLO",10
-    .byte "helper:",10
-    .byte "ret",10,0
 bit_masks:
     .byte $01,$02,$04,$08,$10,$20,$40,$80
 
@@ -1566,6 +1663,8 @@ source_buffer:
     .res SOURCE_LIMIT+1
 content_buffer:
     .res 256
+saved_module_name:
+    .res 25
 export_names:
     .res 200
 export_offsets:

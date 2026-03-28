@@ -102,8 +102,10 @@ They are exported into `ACTION.DNP` root and `BIN/`.
   graph, resolves the current small runtime closure, and emits
   `BIN/<NAME>.AVMTXT` on the host fs tree as symbolic AVM text: `entry main`,
   emitted labels, `call`, and `ret` directives reconstructed from `body_ops`
-  instead of copied `payload_hex`, with unresolved external calls currently
-  lowered to stub labels. The focused headless VICE proof is green through
+  instead of copied `payload_hex`. The current focused proof also resolves one
+  unresolved external by loading a second object and emitting its live code
+  into the symbolic image before literal data. The focused headless VICE proof
+  is green through
   `make vice-action-alink`, with host-side verification that
   `avm_pack.py --text --flags 1` packs the emitted text into the exact
   expected `AVM1` bytes and that an unused local export is stripped from the
