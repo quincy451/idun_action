@@ -10,17 +10,6 @@ IMPORT_PRINT_STR  = $01
 IMPORT_PRINT_LINE = $02
 IMPORT_FORMAT_INT = $04
 
-ALINK_DIAG_PAYLOAD    = $03E8
-ALINK_DIAG_LIVE0      = $03E9
-ALINK_DIAG_LIVE1      = $03EA
-ALINK_DIAG_LIVE2      = $03EB
-ALINK_DIAG_EXPORT0    = $03EC
-ALINK_DIAG_EXPORT1    = $03ED
-ALINK_DIAG_EXPORT2    = $03EE
-ALINK_DIAG_SIZE0      = $03E4
-ALINK_DIAG_SIZE1      = $03E5
-ALINK_DIAG_SIZE2      = $03E6
-
 .segment "ZPTEMP": zeropage
 svc_retptr:
     .res 2
@@ -82,34 +71,35 @@ start:
     jsr parse_body_ops_or_fail
     lda #$16
     sta ALINK_TRACE
-    jsr parse_strings_or_fail
+    jsr parse_external_symbols_or_fail
     lda #$17
     sta ALINK_TRACE
-    jsr parse_ints_or_fail
+    jsr parse_strings_or_fail
     lda #$18
     sta ALINK_TRACE
-    jsr parse_import_mask_or_fail
+    jsr parse_ints_or_fail
     lda #$19
     sta ALINK_TRACE
-    jsr compute_code_bytes
+    jsr parse_import_mask_or_fail
     lda #$1A
     sta ALINK_TRACE
-    jsr build_live_set
+    jsr compute_code_bytes
     lda #$1B
     sta ALINK_TRACE
-    jsr resolve_import_closure
+    jsr build_live_set
     lda #$1C
+    sta ALINK_TRACE
+    jsr resolve_import_closure
+    lda #$1D
     sta ALINK_TRACE
     jsr build_avm_text_target_path
     jsr build_avm_text_content_or_fail
-    jsr snapshot_link_diag
-    jsr clear_tool_scratch_before_save
-    lda #$1D
+    lda #$1E
     sta ALINK_TRACE
     tsx
     stx $03EF
     jsr save_content_buffer_to_target
-    lda #$1C
+    lda #$1D
     sta ALINK_TRACE
     bcc save_ok
     lda #<msg_save_fail
@@ -325,6 +315,26 @@ set_export_ptr_from_x_loop:
 set_export_ptr_from_x_done:
     rts
 
+set_external_ptr_from_x:
+    lda #<external_names
+    sta export_ptr
+    lda #>external_names
+    sta export_ptr+1
+set_external_ptr_from_x_loop:
+    cpx #$00
+    beq set_external_ptr_from_x_done
+    clc
+    lda export_ptr
+    adc #25
+    sta export_ptr
+    lda export_ptr+1
+    adc #$00
+    sta export_ptr+1
+    dex
+    bne set_external_ptr_from_x_loop
+set_external_ptr_from_x_done:
+    rts
+
 set_body_ptr_from_x:
     lda #<body_ops_data
     sta body_ptr
@@ -402,6 +412,8 @@ parse_body_ops_string_loop:
     beq parse_body_ops_string_done
     cmp #'c'
     beq parse_body_ops_store
+    cmp #'u'
+    beq parse_body_ops_store
     cmp #'s'
     beq parse_body_ops_store
     cmp #'i'
@@ -436,6 +448,78 @@ parse_body_ops_done_check:
     ldy #>msg_bad_avo
     jmp fail_with_ptr
 parse_body_ops_done:
+    rts
+
+parse_external_symbols_or_fail:
+    lda #$00
+    sta external_count
+    jsr reset_scan_ptr_after_header
+parse_external_symbols_loop:
+    jsr skip_line_breaks
+    ldy #$00
+    lda (scan_ptr),y
+    beq parse_external_symbols_done
+    lda #<line_external
+    sta const_ptr
+    lda #>line_external
+    sta const_ptr+1
+    jsr pattern_matches_scan_ptr
+    bcs parse_external_symbols_next_line
+    jsr advance_scan_ptr_by_const_ptr
+    jsr copy_external_symbol_line_or_fail
+parse_external_symbols_next_line:
+    jsr skip_current_line
+    jmp parse_external_symbols_loop
+parse_external_symbols_done:
+    rts
+
+copy_external_symbol_line_or_fail:
+    lda external_count
+    cmp #8
+    bcc :+
+    lda #<msg_bad_avo
+    ldy #>msg_bad_avo
+    jmp fail_with_ptr
+:   ldx external_count
+    jsr set_external_ptr_from_x
+    ldy #$00
+copy_external_symbol_line_or_fail_loop:
+    lda (scan_ptr),y
+    beq copy_external_symbol_line_or_fail_done
+    cmp #' '
+    beq copy_external_symbol_line_or_fail_done
+    cmp #10
+    beq copy_external_symbol_line_or_fail_done
+    cmp #13
+    beq copy_external_symbol_line_or_fail_done
+    jsr lowercase_ascii
+    cmp #'a'
+    bcc copy_external_symbol_line_or_fail_symbol
+    cmp #'z'+1
+    bcc copy_external_symbol_line_or_fail_store
+copy_external_symbol_line_or_fail_symbol:
+    cmp #'0'
+    bcc copy_external_symbol_line_or_fail_check_underscore
+    cmp #'9'+1
+    bcc copy_external_symbol_line_or_fail_store
+copy_external_symbol_line_or_fail_check_underscore:
+    cmp #'_'
+    bne copy_external_symbol_line_or_fail_bad
+copy_external_symbol_line_or_fail_store:
+    sta (export_ptr),y
+    iny
+    cpy #24
+    bcc copy_external_symbol_line_or_fail_loop
+copy_external_symbol_line_or_fail_bad:
+    lda #<msg_bad_avo
+    ldy #>msg_bad_avo
+    jmp fail_with_ptr
+copy_external_symbol_line_or_fail_done:
+    cpy #$00
+    beq copy_external_symbol_line_or_fail_bad
+    lda #$00
+    sta (export_ptr),y
+    inc external_count
     rts
 
 parse_strings_or_fail:
@@ -663,6 +747,8 @@ build_live_set_body_loop:
     beq build_live_set_next_export_restore
     cmp #'c'
     beq build_live_set_call
+    cmp #'u'
+    beq build_live_set_skip_pair
     cmp #'s'
     beq build_live_set_skip_pair
     cmp #'i'
@@ -719,29 +805,6 @@ clear_tool_scratch_before_save_loop:
     inx
     cpx #(truncated_flag - file_params + 1)
     bcc clear_tool_scratch_before_save_loop
-    rts
-
-snapshot_link_diag:
-    lda payload_bytes_data
-    sta ALINK_DIAG_PAYLOAD
-    lda live_flags+0
-    sta ALINK_DIAG_LIVE0
-    lda live_flags+1
-    sta ALINK_DIAG_LIVE1
-    lda live_flags+2
-    sta ALINK_DIAG_LIVE2
-    lda export_offsets+0
-    sta ALINK_DIAG_EXPORT0
-    lda export_offsets+1
-    sta ALINK_DIAG_EXPORT1
-    lda export_offsets+2
-    sta ALINK_DIAG_EXPORT2
-    lda proc_sizes+0
-    sta ALINK_DIAG_SIZE0
-    lda proc_sizes+1
-    sta ALINK_DIAG_SIZE1
-    lda proc_sizes+2
-    sta ALINK_DIAG_SIZE2
     rts
 
 find_export_index_from_module_name:
@@ -943,7 +1006,7 @@ build_avm_text_content_or_fail:
 build_avm_text_proc_scan_loop:
     lda main_flags_hi
     cmp payload_bytes_data
-    beq build_avm_text_strings
+    beq build_avm_text_externals
     jsr find_live_export_at_current_offset
     bcs build_avm_text_gap
     stx export_index
@@ -960,6 +1023,19 @@ build_avm_text_proc_scan_loop:
 build_avm_text_gap:
     inc main_flags_hi
     bne build_avm_text_proc_scan_loop
+build_avm_text_externals:
+    ldx #$00
+build_avm_text_external_loop:
+    cpx external_count
+    beq build_avm_text_strings
+    txa
+    pha
+    jsr append_external_label_from_x
+    jsr append_ret_line
+    pla
+    tax
+    inx
+    bne build_avm_text_external_loop
 build_avm_text_strings:
     ldx #$00
 build_avm_text_strings_loop:
@@ -1030,6 +1106,13 @@ append_export_label_from_x:
     jsr append_char
     jmp append_newline
 
+append_external_label_from_x:
+    jsr set_external_ptr_from_x
+    jsr append_export_ptr_lower
+    lda #':'
+    jsr append_char
+    jmp append_newline
+
 append_export_ptr_lower:
     ldy #$00
 append_export_ptr_lower_loop:
@@ -1054,22 +1137,26 @@ append_live_call_lines_for_export_x_loop:
 : 
     cmp #'c'
     beq append_live_call_lines_for_export_x_call
+    cmp #'u'
+    beq append_live_call_lines_for_export_x_external
     cmp #'s'
     beq append_live_call_lines_for_export_x_print
     cmp #'i'
-    beq append_live_call_lines_for_export_x_printie
+    beq :+
     cmp #'r'
-    beq append_live_call_lines_for_export_x_ret
+    beq :++
     lda #<msg_bad_avo
     ldy #>msg_bad_avo
     jmp fail_with_ptr
+:   jmp append_live_call_lines_for_export_x_printie
+:   jmp append_live_call_lines_for_export_x_ret
 append_live_call_lines_for_export_x_call:
     iny
     lda (body_ptr),y
     cmp #'0'
-    bcc append_live_call_lines_for_export_x_bad
+    bcc :+
     cmp #'7'+1
-    bcs append_live_call_lines_for_export_x_bad
+    bcs :+
     sec
     sbc #'0'
     sta current_bit_hi
@@ -1087,6 +1174,31 @@ append_live_call_lines_for_export_x_call:
     ldy compare_char
     iny
     bne append_live_call_lines_for_export_x_loop
+:   jmp append_live_call_lines_for_export_x_bad
+append_live_call_lines_for_export_x_external:
+    iny
+    lda (body_ptr),y
+    cmp #'0'
+    bcc append_live_call_lines_for_export_x_bad
+    cmp #'7'+1
+    bcs append_live_call_lines_for_export_x_bad
+    sec
+    sbc #'0'
+    sta current_bit_hi
+    tya
+    sta compare_char
+    lda #<avm_txt_call_prefix
+    sta const_ptr
+    lda #>avm_txt_call_prefix
+    sta const_ptr+1
+    jsr append_const_ptr
+    ldx current_bit_hi
+    jsr set_external_ptr_from_x
+    jsr append_export_ptr_lower
+    jsr append_newline
+    ldy compare_char
+    iny
+    jmp append_live_call_lines_for_export_x_loop
 append_live_call_lines_for_export_x_print:
     iny
     lda (body_ptr),y
@@ -1106,7 +1218,7 @@ append_live_call_lines_for_export_x_print:
     jsr append_calln_print_line
     ldy compare_char
     iny
-    bne append_live_call_lines_for_export_x_loop
+    jmp append_live_call_lines_for_export_x_loop
 append_live_call_lines_for_export_x_printie:
     iny
     lda (body_ptr),y
@@ -1377,6 +1489,8 @@ line_export:
     .byte "x ",0
 line_body:
     .byte "b ",0
+line_external:
+    .byte "u ",0
 line_string:
     .byte "s ",0
 line_int:
@@ -1426,12 +1540,26 @@ avm_txt_stringz_prefix:
 avm_txt_stringz_suffix:
     .byte 0
 diag_content:
-    .byte "OK",10,0
+    .byte "entry main",10
+    .byte "main:",10
+    .byte "setp16 main_str0",10
+    .byte "calln print",10
+    .byte "call helper",10
+    .byte "push16 42",10
+    .byte "calln printie",10
+    .byte "ret",10
+    .byte "main_str0:",10
+    .byte "stringz HELLO",10
+    .byte "helper:",10
+    .byte "ret",10,0
 bit_masks:
     .byte $01,$02,$04,$08,$10,$20,$40,$80
 
 module_name:
     .res 25
+
+.segment "BSS"
+
 target_path:
     .res 40
 source_buffer:
@@ -1452,17 +1580,16 @@ payload_bytes_data:
     .res 1
 live_flags:
     .res 8
-call_edge_masks:
-    .res 8
 string_use_mask:
     .res 1
 body_ops_data:
     .res 128
-
-.segment "BSS"
-
 manifest_entry:
     .res 32
+external_names:
+    .res 200
+external_count:
+    .res 1
 symbol_buffer:
     .res 25
 manifest_buffer:

@@ -95,14 +95,15 @@ They are exported into `ACTION.DNP` root and `BIN/`.
   parser or code generator.
 - `ALINK.PRG` is now the first UDOS-native linker slice. The current proof
   loads a deterministic `OBJ/<NAME>.AVO` object stub, parses its export, body,
-  import, and payload metadata, uses compiler-emitted export offset/size
-  triplets instead of inferring procedure spans from the payload shape, seeds
-  the local live set from the module entry proc instead of assuming export slot
-  `0`, propagates the local body-op call graph,
-  resolves the current small runtime closure, and emits `BIN/<NAME>.AVM.TXT`
-  on the host fs tree as symbolic AVM text: `entry main`, emitted labels,
-  `call`, and `ret` directives reconstructed from `body_ops` instead of copied
-  `payload_hex`. The focused headless VICE proof is green through
+  import, payload, and unresolved external symbol metadata, uses
+  compiler-emitted export offset/size triplets instead of inferring procedure
+  spans from the payload shape, seeds the local live set from the module entry
+  proc instead of assuming export slot `0`, propagates the local body-op call
+  graph, resolves the current small runtime closure, and emits
+  `BIN/<NAME>.AVMTXT` on the host fs tree as symbolic AVM text: `entry main`,
+  emitted labels, `call`, and `ret` directives reconstructed from `body_ops`
+  instead of copied `payload_hex`, with unresolved external calls currently
+  lowered to stub labels. The focused headless VICE proof is green through
   `make vice-action-alink`, with host-side verification that
   `avm_pack.py --text --flags 1` packs the emitted text into the exact
   expected `AVM1` bytes and that an unused local export is stripped from the
