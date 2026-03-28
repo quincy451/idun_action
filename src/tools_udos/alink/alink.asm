@@ -9,6 +9,7 @@ ALINK_TRACE = $03FC
 IMPORT_PRINT_STR  = $01
 IMPORT_PRINT_LINE = $02
 IMPORT_FORMAT_INT = $04
+PENDING_SYMBOL_MAX = 7
 
 .segment "ZPTEMP": zeropage
 svc_retptr:
@@ -95,9 +96,18 @@ start:
     jsr build_avm_text_target_path
     lda #$1E
     sta ALINK_TRACE
-    tsx
-    stx $03EF
+    lda #$A0
+    sta $03FD
+    lda save_params+4
+    sta $03FE
     jsr save_content_buffer_to_target
+    php
+    pla
+    sta $03FF
+    lda save_params+4
+    sta $03FE
+    lda #$A1
+    sta $03FD
     lda #$1D
     sta ALINK_TRACE
     bcc save_ok
@@ -145,26 +155,6 @@ init_module_name_default_loop:
 init_module_name_done:
     rts
 
-clear_bss:
-    lda #<manifest_entry
-    sta body_ptr
-    lda #>manifest_entry
-    sta body_ptr+1
-clear_bss_loop:
-    ldy #$00
-    lda #$00
-    sta (body_ptr),y
-    inc body_ptr
-    bne :+
-    inc body_ptr+1
-:   lda body_ptr+1
-    cmp #>bss_end
-    bne clear_bss_loop
-    lda body_ptr
-    cmp #<bss_end
-    bne clear_bss_loop
-    rts
-
 skip_cmdline_spaces:
     ldy #$00
 skip_cmdline_spaces_loop:
@@ -197,42 +187,26 @@ load_object_loaded:
     rts
 
 append_external_object_from_x_or_fail:
-    lda #$60
-    sta ALINK_TRACE
     txa
     pha
     jsr save_module_name
     pla
     tax
-    jsr copy_external_symbol_to_module_name_from_x
+    jsr copy_pending_symbol_to_module_name_from_x
     txa
     pha
-    lda #$61
-    sta ALINK_TRACE
     jsr build_object_target_path
-    lda #$62
-    sta ALINK_TRACE
     jsr load_object_or_fail
     jsr require_loaded_source_not_truncated_or_fail
     jsr require_avo1_header_or_fail
-    lda #$63
-    sta ALINK_TRACE
     jsr parse_exports_or_fail
-    lda #$64
-    sta ALINK_TRACE
     jsr parse_body_ops_or_fail
-    jsr require_local_only_body_ops_or_fail
-    lda #$65
-    sta ALINK_TRACE
+    jsr parse_external_symbols_or_fail
+    jsr require_linkable_child_body_ops_or_fail
     jsr compute_code_bytes
-    lda #$66
-    sta ALINK_TRACE
     jsr build_live_set
-    lda #$67
-    sta ALINK_TRACE
+    jsr queue_current_external_symbols_or_fail
     jsr append_current_object_live_code_only
-    lda #$68
-    sta ALINK_TRACE
     jsr restore_module_name
     pla
     tax
@@ -382,6 +356,26 @@ set_external_ptr_from_x_loop:
     dex
     bne set_external_ptr_from_x_loop
 set_external_ptr_from_x_done:
+    rts
+
+set_pending_ptr_from_x:
+    lda #<manifest_buffer
+    sta export_ptr
+    lda #>manifest_buffer
+    sta export_ptr+1
+set_pending_ptr_from_x_loop:
+    cpx #$00
+    beq set_pending_ptr_from_x_done
+    clc
+    lda export_ptr
+    adc #25
+    sta export_ptr
+    lda export_ptr+1
+    adc #$00
+    sta export_ptr+1
+    dex
+    bne set_pending_ptr_from_x_loop
+set_pending_ptr_from_x_done:
     rts
 
 set_body_ptr_from_x:
@@ -760,36 +754,34 @@ parse_decimal_byte_or_fail_bad:
     ldy #>msg_bad_avo
     jmp fail_with_ptr
 
-require_local_only_body_ops_or_fail:
+require_linkable_child_body_ops_or_fail:
     ldx #$00
-require_local_only_body_ops_or_fail_export_loop:
+require_linkable_child_body_ops_or_fail_export_loop:
     cpx export_count
-    beq require_local_only_body_ops_or_fail_done
+    beq require_linkable_child_body_ops_or_fail_done
     txa
     pha
     jsr set_body_ptr_from_x
     ldy #$00
-require_local_only_body_ops_or_fail_body_loop:
+require_linkable_child_body_ops_or_fail_body_loop:
     lda (body_ptr),y
-    beq require_local_only_body_ops_or_fail_next_export
-    cmp #'u'
-    beq require_local_only_body_ops_or_fail_bad
+    beq require_linkable_child_body_ops_or_fail_next_export
     cmp #'s'
-    beq require_local_only_body_ops_or_fail_bad
+    beq require_linkable_child_body_ops_or_fail_bad
     cmp #'i'
-    beq require_local_only_body_ops_or_fail_bad
+    beq require_linkable_child_body_ops_or_fail_bad
     iny
-    bne require_local_only_body_ops_or_fail_body_loop
-require_local_only_body_ops_or_fail_bad:
+    bne require_linkable_child_body_ops_or_fail_body_loop
+require_linkable_child_body_ops_or_fail_bad:
     lda #<msg_bad_avo
     ldy #>msg_bad_avo
     jmp fail_with_ptr
-require_local_only_body_ops_or_fail_next_export:
+require_linkable_child_body_ops_or_fail_next_export:
     pla
     tax
     inx
-    bne require_local_only_body_ops_or_fail_export_loop
-require_local_only_body_ops_or_fail_done:
+    bne require_linkable_child_body_ops_or_fail_export_loop
+require_linkable_child_body_ops_or_fail_done:
     rts
 
 build_live_set:
@@ -1083,15 +1075,21 @@ build_avm_text_content_or_fail:
     jsr append_newline
     lda #$00
     sta string_use_mask
+    sta pending_count
     jsr append_current_object_live_code_only
-build_avm_text_externals:
+    jsr queue_current_external_symbols_or_fail
+build_avm_text_pending_loop:
     ldx #$00
-build_avm_text_external_loop:
-    cpx external_count
+build_avm_text_pending_loop_next:
+    cpx pending_count
     beq build_avm_text_strings
+    txa
+    pha
     jsr append_external_object_from_x_or_fail
+    pla
+    tax
     inx
-    bne build_avm_text_external_loop
+    bne build_avm_text_pending_loop_next
 build_avm_text_strings:
     ldx #$00
 build_avm_text_strings_loop:
@@ -1503,20 +1501,97 @@ restore_module_name_loop:
 restore_module_name_done:
     rts
 
-copy_external_symbol_to_module_name_from_x:
-    jsr set_external_ptr_from_x
+copy_export_ptr_to_module_name:
     ldy #$00
-copy_external_symbol_to_module_name_from_x_loop:
+copy_export_ptr_to_module_name_loop:
     lda (export_ptr),y
     sta module_name,y
-    beq copy_external_symbol_to_module_name_from_x_done
+    beq copy_export_ptr_to_module_name_done
     iny
     cpy #25
-    bcc copy_external_symbol_to_module_name_from_x_loop
-copy_external_symbol_to_module_name_from_x_done:
+    bcc copy_export_ptr_to_module_name_loop
+copy_export_ptr_to_module_name_done:
     lda #$00
     sta module_name+24
     rts
+
+copy_export_ptr_to_symbol_buffer:
+    ldy #$00
+copy_export_ptr_to_symbol_buffer_loop:
+    lda (export_ptr),y
+    sta symbol_buffer,y
+    beq copy_export_ptr_to_symbol_buffer_done
+    iny
+    cpy #25
+    bcc copy_export_ptr_to_symbol_buffer_loop
+copy_export_ptr_to_symbol_buffer_done:
+    lda #$00
+    sta symbol_buffer+24
+    rts
+
+queue_current_external_symbols_or_fail:
+    ldx #$00
+queue_current_external_symbols_or_fail_loop:
+    cpx external_count
+    beq queue_current_external_symbols_or_fail_done
+    txa
+    pha
+    jsr set_external_ptr_from_x
+    jsr copy_export_ptr_to_symbol_buffer
+    jsr enqueue_symbol_buffer_if_new_or_fail
+queue_current_external_symbols_or_fail_next:
+    pla
+    tax
+    inx
+    bne queue_current_external_symbols_or_fail_loop
+queue_current_external_symbols_or_fail_done:
+    rts
+
+enqueue_symbol_buffer_if_new_or_fail:
+    ldx #$00
+enqueue_symbol_buffer_if_new_or_fail_loop:
+    cpx pending_count
+    beq enqueue_symbol_buffer_if_new_or_fail_store
+    stx compare_char
+    jsr set_pending_ptr_from_x
+    lda export_ptr
+    sta const_ptr
+    lda export_ptr+1
+    sta const_ptr+1
+    jsr symbol_buffer_matches_const_ptr
+    bcc enqueue_symbol_buffer_if_new_or_fail_done
+    ldx compare_char
+    inx
+    bne enqueue_symbol_buffer_if_new_or_fail_loop
+enqueue_symbol_buffer_if_new_or_fail_store:
+    cpx #PENDING_SYMBOL_MAX
+    bcc :+
+    lda #<msg_bad_avo
+    ldy #>msg_bad_avo
+    jmp fail_with_ptr
+:   jsr set_pending_ptr_from_x
+    jsr copy_symbol_buffer_to_export_ptr
+    inc pending_count
+enqueue_symbol_buffer_if_new_or_fail_done:
+    rts
+
+copy_symbol_buffer_to_export_ptr:
+    ldy #$00
+copy_symbol_buffer_to_export_ptr_loop:
+    lda symbol_buffer,y
+    sta (export_ptr),y
+    beq copy_symbol_buffer_to_export_ptr_done
+    iny
+    cpy #25
+    bcc copy_symbol_buffer_to_export_ptr_loop
+copy_symbol_buffer_to_export_ptr_done:
+    lda #$00
+    sta (export_ptr),y
+    rts
+
+copy_pending_symbol_to_module_name_from_x:
+    jsr set_pending_ptr_from_x
+    jmp copy_export_ptr_to_module_name
 
 lowercase_ascii:
     cmp #'A'
@@ -1654,11 +1729,11 @@ bit_masks:
 
 module_name:
     .res 25
+target_path:
+    .res 40
 
 .segment "BSS"
 
-target_path:
-    .res 40
 source_buffer:
     .res SOURCE_LIMIT+1
 content_buffer:
@@ -1688,6 +1763,8 @@ manifest_entry:
 external_names:
     .res 200
 external_count:
+    .res 1
+pending_count:
     .res 1
 symbol_buffer:
     .res 25
