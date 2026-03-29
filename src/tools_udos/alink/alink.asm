@@ -96,18 +96,7 @@ start:
     jsr build_avm_text_target_path
     lda #$1E
     sta ALINK_TRACE
-    lda #$A0
-    sta $03FD
-    lda save_params+4
-    sta $03FE
     jsr save_content_buffer_to_target
-    php
-    pla
-    sta $03FF
-    lda save_params+4
-    sta $03FE
-    lda #$A1
-    sta $03FD
     lda #$1D
     sta ALINK_TRACE
     bcc save_ok
@@ -202,12 +191,16 @@ append_external_object_from_x_or_fail:
     jsr parse_exports_or_fail
     jsr parse_body_ops_or_fail
     jsr parse_external_symbols_or_fail
+    jsr parse_strings_or_fail
     jsr parse_ints_or_fail
     jsr require_linkable_child_body_ops_or_fail
     jsr compute_code_bytes
     jsr build_live_set
     jsr queue_current_external_symbols_or_fail
+    lda #$00
+    sta string_use_mask
     jsr append_current_object_live_code_only
+    jsr append_current_object_string_defs
     jsr restore_module_name
     pla
     tax
@@ -767,8 +760,6 @@ require_linkable_child_body_ops_or_fail_export_loop:
 require_linkable_child_body_ops_or_fail_body_loop:
     lda (body_ptr),y
     beq require_linkable_child_body_ops_or_fail_next_export
-    cmp #'s'
-    beq require_linkable_child_body_ops_or_fail_bad
     iny
     bne require_linkable_child_body_ops_or_fail_body_loop
 require_linkable_child_body_ops_or_fail_bad:
@@ -1076,6 +1067,7 @@ build_avm_text_content_or_fail:
     sta string_use_mask
     sta pending_count
     jsr append_current_object_live_code_only
+    jsr save_current_string_state
     jsr queue_current_external_symbols_or_fail
 build_avm_text_pending_loop:
     ldx #$00
@@ -1090,21 +1082,8 @@ build_avm_text_pending_loop_next:
     inx
     bne build_avm_text_pending_loop_next
 build_avm_text_strings:
-    ldx #$00
-build_avm_text_strings_loop:
-    cpx string_count
-    beq build_avm_text_done
-    lda bit_masks,x
-    and string_use_mask
-    beq build_avm_text_next_string
-    txa
-    pha
-    jsr append_string_definition_from_x
-    pla
-    tax
-build_avm_text_next_string:
-    inx
-    bne build_avm_text_strings_loop
+    jsr restore_saved_string_state
+    jsr append_current_object_string_defs
 build_avm_text_done:
     lda #$00
     jmp append_char
@@ -1133,6 +1112,53 @@ append_current_object_live_code_only_gap:
     inc main_flags_hi
     bne append_current_object_live_code_only_proc_scan_loop
 append_current_object_live_code_only_done:
+    rts
+
+append_current_object_string_defs:
+    ldx #$00
+append_current_object_string_defs_loop:
+    cpx string_count
+    beq append_current_object_string_defs_done
+    lda bit_masks,x
+    and string_use_mask
+    beq append_current_object_string_defs_next
+    txa
+    pha
+    jsr append_string_definition_from_x
+    pla
+    tax
+append_current_object_string_defs_next:
+    inx
+    bne append_current_object_string_defs_loop
+append_current_object_string_defs_done:
+    rts
+
+save_current_string_state:
+    lda string_count
+    sta saved_string_count
+    lda string_use_mask
+    sta saved_string_use_mask
+    ldx #$00
+save_current_string_state_loop:
+    lda string_literals,x
+    sta saved_string_literals,x
+    inx
+    cpx #192
+    bcc save_current_string_state_loop
+    rts
+
+restore_saved_string_state:
+    lda saved_string_count
+    sta string_count
+    lda saved_string_use_mask
+    sta string_use_mask
+    ldx #$00
+restore_saved_string_state_loop:
+    lda saved_string_literals,x
+    sta string_literals,x
+    inx
+    cpx #192
+    bcc restore_saved_string_state_loop
     rts
 
 find_live_export_at_current_offset:
@@ -1749,11 +1775,17 @@ string_literals:
     .res 192
 string_count:
     .res 1
+saved_string_literals:
+    .res 192
+saved_string_count:
+    .res 1
 payload_bytes_data:
     .res 1
 live_flags:
     .res 8
 string_use_mask:
+    .res 1
+saved_string_use_mask:
     .res 1
 body_ops_data:
     .res 128
