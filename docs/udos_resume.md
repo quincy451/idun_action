@@ -110,8 +110,9 @@ They are exported into `ACTION.DNP` root and `BIN/`.
   `make vice-action-alink`, with host-side verification that
   `avm_pack.py --text --flags 1` packs the emitted text into the exact
   expected `AVM1` bytes and that an unused local export is stripped from the
-  final image. It is still not a full object merger or direct on-target
-  binary emitter.
+  final image. A dead-code cleanup dropped the current `ALINK.PRG` footprint
+  to `3604` bytes while keeping that proof green. It is still not a full
+  object merger or direct on-target binary emitter.
 - `ACTFLOW.BAT` is the first composite workspace flow proof. It exercises the
   preserved UDOS file write/copy/move/delete services through the existing
   Action-side proof tools, prints `ACTFLOW OK`, and returns to the prompt.

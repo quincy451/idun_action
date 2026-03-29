@@ -412,9 +412,6 @@ set_string_ptr_from_x_loop:
 set_string_ptr_from_x_done:
     rts
 
-parse_imports_or_fail:
-    rts
-
 parse_body_ops_or_fail:
     lda #$00
     sta export_index
@@ -907,83 +904,6 @@ resolve_import_closure:
     sta main_flags_lo
 :   rts
 
-skip_import_delimiters:
-    ldy #$00
-skip_import_delimiters_loop:
-    lda (scan_ptr),y
-    cmp #' '
-    beq skip_import_delimiters_advance
-    cmp #','
-    beq skip_import_delimiters_advance
-    cmp #10
-    beq skip_import_delimiters_advance
-    cmp #13
-    beq skip_import_delimiters_advance
-    rts
-skip_import_delimiters_advance:
-    jsr advance_scan_ptr
-    jmp skip_import_delimiters_loop
-
-map_symbol_buffer_or_fail:
-    lda #$00
-    sta current_bit_lo
-    sta current_bit_hi
-    lda #<import_rt_format_int
-    sta const_ptr
-    lda #>import_rt_format_int
-    sta const_ptr+1
-    jsr symbol_buffer_matches_const_ptr
-    bcs :+
-    lda #IMPORT_FORMAT_INT
-    sta current_bit_lo
-    rts
-:   lda #<import_rt_print_line
-    sta const_ptr
-    lda #>import_rt_print_line
-    sta const_ptr+1
-    jsr symbol_buffer_matches_const_ptr
-    bcs :+
-    lda #IMPORT_PRINT_LINE
-    sta current_bit_lo
-    rts
-:   lda #<import_rt_print_str
-    sta const_ptr
-    lda #>import_rt_print_str
-    sta const_ptr+1
-    jsr symbol_buffer_matches_const_ptr
-    bcs map_symbol_unresolved
-    lda #IMPORT_PRINT_STR
-    sta current_bit_lo
-    rts
-map_symbol_unresolved:
-    lda #<msg_unresolved
-    ldy #>msg_unresolved
-    jmp fail_with_ptr
-
-set_import_ptr_from_x:
-    lda import_name_ptr_lo,x
-    sta const_ptr
-    lda import_name_ptr_hi,x
-    sta const_ptr+1
-    rts
-
-load_current_import_bits_from_x:
-    lda import_bits_lo,x
-    sta current_bit_lo
-    lda import_bits_hi,x
-    sta current_bit_hi
-    rts
-
-import_selected_from_x:
-    jsr load_current_import_bits_from_x
-    lda main_flags_lo
-    and current_bit_lo
-    sta compare_char
-    lda main_flags_hi
-    and current_bit_hi
-    ora compare_char
-    rts
-
 symbol_buffer_matches_const_ptr:
     ldy #$00
 symbol_buffer_matches_const_ptr_loop:
@@ -1195,13 +1115,6 @@ append_module_symbol_lower_done:
 
 append_export_label_from_x:
     jsr set_export_ptr_from_x
-    jsr append_export_ptr_lower
-    lda #':'
-    jsr append_char
-    jmp append_newline
-
-append_external_label_from_x:
-    jsr set_external_ptr_from_x
     jsr append_export_ptr_lower
     lda #':'
     jsr append_char
@@ -1679,8 +1592,6 @@ msg_bad_avo:
     .asciiz "BAD AVO"
 msg_too_large:
     .asciiz "TOO LARGE"
-msg_unresolved:
-    .asciiz "UNRESOLVED"
 msg_created:
     .asciiz "CREATED"
 msg_updated:
@@ -1705,31 +1616,6 @@ line_string:
     .byte "s ",0
 line_int:
     .byte "i ",0
-
-import_rt_format_int:
-    .asciiz "rt.format_int"
-import_rt_print_line:
-    .asciiz "rt.print_line"
-import_rt_print_str:
-    .asciiz "rt.print_str"
-IMPORT_TABLE_COUNT = 3
-
-import_bits_lo:
-    .byte IMPORT_FORMAT_INT
-    .byte IMPORT_PRINT_LINE
-    .byte IMPORT_PRINT_STR
-import_bits_hi:
-    .byte $00
-    .byte $00
-    .byte $00
-import_name_ptr_lo:
-    .byte <import_rt_format_int
-    .byte <import_rt_print_line
-    .byte <import_rt_print_str
-import_name_ptr_hi:
-    .byte >import_rt_format_int
-    .byte >import_rt_print_line
-    .byte >import_rt_print_str
 
 avm_txt_entry_prefix:
     .byte "entry ",0
