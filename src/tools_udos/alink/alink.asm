@@ -66,8 +66,14 @@ start:
     jsr parse_ints_or_fail
     jsr compute_code_bytes
     jsr build_live_set
+    lda #$10
+    sta ALINK_TRACE
     jsr build_avm_text_content_or_fail
+    lda #$1E
+    sta ALINK_TRACE
     jsr build_avm_text_target_path
+    lda #$1F
+    sta ALINK_TRACE
     jsr save_source_buffer_to_target
     bcc save_ok
     lda #<msg_save_fail
@@ -673,6 +679,7 @@ build_live_set_seed:
     bcc :+
     jmp build_live_set_bad
 : 
+    stx entry_export_index
     lda #$01
     sta live_flags,x
 build_live_set_scan_again:
@@ -828,13 +835,9 @@ advance_scan_ptr_by_const_ptr_done:
     rts
 
 build_avm_text_content_or_fail:
-    lda #$21
-    sta ALINK_TRACE
     jsr layout_payload_or_fail
-    lda #$22
-    sta ALINK_TRACE
     jsr emit_payload_or_fail
-    lda #$23
+    lda #$1D
     sta ALINK_TRACE
     jmp render_payload_as_byte_text_or_fail
 
@@ -844,6 +847,7 @@ layout_payload_or_fail:
     sta current_bit_hi
     sta string_use_mask
     sta pending_count
+    sta save_mode
     jsr layout_current_object_code_or_fail
     jsr copy_current_export_layout_to_root
     jsr save_current_string_state
@@ -861,10 +865,25 @@ layout_payload_pending_next:
     inx
     bne layout_payload_pending_next
 layout_payload_root_strings:
+    lda current_bit_lo
+    sta code_limit_data
     jsr restore_saved_string_state
     lda #$00
     sta save_mode
-    jmp layout_current_object_strings_or_fail
+    jsr layout_current_object_strings_or_fail
+    ldx #$00
+layout_payload_external_strings_next:
+    cpx pending_count
+    beq layout_payload_done
+    txa
+    pha
+    jsr layout_external_object_strings_from_x_or_fail
+    pla
+    tax
+    inx
+    bne layout_payload_external_strings_next
+layout_payload_done:
+    rts
 
 layout_external_object_from_x_or_fail:
     txa
@@ -886,6 +905,8 @@ layout_external_object_from_x_or_fail:
     sta current_bit_lo
     lda #$00
     sta string_use_mask
+    lda #$01
+    sta save_mode
     jsr layout_current_object_code_or_fail
     jsr find_export_index_from_module_name
     stx export_index
@@ -897,6 +918,38 @@ layout_external_object_from_x_or_fail:
     lda current_export_offsets_hi,y
     sta pending_offsets_hi,x
     jsr queue_current_external_symbols_or_fail
+    lda string_use_mask
+    sta pending_string_use_masks,x
+    lda #$00
+    sta save_mode
+    jmp restore_module_name
+
+layout_external_object_strings_from_x_or_fail:
+    txa
+    pha
+    jsr save_module_name
+    pla
+    tax
+    txa
+    pha
+    lda current_bit_lo
+    pha
+    lda current_bit_hi
+    pha
+    jsr copy_pending_symbol_to_module_name_from_x
+    jsr load_current_object_link_state_or_fail
+    pla
+    sta current_bit_hi
+    pla
+    sta current_bit_lo
+    pla
+    tax
+    lda pending_string_use_masks,x
+    sta string_use_mask
+    lda current_bit_lo
+    sta pending_string_bases_lo,x
+    lda current_bit_hi
+    sta pending_string_bases_hi,x
     lda #$01
     sta save_mode
     jsr layout_current_object_strings_or_fail
@@ -972,7 +1025,19 @@ add_proc_size_to_layout_from_x:
     sta current_bit_lo
     bcc :+
     inc current_bit_hi
-:   rts
+:   lda save_mode
+    bne add_proc_size_to_layout_from_x_done
+    txa
+    cmp entry_export_index
+    bne add_proc_size_to_layout_from_x_done
+    clc
+    lda current_bit_lo
+    adc #$02
+    sta current_bit_lo
+    bcc add_proc_size_to_layout_from_x_done
+    inc current_bit_hi
+add_proc_size_to_layout_from_x_done:
+    rts
 
 copy_current_export_layout_to_root:
     ldx #$00
@@ -997,13 +1062,8 @@ layout_current_object_strings_loop:
     and string_use_mask
     beq layout_current_object_strings_next
     lda save_mode
-    beq :+
+    bne layout_current_object_strings_store_done
     lda current_bit_lo
-    sta current_string_offsets_lo,x
-    lda current_bit_hi
-    sta current_string_offsets_hi,x
-    jmp layout_current_object_strings_store_done
-:   lda current_bit_lo
     sta root_string_offsets_lo,x
     lda current_bit_hi
     sta root_string_offsets_hi,x
@@ -1039,15 +1099,11 @@ add_current_string_length_to_layout_done:
 :   rts
 
 emit_payload_or_fail:
-    lda #$23
-    sta ALINK_TRACE
     lda #<content_buffer
     sta content_ptr
     lda #>content_buffer
     sta content_ptr+1
     jsr load_current_object_link_state_or_fail
-    lda #$24
-    sta ALINK_TRACE
     lda #$00
     sta main_flags_lo
     sta main_flags_hi
@@ -1055,33 +1111,76 @@ emit_payload_or_fail:
     sta string_use_mask
     sta save_mode
     jsr emit_current_object_code_or_fail
-    lda #$25
-    sta ALINK_TRACE
     jsr save_current_string_state
-    lda #$26
-    sta ALINK_TRACE
 emit_payload_pending_loop:
     ldx #$00
 emit_payload_pending_next:
     cpx pending_count
     beq emit_payload_root_strings
-    lda #$27
-    sta ALINK_TRACE
     txa
     pha
-    jsr emit_external_object_from_x_or_fail
+    jsr emit_external_object_code_from_x_or_fail
     pla
     tax
     inx
     bne emit_payload_pending_next
 emit_payload_root_strings:
     jsr restore_saved_string_state
-    lda #$28
-    sta ALINK_TRACE
-    jmp emit_current_object_strings_or_fail
+    jsr emit_current_object_strings_or_fail
+    ldx #$00
+emit_payload_external_strings_next:
+    cpx pending_count
+    beq emit_payload_done
+    txa
+    pha
+    jsr emit_external_object_strings_from_x_or_fail
+    pla
+    tax
+    inx
+    bne emit_payload_external_strings_next
+emit_payload_done:
+    rts
 
-emit_external_object_from_x_or_fail:
-    lda #$31
+emit_external_object_code_from_x_or_fail:
+    txa
+    pha
+    jsr save_module_name
+    pla
+    tax
+    txa
+    pha
+    jsr copy_pending_symbol_to_module_name_from_x
+    lda main_flags_lo
+    pha
+    lda main_flags_hi
+    pha
+    jsr load_current_object_link_state_or_fail
+    pla
+    sta main_flags_hi
+    pla
+    sta main_flags_lo
+    pla
+    tax
+    lda pending_offsets_lo,x
+    sta current_bit_lo
+    lda pending_offsets_hi,x
+    sta current_bit_hi
+    lda #$01
+    sta save_mode
+    stx pending_active_index
+    lda pending_string_use_masks,x
+    sta string_use_mask
+    lda main_flags_hi
+    pha
+    jsr layout_current_object_code_or_fail
+    pla
+    sta main_flags_hi
+    jsr emit_current_object_code_or_fail
+    jmp restore_module_name
+
+emit_external_object_strings_from_x_or_fail:
+    stx $03FD
+    lda #$1A
     sta ALINK_TRACE
     txa
     pha
@@ -1096,37 +1195,18 @@ emit_external_object_from_x_or_fail:
     lda main_flags_hi
     pha
     jsr load_current_object_link_state_or_fail
-    lda #$32
-    sta ALINK_TRACE
     pla
     sta main_flags_hi
     pla
     sta main_flags_lo
+    lda #$1B
+    sta ALINK_TRACE
     pla
     tax
-    lda pending_offsets_lo,x
-    sta current_bit_lo
-    lda pending_offsets_hi,x
-    sta current_bit_hi
-    lda #$01
-    sta save_mode
-    lda #$00
+    lda pending_string_use_masks,x
     sta string_use_mask
-    lda main_flags_hi
-    pha
-    jsr layout_current_object_code_or_fail
-    pla
-    sta main_flags_hi
-    lda #$33
-    sta ALINK_TRACE
-    jsr layout_current_object_strings_or_fail
-    lda #$34
-    sta ALINK_TRACE
-    jsr emit_current_object_code_or_fail
-    lda #$35
-    sta ALINK_TRACE
     jsr emit_current_object_strings_or_fail
-    lda #$36
+    lda #$1C
     sta ALINK_TRACE
     jmp restore_module_name
 
@@ -1192,11 +1272,10 @@ find_live_export_at_emit_offset_done:
 emit_live_bytes_for_export_x_or_fail:
     txa
     pha
+    stx export_index
     jsr set_body_ptr_from_x
     ldy #$00
 emit_live_bytes_for_export_x_loop:
-    lda #$50
-    sta ALINK_TRACE
     lda (body_ptr),y
     bne :+
     jmp emit_live_bytes_for_export_x_done
@@ -1218,8 +1297,6 @@ emit_live_bytes_for_export_x_loop:
 : 
     jmp emit_live_bytes_for_export_x_bad
 emit_live_bytes_for_export_x_call:
-    lda #$51
-    sta ALINK_TRACE
     iny
     lda (body_ptr),y
     cmp #'0'
@@ -1243,8 +1320,6 @@ emit_live_bytes_for_export_x_call:
     iny
     jmp emit_live_bytes_for_export_x_loop
 emit_live_bytes_for_export_x_external:
-    lda #$52
-    sta ALINK_TRACE
     iny
     lda (body_ptr),y
     cmp #'0'
@@ -1272,8 +1347,6 @@ emit_live_bytes_for_export_x_external:
     iny
     jmp emit_live_bytes_for_export_x_loop
 emit_live_bytes_for_export_x_print:
-    lda #$53
-    sta ALINK_TRACE
     iny
     lda (body_ptr),y
     cmp #'0'
@@ -1305,8 +1378,6 @@ emit_live_bytes_for_export_x_print:
     iny
     jmp emit_live_bytes_for_export_x_loop
 emit_live_bytes_for_export_x_printie:
-    lda #$54
-    sta ALINK_TRACE
     iny
     lda (body_ptr),y
     cmp #'0'
@@ -1339,8 +1410,20 @@ emit_live_bytes_for_export_x_printie:
     iny
     jmp emit_live_bytes_for_export_x_loop
 emit_live_bytes_for_export_x_ret:
-    lda #$55
-    sta ALINK_TRACE
+    lda save_mode
+    bne emit_live_bytes_for_export_x_ret_normal
+    lda export_index
+    cmp entry_export_index
+    bne emit_live_bytes_for_export_x_ret_normal
+    lda #OPCODE_CALLN
+    jsr append_payload_byte
+    lda #$20
+    jsr append_payload_byte
+    lda #$FF
+    jsr append_payload_byte
+    iny
+    jmp emit_live_bytes_for_export_x_loop
+emit_live_bytes_for_export_x_ret_normal:
     lda #OPCODE_RET
     jsr append_payload_byte
     iny
@@ -1371,10 +1454,30 @@ load_export_target_offset_from_x_or_fail:
 load_string_target_offset_from_x_or_fail:
     lda save_mode
     beq :+
-    lda current_string_offsets_lo,x
+    stx compare_char
+    ldy pending_active_index
+    lda pending_string_bases_lo,y
     sta current_bit_lo
-    lda current_string_offsets_hi,x
+    lda pending_string_bases_hi,y
     sta current_bit_hi
+    ldx #$00
+load_string_target_offset_pending_loop:
+    cpx compare_char
+    beq load_string_target_offset_pending_done
+    lda bit_masks,x
+    and string_use_mask
+    beq load_string_target_offset_pending_next
+    txa
+    pha
+    jsr set_string_ptr_from_x
+    jsr add_current_string_length_to_layout
+    pla
+    tax
+load_string_target_offset_pending_next:
+    inx
+    bne load_string_target_offset_pending_loop
+load_string_target_offset_pending_done:
+    ldx compare_char
     rts
 :   lda root_string_offsets_lo,x
     sta current_bit_lo
@@ -1383,15 +1486,11 @@ load_string_target_offset_from_x_or_fail:
     rts
 
 load_pending_offset_for_external_x_or_fail:
-    lda #$41
-    sta ALINK_TRACE
     txa
     pha
     jsr set_external_ptr_from_x
     jsr copy_export_ptr_to_symbol_buffer
     jsr find_pending_index_from_symbol_buffer_or_fail
-    lda #$42
-    sta ALINK_TRACE
     lda pending_offsets_lo,x
     sta current_bit_lo
     lda pending_offsets_hi,x
@@ -1472,12 +1571,6 @@ append_payload_byte:
     inc main_flags_hi
 :   rts
 append_payload_byte_fail:
-    lda main_flags_lo
-    sta ALINK_TRACE+1
-    lda main_flags_hi
-    sta ALINK_TRACE+2
-    lda module_name
-    sta ALINK_TRACE+3
     pla
     tay
     lda #<msg_too_large
@@ -1488,7 +1581,7 @@ render_payload_as_byte_text_or_fail:
     lda main_flags_hi
     bne render_payload_as_byte_text_too_large
     lda main_flags_lo
-    cmp #62
+    cmp #117
     bcc :+
 render_payload_as_byte_text_too_large:
     lda #<msg_too_large
@@ -1503,9 +1596,17 @@ render_payload_as_byte_text_too_large:
     lda #>avm_byte_entry_prefix
     sta const_ptr+1
     jsr append_const_ptr
-    lda #<avm_byte_db_prefix
+    lda #<avm_byte_code_prefix
     sta const_ptr
-    lda #>avm_byte_db_prefix
+    lda #>avm_byte_code_prefix
+    sta const_ptr+1
+    jsr append_const_ptr
+    lda code_limit_data
+    jsr append_hex_byte
+    jsr append_newline
+    lda #<avm_byte_hex_prefix
+    sta const_ptr
+    lda #>avm_byte_hex_prefix
     sta const_ptr+1
     jsr append_const_ptr
     ldx #$00
@@ -1513,13 +1614,8 @@ render_payload_as_byte_text_loop:
     cpx main_flags_lo
     beq render_payload_as_byte_text_done
     stx compare_char
-    cpx #$00
-    beq :+
-    lda #','
-    jsr append_char
-:   ldx compare_char
     lda content_buffer,x
-    jsr append_hex_byte
+    jsr append_hex_byte_compact
     ldx compare_char
     inx
     bne render_payload_as_byte_text_loop
@@ -1527,6 +1623,17 @@ render_payload_as_byte_text_done:
     jsr append_newline
     lda #$00
     jmp append_char
+
+append_hex_byte_compact:
+    pha
+    lsr a
+    lsr a
+    lsr a
+    lsr a
+    jsr append_hex_nibble
+    pla
+    and #$0F
+    jmp append_hex_nibble
 
 append_hex_byte:
     pha
@@ -1857,8 +1964,10 @@ line_int:
 
 avm_byte_entry_prefix:
     .byte "entry 0",10,0
-avm_byte_db_prefix:
-    .byte "db ",0
+avm_byte_code_prefix:
+    .byte "code ",0
+avm_byte_hex_prefix:
+    .byte "hex ",0
 bit_masks:
     .byte $01,$02,$04,$08,$10,$20,$40,$80
 
@@ -1897,15 +2006,17 @@ saved_string_literals:
     .res 192
 saved_string_count:
     .res 1
+pending_active_index:
+    .res 1
 payload_bytes_data:
+    .res 1
+code_limit_data:
+    .res 1
+entry_export_index:
     .res 1
 root_string_offsets_lo:
     .res 8
 root_string_offsets_hi:
-    .res 8
-current_string_offsets_lo:
-    .res 8
-current_string_offsets_hi:
     .res 8
 live_flags:
     .res 8
@@ -1926,6 +2037,12 @@ pending_count:
 pending_offsets_lo:
     .res PENDING_SYMBOL_MAX
 pending_offsets_hi:
+    .res PENDING_SYMBOL_MAX
+pending_string_use_masks:
+    .res PENDING_SYMBOL_MAX
+pending_string_bases_lo:
+    .res PENDING_SYMBOL_MAX
+pending_string_bases_hi:
     .res PENDING_SYMBOL_MAX
 symbol_buffer:
     .res 25

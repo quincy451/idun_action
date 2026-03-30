@@ -100,13 +100,16 @@ They are exported into `ACTION.DNP` root and `BIN/`.
   payload shape, seeds the local live set from the module entry proc instead
   of assuming export slot `0`, propagates the local body-op call graph,
   resolves the current widened small-object closure, and emits
-  `BIN/<NAME>.AVMTXT` on the host fs tree as deterministic AVM byte text:
-  `entry 0` plus a `db $..` payload line. The focused headless VICE proof is
+  `BIN/<NAME>.AVMTXT` on the host fs tree as compact AVM byte text:
+  `entry 0`, `code $..`, and `hex ...`. The focused headless VICE proof is
   green through `make vice-action-alink`, with host-side verification that
   `avm_pack.py --text --flags 1` packs the emitted text into the exact
   expected `AVM1` bytes and that an unused local export is stripped from the
-  final image. The current `ALINK.PRG` footprint is `3979` bytes. It is still
-  not a full object merger or direct on-target binary emitter.
+  final image. The direct typed `make vice-action-alink-avmrun` proof is now
+  also green and executes the emitted artifact through `AVMRUN.PRG`, printing
+  `HELLOTOOL7` and `42` before returning to the UDOS prompt. The current
+  `ALINK.PRG` footprint is `4137` bytes. It is still not a full object merger
+  or direct on-target binary emitter.
 - `ACTFLOW.BAT` is the first composite workspace flow proof. It exercises the
   preserved UDOS file write/copy/move/delete services through the existing
   Action-side proof tools, prints `ACTFLOW OK`, and returns to the prompt.

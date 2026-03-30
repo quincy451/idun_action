@@ -291,6 +291,12 @@ def encode_text(source: str) -> tuple[bytes, int]:
                 state.entry_symbol = value
             continue
 
+        if op == "code":
+            if len(operands) != 1:
+                raise ValueError(f"line {lineno}: code requires one size operand")
+            parse_value(operands[0])
+            continue
+
         if op in {"byte", "db"}:
             if not operands:
                 raise ValueError(f"line {lineno}: {op} requires at least one byte")
@@ -299,6 +305,19 @@ def encode_text(source: str) -> tuple[bytes, int]:
                 if not isinstance(value, int):
                     raise ValueError(f"line {lineno}: {op} requires numeric operands")
                 append_u8(state, value, lineno=lineno)
+            continue
+
+        if op in {"hex", "byteshex"}:
+            if len(operands) != 1:
+                raise ValueError(f"line {lineno}: {op} requires exactly one hex blob")
+            blob = operands[0].strip()
+            if len(blob) % 2 != 0:
+                raise ValueError(f"line {lineno}: {op} requires an even number of hex digits")
+            try:
+                payload = bytes.fromhex(blob)
+            except ValueError as exc:
+                raise ValueError(f"line {lineno}: invalid hex blob") from exc
+            state.payload.extend(payload)
             continue
 
         if op in {"stringz", "asciz"}:

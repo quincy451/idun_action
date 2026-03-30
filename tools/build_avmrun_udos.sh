@@ -27,6 +27,7 @@ fi
 make -C "$ACHERON_DIR" acheron >/dev/null
 python3 "$ROOT_DIR/tools/generate_udos_service_inc.py" --labels "$LABELS" --output "$INC"
 
+cd "$ROOT_DIR"
 ca65 -g -o "$OBJ" "$SRC" -I "$BUILD_DIR" -I "$ACHERON_DIR/bin"
 ld65 -C "$CFG" -o "$BIN" "$OBJ" "$ACHERON_DIR/obj/acheron.o"
 printf '\x00\x09' > "$PRG"

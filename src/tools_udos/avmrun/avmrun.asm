@@ -15,7 +15,19 @@
 AVM_HEADER_SIZE = 10
 AVM_FLAG_ACHERON = 1
 FILE_BUFFER_SIZE = 2048
+PAYLOAD_BUFFER_SIZE = 1024
 
+AVMRUN_TRACE = $03E7
+AVMRUN_DBG0 = $03E8
+AVMRUN_DBG1 = $03E9
+AVMRUN_DBG2 = $03EA
+AVMRUN_DBG3 = $03EB
+AVMRUN_DBG4 = $03EC
+AVMRUN_DBG5 = $03ED
+AVMRUN_DBG6 = $03EE
+AVMRUN_DBG7 = $03EF
+OPCODE_PUSH8 = $10
+OPCODE_PUSH16 = $11
 OPCODE_NATIVE = $2D
 OPCODE_CALL = $45
 OPCODE_JUMP = $46
@@ -28,6 +40,8 @@ OPCODE_SETP16 = $61
 INTRINSIC_PRINT = $FF00
 INTRINSIC_PRINTE = $FF10
 INTRINSIC_EXIT = $FF20
+INTRINSIC_PRINTI = $FF30
+INTRINSIC_PRINTIE = $FF31
 
 .segment "ZPTEMP": zeropage
 svc_retptr:
@@ -46,6 +60,10 @@ scan_end:
     .res 2
 word_tmp:
     .res 2
+digit_flag:
+    .res 1
+hex_tmp:
+    .res 1
 
 .code
 
@@ -110,7 +128,26 @@ show_too_large:
     bne fail_with_ptr
 
 file_loaded:
-    jsr validate_header
+    lda file_params+8
+    cmp #>FILE_BUFFER_SIZE
+    bcc file_loaded_terminate
+    bne file_loaded_skip_terminate
+    lda file_params+7
+    cmp #<FILE_BUFFER_SIZE
+    bcs file_loaded_skip_terminate
+file_loaded_terminate:
+    clc
+    lda #<file_buffer
+    adc file_params+7
+    sta src_ptr
+    lda #>file_buffer
+    adc file_params+8
+    sta src_ptr+1
+    ldy #$00
+    lda #$00
+    sta (src_ptr),y
+file_loaded_skip_terminate:
+    jsr prepare_loaded_payload
     bcc header_ok
     lda #<msg_bad_avm
     ldy #>msg_bad_avm
@@ -148,6 +185,29 @@ fail_with_ptr:
     sta svc_retptr+1
     ldx #svc_retptr
     jmp svc_program_exit
+
+prepare_loaded_payload:
+    lda file_buffer+0
+    cmp #'A'
+    beq :+
+    jmp decode_avm_text
+: 
+    lda file_buffer+1
+    cmp #'V'
+    beq :+
+    jmp decode_avm_text
+: 
+    lda file_buffer+2
+    cmp #'M'
+    beq :+
+    jmp decode_avm_text
+: 
+    lda file_buffer+3
+    cmp #'1'
+    beq :+
+    jmp decode_avm_text
+: 
+    jmp validate_header
 
 validate_header:
     lda file_buffer+0
@@ -216,18 +276,491 @@ validate_header_fail:
     sec
     rts
 
+decode_avm_text:
+    lda #$10
+    sta AVMRUN_TRACE
+    lda file_buffer+0
+    cmp #'e'
+    beq :+
+    jmp decode_avm_text_fail
+: 
+    lda file_buffer+1
+    cmp #'n'
+    beq :+
+    jmp decode_avm_text_fail
+: 
+    lda file_buffer+2
+    cmp #'t'
+    beq :+
+    jmp decode_avm_text_fail
+: 
+    lda file_buffer+3
+    cmp #'r'
+    beq :+
+    jmp decode_avm_text_fail
+: 
+    lda file_buffer+4
+    cmp #'y'
+    beq :+
+    jmp decode_avm_text_fail
+: 
+    lda file_buffer+5
+    cmp #' '
+    beq :+
+    jmp decode_avm_text_fail
+: 
+    lda #<(file_buffer + 6)
+    sta scan_ptr
+    lda #>(file_buffer + 6)
+    sta scan_ptr+1
+    jsr parse_decimal_word_at_scan_ptr
+    bcc :+
+    jmp decode_avm_text_fail
+: 
+    lda word_tmp
+    sta entry_ptr
+    lda word_tmp+1
+    sta entry_ptr+1
+    lda #$00
+    sta scan_end
+    sta scan_end+1
+    jsr consume_line_break_at_scan_ptr
+    bcc :+
+    jmp decode_avm_text_fail
+: 
+    ldy #$00
+    lda (scan_ptr),y
+    cmp #'c'
+    bne decode_avm_text_expect_db
+    iny
+    lda (scan_ptr),y
+    cmp #'o'
+    beq :+
+    jmp decode_avm_text_fail
+: 
+    iny
+    lda (scan_ptr),y
+    cmp #'d'
+    beq :+
+    jmp decode_avm_text_fail
+: 
+    iny
+    lda (scan_ptr),y
+    cmp #'e'
+    beq :+
+    jmp decode_avm_text_fail
+: 
+    iny
+    lda (scan_ptr),y
+    cmp #' '
+    beq :+
+    jmp decode_avm_text_fail
+: 
+    lda #$05
+    jsr advance_scan_ptr
+    ldy #$00
+    lda (scan_ptr),y
+    cmp #'$'
+    bne :+
+    lda #$01
+    jsr advance_scan_ptr
+    jsr parse_hex_byte_at_scan_ptr
+    bcc :+
+    jmp decode_avm_text_fail
+: 
+    sta scan_end
+    lda #$00
+    sta scan_end+1
+    jmp decode_avm_text_have_code_len
+    jsr parse_decimal_word_at_scan_ptr
+    bcc :+
+    jmp decode_avm_text_fail
+: 
+    lda word_tmp
+    sta scan_end
+    lda word_tmp+1
+    sta scan_end+1
+decode_avm_text_have_code_len:
+    jsr consume_line_break_at_scan_ptr
+    bcc :+
+    jmp decode_avm_text_fail
+: 
+decode_avm_text_expect_db:
+    lda #$12
+    sta AVMRUN_TRACE
+    ldy #$00
+    lda (scan_ptr),y
+    cmp #'d'
+    beq decode_avm_text_expect_db_prefix
+    cmp #'h'
+    beq decode_avm_text_expect_hex_prefix
+    jmp decode_avm_text_fail
+decode_avm_text_expect_db_prefix:
+    iny
+    lda (scan_ptr),y
+    cmp #'b'
+    beq :+
+    jmp decode_avm_text_fail
+: 
+    iny
+    lda (scan_ptr),y
+    cmp #' '
+    beq :+
+    jmp decode_avm_text_fail
+: 
+    lda #$03
+    jsr advance_scan_ptr
+    jmp decode_avm_text_init_payload_ptr
+decode_avm_text_expect_hex_prefix:
+    iny
+    lda (scan_ptr),y
+    cmp #'e'
+    beq :+
+    jmp decode_avm_text_fail
+: 
+    iny
+    lda (scan_ptr),y
+    cmp #'x'
+    beq :+
+    jmp decode_avm_text_fail
+: 
+    iny
+    lda (scan_ptr),y
+    cmp #' '
+    beq :+
+    jmp decode_avm_text_fail
+: 
+    lda #$04
+    jsr advance_scan_ptr
+decode_avm_text_init_payload_ptr:
+    lda #<payload_buffer
+    sta payload_ptr
+    sta src_ptr
+    lda #>payload_buffer
+    sta payload_ptr+1
+    sta src_ptr+1
+    ldy #$00
+    lda (scan_ptr),y
+    cmp #'$'
+    beq decode_avm_text_byte_loop
+    jmp decode_avm_text_hex_loop
+decode_avm_text_byte_loop:
+    ldy #$00
+    lda (scan_ptr),y
+    beq decode_avm_text_byte_done
+    cmp #10
+    beq decode_avm_text_byte_done
+    cmp #13
+    beq decode_avm_text_byte_done
+    cmp #'$'
+    beq :+
+    jmp decode_avm_text_fail
+: 
+    lda #$01
+    jsr advance_scan_ptr
+    jsr parse_hex_byte_at_scan_ptr
+    bcc :+
+    jmp decode_avm_text_fail
+: 
+    ldy #$00
+    sta (src_ptr),y
+    inc src_ptr
+    bne :+
+    inc src_ptr+1
+:   lda src_ptr+1
+    cmp #>(payload_buffer + PAYLOAD_BUFFER_SIZE)
+    bcc :+
+    beq :+
+    jmp decode_avm_text_fail
+: 
+    lda src_ptr
+    cmp #<(payload_buffer + PAYLOAD_BUFFER_SIZE)
+    bcc :+
+    bne :+
+    jmp decode_avm_text_fail
+:   ldy #$00
+    lda (scan_ptr),y
+    cmp #','
+    beq decode_avm_text_consume_comma
+    cmp #$00
+    beq decode_avm_text_byte_done
+    cmp #10
+    beq decode_avm_text_byte_done
+    cmp #13
+    beq decode_avm_text_byte_done
+    jmp decode_avm_text_fail
+decode_avm_text_consume_comma:
+    lda #$01
+    jsr advance_scan_ptr
+    jmp decode_avm_text_byte_loop
+decode_avm_text_byte_done:
+    jmp decode_avm_text_done
+decode_avm_text_hex_loop:
+    ldy #$00
+    lda (scan_ptr),y
+    beq decode_avm_text_done
+    cmp #10
+    beq decode_avm_text_done
+    cmp #13
+    beq decode_avm_text_done
+    jsr parse_hex_byte_at_scan_ptr
+    bcc :+
+    jmp decode_avm_text_fail
+: 
+    ldy #$00
+    sta (src_ptr),y
+    inc src_ptr
+    bne :+
+    inc src_ptr+1
+:   lda src_ptr+1
+    cmp #>(payload_buffer + PAYLOAD_BUFFER_SIZE)
+    bcc :+
+    beq :+
+    jmp decode_avm_text_fail
+: 
+    lda src_ptr
+    cmp #<(payload_buffer + PAYLOAD_BUFFER_SIZE)
+    bcc :+
+    bne :+
+    jmp decode_avm_text_fail
+:   jmp decode_avm_text_hex_loop
+decode_avm_text_done:
+    lda src_ptr
+    cmp payload_ptr
+    bne decode_avm_text_have_payload
+    lda src_ptr+1
+    cmp payload_ptr+1
+    bne decode_avm_text_have_payload
+    jmp decode_avm_text_fail
+decode_avm_text_have_payload:
+    lda scan_end
+    ora scan_end+1
+    beq decode_avm_text_use_payload_end
+    clc
+    lda payload_ptr
+    adc scan_end
+    sta scan_end
+    lda payload_ptr+1
+    adc scan_end+1
+    sta scan_end+1
+    jmp decode_avm_text_check_entry
+decode_avm_text_use_payload_end:
+    lda src_ptr
+    sta scan_end
+    lda src_ptr+1
+    sta scan_end+1
+decode_avm_text_check_entry:
+    lda payload_ptr
+    clc
+    adc entry_ptr
+    sta entry_ptr
+    lda payload_ptr+1
+    adc entry_ptr+1
+    sta entry_ptr+1
+    lda entry_ptr+1
+    cmp scan_end+1
+    bcc decode_avm_text_check_code_end
+    bne decode_avm_text_entry_fail
+    lda entry_ptr
+    cmp scan_end
+    bcc decode_avm_text_check_code_end
+decode_avm_text_entry_fail:
+    lda #$21
+    sta AVMRUN_TRACE
+    jmp decode_avm_text_fail
+decode_avm_text_check_code_end:
+    lda scan_end+1
+    cmp src_ptr+1
+    bcc decode_avm_text_success
+    bne decode_avm_text_code_end_fail
+    lda scan_end
+    cmp src_ptr
+    bcc decode_avm_text_success
+    beq decode_avm_text_success
+decode_avm_text_code_end_fail:
+    lda #$22
+    sta AVMRUN_TRACE
+    jmp decode_avm_text_fail
+decode_avm_text_success:
+    clc
+    rts
+decode_avm_text_fail:
+    sec
+    rts
+
+parse_decimal_word_at_scan_ptr:
+    lda #$00
+    sta word_tmp
+    sta word_tmp+1
+    sta digit_flag
+parse_decimal_word_at_scan_ptr_loop:
+    ldy #$00
+    lda (scan_ptr),y
+    cmp #'0'
+    bcc parse_decimal_word_at_scan_ptr_done
+    cmp #'9'+1
+    bcs parse_decimal_word_at_scan_ptr_done
+    sec
+    sbc #'0'
+    pha
+    lda word_tmp
+    sta hex_tmp
+    lda word_tmp+1
+    pha
+    lda word_tmp
+    asl a
+    rol word_tmp+1
+    sta word_tmp
+    lda word_tmp
+    asl a
+    rol word_tmp+1
+    asl a
+    rol word_tmp+1
+    clc
+    adc hex_tmp
+    sta word_tmp
+    pla
+    adc word_tmp+1
+    sta word_tmp+1
+    lda hex_tmp
+    clc
+    adc word_tmp
+    sta word_tmp
+    bcc :+
+    inc word_tmp+1
+:   pla
+    clc
+    adc word_tmp
+    sta word_tmp
+    bcc :+
+    inc word_tmp+1
+:   lda #$01
+    sta digit_flag
+    lda #$01
+    jsr advance_scan_ptr
+    jmp parse_decimal_word_at_scan_ptr_loop
+parse_decimal_word_at_scan_ptr_done:
+    lda digit_flag
+    beq decode_avm_text_fail
+    clc
+    rts
+
+consume_line_break_at_scan_ptr:
+    ldy #$00
+    lda (scan_ptr),y
+    cmp #13
+    beq consume_line_break_cr
+    cmp #10
+    beq consume_line_break_lf
+    sec
+    rts
+consume_line_break_cr:
+    lda #$01
+    jsr advance_scan_ptr
+    ldy #$00
+    lda (scan_ptr),y
+    cmp #10
+    bne :+
+    lda #$01
+    jsr advance_scan_ptr
+:   clc
+    rts
+consume_line_break_lf:
+    lda #$01
+    jsr advance_scan_ptr
+    clc
+    rts
+
+parse_hex_byte_at_scan_ptr:
+    jsr parse_hex_nibble_at_scan_ptr
+    bcs parse_hex_byte_at_scan_ptr_fail
+    asl a
+    asl a
+    asl a
+    asl a
+    sta hex_tmp
+    jsr parse_hex_nibble_at_scan_ptr
+    bcs parse_hex_byte_at_scan_ptr_fail
+    ora hex_tmp
+    clc
+    rts
+parse_hex_byte_at_scan_ptr_fail:
+    sec
+    rts
+
+parse_hex_nibble_at_scan_ptr:
+    ldy #$00
+    lda (scan_ptr),y
+    cmp #'0'
+    bcc parse_hex_nibble_at_scan_ptr_bad
+    cmp #'9'+1
+    bcc parse_hex_nibble_at_scan_ptr_digit
+    cmp #'a'
+    bcc parse_hex_nibble_at_scan_ptr_upper
+    cmp #'f'+1
+    bcs parse_hex_nibble_at_scan_ptr_bad
+    sec
+    sbc #'a'-10
+    pha
+    lda #$01
+    jsr advance_scan_ptr
+    pla
+    clc
+    rts
+parse_hex_nibble_at_scan_ptr_upper:
+    cmp #'A'
+    bcc parse_hex_nibble_at_scan_ptr_bad
+    cmp #'F'+1
+    bcs parse_hex_nibble_at_scan_ptr_bad
+    sec
+    sbc #'A'-10
+    pha
+    lda #$01
+    jsr advance_scan_ptr
+    pla
+    clc
+    rts
+parse_hex_nibble_at_scan_ptr_digit:
+    sec
+    sbc #'0'
+    pha
+    lda #$01
+    jsr advance_scan_ptr
+    pla
+    clc
+    rts
+parse_hex_nibble_at_scan_ptr_bad:
+    sec
+    rts
+
 patch_payload:
     lda payload_ptr
     sta scan_ptr
     lda payload_ptr+1
     sta scan_ptr+1
 patch_payload_loop:
+    lda scan_ptr
+    cmp scan_end
+    bne :+
+    lda scan_ptr+1
+    cmp scan_end+1
+    bne :+
+    jmp patch_payload_done
+: 
     jsr scan_ptr_before_end
     bcc :+
     jmp patch_payload_fail
 :
     ldy #$00
     lda (scan_ptr),y
+    cmp #OPCODE_PUSH8
+    bne :+
+    jmp patch_byte_arg
+:
+    cmp #OPCODE_PUSH16
+    bne :+
+    jmp patch_literal_word_arg
+:
     cmp #OPCODE_NATIVE
     bne :+
     jmp patch_payload_done
@@ -274,6 +807,15 @@ patch_byte_arg:
     jmp patch_payload_fail
 :
     lda #$02
+    jsr advance_scan_ptr
+    jmp patch_payload_loop
+
+patch_literal_word_arg:
+    jsr ensure_scan_room_3
+    bcc :+
+    jmp patch_payload_fail
+:
+    lda #$03
     jsr advance_scan_ptr
     jmp patch_payload_loop
 
@@ -335,7 +877,9 @@ patch_setp16:
 
 patch_calln:
     jsr ensure_scan_room_3
-    bcs patch_payload_fail
+    bcc :+
+    jmp patch_payload_fail
+: 
     ldy #$01
     lda (scan_ptr),y
     sta word_tmp
@@ -351,11 +895,26 @@ patch_calln:
 patch_check_printe:
     lda word_tmp
     cmp #<INTRINSIC_PRINTE
-    bne patch_check_exit
+    bne patch_check_printi
     lda word_tmp+1
     cmp #>INTRINSIC_PRINTE
     beq patch_calln_printe
+patch_check_printi:
+    lda word_tmp
+    cmp #<INTRINSIC_PRINTI
+    bne patch_check_printie
+    lda word_tmp+1
+    cmp #>INTRINSIC_PRINTI
+    beq patch_calln_printi
+patch_check_printie:
+    lda word_tmp
+    cmp #<INTRINSIC_PRINTIE
+    bne patch_check_exit_real
+    lda word_tmp+1
+    cmp #>INTRINSIC_PRINTIE
+    beq patch_calln_printie
 patch_check_exit:
+patch_check_exit_real:
     lda word_tmp
     cmp #<INTRINSIC_EXIT
     bne patch_payload_fail
@@ -378,6 +937,26 @@ patch_calln_printe:
     sta word_tmp
     lda #>native_printe
     sta word_tmp+1
+    bne patch_calln_store
+patch_calln_printi:
+    jsr lower_previous_push16_to_setp16
+    bcc :+
+    jmp patch_payload_fail
+: 
+    lda #<native_printi
+    sta word_tmp
+    lda #>native_printi
+    sta word_tmp+1
+    bne patch_calln_store
+patch_calln_printie:
+    jsr lower_previous_push16_to_setp16
+    bcc :+
+    jmp patch_payload_fail
+: 
+    lda #<native_printie
+    sta word_tmp
+    lda #>native_printie
+    sta word_tmp+1
 patch_calln_store:
     ldy #$01
     lda word_tmp
@@ -394,6 +973,33 @@ patch_payload_done:
     rts
 
 patch_payload_fail:
+    sec
+    rts
+
+lower_previous_push16_to_setp16:
+    sec
+    lda scan_ptr
+    sbc #$03
+    sta word_tmp
+    lda scan_ptr+1
+    sbc #$00
+    sta word_tmp+1
+    lda word_tmp+1
+    cmp payload_ptr+1
+    bcc lower_previous_push16_to_setp16_fail
+    bne :+
+    lda word_tmp
+    cmp payload_ptr
+    bcc lower_previous_push16_to_setp16_fail
+:  ldy #$00
+    lda (word_tmp),y
+    cmp #OPCODE_PUSH16
+    bne lower_previous_push16_to_setp16_fail
+    lda #OPCODE_SETP16
+    sta (word_tmp),y
+    clc
+    rts
+lower_previous_push16_to_setp16_fail:
     sec
     rts
 
@@ -490,12 +1096,104 @@ native_printe:
     jsr restore_vm_state
     rts
 
+native_printi:
+    jsr save_vm_state
+    lda 0,x
+    sta word_tmp
+    lda 1,x
+    sta word_tmp+1
+    jsr print_u16_word_tmp
+    jsr restore_vm_state
+    rts
+
+native_printie:
+    jsr save_vm_state
+    lda 0,x
+    sta word_tmp
+    lda 1,x
+    sta word_tmp+1
+    jsr print_u16_word_tmp
+    jsr svc_console_newline
+    jsr restore_vm_state
+    rts
+
 native_exit:
     lda #$00
     sta svc_retptr
     sta svc_retptr+1
     ldx #svc_retptr
     jmp svc_program_exit
+
+print_u16_word_tmp:
+    lda #$00
+    sta digit_flag
+    ldx #$00
+print_u16_word_tmp_loop:
+    cpx #$04
+    beq print_u16_word_tmp_ones
+    jsr print_digit_divisor_x
+    inx
+    bne print_u16_word_tmp_loop
+print_u16_word_tmp_ones:
+    lda word_tmp
+    clc
+    adc #'0'
+    jmp print_char_a
+
+print_digit_divisor_x:
+    lda #$00
+    sta hex_tmp
+print_digit_divisor_x_sub_loop:
+    lda word_tmp+1
+    cmp decimal_divisors_hi,x
+    bcc print_digit_divisor_x_done
+    bne :+
+    lda word_tmp
+    cmp decimal_divisors_lo,x
+    bcc print_digit_divisor_x_done
+:   sec
+    lda word_tmp
+    sbc decimal_divisors_lo,x
+    sta word_tmp
+    lda word_tmp+1
+    sbc decimal_divisors_hi,x
+    sta word_tmp+1
+    inc hex_tmp
+    bne print_digit_divisor_x_sub_loop
+print_digit_divisor_x_done:
+    lda digit_flag
+    bne print_digit_divisor_x_emit
+    lda hex_tmp
+    beq print_digit_divisor_x_skip
+print_digit_divisor_x_emit:
+    lda hex_tmp
+    clc
+    adc #'0'
+    jsr print_char_a
+    lda #$01
+    sta digit_flag
+print_digit_divisor_x_skip:
+    rts
+
+print_char_a:
+    sta char_buffer
+    lda #$00
+    sta char_buffer+1
+    tya
+    pha
+    txa
+    pha
+    lda #<char_buffer
+    sta svc_retptr
+    lda #>char_buffer
+    sta svc_retptr+1
+    ldx #svc_retptr
+    jsr svc_console_write_sc0
+    pla
+    tax
+    pla
+    tay
+    rts
 
 copy_first_arg:
     ldy #$00
@@ -556,10 +1254,21 @@ msg_bad_avm:
 msg_unsupported:
     .asciiz "UNSUPPORTED AVM"
 
+decimal_divisors_lo:
+    .byte <10000,<1000,<100,<10
+decimal_divisors_hi:
+    .byte >10000,>1000,>100,>10
+
+.segment "BSS"
+
 filename_buffer:
     .res 32
 file_buffer:
     .res FILE_BUFFER_SIZE
+payload_buffer:
+    .res PAYLOAD_BUFFER_SIZE
+char_buffer:
+    .res 2
 
 saved_iptr:
     .res 2
