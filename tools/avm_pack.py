@@ -10,8 +10,10 @@ import sys
 import tempfile
 
 MAGIC = b"AVM1"
-VERSION = 1
-HEADER = struct.Struct("<4sBHHB")
+VERSION_V1 = 1
+VERSION_V2 = 2
+HEADER_V1 = struct.Struct("<4sBHHB")
+HEADER_V2 = struct.Struct("<4sBHHBH")
 AVM_FLAG_ACHERON = 0x01
 
 OPCODE_PUSH8 = 0x10
@@ -98,6 +100,7 @@ class AvmFile:
     payload: bytes
     entry_offset: int
     flags: int = 0
+    code_len: int | None = None
 
 
 @dataclass(frozen=True)
@@ -115,6 +118,7 @@ class AssemblyState:
     fixups: list[Fixup]
     entry_symbol: str | None
     entry_offset: int | None
+    code_len: int | None
 
 
 def parse_number(token: str) -> int:
@@ -255,8 +259,15 @@ def append_u16_or_fixup(state: AssemblyState, value: int | str, *, lineno: int) 
     state.payload.extend((0, 0))
 
 
-def encode_text(source: str) -> tuple[bytes, int]:
-    state = AssemblyState(payload=bytearray(), labels={}, fixups=[], entry_symbol=None, entry_offset=None)
+def encode_text(source: str) -> tuple[bytes, int, int | None]:
+    state = AssemblyState(
+        payload=bytearray(),
+        labels={},
+        fixups=[],
+        entry_symbol=None,
+        entry_offset=None,
+        code_len=None,
+    )
 
     for lineno, raw_line in enumerate(source.splitlines(), start=1):
         line = strip_comments(raw_line)
@@ -294,7 +305,12 @@ def encode_text(source: str) -> tuple[bytes, int]:
         if op == "code":
             if len(operands) != 1:
                 raise ValueError(f"line {lineno}: code requires one size operand")
-            parse_value(operands[0])
+            value = parse_value(operands[0])
+            if not isinstance(value, int):
+                raise ValueError(f"line {lineno}: code requires a numeric operand")
+            if not 0 <= value <= 0xFFFF:
+                raise ValueError(f"line {lineno}: code size out of range")
+            state.code_len = value
             continue
 
         if op in {"byte", "db"}:
@@ -371,43 +387,76 @@ def encode_text(source: str) -> tuple[bytes, int]:
     if not 0 <= entry_offset <= len(state.payload):
         raise ValueError("entry offset must point inside the payload")
 
-    return bytes(state.payload), entry_offset
+    if state.code_len is not None and state.code_len > len(state.payload):
+        raise ValueError("code size must not exceed payload length")
+
+    return bytes(state.payload), entry_offset, state.code_len
 
 
-def pack_avm(payload: bytes, *, entry_offset: int, flags: int = 0, version: int = VERSION) -> bytes:
+def pack_avm(
+    payload: bytes,
+    *,
+    entry_offset: int,
+    flags: int = 0,
+    version: int | None = None,
+    code_len: int | None = None,
+) -> bytes:
+    if version is None:
+        version = VERSION_V2 if code_len is not None else VERSION_V1
     if not 0 <= version <= 0xFF:
         raise ValueError("version must fit in one byte")
     if not 0 <= flags <= 0xFF:
         raise ValueError("flags must fit in one byte")
     if len(payload) > 0xFFFF:
-        raise ValueError("payload too large for version 1 header")
+        raise ValueError("payload too large for AVM header")
     if not 0 <= entry_offset <= len(payload):
         raise ValueError("entry offset must point inside the payload")
-    return HEADER.pack(MAGIC, version, len(payload), entry_offset, flags) + payload
+    if version == VERSION_V1:
+        if code_len is not None and code_len != len(payload):
+            raise ValueError("version 1 cannot encode a code length shorter than the payload")
+        return HEADER_V1.pack(MAGIC, version, len(payload), entry_offset, flags) + payload
+    if version == VERSION_V2:
+        if code_len is None:
+            code_len = len(payload)
+        if not 0 <= code_len <= len(payload):
+            raise ValueError("code length must point inside the payload")
+        return HEADER_V2.pack(MAGIC, version, len(payload), entry_offset, flags, code_len) + payload
+    raise ValueError(f"unsupported AVM version: {version}")
 
 
 def unpack_avm(data: bytes) -> AvmFile:
-    if len(data) < HEADER.size:
+    if len(data) < HEADER_V1.size:
         raise ValueError("file too short for AVM header")
-    magic, version, payload_len, entry_offset, flags = HEADER.unpack_from(data)
+    magic = data[:4]
+    version = data[4]
     if magic != MAGIC:
         raise ValueError(f"bad magic: {magic!r}")
-    if version != VERSION:
+    if version == VERSION_V1:
+        magic, version, payload_len, entry_offset, flags = HEADER_V1.unpack_from(data)
+        code_len = payload_len
+        header_size = HEADER_V1.size
+    elif version == VERSION_V2:
+        if len(data) < HEADER_V2.size:
+            raise ValueError("file too short for AVM v2 header")
+        magic, version, payload_len, entry_offset, flags, code_len = HEADER_V2.unpack_from(data)
+        if code_len > payload_len:
+            raise ValueError("code length beyond payload length")
+        header_size = HEADER_V2.size
+    else:
         raise ValueError(f"unsupported version: {version}")
-    if flags != 0:
-        raise ValueError(f"unsupported flags for version 1: {flags}")
-    payload = data[HEADER.size : HEADER.size + payload_len]
+    payload = data[header_size : header_size + payload_len]
     if len(payload) != payload_len:
         raise ValueError("truncated payload")
     if entry_offset > payload_len:
         raise ValueError("entry offset beyond payload length")
-    return AvmFile(version=version, payload=payload, entry_offset=entry_offset, flags=flags)
+    return AvmFile(version=version, payload=payload, entry_offset=entry_offset, flags=flags, code_len=code_len)
 
 
 def run_selftest() -> int:
-    payload, entry_offset = encode_text(
+    payload, entry_offset, code_len = encode_text(
         """
         entry start
+        code $0d
         start:
           setp16 msg
           calln print
@@ -418,9 +467,13 @@ def run_selftest() -> int:
           stringz "OK"
         """
     )
-    packed = pack_avm(payload, entry_offset=entry_offset)
+    packed = pack_avm(payload, entry_offset=entry_offset, code_len=code_len)
     unpacked = unpack_avm(packed)
-    if unpacked.payload != payload or unpacked.entry_offset != entry_offset:
+    if (
+        unpacked.payload != payload
+        or unpacked.entry_offset != entry_offset
+        or unpacked.code_len != code_len
+    ):
         print("selftest failed: roundtrip mismatch", file=sys.stderr)
         return 1
 
@@ -428,7 +481,7 @@ def run_selftest() -> int:
         out_path = Path(tmpdir) / "selftest.avm"
         out_path.write_bytes(packed)
         reread = unpack_avm(out_path.read_bytes())
-        if reread.payload != payload or reread.entry_offset != entry_offset:
+        if reread.payload != payload or reread.entry_offset != entry_offset or reread.code_len != code_len:
             print("selftest failed: disk roundtrip mismatch", file=sys.stderr)
             return 1
 
@@ -463,13 +516,15 @@ def main(argv: list[str] | None = None) -> int:
         parser.error(f"input file not found: {input_path}")
 
     if args.text:
-        payload, inferred_entry = encode_text(input_path.read_text())
+        payload, inferred_entry, inferred_code = encode_text(input_path.read_text())
         entry_offset = args.entry_offset if args.entry_offset is not None else inferred_entry
+        code_len = inferred_code
     else:
         payload = input_path.read_bytes()
         entry_offset = args.entry_offset if args.entry_offset is not None else 0
+        code_len = None
 
-    packed = pack_avm(payload, entry_offset=entry_offset, flags=args.flags)
+    packed = pack_avm(payload, entry_offset=entry_offset, flags=args.flags, code_len=code_len)
     output_path.write_bytes(packed)
     print(f"wrote {output_path} ({len(payload)} payload bytes)")
     return 0

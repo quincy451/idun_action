@@ -12,7 +12,7 @@ file_params:
 query_params:
     .res 9
 save_params:
-    .res 5
+    .res 7
 src_ptr:
     .res 2
 name_len:

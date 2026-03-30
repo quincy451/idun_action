@@ -6,9 +6,8 @@
 svc_retptr:
     .res 2
 dir_params:
-    .res 3
-save_params:
-    .res 5
+    .res 7
+save_params = dir_params
 src_ptr:
     .res 2
 dst_ptr:
@@ -75,11 +74,14 @@ have_args:
     sta save_params+2
     lda #>marker_text
     sta save_params+3
-    lda #tool_file_status_fail
+    lda #$00
     sta save_params+4
+    sta save_params+5
+    lda #tool_file_status_fail
+    sta save_params+6
     ldx #save_params
     jsr svc_file_save_sc0
-    lda save_params+4
+    lda save_params+6
     cmp #tool_file_status_ok
     beq :+
     lda #<msg_save_fail
@@ -94,11 +96,14 @@ have_args:
     sta save_params+2
     lda #>readme_text
     sta save_params+3
-    lda #tool_file_status_fail
+    lda #$00
     sta save_params+4
+    sta save_params+5
+    lda #tool_file_status_fail
+    sta save_params+6
     ldx #save_params
     jsr svc_file_save_sc0
-    lda save_params+4
+    lda save_params+6
     cmp #tool_file_status_ok
     beq :+
     lda #<msg_save_fail
@@ -113,11 +118,14 @@ have_args:
     sta save_params+2
     lda #>main_text
     sta save_params+3
-    lda #tool_file_status_fail
+    lda #$00
     sta save_params+4
+    sta save_params+5
+    lda #tool_file_status_fail
+    sta save_params+6
     ldx #save_params
     jsr svc_file_save_sc0
-    lda save_params+4
+    lda save_params+6
     cmp #tool_file_status_ok
     beq :+
     lda #<msg_save_fail

@@ -5,6 +5,9 @@
 MANIFEST_LIMIT = 191
 SOURCE_LIMIT = 255
 ALINK_TRACE = $03FC
+AVM_VERSION = 2
+AVM_FLAG_ACHERON = 1
+AVM_HEADER_SIZE = 12
 
 PENDING_SYMBOL_MAX = 7
 OPCODE_PUSH16 = $11
@@ -19,7 +22,7 @@ svc_retptr:
 file_params:
     .res 9
 save_params:
-    .res 5
+    .res 7
 src_ptr:
     .res 2
 scan_ptr:
@@ -37,10 +40,6 @@ current_bit_hi:
 main_flags_lo:
     .res 1
 main_flags_hi:
-    .res 1
-save_mode:
-    .res 1
-export_index_zp:
     .res 1
 truncated_flag:
     .res 1
@@ -68,10 +67,10 @@ start:
     jsr build_live_set
     lda #$10
     sta ALINK_TRACE
-    jsr build_avm_text_content_or_fail
+    jsr build_avm_binary_content_or_fail
     lda #$1E
     sta ALINK_TRACE
-    jsr build_avm_text_target_path
+    jsr build_avm_binary_target_path
     lda #$1F
     sta ALINK_TRACE
     jsr save_source_buffer_to_target
@@ -834,12 +833,12 @@ advance_scan_ptr_by_const_ptr_loop:
 advance_scan_ptr_by_const_ptr_done:
     rts
 
-build_avm_text_content_or_fail:
+build_avm_binary_content_or_fail:
     jsr layout_payload_or_fail
     jsr emit_payload_or_fail
     lda #$1D
     sta ALINK_TRACE
-    jmp render_payload_as_byte_text_or_fail
+    jmp render_payload_as_binary_or_fail
 
 layout_payload_or_fail:
     lda #$00
@@ -1577,89 +1576,52 @@ append_payload_byte_fail:
     ldy #>msg_too_large
     jmp fail_with_ptr
 
-render_payload_as_byte_text_or_fail:
+render_payload_as_binary_or_fail:
     lda main_flags_hi
-    bne render_payload_as_byte_text_too_large
-    lda main_flags_lo
-    cmp #117
-    bcc :+
-render_payload_as_byte_text_too_large:
+    beq :+
     lda #<msg_too_large
     ldy #>msg_too_large
     jmp fail_with_ptr
-:   lda #<source_buffer
-    sta content_ptr
-    lda #>source_buffer
-    sta content_ptr+1
-    lda #<avm_byte_entry_prefix
-    sta const_ptr
-    lda #>avm_byte_entry_prefix
-    sta const_ptr+1
-    jsr append_const_ptr
-    lda #<avm_byte_code_prefix
-    sta const_ptr
-    lda #>avm_byte_code_prefix
-    sta const_ptr+1
-    jsr append_const_ptr
-    lda code_limit_data
-    jsr append_hex_byte
-    jsr append_newline
-    lda #<avm_byte_hex_prefix
-    sta const_ptr
-    lda #>avm_byte_hex_prefix
-    sta const_ptr+1
-    jsr append_const_ptr
-    ldx #$00
-render_payload_as_byte_text_loop:
-    cpx main_flags_lo
-    beq render_payload_as_byte_text_done
-    stx compare_char
-    lda content_buffer,x
-    jsr append_hex_byte_compact
-    ldx compare_char
-    inx
-    bne render_payload_as_byte_text_loop
-render_payload_as_byte_text_done:
-    jsr append_newline
-    lda #$00
-    jmp append_char
-
-append_hex_byte_compact:
-    pha
-    lsr a
-    lsr a
-    lsr a
-    lsr a
-    jsr append_hex_nibble
-    pla
-    and #$0F
-    jmp append_hex_nibble
-
-append_hex_byte:
-    pha
-    lda #'$'
-    jsr append_char
-    pla
-    pha
-    lsr a
-    lsr a
-    lsr a
-    lsr a
-    jsr append_hex_nibble
-    pla
-    and #$0F
-    jmp append_hex_nibble
-
-append_hex_nibble:
-    and #$0F
-    cmp #10
+:   lda main_flags_lo
+    cmp #245
     bcc :+
-    clc
-    adc #'a' - 10
-    jmp append_char
-:   clc
-    adc #'0'
-    jmp append_char
+    lda #<msg_too_large
+    ldy #>msg_too_large
+    jmp fail_with_ptr
+:   ldx main_flags_lo
+    beq render_payload_as_binary_header
+    dex
+render_payload_as_binary_shift_loop:
+    lda content_buffer,x
+    sta content_buffer+AVM_HEADER_SIZE,x
+    dex
+    cpx #$FF
+    bne render_payload_as_binary_shift_loop
+render_payload_as_binary_header:
+    lda #'A'
+    sta content_buffer+0
+    lda #'V'
+    sta content_buffer+1
+    lda #'M'
+    sta content_buffer+2
+    lda #'1'
+    sta content_buffer+3
+    lda #AVM_VERSION
+    sta content_buffer+4
+    lda main_flags_lo
+    sta content_buffer+5
+    lda #$00
+    sta content_buffer+6
+    sta content_buffer+7
+    sta content_buffer+8
+    lda #AVM_FLAG_ACHERON
+    sta content_buffer+9
+    lda code_limit_data
+    sta content_buffer+10
+    lda #$00
+    sta content_buffer+11
+render_payload_as_binary_done:
+    rts
 
 save_current_string_state:
     lda string_count
@@ -1871,15 +1833,22 @@ save_source_buffer_to_target:
     sta save_params+0
     lda #>target_path
     sta save_params+1
-    lda #<source_buffer
+    lda #<content_buffer
     sta save_params+2
-    lda #>source_buffer
+    lda #>content_buffer
     sta save_params+3
-    lda #tool_file_status_fail
+    clc
+    lda main_flags_lo
+    adc #AVM_HEADER_SIZE
     sta save_params+4
+    lda #$00
+    adc main_flags_hi
+    sta save_params+5
+    lda #tool_file_status_fail
+    sta save_params+6
     ldx #save_params
     jsr svc_file_save_sc0
-    lda save_params+4
+    lda save_params+6
     cmp #tool_file_status_ok
     beq save_source_buffer_to_target_ok
     sec
@@ -1962,12 +1931,6 @@ line_string:
 line_int:
     .byte "i ",0
 
-avm_byte_entry_prefix:
-    .byte "entry 0",10,0
-avm_byte_code_prefix:
-    .byte "code ",0
-avm_byte_hex_prefix:
-    .byte "hex ",0
 bit_masks:
     .byte $01,$02,$04,$08,$10,$20,$40,$80
 
@@ -2005,6 +1968,10 @@ string_count:
 saved_string_literals:
     .res 192
 saved_string_count:
+    .res 1
+save_mode:
+    .res 1
+export_index_zp:
     .res 1
 pending_active_index:
     .res 1

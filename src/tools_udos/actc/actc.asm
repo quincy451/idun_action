@@ -16,7 +16,7 @@ svc_retptr:
 file_params:
     .res 9
 save_params:
-    .res 5
+    .res 7
 src_ptr:
     .res 2
 scan_ptr:
@@ -29,11 +29,7 @@ import_flags_lo:
     .res 1
 truncated_flag:
     .res 1
-compare_char:
-    .res 1
 save_mode:
-    .res 1
-hex_work:
     .res 1
 list_started:
     .res 1
@@ -1381,6 +1377,10 @@ int_count_data:
 current_proc_index_data:
     .res 1
 extern_count_data:
+    .res 1
+compare_char:
+    .res 1
+hex_work:
     .res 1
 export_names:
     .res 200

@@ -13,6 +13,9 @@
     jmp start
 
 AVM_HEADER_SIZE = 10
+AVM_HEADER_SIZE_V2 = 12
+AVM_VERSION_V1 = 1
+AVM_VERSION_V2 = 2
 AVM_FLAG_ACHERON = 1
 FILE_BUFFER_SIZE = 2048
 PAYLOAD_BUFFER_SIZE = 1024
@@ -212,30 +215,78 @@ prepare_loaded_payload:
 validate_header:
     lda file_buffer+0
     cmp #'A'
-    bne validate_header_fail
+    beq :+
+    jmp validate_header_fail
+:   
     lda file_buffer+1
     cmp #'V'
-    bne validate_header_fail
+    beq :+
+    jmp validate_header_fail
+:   
     lda file_buffer+2
     cmp #'M'
-    bne validate_header_fail
+    beq :+
+    jmp validate_header_fail
+:   
     lda file_buffer+3
     cmp #'1'
-    bne validate_header_fail
+    beq :+
+    jmp validate_header_fail
+:   
     lda file_buffer+4
-    cmp #$01
-    bne validate_header_fail
-    lda file_buffer+9
-    cmp #AVM_FLAG_ACHERON
-    bne validate_header_fail
-    lda file_buffer+7
-    sta word_tmp
-    lda file_buffer+8
-    sta word_tmp+1
+    cmp #AVM_VERSION_V1
+    beq validate_header_v1
+    cmp #AVM_VERSION_V2
+    beq validate_header_v2
+    jmp validate_header_fail
+validate_header_v1:
     lda file_buffer+5
     sta scan_end
     lda file_buffer+6
     sta scan_end+1
+    lda scan_end
+    sta src_ptr
+    lda scan_end+1
+    sta src_ptr+1
+    lda file_buffer+7
+    sta word_tmp
+    lda file_buffer+8
+    sta word_tmp+1
+    lda #<(file_buffer + AVM_HEADER_SIZE)
+    sta payload_ptr
+    lda #>(file_buffer + AVM_HEADER_SIZE)
+    sta payload_ptr+1
+    jmp validate_header_common
+validate_header_v2:
+    lda file_buffer+5
+    sta scan_end
+    lda file_buffer+6
+    sta scan_end+1
+    lda file_buffer+10
+    sta src_ptr
+    lda file_buffer+11
+    sta src_ptr+1
+    lda src_ptr+1
+    cmp scan_end+1
+    bcc :+
+    bne validate_header_fail
+    lda src_ptr
+    cmp scan_end
+    bcc :+
+    beq :+
+    jmp validate_header_fail
+:   lda file_buffer+7
+    sta word_tmp
+    lda file_buffer+8
+    sta word_tmp+1
+    lda #<(file_buffer + AVM_HEADER_SIZE_V2)
+    sta payload_ptr
+    lda #>(file_buffer + AVM_HEADER_SIZE_V2)
+    sta payload_ptr+1
+validate_header_common:
+    lda file_buffer+9
+    cmp #AVM_FLAG_ACHERON
+    bne validate_header_fail
     lda word_tmp+1
     cmp scan_end+1
     bcc :+
@@ -244,16 +295,12 @@ validate_header:
     cmp scan_end
     bcs validate_header_fail
 :
-    lda #<(file_buffer + AVM_HEADER_SIZE)
-    sta payload_ptr
-    lda #>(file_buffer + AVM_HEADER_SIZE)
-    sta payload_ptr+1
     clc
     lda payload_ptr
-    adc file_buffer+5
+    adc src_ptr
     sta scan_end
     lda payload_ptr+1
-    adc file_buffer+6
+    adc src_ptr+1
     sta scan_end+1
     sec
     lda payload_ptr

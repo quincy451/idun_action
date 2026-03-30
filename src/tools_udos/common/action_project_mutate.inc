@@ -100,11 +100,14 @@ save_manifest_buffer:
     sta save_params+2
     lda #>manifest_buffer
     sta save_params+3
-    lda #tool_file_status_fail
+    lda #$00
     sta save_params+4
+    sta save_params+5
+    lda #tool_file_status_fail
+    sta save_params+6
     ldx #save_params
     jsr svc_file_save_sc0
-    lda save_params+4
+    lda save_params+6
     cmp #tool_file_status_ok
     beq save_manifest_buffer_ok
     sec
