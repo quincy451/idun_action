@@ -394,7 +394,11 @@ parse_body_ops_string_loop:
     beq parse_body_ops_store
     cmp #'s'
     beq parse_body_ops_store
+    cmp #'e'
+    beq parse_body_ops_store
     cmp #'i'
+    beq parse_body_ops_store
+    cmp #'j'
     beq parse_body_ops_store
     cmp #'r'
     beq parse_body_ops_store
@@ -702,7 +706,11 @@ build_live_set_body_loop:
     beq build_live_set_skip_pair
     cmp #'s'
     beq build_live_set_skip_pair
+    cmp #'e'
+    beq build_live_set_skip_pair
     cmp #'i'
+    beq build_live_set_skip_pair
+    cmp #'j'
     beq build_live_set_skip_pair
     cmp #'r'
     beq build_live_set_ret
@@ -836,8 +844,6 @@ advance_scan_ptr_by_const_ptr_done:
 build_avm_binary_content_or_fail:
     jsr layout_payload_or_fail
     jsr emit_payload_or_fail
-    lda #$1D
-    sta ALINK_TRACE
     jmp render_payload_as_binary_or_fail
 
 layout_payload_or_fail:
@@ -992,6 +998,8 @@ note_strings_used_for_export_x_loop:
     lda (body_ptr),y
     beq note_strings_used_for_export_x_done
     cmp #'s'
+    beq note_strings_used_for_export_x_string
+    cmp #'e'
     beq note_strings_used_for_export_x_string
     iny
     bne note_strings_used_for_export_x_loop
@@ -1287,9 +1295,15 @@ emit_live_bytes_for_export_x_loop:
 :   cmp #'s'
     bne :+
     jmp emit_live_bytes_for_export_x_print
+:   cmp #'e'
+    bne :+
+    jmp emit_live_bytes_for_export_x_printe
 :   cmp #'i'
     bne :+
     jmp emit_live_bytes_for_export_x_printie
+:   cmp #'j'
+    bne :+
+    jmp emit_live_bytes_for_export_x_printi
 :   cmp #'r'
     bne :+
     jmp emit_live_bytes_for_export_x_ret
@@ -1297,67 +1311,32 @@ emit_live_bytes_for_export_x_loop:
     jmp emit_live_bytes_for_export_x_bad
 emit_live_bytes_for_export_x_call:
     iny
-    lda (body_ptr),y
-    cmp #'0'
-    bcs :+
-    jmp emit_live_bytes_for_export_x_bad
-: 
-    cmp #'7'+1
-    bcc :+
-    jmp emit_live_bytes_for_export_x_bad
-: 
-    sec
-    sbc #'0'
-    tax
+    jsr load_body_digit_index_to_x_or_fail
     jsr load_export_target_offset_from_x_or_fail
-    lda #OPCODE_CALL
-    jsr append_payload_byte
-    lda current_bit_lo
-    jsr append_payload_byte
-    lda current_bit_hi
-    jsr append_payload_byte
+    jsr append_current_target_call_bytes
     iny
     jmp emit_live_bytes_for_export_x_loop
 emit_live_bytes_for_export_x_external:
     iny
-    lda (body_ptr),y
-    cmp #'0'
-    bcs :+
-    jmp emit_live_bytes_for_export_x_bad
-: 
-    cmp #'7'+1
-    bcc :+
-    jmp emit_live_bytes_for_export_x_bad
-: 
-    sec
-    sbc #'0'
-    tax
+    jsr load_body_digit_index_to_x_or_fail
     tya
     pha
     jsr load_pending_offset_for_external_x_or_fail
     pla
     tay
-    lda #OPCODE_CALL
-    jsr append_payload_byte
-    lda current_bit_lo
-    jsr append_payload_byte
-    lda current_bit_hi
-    jsr append_payload_byte
+    jsr append_current_target_call_bytes
     iny
     jmp emit_live_bytes_for_export_x_loop
 emit_live_bytes_for_export_x_print:
+    lda #$00
+    pha
+    jmp emit_live_bytes_for_export_x_print_common
+emit_live_bytes_for_export_x_printe:
+    lda #$10
+    pha
+emit_live_bytes_for_export_x_print_common:
     iny
-    lda (body_ptr),y
-    cmp #'0'
-    bcs :+
-    jmp emit_live_bytes_for_export_x_bad
-:   cmp #'7'+1
-    bcc :+
-    jmp emit_live_bytes_for_export_x_bad
-: 
-    sec
-    sbc #'0'
-    tax
+    jsr load_body_digit_index_to_x_or_fail
     lda bit_masks,x
     ora string_use_mask
     sta string_use_mask
@@ -1370,22 +1349,22 @@ emit_live_bytes_for_export_x_print:
     jsr append_payload_byte
     lda #OPCODE_CALLN
     jsr append_payload_byte
-    lda #$00
+    pla
     jsr append_payload_byte
     lda #$FF
     jsr append_payload_byte
     iny
     jmp emit_live_bytes_for_export_x_loop
+emit_live_bytes_for_export_x_printi:
+    lda #$30
+    pha
+    jmp emit_live_bytes_for_export_x_printi_common
 emit_live_bytes_for_export_x_printie:
+    lda #$31
+    pha
+emit_live_bytes_for_export_x_printi_common:
     iny
-    lda (body_ptr),y
-    cmp #'0'
-    bcc emit_live_bytes_for_export_x_bad
-    cmp #'7'+1
-    bcs emit_live_bytes_for_export_x_bad
-    sec
-    sbc #'0'
-    tax
+    jsr load_body_digit_index_to_x_or_fail
     txa
     pha
     lda int_values_hi,x
@@ -1402,7 +1381,7 @@ emit_live_bytes_for_export_x_printie:
     tax
     lda #OPCODE_CALLN
     jsr append_payload_byte
-    lda #$31
+    pla
     jsr append_payload_byte
     lda #$FF
     jsr append_payload_byte
@@ -1435,6 +1414,27 @@ emit_live_bytes_for_export_x_done:
     pla
     tax
     rts
+
+load_body_digit_index_to_x_or_fail:
+    lda (body_ptr),y
+    cmp #'0'
+    bcs :+
+    jmp emit_live_bytes_for_export_x_bad
+:   cmp #'7'+1
+    bcc :+
+    jmp emit_live_bytes_for_export_x_bad
+:   sec
+    sbc #'0'
+    tax
+    rts
+
+append_current_target_call_bytes:
+    lda #OPCODE_CALL
+    jsr append_payload_byte
+    lda current_bit_lo
+    jsr append_payload_byte
+    lda current_bit_hi
+    jmp append_payload_byte
 
 load_export_target_offset_from_x_or_fail:
     lda save_mode
