@@ -563,20 +563,88 @@ store_small_decimal_literal_from_scan_ptr:
     bcc :+
     sec
     rts
-:   lda #$00
+:   ldy #$00
+    jsr parse_small_decimal_expr_at_scan_y
+    bcs store_small_decimal_literal_from_scan_ptr_fail
+    lda expr_value_lo
     sta int_values_lo,x
+    lda #$00
     sta int_values_hi,x
-    ldy #$00
-store_small_decimal_literal_from_scan_ptr_loop:
+    inc int_count_data
+    clc
+    rts
+store_small_decimal_literal_from_scan_ptr_fail:
+    sec
+    rts
+
+parse_small_decimal_expr_at_scan_y:
+    jsr parse_small_decimal_at_scan_y
+    bcs parse_small_decimal_expr_at_scan_y_fail
+    lda expr_value_lo
+    sta expr_saved_lo
+    lda (scan_ptr),y
+    cmp #'+'
+    beq parse_small_decimal_expr_add
+    cmp #'-'
+    beq parse_small_decimal_expr_sub
+    cmp #')'
+    beq parse_small_decimal_expr_single
+    bne parse_small_decimal_expr_at_scan_y_fail
+
+parse_small_decimal_expr_add:
+    iny
+    jsr parse_small_decimal_at_scan_y
+    bcs parse_small_decimal_expr_at_scan_y_fail
+    lda expr_saved_lo
+    clc
+    adc expr_value_lo
+    bcs parse_small_decimal_expr_at_scan_y_fail
+    sta expr_value_lo
+    lda (scan_ptr),y
+    cmp #')'
+    bne parse_small_decimal_expr_at_scan_y_fail
+    clc
+    rts
+
+parse_small_decimal_expr_sub:
+    iny
+    jsr parse_small_decimal_at_scan_y
+    bcs parse_small_decimal_expr_at_scan_y_fail
+    lda expr_saved_lo
+    sec
+    sbc expr_value_lo
+    bcc parse_small_decimal_expr_at_scan_y_fail
+    sta expr_value_lo
+    lda (scan_ptr),y
+    cmp #')'
+    bne parse_small_decimal_expr_at_scan_y_fail
+    clc
+    rts
+
+parse_small_decimal_expr_single:
+    lda expr_saved_lo
+    sta expr_value_lo
+    clc
+    rts
+
+parse_small_decimal_expr_at_scan_y_fail:
+    sec
+    rts
+
+parse_small_decimal_at_scan_y:
+    lda #$00
+    sta expr_value_lo
+    sta expr_digit_count
+parse_small_decimal_at_scan_y_loop:
     lda (scan_ptr),y
     cmp #'0'
-    bcc store_small_decimal_literal_from_scan_ptr_done_check
+    bcc parse_small_decimal_at_scan_y_done_check
     cmp #'9'+1
-    bcs store_small_decimal_literal_from_scan_ptr_done_check
+    bcs parse_small_decimal_at_scan_y_done_check
     sec
     sbc #'0'
     sta compare_char
-    lda int_values_lo,x
+    lda expr_value_lo
     sta hex_work
     asl a
     sta truncated_flag
@@ -586,19 +654,19 @@ store_small_decimal_literal_from_scan_ptr_loop:
     asl a
     clc
     adc truncated_flag
-    bcs store_small_decimal_literal_from_scan_ptr_fail
+    bcs parse_small_decimal_at_scan_y_fail
     adc compare_char
-    bcs store_small_decimal_literal_from_scan_ptr_fail
-    sta int_values_lo,x
+    bcs parse_small_decimal_at_scan_y_fail
+    sta expr_value_lo
     iny
-    bne store_small_decimal_literal_from_scan_ptr_loop
-store_small_decimal_literal_from_scan_ptr_done_check:
-    cpy #$00
-    beq store_small_decimal_literal_from_scan_ptr_fail
-    inc int_count_data
+    inc expr_digit_count
+    bne parse_small_decimal_at_scan_y_loop
+parse_small_decimal_at_scan_y_done_check:
+    lda expr_digit_count
+    beq parse_small_decimal_at_scan_y_fail
     clc
     rts
-store_small_decimal_literal_from_scan_ptr_fail:
+parse_small_decimal_at_scan_y_fail:
     sec
     rts
 
@@ -1442,6 +1510,12 @@ int_count_data:
 current_proc_index_data:
     .res 1
 extern_count_data:
+    .res 1
+expr_saved_lo:
+    .res 1
+expr_value_lo:
+    .res 1
+expr_digit_count:
     .res 1
 compare_char:
     .res 1

@@ -80,7 +80,8 @@ They are exported into `ACTION.DNP` root and `BIN/`.
   corresponding `SRC/<NAME>.ACT` source exists, checks that the source
   `MODULE` header matches the requested module name, extracts top-level
   `PROC` exports, scans the loaded source text for the current runtime-call
-  marker set, and emits a
+  marker set, folds the current narrow decimal `PrintI` / `PrintIE` `+` / `-`
+  expressions before object emission, and emits a
   deterministic `OBJ/<NAME>.AVO` text object stub with `AVO1`,
   module/export/call/import metadata where each export carries compiled offset
   and size, plus compiler-emitted `body_ops` and a minimal local control-flow
