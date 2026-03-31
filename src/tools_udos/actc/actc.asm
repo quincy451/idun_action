@@ -628,7 +628,7 @@ parse_small_decimal_expr_at_scan_y_fail:
 
 parse_small_decimal_term_at_scan_y:
     jsr skip_inline_spaces_at_scan_y
-    jsr parse_small_decimal_at_scan_y
+    jsr parse_small_decimal_factor_at_scan_y
     bcs parse_small_decimal_term_at_scan_y_fail
     lda expr_value_lo
     sta expr_term_lo
@@ -646,7 +646,7 @@ parse_small_decimal_term_loop:
 
 parse_small_decimal_term_mul:
     iny
-    jsr parse_small_decimal_at_scan_y
+    jsr parse_small_decimal_factor_at_scan_y
     bcs parse_small_decimal_term_at_scan_y_fail
     lda expr_term_lo
     sta compare_char
@@ -667,7 +667,7 @@ parse_small_decimal_term_mul_loop:
 
 parse_small_decimal_term_div:
     iny
-    jsr parse_small_decimal_at_scan_y
+    jsr parse_small_decimal_factor_at_scan_y
     bcs parse_small_decimal_term_at_scan_y_fail
     lda expr_value_lo
     beq parse_small_decimal_term_at_scan_y_fail
@@ -687,6 +687,29 @@ parse_small_decimal_term_div_loop:
     bne parse_small_decimal_term_div_loop
 
 parse_small_decimal_term_at_scan_y_fail:
+    sec
+    rts
+
+parse_small_decimal_factor_at_scan_y:
+    jsr skip_inline_spaces_at_scan_y
+    lda (scan_ptr),y
+    cmp #'('
+    beq parse_small_decimal_factor_group
+    jmp parse_small_decimal_at_scan_y
+
+parse_small_decimal_factor_group:
+    iny
+    jsr parse_small_decimal_expr_at_scan_y
+    bcs parse_small_decimal_factor_at_scan_y_fail
+    jsr skip_inline_spaces_at_scan_y
+    lda (scan_ptr),y
+    cmp #')'
+    bne parse_small_decimal_factor_at_scan_y_fail
+    iny
+    clc
+    rts
+
+parse_small_decimal_factor_at_scan_y_fail:
     sec
     rts
 

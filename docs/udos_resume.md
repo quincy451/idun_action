@@ -81,8 +81,8 @@ They are exported into `ACTION.DNP` root and `BIN/`.
   `MODULE` header matches the requested module name, extracts top-level
   `PROC` exports, scans the loaded source text for the current runtime-call
   marker set, folds the current narrow decimal `PrintI` / `PrintIE`
-  `+` / `-` / `*` / `/` expressions with inline spaces and simple precedence
-  before object emission, and emits a
+  `+` / `-` / `*` / `/` expressions with inline spaces, simple precedence,
+  and parenthesized grouping before object emission, and emits a
   deterministic `OBJ/<NAME>.AVO` text object stub with `AVO1`,
   module/export/call/import metadata where each export carries compiled offset
   and size, plus compiler-emitted `body_ops` and a minimal local control-flow
