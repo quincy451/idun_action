@@ -19,18 +19,22 @@ AVM_VERSION_V2 = 2
 AVM_FLAG_ACHERON = 1
 FILE_BUFFER_SIZE = 2048
 PAYLOAD_BUFFER_SIZE = 1024
+INTERP_STACK_MAX = 16
 
-AVMRUN_TRACE = $03E7
-AVMRUN_DBG0 = $03E8
-AVMRUN_DBG1 = $03E9
-AVMRUN_DBG2 = $03EA
-AVMRUN_DBG3 = $03EB
-AVMRUN_DBG4 = $03EC
-AVMRUN_DBG5 = $03ED
-AVMRUN_DBG6 = $03EE
-AVMRUN_DBG7 = $03EF
 OPCODE_PUSH8 = $10
 OPCODE_PUSH16 = $11
+OPCODE_STORE = $12
+OPCODE_LOAD = $13
+OPCODE_ADD = $14
+OPCODE_SUB = $15
+OPCODE_EQ = $16
+OPCODE_NE = $17
+OPCODE_JZ = $18
+OPCODE_JMP = $19
+OPCODE_DUP = $1A
+OPCODE_DROP = $1B
+OPCODE_LT = $1C
+OPCODE_GT = $1D
 OPCODE_NATIVE = $2D
 OPCODE_CALL = $45
 OPCODE_JUMP = $46
@@ -159,9 +163,18 @@ file_loaded_skip_terminate:
 header_ok:
     jsr patch_payload
     bcc payload_ready
+    jsr interpret_payload
+    bcc interpreted_ok
     lda #<msg_unsupported
     ldy #>msg_unsupported
     bne fail_with_ptr
+
+interpreted_ok:
+    lda #$00
+    sta svc_retptr
+    sta svc_retptr+1
+    ldx #svc_retptr
+    jmp svc_program_exit
 
 payload_ready:
     jsr clear_rstack
@@ -324,8 +337,6 @@ validate_header_fail:
     rts
 
 decode_avm_text:
-    lda #$10
-    sta AVMRUN_TRACE
     lda file_buffer+0
     cmp #'e'
     beq :+
@@ -433,8 +444,6 @@ decode_avm_text_have_code_len:
     jmp decode_avm_text_fail
 : 
 decode_avm_text_expect_db:
-    lda #$12
-    sta AVMRUN_TRACE
     ldy #$00
     lda (scan_ptr),y
     cmp #'d'
@@ -612,8 +621,6 @@ decode_avm_text_check_entry:
     cmp scan_end
     bcc decode_avm_text_check_code_end
 decode_avm_text_entry_fail:
-    lda #$21
-    sta AVMRUN_TRACE
     jmp decode_avm_text_fail
 decode_avm_text_check_code_end:
     lda scan_end+1
@@ -625,8 +632,6 @@ decode_avm_text_check_code_end:
     bcc decode_avm_text_success
     beq decode_avm_text_success
 decode_avm_text_code_end_fail:
-    lda #$22
-    sta AVMRUN_TRACE
     jmp decode_avm_text_fail
 decode_avm_text_success:
     clc
@@ -1023,6 +1028,449 @@ patch_payload_fail:
     sec
     rts
 
+interpret_payload:
+    lda #$00
+    sta interp_sp
+    lda entry_ptr
+    sta scan_ptr
+    lda entry_ptr+1
+    sta scan_ptr+1
+    lda payload_ptr
+    sta interp_string_ptr
+    lda payload_ptr+1
+    sta interp_string_ptr+1
+interpret_payload_loop:
+    lda scan_ptr
+    cmp scan_end
+    bne :+
+    lda scan_ptr+1
+    cmp scan_end+1
+    bne :+
+    jmp interpret_payload_done
+:   jsr scan_ptr_before_end
+    bcc :+
+    jmp interpret_payload_fail
+:   ldy #$00
+    lda (scan_ptr),y
+    cmp #OPCODE_PUSH8
+    bne :+
+    jmp interpret_push8
+:   cmp #OPCODE_PUSH16
+    bne :+
+    jmp interpret_push16
+:   cmp #OPCODE_ADD
+    bne :+
+    jmp interpret_add
+:   cmp #OPCODE_SUB
+    bne :+
+    jmp interpret_sub
+:   cmp #OPCODE_EQ
+    bne :+
+    jmp interpret_eq
+:   cmp #OPCODE_NE
+    bne :+
+    jmp interpret_ne
+:   cmp #OPCODE_LT
+    bne :+
+    jmp interpret_lt
+:   cmp #OPCODE_GT
+    bne :+
+    jmp interpret_gt
+:   cmp #OPCODE_DUP
+    bne :+
+    jmp interpret_dup
+:   cmp #OPCODE_DROP
+    bne :+
+    jmp interpret_drop
+:   cmp #OPCODE_SETP16
+    bne :+
+    jmp interpret_setp16
+:   cmp #OPCODE_CALLN
+    bne :+
+    jmp interpret_calln
+:   sec
+    rts
+
+interpret_push8:
+    jsr ensure_scan_room_2
+    bcc :+
+    jmp interpret_payload_fail
+:   ldy #$01
+    lda (scan_ptr),y
+    sta word_tmp
+    lda #$00
+    sta word_tmp+1
+    jsr interp_push_word_tmp
+    bcc :+
+    jmp interpret_payload_fail
+:   lda #$02
+    jsr advance_scan_ptr
+    jmp interpret_payload_loop
+
+interpret_push16:
+    jsr ensure_scan_room_3
+    bcc :+
+    jmp interpret_payload_fail
+:   ldy #$01
+    lda (scan_ptr),y
+    sta word_tmp
+    iny
+    lda (scan_ptr),y
+    sta word_tmp+1
+    jsr interp_push_word_tmp
+    bcc :+
+    jmp interpret_payload_fail
+:   lda #$03
+    jsr advance_scan_ptr
+    jmp interpret_payload_loop
+
+interpret_add:
+    jsr interp_pop_to_word_tmp
+    bcc :+
+    jmp interpret_payload_fail
+:   jsr interp_pop_to_svc_retptr
+    bcc :+
+    jmp interpret_payload_fail
+:   clc
+    lda svc_retptr
+    adc word_tmp
+    sta word_tmp
+    lda svc_retptr+1
+    adc word_tmp+1
+    sta word_tmp+1
+    jsr interp_push_word_tmp
+    bcc :+
+    jmp interpret_payload_fail
+:   lda #$01
+    jsr advance_scan_ptr
+    jmp interpret_payload_loop
+
+interpret_sub:
+    jsr interp_pop_to_word_tmp
+    bcc :+
+    jmp interpret_payload_fail
+:   jsr interp_pop_to_svc_retptr
+    bcc :+
+    jmp interpret_payload_fail
+:   sec
+    lda svc_retptr
+    sbc word_tmp
+    sta word_tmp
+    lda svc_retptr+1
+    sbc word_tmp+1
+    sta word_tmp+1
+    jsr interp_push_word_tmp
+    bcc :+
+    jmp interpret_payload_fail
+:   lda #$01
+    jsr advance_scan_ptr
+    jmp interpret_payload_loop
+
+interpret_eq:
+    jsr interp_compare_to_bool_eq
+    jmp interpret_compare_common
+
+interpret_ne:
+    jsr interp_compare_to_bool_ne
+    jmp interpret_compare_common
+
+interpret_lt:
+    jsr interp_compare_to_bool_lt
+    jmp interpret_compare_common
+
+interpret_gt:
+    jsr interp_compare_to_bool_gt
+interpret_compare_common:
+    bcc :+
+    jmp interpret_payload_fail
+:   jsr interp_push_word_tmp
+    bcc :+
+    jmp interpret_payload_fail
+:   lda #$01
+    jsr advance_scan_ptr
+    jmp interpret_payload_loop
+
+interpret_dup:
+    jsr interp_peek_to_word_tmp
+    bcc :+
+    jmp interpret_payload_fail
+:   jsr interp_push_word_tmp
+    bcc :+
+    jmp interpret_payload_fail
+:   lda #$01
+    jsr advance_scan_ptr
+    jmp interpret_payload_loop
+
+interpret_drop:
+    lda interp_sp
+    bne :+
+    jmp interpret_payload_fail
+: 
+    dec interp_sp
+    lda #$01
+    jsr advance_scan_ptr
+    jmp interpret_payload_loop
+
+interpret_setp16:
+    jsr ensure_scan_room_3
+    bcc :+
+    jmp interpret_payload_fail
+:   ldy #$01
+    lda (scan_ptr),y
+    sta word_tmp
+    iny
+    lda (scan_ptr),y
+    sta word_tmp+1
+    clc
+    lda payload_ptr
+    adc word_tmp
+    sta interp_string_ptr
+    lda payload_ptr+1
+    adc word_tmp+1
+    sta interp_string_ptr+1
+    lda #$03
+    jsr advance_scan_ptr
+    jmp interpret_payload_loop
+
+interpret_calln:
+    jsr ensure_scan_room_3
+    bcc :+
+    jmp interpret_payload_fail
+:   ldy #$01
+    lda (scan_ptr),y
+    sta word_tmp
+    iny
+    lda (scan_ptr),y
+    sta word_tmp+1
+    lda word_tmp
+    cmp #<INTRINSIC_PRINT
+    bne interpret_calln_check_printe
+    lda word_tmp+1
+    cmp #>INTRINSIC_PRINT
+    beq interpret_calln_print
+interpret_calln_check_printe:
+    lda word_tmp
+    cmp #<INTRINSIC_PRINTE
+    bne interpret_calln_check_printi
+    lda word_tmp+1
+    cmp #>INTRINSIC_PRINTE
+    beq interpret_calln_printe
+interpret_calln_check_printi:
+    lda word_tmp
+    cmp #<INTRINSIC_PRINTI
+    bne interpret_calln_check_printie
+    lda word_tmp+1
+    cmp #>INTRINSIC_PRINTI
+    beq interpret_calln_printi
+interpret_calln_check_printie:
+    lda word_tmp
+    cmp #<INTRINSIC_PRINTIE
+    bne interpret_calln_check_exit
+    lda word_tmp+1
+    cmp #>INTRINSIC_PRINTIE
+    beq interpret_calln_printie
+interpret_calln_check_exit:
+    lda word_tmp
+    cmp #<INTRINSIC_EXIT
+    bne interpret_payload_fail
+    lda word_tmp+1
+    cmp #>INTRINSIC_EXIT
+    bne interpret_payload_fail
+    lda #$03
+    jsr advance_scan_ptr
+    jmp interpret_payload_done
+
+interpret_calln_print:
+    lda interp_string_ptr
+    sta svc_retptr
+    lda interp_string_ptr+1
+    sta svc_retptr+1
+    ldx #svc_retptr
+    jsr svc_console_write_sc0
+    lda #$03
+    jsr advance_scan_ptr
+    jmp interpret_payload_loop
+
+interpret_calln_printe:
+    lda interp_string_ptr
+    sta svc_retptr
+    lda interp_string_ptr+1
+    sta svc_retptr+1
+    ldx #svc_retptr
+    jsr svc_console_write_sc0
+    jsr svc_console_newline
+    lda #$03
+    jsr advance_scan_ptr
+    jmp interpret_payload_loop
+
+interpret_calln_printi:
+    jsr interp_peek_to_word_tmp
+    bcc :+
+    jmp interpret_payload_fail
+:   jsr print_u16_word_tmp
+    lda #$03
+    jsr advance_scan_ptr
+    jmp interpret_payload_loop
+
+interpret_calln_printie:
+    jsr interp_peek_to_word_tmp
+    bcc :+
+    jmp interpret_payload_fail
+:   jsr print_u16_word_tmp
+    jsr svc_console_newline
+    lda #$03
+    jsr advance_scan_ptr
+    jmp interpret_payload_loop
+
+interpret_payload_done:
+    clc
+    rts
+
+interpret_payload_fail:
+    sec
+    rts
+
+interp_push_word_tmp:
+    ldx interp_sp
+    cpx #INTERP_STACK_MAX
+    bcc :+
+    sec
+    rts
+:   lda word_tmp
+    sta interp_stack_lo,x
+    lda word_tmp+1
+    sta interp_stack_hi,x
+    inc interp_sp
+    clc
+    rts
+
+interp_pop_to_word_tmp:
+    lda interp_sp
+    beq interp_pop_fail
+    dec interp_sp
+    ldx interp_sp
+    lda interp_stack_lo,x
+    sta word_tmp
+    lda interp_stack_hi,x
+    sta word_tmp+1
+    clc
+    rts
+
+interp_pop_to_svc_retptr:
+    lda interp_sp
+    beq interp_pop_fail
+    dec interp_sp
+    ldx interp_sp
+    lda interp_stack_lo,x
+    sta svc_retptr
+    lda interp_stack_hi,x
+    sta svc_retptr+1
+    clc
+    rts
+
+interp_peek_to_word_tmp:
+    lda interp_sp
+    beq interp_pop_fail
+    sec
+    sbc #$01
+    tax
+    lda interp_stack_lo,x
+    sta word_tmp
+    lda interp_stack_hi,x
+    sta word_tmp+1
+    clc
+    rts
+
+interp_pop_fail:
+    sec
+    rts
+
+interp_compare_to_bool_eq:
+    jsr interp_pop_to_word_tmp
+    bcc :+
+    sec
+    rts
+:   jsr interp_pop_to_svc_retptr
+    bcc :+
+    sec
+    rts
+:   lda svc_retptr
+    cmp word_tmp
+    bne interp_compare_false
+    lda svc_retptr+1
+    cmp word_tmp+1
+    bne interp_compare_false
+    jmp interp_compare_true
+
+interp_compare_to_bool_ne:
+    jsr interp_pop_to_word_tmp
+    bcc :+
+    sec
+    rts
+:   jsr interp_pop_to_svc_retptr
+    bcc :+
+    sec
+    rts
+:   lda svc_retptr
+    cmp word_tmp
+    bne interp_compare_true
+    lda svc_retptr+1
+    cmp word_tmp+1
+    bne interp_compare_true
+    jmp interp_compare_false
+
+interp_compare_to_bool_lt:
+    jsr interp_pop_to_word_tmp
+    bcc :+
+    sec
+    rts
+:   jsr interp_pop_to_svc_retptr
+    bcc :+
+    sec
+    rts
+:   lda svc_retptr+1
+    cmp word_tmp+1
+    bcc interp_compare_true
+    bne interp_compare_false
+    lda svc_retptr
+    cmp word_tmp
+    bcc interp_compare_true
+    jmp interp_compare_false
+
+interp_compare_to_bool_gt:
+    jsr interp_pop_to_word_tmp
+    bcc :+
+    sec
+    rts
+:   jsr interp_pop_to_svc_retptr
+    bcc :+
+    sec
+    rts
+:   lda svc_retptr+1
+    cmp word_tmp+1
+    bcc interp_compare_false
+    bne interp_compare_true
+    lda svc_retptr
+    cmp word_tmp
+    bcc interp_compare_false
+    beq interp_compare_false
+    jmp interp_compare_true
+
+interp_compare_true:
+    lda #$01
+    sta word_tmp
+    lda #$00
+    sta word_tmp+1
+    clc
+    rts
+
+interp_compare_false:
+    lda #$00
+    sta word_tmp
+    sta word_tmp+1
+    clc
+    rts
+
 lower_previous_push16_to_setp16:
     sec
     lda scan_ptr
@@ -1316,6 +1764,14 @@ payload_buffer:
     .res PAYLOAD_BUFFER_SIZE
 char_buffer:
     .res 2
+interp_sp:
+    .res 1
+interp_string_ptr:
+    .res 2
+interp_stack_lo:
+    .res INTERP_STACK_MAX
+interp_stack_hi:
+    .res INTERP_STACK_MAX
 
 saved_iptr:
     .res 2

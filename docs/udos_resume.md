@@ -199,9 +199,9 @@ They are exported into `ACTION.DNP` root and `BIN/`.
   from the mounted Action workspace, validates the `AVM1` header, prints
   `AVM OK`, and returns to the prompt.
 - `AVMRUN.PRG` executes a constrained flagged `AVM1` subset on top of
-  AcheronVM. The current proof payloads are `UDOSHELLO.AVM`, which prints
-  `UDOS AVM OK`, and `UDOSFLOW.AVM`, which proves `jump`, `call`, and `ret`
-  by printing `UDOS AVM FLOW OK` and returning to the prompt.
+  AcheronVM. The current proof payloads are `UDOSHELLO.AVM`, `UDOSFLOW.AVM`,
+  and focused runtime arithmetic/comparison samples proving the current narrow
+  interpreted subset for `push16`, `add`, `sub`, and `gt`.
 
 ## Immediate Follow-On Work
 
