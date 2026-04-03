@@ -2,16 +2,21 @@
 
 .export start
 
-ALINK_TRACE = $03FC
-
 MANIFEST_LIMIT = 191
 SOURCE_LIMIT = 255
+BODY_OPS_STRIDE = 24
 AVM_VERSION = 2
 AVM_FLAG_ACHERON = 1
 AVM_HEADER_SIZE = 12
 
 PENDING_SYMBOL_MAX = 7
 OPCODE_PUSH16 = $11
+OPCODE_ADD = $14
+OPCODE_SUB = $15
+OPCODE_EQ = $16
+OPCODE_NE = $17
+OPCODE_LT = $1C
+OPCODE_GT = $1D
 OPCODE_CALL = $45
 OPCODE_RET = $48
 OPCODE_CALLN = $49
@@ -22,29 +27,17 @@ svc_retptr:
     .res 2
 file_params:
     .res 9
-save_params:
-    .res 7
 src_ptr:
     .res 2
 scan_ptr:
     .res 2
+save_params = file_params
 content_ptr:
     .res 2
 const_ptr:
     .res 2
-compare_char:
-    .res 1
-current_bit_lo:
-    .res 1
-current_bit_hi:
-    .res 1
-main_flags_lo:
-    .res 1
-main_flags_hi:
-    .res 1
 truncated_flag:
     .res 1
-
 export_count = truncated_flag
 export_index = export_index_zp
 export_ptr = svc_retptr
@@ -75,9 +68,6 @@ start:
     jmp fail_with_ptr
 
 save_ok:
-    lda #<msg_ok
-    ldy #>msg_ok
-    jsr print_line_ptr
     lda #$00
     sta svc_retptr
     sta svc_retptr+1
@@ -321,7 +311,7 @@ set_body_ptr_from_x_loop:
     beq set_body_ptr_from_x_done
     clc
     lda body_ptr
-    adc #16
+    adc #BODY_OPS_STRIDE
     sta body_ptr
     lda body_ptr+1
     adc #$00
@@ -359,13 +349,17 @@ parse_body_ops_loop:
     jsr skip_line_breaks
     ldy #$00
     lda (scan_ptr),y
-    beq parse_body_ops_done_check
+    bne :+
+    jmp parse_body_ops_done_check
+:
     lda #<line_body
     sta const_ptr
     lda #>line_body
     sta const_ptr+1
     jsr pattern_matches_scan_ptr
-    bcs parse_body_ops_next_line
+    bcc :+
+    jmp parse_body_ops_next_line
+:
     jsr advance_scan_ptr_by_const_ptr
     lda export_index
     cmp export_count
@@ -395,6 +389,24 @@ parse_body_ops_string_loop:
     beq parse_body_ops_store
     cmp #'j'
     beq parse_body_ops_store
+    cmp #'p'
+    beq parse_body_ops_store
+    cmp #'a'
+    beq parse_body_ops_store
+    cmp #'m'
+    beq parse_body_ops_store
+    cmp #'q'
+    beq parse_body_ops_store
+    cmp #'n'
+    beq parse_body_ops_store
+    cmp #'l'
+    beq parse_body_ops_store
+    cmp #'g'
+    beq parse_body_ops_store
+    cmp #'y'
+    beq parse_body_ops_store
+    cmp #'z'
+    beq parse_body_ops_store
     cmp #'r'
     beq parse_body_ops_store
     cmp #'0'
@@ -404,7 +416,7 @@ parse_body_ops_string_loop:
 parse_body_ops_store:
     sta (body_ptr),y
     iny
-    cpy #15
+    cpy #BODY_OPS_STRIDE
     bcc parse_body_ops_string_loop
 parse_body_ops_bad:
     lda #<msg_bad_avo
@@ -676,7 +688,7 @@ build_live_set_seed:
 :   jsr find_export_index_from_module_name
     bcc :+
     jmp build_live_set_bad
-: 
+:
     stx entry_export_index
     lda #$01
     sta live_flags,x
@@ -686,7 +698,9 @@ build_live_set_scan_again:
     ldx #$00
 build_live_set_export_loop:
     cpx export_count
-    beq build_live_set_check
+    bne :+
+    jmp build_live_set_check
+:
     lda live_flags,x
     beq build_live_set_next_export
     stx current_bit_hi
@@ -707,6 +721,24 @@ build_live_set_body_loop:
     beq build_live_set_skip_pair
     cmp #'j'
     beq build_live_set_skip_pair
+    cmp #'p'
+    beq build_live_set_skip_pair
+    cmp #'a'
+    beq build_live_set_single
+    cmp #'m'
+    beq build_live_set_single
+    cmp #'q'
+    beq build_live_set_single
+    cmp #'n'
+    beq build_live_set_single
+    cmp #'l'
+    beq build_live_set_single
+    cmp #'g'
+    beq build_live_set_single
+    cmp #'y'
+    beq build_live_set_single
+    cmp #'z'
+    beq build_live_set_single
     cmp #'r'
     beq build_live_set_ret
     jmp build_live_set_bad
@@ -733,6 +765,9 @@ build_live_set_skip_pair:
     iny
     iny
     bne build_live_set_body_loop
+build_live_set_single:
+    iny
+    bne build_live_set_body_loop
 build_live_set_ret:
     iny
     bne build_live_set_body_loop
@@ -740,10 +775,14 @@ build_live_set_next_export_restore:
     ldx current_bit_hi
 build_live_set_next_export:
     inx
-    bne build_live_set_export_loop
+    beq :+
+    jmp build_live_set_export_loop
+:
 build_live_set_check:
     lda compare_char
-    bne build_live_set_scan_again
+    beq :+
+    jmp build_live_set_scan_again
+:
 build_live_set_done:
     rts
 build_live_set_bad:
@@ -1181,7 +1220,6 @@ emit_external_object_code_from_x_or_fail:
     jmp restore_module_name
 
 emit_external_object_strings_from_x_or_fail:
-    stx $03FD
     txa
     pha
     jsr save_module_name
@@ -1207,32 +1245,16 @@ emit_external_object_strings_from_x_or_fail:
     jmp restore_module_name
 
 load_current_object_link_state_or_fail:
-    lda #$25
-    sta ALINK_TRACE
     jsr build_object_target_path
     jsr load_object_or_fail
-    lda #$26
-    sta ALINK_TRACE
     jsr require_loaded_source_not_truncated_or_fail
     jsr require_avo1_header_or_fail
     jsr parse_exports_or_fail
-    lda #$27
-    sta ALINK_TRACE
     jsr parse_body_ops_or_fail
-    lda #$28
-    sta ALINK_TRACE
     jsr parse_external_symbols_or_fail
-    lda #$29
-    sta ALINK_TRACE
     jsr parse_strings_or_fail
-    lda #$2A
-    sta ALINK_TRACE
     jsr parse_ints_or_fail
-    lda #$2B
-    sta ALINK_TRACE
     jsr compute_code_bytes
-    lda #$2C
-    sta ALINK_TRACE
     jmp build_live_set
 
 emit_current_object_code_or_fail:
@@ -1309,10 +1331,37 @@ emit_live_bytes_for_export_x_loop:
 :   cmp #'j'
     bne :+
     jmp emit_live_bytes_for_export_x_printi
+:   cmp #'p'
+    bne :+
+    jmp emit_live_bytes_for_export_x_push
+:   cmp #'a'
+    bne :+
+    jmp emit_live_bytes_for_export_x_add
+:   cmp #'m'
+    bne :+
+    jmp emit_live_bytes_for_export_x_sub
+:   cmp #'q'
+    bne :+
+    jmp emit_live_bytes_for_export_x_eq
+:   cmp #'n'
+    bne :+
+    jmp emit_live_bytes_for_export_x_ne
+:   cmp #'l'
+    bne :+
+    jmp emit_live_bytes_for_export_x_lt
+:   cmp #'g'
+    bne :+
+    jmp emit_live_bytes_for_export_x_gt
+:   cmp #'y'
+    bne :+
+    jmp emit_live_bytes_for_export_x_printi_top
+:   cmp #'z'
+    bne :+
+    jmp emit_live_bytes_for_export_x_printie_top
 :   cmp #'r'
     bne :+
     jmp emit_live_bytes_for_export_x_ret
-: 
+:
     jmp emit_live_bytes_for_export_x_bad
 emit_live_bytes_for_export_x_call:
     iny
@@ -1384,6 +1433,71 @@ emit_live_bytes_for_export_x_printi_common:
     jsr append_payload_byte
     pla
     tax
+    lda #OPCODE_CALLN
+    jsr append_payload_byte
+    pla
+    jsr append_payload_byte
+    lda #$FF
+    jsr append_payload_byte
+    iny
+    jmp emit_live_bytes_for_export_x_loop
+emit_live_bytes_for_export_x_push:
+    iny
+    jsr load_body_digit_index_to_x_or_fail
+    txa
+    pha
+    lda int_values_hi,x
+    pha
+    lda int_values_lo,x
+    pha
+    lda #OPCODE_PUSH16
+    jsr append_payload_byte
+    pla
+    jsr append_payload_byte
+    pla
+    jsr append_payload_byte
+    pla
+    tax
+    iny
+    jmp emit_live_bytes_for_export_x_loop
+emit_live_bytes_for_export_x_add:
+    lda #OPCODE_ADD
+    jsr append_payload_byte
+    iny
+    jmp emit_live_bytes_for_export_x_loop
+emit_live_bytes_for_export_x_sub:
+    lda #OPCODE_SUB
+    jsr append_payload_byte
+    iny
+    jmp emit_live_bytes_for_export_x_loop
+emit_live_bytes_for_export_x_eq:
+    lda #OPCODE_EQ
+    jsr append_payload_byte
+    iny
+    jmp emit_live_bytes_for_export_x_loop
+emit_live_bytes_for_export_x_ne:
+    lda #OPCODE_NE
+    jsr append_payload_byte
+    iny
+    jmp emit_live_bytes_for_export_x_loop
+emit_live_bytes_for_export_x_lt:
+    lda #OPCODE_LT
+    jsr append_payload_byte
+    iny
+    jmp emit_live_bytes_for_export_x_loop
+emit_live_bytes_for_export_x_gt:
+    lda #OPCODE_GT
+    jsr append_payload_byte
+    iny
+    jmp emit_live_bytes_for_export_x_loop
+emit_live_bytes_for_export_x_printi_top:
+    lda #$30
+    pha
+    jmp emit_live_bytes_for_export_x_print_top_common
+emit_live_bytes_for_export_x_printie_top:
+    lda #$31
+    pha
+emit_live_bytes_for_export_x_print_top_common:
     lda #OPCODE_CALLN
     jsr append_payload_byte
     pla
@@ -1857,6 +1971,21 @@ save_source_buffer_to_target:
     sta save_params+5
     lda #tool_file_status_fail
     sta save_params+6
+    tsx
+    stx compare_char
+    lda #$00
+    sta content_ptr
+    sta content_ptr+1
+    sta const_ptr
+    sta const_ptr+1
+    ldx #$00
+save_source_buffer_clear_unused_stack:
+    cpx compare_char
+    bcs save_source_buffer_clear_unused_stack_done
+    sta $0100,x
+    inx
+    bne save_source_buffer_clear_unused_stack
+save_source_buffer_clear_unused_stack_done:
     ldx #save_params
     jsr svc_file_save_sc0
     lda save_params+6
@@ -1949,6 +2078,8 @@ module_name:
     .res 25
 target_path:
     .res 40
+saved_module_name:
+    .res 25
 
 .segment "BSS"
 
@@ -1956,8 +2087,6 @@ source_buffer:
     .res SOURCE_LIMIT+1
 content_buffer:
     .res 256
-saved_module_name:
-    .res 25
 export_names:
     .res 200
 export_offsets:
@@ -1984,6 +2113,16 @@ save_mode:
     .res 1
 export_index_zp:
     .res 1
+compare_char:
+    .res 1
+current_bit_lo:
+    .res 1
+current_bit_hi:
+    .res 1
+main_flags_lo:
+    .res 1
+main_flags_hi:
+    .res 1
 pending_active_index:
     .res 1
 payload_bytes_data:
@@ -2003,7 +2142,7 @@ string_use_mask:
 saved_string_use_mask:
     .res 1
 body_ops_data:
-    .res 128
+    .res BODY_OPS_STRIDE * 8
 manifest_entry:
     .res 32
 external_names:
