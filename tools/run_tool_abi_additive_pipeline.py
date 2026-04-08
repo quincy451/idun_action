@@ -87,6 +87,44 @@ SCENARIOS = {
         ),
         "expected_console": "145\n",
     },
+    "comparisons": {
+        "out_fs_name": "harness-actc-alink-avmrun-comparisons",
+        "source": (
+            'MODULE MAIN\r'
+            'PROC MAIN()\r'
+            'PrintIE(2 + 3 * 4)\r'
+            'PrintIE((20 - 5) / 3)\r'
+            'PrintIE((2 + 3) * 4 = 20)\r'
+            'PrintIE((2 + 3 * 4) > 10)\r'
+            'W()\r'
+            'RETURN\r'
+        ),
+        "expected_avo": (
+            "AVO1\n"
+            "x main 0 40\n"
+            "b p0p1azi2p3p4qzp5p6gzu0r\n"
+            "u w\n"
+            "i 2\n"
+            "i 12\n"
+            "i 5\n"
+            "i 20\n"
+            "i 20\n"
+            "i 14\n"
+            "i 10\n"
+            "k 6\n"
+            "n main\n"
+        ),
+        "expected_avm": bytes(
+            [
+                65, 86, 77, 49, 2, 60, 0, 0, 0, 1, 55, 0, 17, 2, 0, 17,
+                12, 0, 20, 73, 49, 255, 17, 5, 0, 73, 49, 255, 17, 20, 0,
+                17, 20, 0, 22, 73, 49, 255, 17, 14, 0, 17, 10, 0, 29, 73,
+                49, 255, 69, 42, 0, 73, 32, 255, 97, 55, 0, 73, 0, 255, 17,
+                7, 0, 73, 49, 255, 72, 84, 79, 79, 76, 0,
+            ]
+        ),
+        "expected_console": "14\n5\n1\n1\nTOOL7\n",
+    },
 }
 
 

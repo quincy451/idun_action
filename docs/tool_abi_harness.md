@@ -69,6 +69,13 @@ cd /mnt/c/test/action/actionc64u
 ./tools/run_tool_abi_additive_pipeline.py --scenario precedence --keep-workspace
 ```
 
+Run the current arithmetic+comparisons proof end to end:
+
+```sh
+cd /mnt/c/test/action/actionc64u
+./tools/run_tool_abi_additive_pipeline.py --scenario comparisons --keep-workspace
+```
+
 That script:
 
 - clones a clean harness workspace from the current manual-pipeline fs tree
@@ -220,6 +227,8 @@ That now includes at least two stable scenarios:
   `HELLO`, `TOOL7`, `5459`
 - mixed precedence and parentheses:
   `145`
+- arithmetic + comparisons + external call:
+  `14`, `5`, `1`, `1`, `TOOL7`
 
 ## Current Debug Value
 

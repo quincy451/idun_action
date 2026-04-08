@@ -62,6 +62,9 @@ class TestToolAbiPipeline(unittest.TestCase):
     def test_precedence_pipeline_is_green_under_harness(self) -> None:
         self.run_scenario("precedence", "145\n", 53, 31)
 
+    def test_comparisons_pipeline_is_green_under_harness(self) -> None:
+        self.run_scenario("comparisons", "14\n5\n1\n1\nTOOL7\n", 91, 72)
+
 
 if __name__ == "__main__":
     unittest.main()

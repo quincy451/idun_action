@@ -51,16 +51,22 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
   `PrintI(2 + 3 * 4)`
 - [x] parenthesized integer print-expression chains:
   `PrintIE((20 - 5) / 3)`
+- [x] arithmetic/comparison mixes in print-expression chains:
+  `PrintIE((2 + 3) * 4 = 20)` and `PrintIE((2 + 3 * 4) > 10)`
 - [x] current widened additive object emission:
   `b e0u0p0p1ap2myp3p4mp5azr`
 - [x] current widened precedence object emission:
   `b p0p1ayi2r`
+- [x] current widened arithmetic/comparison object emission:
+  `b p0p1azi2p3p4qzp5p6gzu0r`
 - [x] harness proof exists through:
   `ACTC -> ALINK -> AVMRUN`
 - [x] current harness runtime output for that widened slice:
   `HELLO`, `TOOL7`, `5459`
 - [x] current harness runtime output for the precedence slice:
   `145`
+- [x] current harness runtime output for the arithmetic/comparison slice:
+  `14`, `5`, `1`, `1`, `TOOL7`
 
 ## Current Biggest Blockers
 
