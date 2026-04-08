@@ -63,6 +63,10 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
   `PROC HELLO() ...` and `PROC MAIN() ...`
 - [x] local user procedure calls:
   `HELLO()`
+- [x] local user procedure calls inside `IF ... THEN ... ELSE ... FI`:
+  `IF 1 = 1 THEN HELLO() ELSE BYE() FI`
+- [x] arithmetic/comparison-driven local procedure calls inside `IF ... THEN ... ELSE ... FI`:
+  `IF 2 + 3 * 4 > 10 THEN HELLO() ELSE BYE() FI`
 - [x] single-branch control flow:
   `IF 1 = 0 THEN ... FI` and `IF 1 = 1 THEN ... FI`
 - [x] `ELSE` control flow:
@@ -87,6 +91,10 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
   `b p0p1azi2p3p4qzp5p6gzu0r`
 - [x] current widened arithmetic/comparison `IF/ELSE` object emission:
   `b p0p1ap2ghe0we1ve2r`
+- [x] current widened branch-call object emission:
+  `b p0p1qhc0wc1ve2r`
+- [x] current widened arithmetic/comparison branch-call object emission:
+  `b p0p1ap2ghc0wc1ve2r`
 - [x] harness proof exists through:
   `ACTC -> ALINK -> AVMRUN`
 - [x] current harness runtime output for that widened slice:
@@ -97,6 +105,10 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
   `14`, `5`, `1`, `1`, `TOOL7`
 - [x] current harness runtime output for the arithmetic/comparison `IF/ELSE` slice:
   `YES`, `DONE`
+- [x] current harness runtime output for the branch-call slice:
+  `HELLO`, `DONE`
+- [x] current harness runtime output for the arithmetic/comparison branch-call slice:
+  `HELLO`, `DONE`
 - [x] current harness runtime output for the local-procedure slice:
   `ONE`, `TWO`
 - [x] current harness runtime output for the `IF` slice:

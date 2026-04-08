@@ -162,6 +162,99 @@ SCENARIOS = {
         ),
         "expected_console": "YES\nDONE\n",
     },
+    "branch_calls": {
+        "out_fs_name": "harness-actc-alink-avmrun-branch-calls",
+        "source": (
+            'MODULE MAIN\r'
+            'PROC HELLO()\r'
+            'PrintE("HELLO")\r'
+            'RETURN\r'
+            'PROC BYE()\r'
+            'PrintE("BYE")\r'
+            'RETURN\r'
+            'PROC MAIN()\r'
+            'IF 1 = 1 THEN\r'
+            'HELLO()\r'
+            'ELSE\r'
+            'BYE()\r'
+            'FI\r'
+            'PrintE("DONE")\r'
+            'RETURN\r'
+        ),
+        "expected_avo": (
+            "AVO1\n"
+            "x hello 0 7\n"
+            "x bye 7 7\n"
+            "x main 14 26\n"
+            "b e0r\n"
+            "b e1r\n"
+            "b p0p1qhc0wc1ve2r\n"
+            "s HELLO\n"
+            "s BYE\n"
+            "s DONE\n"
+            "i 1\n"
+            "i 1\n"
+            "k 2\n"
+            "n main\n"
+        ),
+        "expected_avm": bytes(
+            [
+                65, 86, 77, 49, 2, 57, 0, 14, 0, 1, 42, 0, 97, 42, 0, 73,
+                16, 255, 72, 97, 48, 0, 73, 16, 255, 72, 17, 1, 0, 17, 1,
+                0, 22, 24, 30, 0, 69, 0, 0, 25, 33, 0, 69, 7, 0, 97, 52,
+                0, 73, 16, 255, 73, 32, 255, 72, 69, 76, 76, 79, 0, 66, 89,
+                69, 0, 68, 79, 78, 69, 0,
+            ]
+        ),
+        "expected_console": "HELLO\nDONE\n",
+    },
+    "comparison_branch_calls": {
+        "out_fs_name": "harness-actc-alink-avmrun-comparison-branch-calls",
+        "source": (
+            'MODULE MAIN\r'
+            'PROC HELLO()\r'
+            'PrintE("HELLO")\r'
+            'RETURN\r'
+            'PROC BYE()\r'
+            'PrintE("BYE")\r'
+            'RETURN\r'
+            'PROC MAIN()\r'
+            'IF 2 + 3 * 4 > 10 THEN\r'
+            'HELLO()\r'
+            'ELSE\r'
+            'BYE()\r'
+            'FI\r'
+            'PrintE("DONE")\r'
+            'RETURN\r'
+        ),
+        "expected_avo": (
+            "AVO1\n"
+            "x hello 0 7\n"
+            "x bye 7 7\n"
+            "x main 14 30\n"
+            "b e0r\n"
+            "b e1r\n"
+            "b p0p1ap2ghc0wc1ve2r\n"
+            "s HELLO\n"
+            "s BYE\n"
+            "s DONE\n"
+            "i 2\n"
+            "i 12\n"
+            "i 10\n"
+            "k 2\n"
+            "n main\n"
+        ),
+        "expected_avm": bytes(
+            [
+                65, 86, 77, 49, 2, 61, 0, 14, 0, 1, 46, 0, 97, 46, 0, 73,
+                16, 255, 72, 97, 52, 0, 73, 16, 255, 72, 17, 2, 0, 17, 12,
+                0, 20, 17, 10, 0, 29, 24, 34, 0, 69, 0, 0, 25, 37, 0, 69,
+                7, 0, 97, 56, 0, 73, 16, 255, 73, 32, 255, 72, 69, 76, 76,
+                79, 0, 66, 89, 69, 0, 68, 79, 78, 69, 0,
+            ]
+        ),
+        "expected_console": "HELLO\nDONE\n",
+    },
     "procedures": {
         "out_fs_name": "harness-actc-alink-avmrun-procedures",
         "source": (

@@ -1332,7 +1332,11 @@ emit_current_object_code_loop:
     bcs emit_current_object_code_gap
     stx export_index
     ldx export_index
+    lda current_bit_hi
+    pha
     jsr emit_live_bytes_for_export_x_or_fail
+    pla
+    sta current_bit_hi
     ldx export_index
     clc
     lda current_bit_hi
