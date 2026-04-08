@@ -57,6 +57,8 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
   `PrintIE((20 - 5) / 3)`
 - [x] arithmetic/comparison mixes in print-expression chains:
   `PrintIE((2 + 3) * 4 = 20)` and `PrintIE((2 + 3 * 4) > 10)`
+- [x] arithmetic/comparison conditions inside `IF ... THEN ... ELSE ... FI`:
+  `IF 2 + 3 * 4 > 10 THEN ... ELSE ... FI`
 - [x] multiple local procedures in one module:
   `PROC HELLO() ...` and `PROC MAIN() ...`
 - [x] local user procedure calls:
@@ -83,6 +85,8 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
   `b p0p1ayi2r`
 - [x] current widened arithmetic/comparison object emission:
   `b p0p1azi2p3p4qzp5p6gzu0r`
+- [x] current widened arithmetic/comparison `IF/ELSE` object emission:
+  `b p0p1ap2ghe0we1ve2r`
 - [x] harness proof exists through:
   `ACTC -> ALINK -> AVMRUN`
 - [x] current harness runtime output for that widened slice:
@@ -91,6 +95,8 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
   `145`
 - [x] current harness runtime output for the arithmetic/comparison slice:
   `14`, `5`, `1`, `1`, `TOOL7`
+- [x] current harness runtime output for the arithmetic/comparison `IF/ELSE` slice:
+  `YES`, `DONE`
 - [x] current harness runtime output for the local-procedure slice:
   `ONE`, `TWO`
 - [x] current harness runtime output for the `IF` slice:

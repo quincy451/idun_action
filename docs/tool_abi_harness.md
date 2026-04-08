@@ -76,6 +76,13 @@ cd /mnt/c/test/action/actionc64u
 ./tools/run_tool_abi_additive_pipeline.py --scenario comparisons --keep-workspace
 ```
 
+Run the current arithmetic+comparison `IF/ELSE` proof end to end:
+
+```sh
+cd /mnt/c/test/action/actionc64u
+./tools/run_tool_abi_additive_pipeline.py --scenario comparison_else --keep-workspace
+```
+
 Run the current local-procedure-call proof end to end:
 
 ```sh
@@ -264,6 +271,8 @@ That now includes at least two stable scenarios:
   `145`
 - arithmetic + comparisons + external call:
   `14`, `5`, `1`, `1`, `TOOL7`
+- arithmetic/comparison condition with `IF/ELSE`:
+  `YES`, `DONE`
 - local user procedure call:
   `ONE`, `TWO`
 - single-branch `IF` control flow:

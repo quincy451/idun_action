@@ -125,6 +125,43 @@ SCENARIOS = {
         ),
         "expected_console": "14\n5\n1\n1\nTOOL7\n",
     },
+    "comparison_else": {
+        "out_fs_name": "harness-actc-alink-avmrun-comparison-else",
+        "source": (
+            'MODULE MAIN\r'
+            'PROC MAIN()\r'
+            'IF 2 + 3 * 4 > 10 THEN\r'
+            'PrintE("YES")\r'
+            'ELSE\r'
+            'PrintE("NO")\r'
+            'FI\r'
+            'PrintE("DONE")\r'
+            'RETURN\r'
+        ),
+        "expected_avo": (
+            "AVO1\n"
+            "x main 0 36\n"
+            "b p0p1ap2ghe0we1ve2r\n"
+            "s YES\n"
+            "s NO\n"
+            "s DONE\n"
+            "i 2\n"
+            "i 12\n"
+            "i 10\n"
+            "k 2\n"
+            "n main\n"
+        ),
+        "expected_avm": bytes(
+            [
+                65, 86, 77, 49, 2, 50, 0, 0, 0, 1, 38, 0, 17, 2, 0, 17,
+                12, 0, 20, 17, 10, 0, 29, 24, 23, 0, 97, 38, 0, 73, 16,
+                255, 25, 29, 0, 97, 42, 0, 73, 16, 255, 97, 45, 0, 73,
+                16, 255, 73, 32, 255, 89, 69, 83, 0, 78, 79, 0, 68, 79,
+                78, 69, 0,
+            ]
+        ),
+        "expected_console": "YES\nDONE\n",
+    },
     "procedures": {
         "out_fs_name": "harness-actc-alink-avmrun-procedures",
         "source": (
