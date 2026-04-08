@@ -36,6 +36,7 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
 - [x] `IF ... THEN ... FI`
 - [x] `IF ... THEN ... ELSE ... FI`
 - [x] nested `IF ... THEN ... FI`
+- [x] nested `IF ... THEN ... ELSE ... FI`
 
 ## Current Widening Work
 
@@ -66,12 +67,16 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
   `IF 1 = 0 THEN ... ELSE ... FI`
 - [x] nested control flow:
   `IF 1 = 1 THEN IF 1 = 0 THEN ... FI ... FI`
+- [x] nested `ELSE` control flow:
+  `IF 1 = 1 THEN IF 1 = 0 THEN ... ELSE ... FI ELSE ... FI`
 - [x] current widened control-flow object emission:
   `b p0p1qhe0vp2p3qhe1ve2r`
 - [x] current widened `ELSE` object emission:
   `b p0p1qhe0we1ve2r`
 - [x] current widened nested-control-flow object emission:
   `b p0p1qhp2p3qhe0ve1ve2r`
+- [x] current widened nested-`ELSE` object emission:
+  `b p0p1qhp2p3qhe0we1vwe2ve3r`
 - [x] current widened additive object emission:
   `b e0u0p0p1ap2myp3p4mp5azr`
 - [x] current widened precedence object emission:
@@ -94,6 +99,8 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
   `GOOD`, `DONE`
 - [x] current harness runtime output for the nested-`IF` slice:
   `INNERDONE`, `OUTERDONE`
+- [x] current harness runtime output for the nested-`ELSE` slice:
+  `GOOD1`, `DONE`
 
 ## Current Biggest Blockers
 

@@ -4,7 +4,7 @@
 
 MANIFEST_LIMIT = 191
 SOURCE_LIMIT = 255
-BODY_OPS_STRIDE = 24
+BODY_OPS_STRIDE = 32
 
 IMPORT_PRINT_STR  = $01
 IMPORT_PRINT_LINE = $02
@@ -338,8 +338,7 @@ collect_proc_body_ops_clear_loop:
     lda #$00
     sta (body_ptr),y
     iny
-    cpy #(BODY_OPS_STRIDE * 8)
-    bcc collect_proc_body_ops_clear_loop
+    bne collect_proc_body_ops_clear_loop
     lda #<source_buffer
     sta scan_ptr
     lda #>source_buffer

@@ -231,6 +231,50 @@ SCENARIOS = {
         ),
         "expected_console": "GOOD\nDONE\n",
     },
+    "nested_else": {
+        "out_fs_name": "harness-actc-alink-avmrun-nested-else",
+        "source": (
+            'MODULE MAIN\r'
+            'PROC MAIN()\r'
+            'IF 1 = 1 THEN\r'
+            'IF 1 = 0 THEN\r'
+            'PrintE("BAD1")\r'
+            'ELSE\r'
+            'PrintE("GOOD1")\r'
+            'FI\r'
+            'ELSE\r'
+            'PrintE("BAD2")\r'
+            'FI\r'
+            'PrintE("DONE")\r'
+            'RETURN\r'
+        ),
+        "expected_avo": (
+            "AVO1\n"
+            "x main 0 51\n"
+            "b p0p1qhp2p3qhe0we1vwe2ve3r\n"
+            "s BAD1\n"
+            "s GOOD1\n"
+            "s BAD2\n"
+            "s DONE\n"
+            "i 1\n"
+            "i 1\n"
+            "i 1\n"
+            "i 0\n"
+            "k 2\n"
+            "n main\n"
+        ),
+        "expected_avm": bytes(
+            [
+                65, 86, 77, 49, 2, 74, 0, 0, 0, 1, 53, 0, 17, 1, 0, 17,
+                1, 0, 22, 24, 38, 0, 17, 1, 0, 17, 0, 0, 22, 24, 29, 0,
+                97, 53, 0, 73, 16, 255, 25, 44, 0, 97, 58, 0, 73, 16, 255,
+                25, 44, 0, 97, 64, 0, 73, 16, 255, 97, 69, 0, 73, 16, 255,
+                73, 32, 255, 66, 65, 68, 49, 0, 71, 79, 79, 68, 49, 0, 66,
+                65, 68, 50, 0, 68, 79, 78, 69, 0,
+            ]
+        ),
+        "expected_console": "GOOD1\nDONE\n",
+    },
     "nested_if": {
         "out_fs_name": "harness-actc-alink-avmrun-nested-if",
         "source": (
@@ -274,13 +318,23 @@ SCENARIOS = {
 
 
 def run(cmd: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
+    result = subprocess.run(
         cmd,
         cwd=cwd,
-        check=True,
-        text=True,
+        check=False,
+        text=False,
         capture_output=True,
     )
+    stdout = result.stdout.decode("utf-8", errors="replace")
+    stderr = result.stderr.decode("utf-8", errors="replace")
+    if result.returncode != 0:
+        raise subprocess.CalledProcessError(
+            result.returncode,
+            result.args,
+            output=stdout,
+            stderr=stderr,
+        )
+    return subprocess.CompletedProcess(result.args, result.returncode, stdout, stderr)
 
 
 def build_current_tools() -> None:
