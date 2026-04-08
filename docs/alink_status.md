@@ -1,0 +1,79 @@
+# `ALINK` Status
+
+Current as of `2026-04-08`.
+
+This file is a focused ledger for the UDOS-native `ALINK.PRG` tool.
+It tracks the real linker slice separately from the broader [action_matrix.md](/mnt/c/test/action/actionc64u/docs/action_matrix.md).
+
+## Proven On The Committed Baseline
+
+- [x] Launches from a UDOS Action workspace as `ALINK.PRG <module>`
+- [x] Loads deterministic `AVO1` object stubs from `OBJ/`
+- [x] Parses export metadata
+- [x] Parses `body_ops`
+- [x] Parses unresolved external symbol lines
+- [x] Parses integer literal pools
+- [x] Parses string literal pools
+- [x] Uses compiler-emitted export sizes to recover procedure boundaries
+- [x] Builds a live-set from the requested module entry
+- [x] Resolves the current narrow external-object closure by loading child objects
+- [x] Carries child-object int/string pools into the linked image
+- [x] Emits direct binary `AVM1` to `BIN/<NAME>.AVM`
+- [x] Narrow exact-byte proof exists for the emitted image
+- [x] Narrow integrated proof exists through `ALINK -> AVMRUN`
+- [x] Narrow integrated proof also exists through `ACTC -> ALINK -> AVMRUN`
+
+## Proven Linker Behaviors
+
+- [x] dead-strip on the current narrow local/export graph
+- [x] child object loading for the already-proven narrow object shape
+- [x] final binary target path `BIN/<NAME>.AVM`
+- [x] direct binary output instead of text or planning-report output
+
+## Current Widening Work
+
+- [ ] broader object graph / external-resolution surface
+- [ ] more robust child-object load path under the current dirty VICE debug line
+- [ ] more robust final save/return path under the current dirty VICE debug line
+- [ ] larger body-op surface than the already-proven narrow slice
+- [ ] full historical dead-strip/link behavior
+
+## Harness-Proven Current Widening Line
+
+- [x] loads widened `ACTC` output for:
+  `PrintI(50 + 7 - 3)` and `PrintIE(60 - 3 + 2)`
+- [x] resolves the current widened child-object closure including `OBJ/W.AVO`
+- [x] emits a widened `BIN/MAIN.AVM` of `76` bytes on that slice
+- [x] harness proof exists through:
+  `ACTC -> ALINK -> AVMRUN`
+- [x] current harness runtime output for that widened slice:
+  `HELLO`, `TOOL7`, `5459`
+
+## Current Biggest Blockers
+
+- Call-depth / return-context sensitivity around tool ABI file loads and saves.
+  This is still the biggest blocker on the VICE-facing path. The harness now proves the widened linker logic itself on the current additive slice.
+- Proof friction from VICE automation.
+  This is real, but secondary. It slows narrowing because some dirty lines perturb shell launch, mount timing, or prompt detection before the actual linker boundary is reached.
+- Lack of a small, stable comparator for every dirty line.
+  When the control path itself gets perturbed, it becomes harder to make honest claims about whether the next failure is in `ALINK` or in the shared tool/service context.
+
+## How Current Debugging Relates To The Linker
+
+The current debugging is directly about core linker function, not side work.
+
+`ALINK` only becomes meaningfully functional when it can:
+
+1. load the root object
+2. load child objects for unresolved externals
+3. build the final live image
+4. save `BIN/<NAME>.AVM`
+5. hand that image to `AVMRUN`
+
+The active failures are in steps `2` and `4` on the widened dirty line, so the current work is still central linker work.
+
+## What Is Not Claimed Here
+
+- full ACTION! linker coverage
+- full historical module/runtime graph support
+- stability for every currently dirty widening experiment
