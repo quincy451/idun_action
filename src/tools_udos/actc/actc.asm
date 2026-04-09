@@ -4,7 +4,8 @@
 
 MANIFEST_LIMIT = 191
 SOURCE_LIMIT = 255
-BODY_OPS_STRIDE = 40
+BODY_OPS_STRIDE = 48
+INT_LITERAL_MAX = 10
 
 IMPORT_PRINT_STR  = $01
 IMPORT_PRINT_LINE = $02
@@ -721,7 +722,7 @@ store_string_literal_from_scan_ptr_done:
 
 store_small_decimal_literal_from_scan_ptr:
     ldx int_count_data
-    cpx #8
+    cpx #INT_LITERAL_MAX
     bcc :+
     sec
     rts
@@ -1108,7 +1109,7 @@ emit_runtime_sum_from_scan_y_sub:
 
 store_expr_value_as_int_literal:
     ldx int_count_data
-    cpx #8
+    cpx #INT_LITERAL_MAX
     bcc :+
     sec
     rts
@@ -2373,9 +2374,9 @@ body_ops_data:
 string_literals:
     .res 192
 int_values_lo:
-    .res 8
+    .res INT_LITERAL_MAX
 int_values_hi:
-    .res 8
+    .res INT_LITERAL_MAX
 export_offsets:
     .res 8
 proc_sizes_data:

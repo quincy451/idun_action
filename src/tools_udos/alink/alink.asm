@@ -4,7 +4,8 @@
 
 MANIFEST_LIMIT = 191
 SOURCE_LIMIT = 255
-BODY_OPS_STRIDE = 40
+BODY_OPS_STRIDE = 48
+INT_LITERAL_MAX = 10
 AVM_VERSION = 2
 AVM_FLAG_ACHERON = 1
 AVM_HEADER_SIZE = 12
@@ -438,7 +439,7 @@ parse_body_ops_string_loop:
     beq parse_body_ops_store
     cmp #'0'
     bcc parse_body_ops_bad
-    cmp #'7'+1
+    cmp #'9'+1
     bcs parse_body_ops_bad
 parse_body_ops_store:
     sta (body_ptr),y
@@ -555,7 +556,7 @@ parse_strings_loop:
     bcs parse_strings_next_line
     jsr advance_scan_ptr_by_const_ptr
     ldx string_count
-    cpx #8
+    cpx #INT_LITERAL_MAX
     bcc :+
 parse_strings_bad:
     lda #<msg_bad_avo
@@ -602,7 +603,7 @@ parse_ints_loop:
     bcs parse_ints_next_line
     jsr advance_scan_ptr_by_const_ptr
     ldx int_count
-    cpx #8
+    cpx #INT_LITERAL_MAX
     bcc :+
     lda #<msg_bad_avo
     ldy #>msg_bad_avo
@@ -790,7 +791,7 @@ build_live_set_call:
     lda (body_ptr),y
     cmp #'0'
     bcc build_live_set_bad
-    cmp #'7'+1
+    cmp #'9'+1
     bcs build_live_set_bad
     sec
     sbc #'0'
@@ -1807,12 +1808,17 @@ load_else_end_target_offset_or_fail:
 	    tya
 	    pha
 	    sta saved_state_hi
-	    ldx export_index
-	    jsr load_export_target_offset_from_x_or_fail
+	    lda main_flags_lo
+	    sta current_bit_lo
+	    lda main_flags_hi
+	    sta current_bit_hi
+	    lda #$03
+	    jsr add_if_false_target_size
 	    lda #$00
 	    sta compare_char
-	    ldy #$00
+	    ldy saved_state_hi
 load_else_end_target_offset_loop:
+	    iny
 	    lda (body_ptr),y
 	    bne :+
 	    jmp load_else_end_target_offset_fail
@@ -1844,9 +1850,9 @@ load_else_end_target_offset_loop:
 	    cmp #'v'
 	    beq load_else_end_target_offset_pop_if
 	    cmp #'d'
-	    beq load_else_end_target_offset_pop_if_next
+	    beq load_else_end_target_offset_skip
 	    cmp #'o'
-	    beq load_else_end_target_offset_pop_if_next
+	    beq load_else_end_target_offset_skip
 	    cmp #'a'
 	    beq load_else_end_target_offset_add_single
 	    cmp #'m'
@@ -1866,55 +1872,40 @@ load_else_end_target_offset_add_call:
 	    lda #$03
 	    jsr add_if_false_target_size
 	    iny
-	    iny
 	    jmp load_else_end_target_offset_loop
 load_else_end_target_offset_add_string:
 	    lda #$06
 	    jsr add_if_false_target_size
-	    iny
 	    iny
 	    jmp load_else_end_target_offset_loop
 load_else_end_target_offset_add_int:
 	    lda #$06
 	    jsr add_if_false_target_size
 	    iny
-	    iny
 	    jmp load_else_end_target_offset_loop
 load_else_end_target_offset_add_single_int:
 	    lda #$03
 	    jsr add_if_false_target_size
-	    iny
 	    jmp load_else_end_target_offset_loop
 load_else_end_target_offset_add_if:
-	    cpy saved_state_hi
-	    bne :+
+	    inc compare_char
 	    lda #$03
 	    jsr add_if_false_target_size
-	    iny
-	    jmp load_else_end_target_offset_loop
-:	    inc compare_char
-	    lda #$03
-	    jsr add_if_false_target_size
-	    iny
 	    jmp load_else_end_target_offset_loop
 load_else_end_target_offset_add_else:
 	    lda #$03
 	    jsr add_if_false_target_size
-	    iny
 	    jmp load_else_end_target_offset_loop
 load_else_end_target_offset_pop_if:
 	    lda compare_char
-	    beq load_else_end_target_offset_pop_if_next
-	    cmp #$01
 	    beq load_else_end_target_offset_done
 	    dec compare_char
-load_else_end_target_offset_pop_if_next:
-	    iny
+	    jmp load_else_end_target_offset_loop
+load_else_end_target_offset_skip:
 	    jmp load_else_end_target_offset_loop
 load_else_end_target_offset_add_single:
 	    lda #$01
 	    jsr add_if_false_target_size
-	    iny
 	    jmp load_else_end_target_offset_loop
 load_else_end_target_offset_done:
 	    pla
@@ -2077,7 +2068,7 @@ load_body_digit_index_to_x_or_fail:
     cmp #'0'
     bcs :+
     jmp emit_live_bytes_for_export_x_bad
-:   cmp #'7'+1
+:   cmp #'9'+1
     bcc :+
     jmp emit_live_bytes_for_export_x_bad
 :   sec
@@ -2759,7 +2750,7 @@ source_buffer_pad:
 source_buffer:
     .res SOURCE_LIMIT+1
 content_buffer_pad:
-    .res $0054
+    .res $0010
 content_buffer:
     .res 256
 export_names:
@@ -2859,9 +2850,9 @@ symbol_buffer:
 manifest_buffer:
     .res MANIFEST_LIMIT+1
 int_values_lo:
-    .res 8
+    .res INT_LITERAL_MAX
 int_values_hi:
-    .res 8
+    .res INT_LITERAL_MAX
 int_count:
     .res 1
 bss_end:

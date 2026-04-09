@@ -48,8 +48,7 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
 ## Current Widening Work
 
 - [ ] broader runtime-emitted integer expression chains beyond the already-proven narrow path
-- [ ] larger statement/control-flow surface beyond the current `IF`/`ELSE`/`DO ... UNTIL ... OD`/nested-loop path
-- [ ] mixed nested loop + nested branch bodies beyond the current literal-pool ceiling
+- [ ] larger statement/control-flow surface beyond the current `IF`/`ELSE`/`DO ... UNTIL ... OD`/nested-loop/branch-combined path
 - [ ] broader procedure/function surface
 - [ ] full historical ACTION! source compatibility
 
@@ -121,8 +120,12 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
   `DO ... DO ... UNTIL 1 = 1 OD UNTIL 1 = 1 OD`
 - [x] local and unresolved-external calls inside nested `DO ... UNTIL ... OD`:
   `DO HELLO() DO W() UNTIL 1 = 1 OD UNTIL 1 = 1 OD`
+- [x] nested `IF ... THEN ... ELSE ... FI` inside nested `DO ... UNTIL ... OD`:
+  `DO IF ... THEN ... FI DO IF ... THEN ... ELSE ... FI UNTIL ... OD UNTIL ... OD`
 - [x] compiler body-op stride widened to support the current nested-loop surface:
-  `BODY_OPS_STRIDE = 40`
+  `BODY_OPS_STRIDE = 48`
+- [x] compiler integer literal pool widened for the current nested-loop + nested-branch surface:
+  `INT_LITERAL_MAX = 10`
 - [x] current widened control-flow object emission:
   `b p0p1qhe0vp2p3qhe1ve2r`
 - [x] current widened `ELSE` object emission:
@@ -145,6 +148,8 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
   `b de0de1p0p1qtop2p3qtoe2r`
 - [x] current widened nested loop + call/external object emission:
   `b dc0du0p0p1qtop2p3qtoe1r`
+- [x] current widened nested loop + nested-branch object emission:
+  `b dp0p1ap2ghe0vdp3p4qhe1we2vp5p6qtop7p8qtoe3r`
 - [x] current widened additive object emission:
   `b e0u0p0p1ap2myp3p4mp5azr`
 - [x] current widened precedence object emission:
@@ -239,6 +244,8 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
   `OUTER`, `INNER`, `DONE`
 - [x] current harness runtime output for the nested loop + call/external slice:
   `HELLO`, `TOOL7`, `DONE`
+- [x] current harness runtime output for the nested loop + nested-branch slice:
+  `OUTER`, `INNER`, `DONE`
 
 ## Current Biggest Blockers
 

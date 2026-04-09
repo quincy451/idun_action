@@ -35,7 +35,7 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
 - [ ] broader object graph / external-resolution surface
 - [ ] more robust child-object load path under the current dirty VICE debug line
 - [ ] more robust final save/return path under the current dirty VICE debug line
-- [ ] larger body-op surface than the current arithmetic/procedure/branch/nested-loop slice
+- [ ] larger body-op surface than the current arithmetic/procedure/branch/nested-loop-combined slice
 - [ ] full historical dead-strip/link behavior
 
 ## Harness-Proven Current Widening Line
@@ -100,6 +100,8 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
   `DO ... DO ... UNTIL 1 = 1 OD UNTIL 1 = 1 OD`
 - [x] also loads local-call plus unresolved-external nested-loop `ACTC` output for:
   `DO HELLO() DO W() UNTIL 1 = 1 OD UNTIL 1 = 1 OD`
+- [x] also loads nested branch control flow inside nested `DO ... UNTIL ... OD`:
+  `DO IF ... THEN ... FI DO IF ... THEN ... ELSE ... FI UNTIL ... OD UNTIL ... OD`
 - [x] resolves the current widened child-object closure including `OBJ/W.AVO`
 - [x] resolves the current widened transitive child-object closure including `OBJ/W.AVO` and `OBJ/Z.AVO`
 - [x] resolves sibling child objects from the root:
@@ -137,6 +139,7 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
 - [x] emits a branch-external `DO ... UNTIL ... OD` slice `BIN/MAIN.AVM` of `84` bytes
 - [x] emits a nested `DO ... UNTIL ... OD` slice `BIN/MAIN.AVM` of `70` bytes
 - [x] emits a nested loop + call/external slice `BIN/MAIN.AVM` of `83` bytes
+- [x] emits a nested loop + nested-branch slice `BIN/MAIN.AVM` of `107` bytes
 - [x] harness proof exists through:
   `ACTC -> ALINK -> AVMRUN`
 - [x] current harness runtime output for that widened slice:
@@ -199,6 +202,8 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
   `OUTER`, `INNER`, `DONE`
 - [x] current harness runtime output for the nested loop + call/external slice:
   `HELLO`, `TOOL7`, `DONE`
+- [x] current harness runtime output for the nested loop + nested-branch slice:
+  `OUTER`, `INNER`, `DONE`
 
 ## Current Biggest Blockers
 
