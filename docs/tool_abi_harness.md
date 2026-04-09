@@ -272,6 +272,13 @@ cd /mnt/c/test/action/actionc64u
 ./tools/run_tool_abi_additive_pipeline.py --scenario nested_do_until_if_else --keep-workspace
 ```
 
+Run the current nested loop + mixed branch local/external proof end to end:
+
+```sh
+cd /mnt/c/test/action/actionc64u
+./tools/run_tool_abi_additive_pipeline.py --scenario nested_do_until_branch_mixed --keep-workspace
+```
+
 That script:
 
 - clones a clean harness workspace from the current manual-pipeline fs tree
@@ -445,6 +452,8 @@ That now includes at least two stable scenarios:
   `HELLO`, `TOOL7`, `DONE`
 - nested loop + nested branch control flow:
   `OUTER`, `INNER`, `DONE`
+- nested loop + mixed branch local/external calls:
+  `TOOL7`, `HELLO`, `DONE`
 - transitive unresolved-external closure inside branch control flow:
   `START`, `MID`, `END`, `DONE`
 - sibling unresolved-external calls from the root:
