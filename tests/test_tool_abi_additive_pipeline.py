@@ -77,11 +77,17 @@ class TestToolAbiPipeline(unittest.TestCase):
     def test_many_string_do_until_pipeline_is_green_under_harness(self) -> None:
         self.run_scenario("many_string_do_until", "A\nB\nC\nD\nE\nF\nG\nH\nI\nJ\nK\nL\nM\nN\nO\nP\n", 145, 153)
 
+    def test_many_string_do_until_if_else_pipeline_is_green_under_harness(self) -> None:
+        self.run_scenario("many_string_do_until_if_else", "I\nJ\nK\nL\nM\nN\nO\nP\n", 161, 166)
+
     def test_many_int_indices_pipeline_is_green_under_harness(self) -> None:
         self.run_scenario("many_int_indices", "0\n1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12\n13\n14\n15\n16\n17\n18\n19\n", 163, 135)
 
     def test_many_int_if_else_pipeline_is_green_under_harness(self) -> None:
         self.run_scenario("many_int_if_else", "8\n9\n10\n11\n12\n13\n14\n15\n", 151, 124)
+
+    def test_many_int_do_until_if_else_pipeline_is_green_under_harness(self) -> None:
+        self.run_scenario("many_int_do_until_if_else", "8\n9\n10\n11\n12\n13\n14\n15\n", 167, 134)
 
     def test_comparison_ops_if_else_pipeline_is_green_under_harness(self) -> None:
         self.run_scenario("comparison_ops_if_else", "NE\nLT\nLE\nGE\n", 197, 149)
@@ -97,6 +103,12 @@ class TestToolAbiPipeline(unittest.TestCase):
 
     def test_many_string_branch_external_pipeline_is_green_under_harness(self) -> None:
         self.run_scenario("many_string_branch_external", "TOOL7\nA\nB\nC\nD\nE\nF\nG\nH\nI\nJ\nK\nL\n", 134, 155)
+
+    def test_many_string_branch_transitive_pipeline_is_green_under_harness(self) -> None:
+        self.run_scenario("many_string_branch_transitive", "MID\nEND\nA\nB\nC\nD\nE\nF\nG\nH\nI\nJ\nK\nL\n", 134, 162)
+
+    def test_many_string_nested_loops_external_pipeline_is_green_under_harness(self) -> None:
+        self.run_scenario("many_string_nested_loops_external", "TOOL7\nA\nB\nC\nD\nE\nF\nG\nH\nI\nJ\n", 138, 144)
 
     def test_branch_call_pipeline_is_green_under_harness(self) -> None:
         self.run_scenario("branch_calls", "HELLO\nDONE\n", 110, 69)

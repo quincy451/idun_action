@@ -78,10 +78,18 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
   `IF 1 = 0 THEN ... ELSE PrintE("I") ... PrintE("P") FI`
 - [x] high string-index loop bodies:
   `DO PrintE("A") ... PrintE("P") UNTIL 1 = 1 OD`
+- [x] high string-index loop bodies combined with `IF/ELSE`:
+  `DO IF 1 = 0 THEN PrintE("A") ... ELSE PrintE("I") ... PrintE("P") FI UNTIL 1 = 1 OD`
 - [x] high int-index control flow under `IF/ELSE`:
   `IF 1 = 0 THEN PrintIE(0..7) ELSE PrintIE(8..15) FI`
+- [x] high int-index loop bodies combined with `IF/ELSE`:
+  `DO IF 1 = 0 THEN PrintIE(0..7) ELSE PrintIE(8..15) FI UNTIL 1 = 1 OD`
 - [x] high string indices mixed with unresolved externals under branch control:
   `IF 1 = 1 THEN W() PrintE("A") ... PrintE("L") ELSE PrintE("BAD") FI`
+- [x] high string indices mixed with transitive externals under branch control:
+  `IF 1 = 1 THEN W() PrintE("A") ... PrintE("L") ELSE PrintE("BAD") FI` with `W -> Z`
+- [x] high string indices mixed with nested-loop external control:
+  `DO WHILE 1 = 0 DO PrintE("BAD") OD W() PrintE("A") ... PrintE("J") UNTIL 1 = 1 OD`
 - [x] arithmetic/comparison conditions inside `IF ... THEN ... ELSE ... FI`:
   `IF 2 + 3 * 4 > 10 THEN ... ELSE ... FI`
 - [x] direct comparison operator conditions inside `IF ... THEN ... FI`:
