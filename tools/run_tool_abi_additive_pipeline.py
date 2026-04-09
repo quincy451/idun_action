@@ -2474,6 +2474,198 @@ SCENARIOS = {
         ),
         "expected_console": "INNERDONE\nOUTERDONE\n",
     },
+    "if_early_return": {
+        "out_fs_name": "harness-actc-alink-avmrun-if-early-return",
+        "source": (
+            'MODULE MAIN\r'
+            'PROC MAIN()\r'
+            'PrintE("START")\r'
+            'IF 1 = 1 THEN\r'
+            'PrintE("EARLY")\r'
+            'RETURN\r'
+            'FI\r'
+            'PrintE("BAD")\r'
+            'RETURN\r'
+        ),
+        "expected_avo": (
+            "AVO1\n"
+            "x main 0 30\n"
+            "b e0p0p1qhe1rve2r\n"
+            "s START\n"
+            "s EARLY\n"
+            "s BAD\n"
+            "i 1\n"
+            "i 1\n"
+            "k 2\n"
+            "n main\n"
+        ),
+        "expected_avm": bytes(
+            [
+                65, 86, 77, 49, 2, 50, 0, 0, 0, 1, 34, 0, 97, 34, 0, 73,
+                16, 255, 17, 1, 0, 17, 1, 0, 22, 24, 25, 0, 97, 40, 0, 73,
+                16, 255, 25, 31, 0, 97, 46, 0, 73, 16, 255, 73, 32, 255, 83,
+                84, 65, 82, 84, 0, 69, 65, 82, 76, 89, 0, 66, 65, 68, 0,
+            ]
+        ),
+        "expected_console": "START\nEARLY\n",
+    },
+    "else_early_return": {
+        "out_fs_name": "harness-actc-alink-avmrun-else-early-return",
+        "source": (
+            'MODULE MAIN\r'
+            'PROC MAIN()\r'
+            'IF 1 = 0 THEN\r'
+            'PrintE("BAD")\r'
+            'ELSE\r'
+            'PrintE("EARLY")\r'
+            'RETURN\r'
+            'FI\r'
+            'PrintE("BAD2")\r'
+            'RETURN\r'
+        ),
+        "expected_avo": (
+            "AVO1\n"
+            "x main 0 33\n"
+            "b p0p1qhe0we1rve2r\n"
+            "s BAD\n"
+            "s EARLY\n"
+            "s BAD2\n"
+            "i 1\n"
+            "i 0\n"
+            "k 2\n"
+            "n main\n"
+        ),
+        "expected_avm": bytes(
+            [
+                65, 86, 77, 49, 2, 52, 0, 0, 0, 1, 37, 0, 17, 1, 0, 17, 0,
+                0, 22, 24, 19, 0, 97, 37, 0, 73, 16, 255, 25, 28, 0, 97, 41,
+                0, 73, 16, 255, 25, 34, 0, 97, 47, 0, 73, 16, 255, 73, 32,
+                255, 66, 65, 68, 0, 69, 65, 82, 76, 89, 0, 66, 65, 68, 50, 0,
+            ]
+        ),
+        "expected_console": "EARLY\n",
+    },
+    "do_until_early_return": {
+        "out_fs_name": "harness-actc-alink-avmrun-do-until-early-return",
+        "source": (
+            'MODULE MAIN\r'
+            'PROC MAIN()\r'
+            'PrintE("START")\r'
+            'DO\r'
+            'PrintE("EARLY")\r'
+            'RETURN\r'
+            'UNTIL 1 = 1\r'
+            'OD\r'
+            'PrintE("BAD")\r'
+            'RETURN\r'
+        ),
+        "expected_avo": (
+            "AVO1\n"
+            "x main 0 30\n"
+            "b e0de1rp0p1qtoe2r\n"
+            "s START\n"
+            "s EARLY\n"
+            "s BAD\n"
+            "i 1\n"
+            "i 1\n"
+            "k 2\n"
+            "n main\n"
+        ),
+        "expected_avm": bytes(
+            [
+                65, 86, 77, 49, 2, 50, 0, 0, 0, 1, 34, 0, 97, 34, 0, 73, 16,
+                255, 97, 40, 0, 73, 16, 255, 25, 31, 0, 17, 1, 0, 17, 1, 0,
+                22, 24, 6, 0, 97, 46, 0, 73, 16, 255, 73, 32, 255, 83, 84,
+                65, 82, 84, 0, 69, 65, 82, 76, 89, 0, 66, 65, 68, 0,
+            ]
+        ),
+        "expected_console": "START\nEARLY\n",
+    },
+    "while_early_return": {
+        "out_fs_name": "harness-actc-alink-avmrun-while-early-return",
+        "source": (
+            'MODULE MAIN\r'
+            'PROC MAIN()\r'
+            'PrintE("START")\r'
+            'WHILE 1 = 1 DO\r'
+            'PrintE("EARLY")\r'
+            'RETURN\r'
+            'OD\r'
+            'PrintE("BAD")\r'
+            'RETURN\r'
+        ),
+        "expected_avo": (
+            "AVO1\n"
+            "x main 0 33\n"
+            "b e0dp0p1qfe1rxe2r\n"
+            "s START\n"
+            "s EARLY\n"
+            "s BAD\n"
+            "i 1\n"
+            "i 1\n"
+            "k 2\n"
+            "n main\n"
+        ),
+        "expected_avm": bytes(
+            [
+                65, 86, 77, 49, 2, 53, 0, 0, 0, 1, 37, 0, 97, 37, 0, 73, 16,
+                255, 17, 1, 0, 17, 1, 0, 22, 24, 28, 0, 97, 43, 0, 73, 16,
+                255, 25, 34, 0, 25, 6, 0, 97, 49, 0, 73, 16, 255, 73, 32,
+                255, 83, 84, 65, 82, 84, 0, 69, 65, 82, 76, 89, 0, 66, 65,
+                68, 0,
+            ]
+        ),
+        "expected_console": "START\nEARLY\n",
+    },
+    "nested_if_early_return": {
+        "out_fs_name": "harness-actc-alink-avmrun-nested-if-early-return",
+        "source": (
+            'MODULE MAIN\r'
+            'PROC MAIN()\r'
+            'PrintE("START")\r'
+            'IF 1 = 1 THEN\r'
+            'IF 2 + 3 * 4 > 10 THEN\r'
+            'PrintE("EARLY")\r'
+            'RETURN\r'
+            'ELSE\r'
+            'PrintE("BAD1")\r'
+            'FI\r'
+            'ELSE\r'
+            'PrintE("BAD2")\r'
+            'FI\r'
+            'PrintE("BAD3")\r'
+            'RETURN\r'
+        ),
+        "expected_avo": (
+            "AVO1\n"
+            "x main 0 62\n"
+            "b e0p0p1qhp2p3ap4ghe1rwe2vwe3ve4r\n"
+            "s START\n"
+            "s EARLY\n"
+            "s BAD1\n"
+            "s BAD2\n"
+            "s BAD3\n"
+            "i 1\n"
+            "i 1\n"
+            "i 2\n"
+            "i 12\n"
+            "i 10\n"
+            "k 2\n"
+            "n main\n"
+        ),
+        "expected_avm": bytes(
+            [
+                65, 86, 77, 49, 2, 93, 0, 0, 0, 1, 66, 0, 97, 66, 0, 73, 16,
+                255, 17, 1, 0, 17, 1, 0, 22, 24, 51, 0, 17, 2, 0, 17, 12, 0,
+                20, 17, 10, 0, 29, 24, 42, 0, 97, 72, 0, 73, 16, 255, 25, 63,
+                0, 25, 48, 0, 97, 78, 0, 73, 16, 255, 25, 57, 0, 97, 83, 0,
+                73, 16, 255, 97, 88, 0, 73, 16, 255, 73, 32, 255, 83, 84, 65,
+                82, 84, 0, 69, 65, 82, 76, 89, 0, 66, 65, 68, 49, 0, 66, 65,
+                68, 50, 0, 66, 65, 68, 51, 0,
+            ]
+        ),
+        "expected_console": "START\nEARLY\n",
+    },
 }
 
 

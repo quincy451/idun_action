@@ -1115,13 +1115,32 @@ add_proc_size_to_layout_from_x:
     txa
     cmp entry_export_index
     bne add_proc_size_to_layout_from_x_done
+    jsr add_root_return_bonus_from_x
+add_proc_size_to_layout_from_x_done:
+    rts
+
+add_root_return_bonus_from_x:
+    txa
+    pha
+    jsr set_body_ptr_from_x
+    ldy #$00
+add_root_return_bonus_from_x_loop:
+    lda (body_ptr),y
+    beq add_root_return_bonus_from_x_done
+    cmp #'r'
+    bne add_root_return_bonus_from_x_next
     clc
     lda current_bit_lo
     adc #$02
     sta current_bit_lo
-    bcc add_proc_size_to_layout_from_x_done
+    bcc add_root_return_bonus_from_x_next
     inc current_bit_hi
-add_proc_size_to_layout_from_x_done:
+add_root_return_bonus_from_x_next:
+    iny
+    bne add_root_return_bonus_from_x_loop
+add_root_return_bonus_from_x_done:
+    pla
+    tax
     rts
 
 copy_current_export_layout_to_root:
@@ -1686,11 +1705,27 @@ emit_live_bytes_for_export_x_while_end:
 emit_live_bytes_for_export_x_ret:
 	    lda save_mode
 	    bne emit_live_bytes_for_export_x_ret_normal
-    lda export_index
-    cmp entry_export_index
-    bne emit_live_bytes_for_export_x_ret_normal
-    lda #OPCODE_CALLN
+	    lda export_index
+	    cmp entry_export_index
+	    bne emit_live_bytes_for_export_x_ret_normal
+	    iny
+	    lda (body_ptr),y
+	    beq emit_live_bytes_for_export_x_ret_exit_restore
+	    dey
+	    jsr load_next_root_return_target_offset_or_fail
+	    lda #OPCODE_JMP
+	    jsr append_payload_byte
+	    lda current_bit_lo
     jsr append_payload_byte
+    lda current_bit_hi
+	    jsr append_payload_byte
+	    iny
+	    jmp emit_live_bytes_for_export_x_loop
+emit_live_bytes_for_export_x_ret_exit_restore:
+	    dey
+emit_live_bytes_for_export_x_ret_exit:
+	    lda #OPCODE_CALLN
+	    jsr append_payload_byte
     lda #$20
     jsr append_payload_byte
     lda #$FF
@@ -1710,6 +1745,119 @@ emit_live_bytes_for_export_x_done:
 	    pla
 	    tax
 	    rts
+
+load_next_root_return_target_offset_or_fail:
+	    tya
+	    pha
+	    sta saved_state_hi
+	    ldx export_index
+	    jsr load_export_target_offset_from_x_or_fail
+	    ldy #$00
+load_next_root_return_target_offset_loop:
+	    lda (body_ptr),y
+	    bne :+
+	    jmp load_next_root_return_target_offset_fail
+: 
+	    cpy saved_state_hi
+	    beq load_next_root_return_target_offset_skip_current
+	    cmp #'r'
+	    bne :+
+	    jmp load_next_root_return_target_offset_done
+: 
+	    cmp #'c'
+	    beq load_next_root_return_target_offset_add_call
+	    cmp #'u'
+	    beq load_next_root_return_target_offset_add_call
+	    cmp #'p'
+	    beq load_next_root_return_target_offset_add_call
+	    cmp #'s'
+	    beq load_next_root_return_target_offset_add_string
+	    cmp #'e'
+	    beq load_next_root_return_target_offset_add_string
+	    cmp #'i'
+	    beq load_next_root_return_target_offset_add_int
+	    cmp #'j'
+	    beq load_next_root_return_target_offset_add_int
+	    cmp #'y'
+	    beq load_next_root_return_target_offset_add_single_int
+	    cmp #'z'
+	    beq load_next_root_return_target_offset_add_single_int
+	    cmp #'h'
+	    beq load_next_root_return_target_offset_add_single_int
+	    cmp #'f'
+	    beq load_next_root_return_target_offset_add_single_int
+	    cmp #'t'
+	    beq load_next_root_return_target_offset_add_single_int
+	    cmp #'w'
+	    beq load_next_root_return_target_offset_add_single_int
+	    cmp #'x'
+	    beq load_next_root_return_target_offset_add_single_int
+	    cmp #'a'
+	    beq load_next_root_return_target_offset_add_single
+	    cmp #'m'
+	    beq load_next_root_return_target_offset_add_single
+	    cmp #'q'
+	    beq load_next_root_return_target_offset_add_single
+	    cmp #'n'
+	    beq load_next_root_return_target_offset_add_single
+	    cmp #'l'
+	    beq load_next_root_return_target_offset_add_single
+	    cmp #'g'
+	    beq load_next_root_return_target_offset_add_single
+	    cmp #'v'
+	    beq load_next_root_return_target_offset_skip
+	    cmp #'d'
+	    beq load_next_root_return_target_offset_skip
+	    cmp #'o'
+	    beq load_next_root_return_target_offset_skip
+	    jmp load_next_root_return_target_offset_fail
+load_next_root_return_target_offset_skip_current:
+        jsr load_ret_target_size
+        jsr add_if_false_target_size
+	    iny
+	    jmp load_next_root_return_target_offset_loop
+load_next_root_return_target_offset_add_call:
+	    lda #$03
+	    jsr add_if_false_target_size
+	    iny
+	    iny
+	    jmp load_next_root_return_target_offset_loop
+load_next_root_return_target_offset_add_string:
+	    lda #$06
+	    jsr add_if_false_target_size
+	    iny
+	    iny
+	    jmp load_next_root_return_target_offset_loop
+load_next_root_return_target_offset_add_int:
+	    lda #$06
+	    jsr add_if_false_target_size
+	    iny
+	    iny
+	    jmp load_next_root_return_target_offset_loop
+load_next_root_return_target_offset_add_single_int:
+	    lda #$03
+	    jsr add_if_false_target_size
+	    iny
+	    jmp load_next_root_return_target_offset_loop
+load_next_root_return_target_offset_add_single:
+	    lda #$01
+	    jsr add_if_false_target_size
+	    iny
+	    jmp load_next_root_return_target_offset_loop
+load_next_root_return_target_offset_skip:
+	    iny
+	    jmp load_next_root_return_target_offset_loop
+load_next_root_return_target_offset_done:
+	    pla
+	    tay
+	    clc
+	    rts
+load_next_root_return_target_offset_fail:
+	    pla
+	    tay
+	    lda #<msg_bad_avo
+	    ldy #>msg_bad_avo
+	    jmp fail_with_ptr
 
 load_if_false_target_offset_or_fail:
 	    tya
@@ -1772,7 +1920,7 @@ load_if_false_target_offset_loop:
 	    cmp #'g'
 	    beq load_if_false_target_offset_add_single
 	    cmp #'r'
-	    beq load_if_false_target_offset_add_single
+	    beq load_if_false_target_offset_add_ret
 	    jmp load_if_false_target_offset_fail
 load_if_false_target_offset_add_call:
 	    lda #$03
@@ -1827,6 +1975,11 @@ load_if_false_target_offset_pop_if_next:
 	    jmp load_if_false_target_offset_loop
 load_if_false_target_offset_add_single:
 	    lda #$01
+	    jsr add_if_false_target_size
+	    iny
+	    jmp load_if_false_target_offset_loop
+load_if_false_target_offset_add_ret:
+	    jsr load_ret_target_size
 	    jsr add_if_false_target_size
 	    iny
 	    jmp load_if_false_target_offset_loop
@@ -1908,7 +2061,7 @@ load_while_false_target_offset_loop:
 	    cmp #'g'
 	    beq load_while_false_target_offset_add_single
 	    cmp #'r'
-	    beq load_while_false_target_offset_add_single
+	    beq load_while_false_target_offset_add_ret
 	    jmp load_while_false_target_offset_fail
 load_while_false_target_offset_add_call:
 	    lda #$03
@@ -1931,6 +2084,10 @@ load_while_false_target_offset_add_single_int:
 	    jmp load_while_false_target_offset_loop
 load_while_false_target_offset_add_single:
 	    lda #$01
+	    jsr add_if_false_target_size
+	    jmp load_while_false_target_offset_loop
+load_while_false_target_offset_add_ret:
+	    jsr load_ret_target_size
 	    jsr add_if_false_target_size
 	    jmp load_while_false_target_offset_loop
 load_while_false_target_offset_skip:
@@ -2009,7 +2166,9 @@ load_while_loop_start_target_offset_loop:
 	    cmp #'o'
 	    beq load_while_loop_start_target_offset_pop_do
 	    cmp #'x'
-	    beq load_while_loop_start_target_offset_pop_while
+	    bne :+
+	    jmp load_while_loop_start_target_offset_pop_while
+: 
 	    cmp #'a'
 	    beq load_while_loop_start_target_offset_add_single
 	    cmp #'m'
@@ -2023,7 +2182,7 @@ load_while_loop_start_target_offset_loop:
 	    cmp #'g'
 	    beq load_while_loop_start_target_offset_add_single
 	    cmp #'r'
-	    beq load_while_loop_start_target_offset_add_single
+	    beq load_while_loop_start_target_offset_add_ret
 	    jmp load_while_loop_start_target_offset_fail
 load_while_loop_start_target_offset_add_call:
 	    lda #$03
@@ -2050,6 +2209,11 @@ load_while_loop_start_target_offset_add_single_int:
 	    jmp load_while_loop_start_target_offset_loop
 load_while_loop_start_target_offset_add_single:
 	    lda #$01
+	    jsr add_if_false_target_size
+	    iny
+	    jmp load_while_loop_start_target_offset_loop
+load_while_loop_start_target_offset_add_ret:
+	    jsr load_ret_target_size
 	    jsr add_if_false_target_size
 	    iny
 	    jmp load_while_loop_start_target_offset_loop
@@ -2169,7 +2333,7 @@ load_else_end_target_offset_loop:
 	    cmp #'g'
 	    beq load_else_end_target_offset_add_single
 	    cmp #'r'
-	    beq load_else_end_target_offset_add_single
+	    beq load_else_end_target_offset_add_ret
 	    jmp load_else_end_target_offset_fail
 load_else_end_target_offset_add_call:
 	    lda #$03
@@ -2208,6 +2372,10 @@ load_else_end_target_offset_skip:
 	    jmp load_else_end_target_offset_loop
 load_else_end_target_offset_add_single:
 	    lda #$01
+	    jsr add_if_false_target_size
+	    jmp load_else_end_target_offset_loop
+load_else_end_target_offset_add_ret:
+	    jsr load_ret_target_size
 	    jsr add_if_false_target_size
 	    jmp load_else_end_target_offset_loop
 load_else_end_target_offset_done:
@@ -2285,7 +2453,7 @@ load_until_loop_start_target_offset_loop:
 	    cmp #'g'
 	    beq load_until_loop_start_target_offset_add_single
 	    cmp #'r'
-	    beq load_until_loop_start_target_offset_add_single
+	    beq load_until_loop_start_target_offset_add_ret
 	    jmp load_until_loop_start_target_offset_fail
 load_until_loop_start_target_offset_add_call:
 	    lda #$03
@@ -2312,6 +2480,11 @@ load_until_loop_start_target_offset_add_single_int:
 	    jmp load_until_loop_start_target_offset_loop
 load_until_loop_start_target_offset_add_single:
 	    lda #$01
+	    jsr add_if_false_target_size
+	    iny
+	    jmp load_until_loop_start_target_offset_loop
+load_until_loop_start_target_offset_add_ret:
+	    jsr load_ret_target_size
 	    jsr add_if_false_target_size
 	    iny
 	    jmp load_until_loop_start_target_offset_loop
@@ -2369,6 +2542,15 @@ add_if_false_target_size:
 	    bcc :+
 	    inc current_bit_hi
 	:   rts
+
+load_ret_target_size:
+	    lda export_index
+	    cmp entry_export_index
+	    beq :+
+	    lda #$01
+	    rts
+:	    lda #$03
+	    rts
 
 load_body_digit_index_to_x_or_fail:
     lda (body_ptr),y

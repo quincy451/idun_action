@@ -549,7 +549,7 @@ collect_proc_body_ops_try_printi:
     lda #>pattern_printi
     sta const_ptr+1
     jsr pattern_matches_scan_ptr
-    bcs collect_proc_body_ops_try_local_call
+    bcs collect_proc_body_ops_try_return
     jsr advance_scan_ptr_by_const_ptr
     lda #'y'
     sta expr_print_op
@@ -559,6 +559,17 @@ collect_proc_body_ops_try_printi:
     bcs collect_proc_body_ops_bad_literal
     lda #'j'
     jsr append_body_op_for_current_proc
+    jmp collect_proc_body_ops_skip_line
+
+collect_proc_body_ops_try_return:
+    lda #<pattern_return
+    sta const_ptr
+    lda #>pattern_return
+    sta const_ptr+1
+    jsr pattern_matches_scan_ptr_keyword
+    bcs collect_proc_body_ops_try_local_call
+    lda #'r'
+    jsr append_body_op_no_arg_for_current_proc
     jmp collect_proc_body_ops_skip_line
 
 collect_proc_body_ops_try_local_call:
@@ -1657,6 +1668,14 @@ compute_payload_layout_add_int:
     jmp compute_payload_layout_body_loop
 :
 compute_payload_layout_ret:
+    cpy #$00
+    beq :+
+    dey
+    lda (body_ptr),y
+    cmp #'r'
+    bne :+
+    dec proc_sizes_data,x
+:
     clc
     lda payload_offset
     adc proc_sizes_data,x
@@ -2157,8 +2176,17 @@ append_body_ops_list_body_loop:
     iny
     bne append_body_ops_list_body_loop
 append_body_ops_list_ret:
+    cpy #$00
+    beq append_body_ops_list_emit_ret
+    dey
+    lda (body_ptr),y
+    cmp #'r'
+    beq append_body_ops_list_newline
+    iny
+append_body_ops_list_emit_ret:
     lda #'r'
     jsr append_char
+append_body_ops_list_newline:
     jsr append_newline
     inc proc_index
     jmp append_body_ops_list_proc_loop
@@ -2442,6 +2470,8 @@ pattern_fi:
     .asciiz "FI"
 pattern_endif:
     .asciiz "ENDIF"
+pattern_return:
+    .asciiz "RETURN"
 pattern_print_quote:
     .byte "PRINT(",34,0
 pattern_printe_quote:

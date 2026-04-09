@@ -223,6 +223,41 @@ cd /mnt/c/test/action/actionc64u
 ./tools/run_tool_abi_additive_pipeline.py --scenario nested_else --keep-workspace
 ```
 
+Run the current early-return `IF` proof end to end:
+
+```sh
+cd /mnt/c/test/action/actionc64u
+./tools/run_tool_abi_additive_pipeline.py --scenario if_early_return --keep-workspace
+```
+
+Run the current early-return `ELSE` proof end to end:
+
+```sh
+cd /mnt/c/test/action/actionc64u
+./tools/run_tool_abi_additive_pipeline.py --scenario else_early_return --keep-workspace
+```
+
+Run the current early-return `DO ... UNTIL ... OD` proof end to end:
+
+```sh
+cd /mnt/c/test/action/actionc64u
+./tools/run_tool_abi_additive_pipeline.py --scenario do_until_early_return --keep-workspace
+```
+
+Run the current early-return `WHILE ... DO ... OD` proof end to end:
+
+```sh
+cd /mnt/c/test/action/actionc64u
+./tools/run_tool_abi_additive_pipeline.py --scenario while_early_return --keep-workspace
+```
+
+Run the current nested early-return `IF` proof end to end:
+
+```sh
+cd /mnt/c/test/action/actionc64u
+./tools/run_tool_abi_additive_pipeline.py --scenario nested_if_early_return --keep-workspace
+```
+
 Run the current `DO ... UNTIL ... OD` loop proof end to end:
 
 ```sh

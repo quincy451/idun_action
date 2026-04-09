@@ -37,6 +37,7 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
 - [x] `IF ... THEN ... ELSE ... FI`
 - [x] nested `IF ... THEN ... FI`
 - [x] nested `IF ... THEN ... ELSE ... FI`
+- [x] explicit `RETURN`
 - [x] `DO ... UNTIL ... OD`
 - [x] local and unresolved-external calls inside `DO ... UNTIL ... OD`
 - [x] `IF ... THEN ... ELSE ... FI` inside `DO ... UNTIL ... OD`
@@ -109,6 +110,8 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
   `IF 1 = 1 THEN IF 1 = 0 THEN ... FI ... FI`
 - [x] nested `ELSE` control flow:
   `IF 1 = 1 THEN IF 1 = 0 THEN ... ELSE ... FI ELSE ... FI`
+- [x] explicit early return inside current control-flow forms:
+  `IF ... THEN RETURN FI`, `IF ... ELSE RETURN FI`, `DO ... RETURN UNTIL ... OD`, `WHILE ... RETURN OD`
 - [x] `DO ... UNTIL ... OD` loop control flow:
   `DO ... UNTIL 1 = 1 OD`
 - [x] local and unresolved-external calls inside `DO ... UNTIL ... OD`:

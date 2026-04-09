@@ -197,6 +197,21 @@ class TestToolAbiPipeline(unittest.TestCase):
     def test_nested_if_pipeline_is_green_under_harness(self) -> None:
         self.run_scenario("nested_if", "INNERDONE\nOUTERDONE\n", 98, 77)
 
+    def test_if_early_return_pipeline_is_green_under_harness(self) -> None:
+        self.run_scenario("if_early_return", "START\nEARLY\n", 76, 62)
+
+    def test_else_early_return_pipeline_is_green_under_harness(self) -> None:
+        self.run_scenario("else_early_return", "EARLY\n", 76, 64)
+
+    def test_do_until_early_return_pipeline_is_green_under_harness(self) -> None:
+        self.run_scenario("do_until_early_return", "START\nEARLY\n", 77, 62)
+
+    def test_while_early_return_pipeline_is_green_under_harness(self) -> None:
+        self.run_scenario("while_early_return", "START\nEARLY\n", 77, 65)
+
+    def test_nested_if_early_return_pipeline_is_green_under_harness(self) -> None:
+        self.run_scenario("nested_if_early_return", "START\nEARLY\n", 121, 105)
+
 
 if __name__ == "__main__":
     unittest.main()
