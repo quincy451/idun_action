@@ -1161,6 +1161,8 @@ add_current_string_length_to_layout_done:
 
 emit_payload_or_fail:
     jsr load_current_object_link_state_or_fail
+    lda entry_export_index
+    sta root_entry_export_index
     lda #$34
     sta debug_phase
     lda #$00
@@ -2082,7 +2084,7 @@ render_payload_as_binary_header:
     sta content_buffer+5
     lda #$00
     sta content_buffer+6
-    ldx entry_export_index
+    ldx root_entry_export_index
     lda root_export_offsets_lo,x
     sta content_buffer+7
     lda root_export_offsets_hi,x
@@ -2627,6 +2629,8 @@ payload_bytes_data:
 code_limit_data:
     .res 1
 entry_export_index:
+    .res 1
+root_entry_export_index:
     .res 1
 root_string_offsets_lo:
     .res 8

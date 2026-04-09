@@ -71,6 +71,8 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
   `IF 1 = 1 THEN IF 2 + 3 * 4 > 10 THEN HELLO() ELSE BYE() FI ELSE OUTER() FI`
 - [x] unresolved external calls inside arithmetic/comparison-driven `IF ... THEN ... ELSE ... FI`:
   `IF 2 + 3 * 4 > 10 THEN W() ELSE ... FI`
+- [x] nested unresolved external calls inside control flow:
+  `IF 1 = 1 THEN IF 2 + 3 * 4 > 10 THEN W() ELSE ... FI ELSE OUTER() FI`
 - [x] single-branch control flow:
   `IF 1 = 0 THEN ... FI` and `IF 1 = 1 THEN ... FI`
 - [x] `ELSE` control flow:
@@ -103,6 +105,8 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
   `b p0p1qhp2p3ap4ghc0wc1vwc2ve3r`
 - [x] current widened branch-external object emission:
   `b p0p1ap2ghu0we0ve1r`
+- [x] current widened nested branch-external object emission:
+  `b p0p1qhp2p3ap4ghu0we1vwc0ve2r`
 - [x] harness proof exists through:
   `ACTC -> ALINK -> AVMRUN`
 - [x] current harness runtime output for that widened slice:
@@ -120,6 +124,8 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
 - [x] current harness runtime output for the nested branch-call slice:
   `HELLO`, `DONE`
 - [x] current harness runtime output for the branch-external slice:
+  `TOOL7`, `DONE`
+- [x] current harness runtime output for the nested branch-external slice:
   `TOOL7`, `DONE`
 - [x] current harness runtime output for the local-procedure slice:
   `ONE`, `TWO`

@@ -353,6 +353,57 @@ SCENARIOS = {
         ),
         "expected_console": "TOOL7\nDONE\n",
     },
+    "nested_branch_external": {
+        "out_fs_name": "harness-actc-alink-avmrun-nested-branch-external",
+        "source": (
+            'MODULE MAIN\r'
+            'PROC OUTER()\r'
+            'PrintE("OUTER")\r'
+            'RETURN\r'
+            'PROC MAIN()\r'
+            'IF 1 = 1 THEN\r'
+            'IF 2 + 3 * 4 > 10 THEN\r'
+            'W()\r'
+            'ELSE\r'
+            'PrintE("BAD1")\r'
+            'FI\r'
+            'ELSE\r'
+            'OUTER()\r'
+            'FI\r'
+            'PrintE("DONE")\r'
+            'RETURN\r'
+        ),
+        "expected_avo": (
+            "AVO1\n"
+            "x outer 0 7\n"
+            "x main 7 49\n"
+            "b e0r\n"
+            "b p0p1qhp2p3ap4ghu0we1vwc0ve2r\n"
+            "u w\n"
+            "s OUTER\n"
+            "s BAD1\n"
+            "s DONE\n"
+            "i 1\n"
+            "i 1\n"
+            "i 2\n"
+            "i 12\n"
+            "i 10\n"
+            "k 2\n"
+            "n main\n"
+        ),
+        "expected_avm": bytes(
+            [
+                65, 86, 77, 49, 2, 92, 0, 7, 0, 1, 71, 0, 97, 71, 0, 73,
+                16, 255, 72, 17, 1, 0, 17, 1, 0, 22, 24, 46, 0, 17, 2, 0,
+                17, 12, 0, 20, 17, 10, 0, 29, 24, 37, 0, 69, 58, 0, 25, 49,
+                0, 97, 77, 0, 73, 16, 255, 25, 49, 0, 69, 0, 0, 97, 82, 0,
+                73, 16, 255, 73, 32, 255, 97, 87, 0, 73, 0, 255, 17, 7, 0,
+                73, 49, 255, 72, 79, 85, 84, 69, 82, 0, 66, 65, 68, 49, 0,
+                68, 79, 78, 69, 0, 84, 79, 79, 76, 0,
+            ]
+        ),
+        "expected_console": "TOOL7\nDONE\n",
+    },
     "procedures": {
         "out_fs_name": "harness-actc-alink-avmrun-procedures",
         "source": (
