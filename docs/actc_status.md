@@ -42,11 +42,14 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
 - [x] `IF ... THEN ... ELSE ... FI` inside `DO ... UNTIL ... OD`
 - [x] local branch calls inside `DO ... UNTIL ... OD`
 - [x] unresolved-external branch calls inside `DO ... UNTIL ... OD`
+- [x] nested `DO ... UNTIL ... OD`
+- [x] local and unresolved-external calls inside nested `DO ... UNTIL ... OD`
 
 ## Current Widening Work
 
 - [ ] broader runtime-emitted integer expression chains beyond the already-proven narrow path
-- [ ] larger statement/control-flow surface beyond the current single-branch `IF` path
+- [ ] larger statement/control-flow surface beyond the current `IF`/`ELSE`/`DO ... UNTIL ... OD`/nested-loop path
+- [ ] mixed nested loop + nested branch bodies beyond the current literal-pool ceiling
 - [ ] broader procedure/function surface
 - [ ] full historical ACTION! source compatibility
 
@@ -114,6 +117,12 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
   `DO IF 2 + 3 * 4 > 10 THEN HELLO() ELSE BYE() FI UNTIL 1 = 1 OD`
 - [x] unresolved-external branch calls inside `DO ... UNTIL ... OD`:
   `DO IF 2 + 3 * 4 > 10 THEN W() ELSE ... FI UNTIL 1 = 1 OD`
+- [x] nested `DO ... UNTIL ... OD`:
+  `DO ... DO ... UNTIL 1 = 1 OD UNTIL 1 = 1 OD`
+- [x] local and unresolved-external calls inside nested `DO ... UNTIL ... OD`:
+  `DO HELLO() DO W() UNTIL 1 = 1 OD UNTIL 1 = 1 OD`
+- [x] compiler body-op stride widened to support the current nested-loop surface:
+  `BODY_OPS_STRIDE = 40`
 - [x] current widened control-flow object emission:
   `b p0p1qhe0vp2p3qhe1ve2r`
 - [x] current widened `ELSE` object emission:
@@ -132,6 +141,10 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
   `b dp0p1ap2ghc0wc1vp3p4qtoe2r`
 - [x] current widened loop + branch-external object emission:
   `b dp0p1ap2ghu0we0vp3p4qtoe1r`
+- [x] current widened nested-loop object emission:
+  `b de0de1p0p1qtop2p3qtoe2r`
+- [x] current widened nested loop + call/external object emission:
+  `b dc0du0p0p1qtop2p3qtoe1r`
 - [x] current widened additive object emission:
   `b e0u0p0p1ap2myp3p4mp5azr`
 - [x] current widened precedence object emission:
@@ -222,6 +235,10 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
   `HELLO`, `DONE`
 - [x] current harness runtime output for the loop + branch-external slice:
   `TOOL7`, `DONE`
+- [x] current harness runtime output for the nested-loop slice:
+  `OUTER`, `INNER`, `DONE`
+- [x] current harness runtime output for the nested loop + call/external slice:
+  `HELLO`, `TOOL7`, `DONE`
 
 ## Current Biggest Blockers
 

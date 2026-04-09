@@ -4,7 +4,7 @@
 
 MANIFEST_LIMIT = 191
 SOURCE_LIMIT = 255
-BODY_OPS_STRIDE = 32
+BODY_OPS_STRIDE = 40
 AVM_VERSION = 2
 AVM_FLAG_ACHERON = 1
 AVM_HEADER_SIZE = 12
@@ -2759,7 +2759,7 @@ source_buffer_pad:
 source_buffer:
     .res SOURCE_LIMIT+1
 content_buffer_pad:
-    .res $0094
+    .res $0054
 content_buffer:
     .res 256
 export_names:

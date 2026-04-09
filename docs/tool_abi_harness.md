@@ -251,6 +251,20 @@ cd /mnt/c/test/action/actionc64u
 ./tools/run_tool_abi_additive_pipeline.py --scenario do_until_branch_external --keep-workspace
 ```
 
+Run the current nested `DO ... UNTIL ... OD` proof end to end:
+
+```sh
+cd /mnt/c/test/action/actionc64u
+./tools/run_tool_abi_additive_pipeline.py --scenario nested_do_until --keep-workspace
+```
+
+Run the current nested loop + local/external call proof end to end:
+
+```sh
+cd /mnt/c/test/action/actionc64u
+./tools/run_tool_abi_additive_pipeline.py --scenario nested_do_until_calls --keep-workspace
+```
+
 That script:
 
 - clones a clean harness workspace from the current manual-pipeline fs tree
@@ -418,6 +432,10 @@ That now includes at least two stable scenarios:
   `TOOL7`, `DONE`
 - transitive unresolved-external closure across modules:
   `START`, `MID`, `END`, `DONE`
+- nested `DO ... UNTIL ... OD`:
+  `OUTER`, `INNER`, `DONE`
+- nested loop + local/external calls:
+  `HELLO`, `TOOL7`, `DONE`
 - transitive unresolved-external closure inside branch control flow:
   `START`, `MID`, `END`, `DONE`
 - sibling unresolved-external calls from the root:

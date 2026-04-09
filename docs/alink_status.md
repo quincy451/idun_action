@@ -35,7 +35,7 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
 - [ ] broader object graph / external-resolution surface
 - [ ] more robust child-object load path under the current dirty VICE debug line
 - [ ] more robust final save/return path under the current dirty VICE debug line
-- [ ] larger body-op surface than the current arithmetic/procedure/`IF` slice
+- [ ] larger body-op surface than the current arithmetic/procedure/branch/nested-loop slice
 - [ ] full historical dead-strip/link behavior
 
 ## Harness-Proven Current Widening Line
@@ -96,6 +96,10 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
   `DO IF 2 + 3 * 4 > 10 THEN HELLO() ELSE BYE() FI UNTIL 1 = 1 OD`
 - [x] also loads branch-local unresolved externals inside `DO ... UNTIL ... OD`:
   `DO IF 2 + 3 * 4 > 10 THEN W() ELSE ... FI UNTIL 1 = 1 OD`
+- [x] also loads nested `DO ... UNTIL ... OD` `ACTC` output for:
+  `DO ... DO ... UNTIL 1 = 1 OD UNTIL 1 = 1 OD`
+- [x] also loads local-call plus unresolved-external nested-loop `ACTC` output for:
+  `DO HELLO() DO W() UNTIL 1 = 1 OD UNTIL 1 = 1 OD`
 - [x] resolves the current widened child-object closure including `OBJ/W.AVO`
 - [x] resolves the current widened transitive child-object closure including `OBJ/W.AVO` and `OBJ/Z.AVO`
 - [x] resolves sibling child objects from the root:
@@ -131,6 +135,8 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
 - [x] emits a branch `DO ... UNTIL ... OD` slice `BIN/MAIN.AVM` of `73` bytes
 - [x] emits a branch-call `DO ... UNTIL ... OD` slice `BIN/MAIN.AVM` of `83` bytes
 - [x] emits a branch-external `DO ... UNTIL ... OD` slice `BIN/MAIN.AVM` of `84` bytes
+- [x] emits a nested `DO ... UNTIL ... OD` slice `BIN/MAIN.AVM` of `70` bytes
+- [x] emits a nested loop + call/external slice `BIN/MAIN.AVM` of `83` bytes
 - [x] harness proof exists through:
   `ACTC -> ALINK -> AVMRUN`
 - [x] current harness runtime output for that widened slice:
@@ -189,6 +195,10 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
   `HELLO`, `DONE`
 - [x] current harness runtime output for the loop + branch-external slice:
   `TOOL7`, `DONE`
+- [x] current harness runtime output for the nested-loop slice:
+  `OUTER`, `INNER`, `DONE`
+- [x] current harness runtime output for the nested loop + call/external slice:
+  `HELLO`, `TOOL7`, `DONE`
 
 ## Current Biggest Blockers
 
