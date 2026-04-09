@@ -1662,6 +1662,38 @@ SCENARIOS = {
         ),
         "expected_console": "TOOL7\nHELLO\nDONE\n",
     },
+    "while_blocks": {
+        "out_fs_name": "harness-actc-alink-avmrun-while-blocks",
+        "source": (
+            'MODULE MAIN\r'
+            'PROC MAIN()\r'
+            'WHILE 1 = 0 DO\r'
+            'PrintE("BAD")\r'
+            'OD\r'
+            'PrintE("DONE")\r'
+            'RETURN\r'
+        ),
+        "expected_avo": (
+            "AVO1\n"
+            "x main 0 26\n"
+            "b dp0p1qfe0xe1r\n"
+            "s BAD\n"
+            "s DONE\n"
+            "i 1\n"
+            "i 0\n"
+            "k 2\n"
+            "n main\n"
+        ),
+        "expected_avm": bytes(
+            [
+                65, 86, 77, 49, 2, 37, 0, 0, 0, 1, 28, 0, 17, 1, 0, 17,
+                0, 0, 22, 24, 19, 0, 97, 28, 0, 73, 16, 255, 25, 0, 0,
+                97, 32, 0, 73, 16, 255, 73, 32, 255, 66, 65, 68, 0, 68,
+                79, 78, 69, 0,
+            ]
+        ),
+        "expected_console": "DONE\n",
+    },
     "nested_if": {
         "out_fs_name": "harness-actc-alink-avmrun-nested-if",
         "source": (
@@ -1727,8 +1759,8 @@ def run(cmd: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[
 def build_current_tools() -> None:
     for script in (
         "build_tool_abi_harness.sh",
-        "build_actc_udos.sh",
-        "build_alink_udos.sh",
+        "build_actc_harness_udos.sh",
+        "build_alink_harness_udos.sh",
         "build_avmrun_udos.sh",
     ):
         run([str(ROOT / "tools" / script)], cwd=ROOT)

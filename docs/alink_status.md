@@ -35,7 +35,7 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
 - [ ] broader object graph / external-resolution surface
 - [ ] more robust child-object load path under the current dirty VICE debug line
 - [ ] more robust final save/return path under the current dirty VICE debug line
-- [ ] larger body-op surface than the current arithmetic/procedure/branch/nested-loop-combined slice
+- [ ] larger body-op surface than the current arithmetic/procedure/branch/`WHILE`/nested-loop-combined slice
 - [ ] full historical dead-strip/link behavior
 
 ## Harness-Proven Current Widening Line
@@ -104,6 +104,8 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
   `DO IF ... THEN ... FI DO IF ... THEN ... ELSE ... FI UNTIL ... OD UNTIL ... OD`
 - [x] also loads mixed local/external branch calls inside nested `DO ... UNTIL ... OD`:
   `DO IF ... THEN W() ELSE ... FI DO IF ... THEN HELLO() ELSE ... FI UNTIL ... OD UNTIL ... OD`
+- [x] also loads top-tested `WHILE ... DO ... OD` `ACTC` output for:
+  `WHILE 1 = 0 DO ... OD`
 - [x] resolves the current widened child-object closure including `OBJ/W.AVO`
 - [x] resolves the current widened transitive child-object closure including `OBJ/W.AVO` and `OBJ/Z.AVO`
 - [x] resolves sibling child objects from the root:
@@ -143,6 +145,7 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
 - [x] emits a nested loop + call/external slice `BIN/MAIN.AVM` of `83` bytes
 - [x] emits a nested loop + nested-branch slice `BIN/MAIN.AVM` of `107` bytes
 - [x] emits a nested loop + mixed branch local/external slice `BIN/MAIN.AVM` of `135` bytes
+- [x] emits a `WHILE ... DO ... OD` slice `BIN/MAIN.AVM` of `49` bytes
 - [x] harness proof exists through:
   `ACTC -> ALINK -> AVMRUN`
 - [x] current harness runtime output for that widened slice:
@@ -209,6 +212,8 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
   `OUTER`, `INNER`, `DONE`
 - [x] current harness runtime output for the nested loop + mixed branch local/external slice:
   `TOOL7`, `HELLO`, `DONE`
+- [x] current harness runtime output for the `WHILE ... DO ... OD` slice:
+  `DONE`
 
 ## Current Biggest Blockers
 

@@ -48,7 +48,7 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
 ## Current Widening Work
 
 - [ ] broader runtime-emitted integer expression chains beyond the already-proven narrow path
-- [ ] larger statement/control-flow surface beyond the current `IF`/`ELSE`/`DO ... UNTIL ... OD`/nested-loop/branch-combined path
+- [ ] larger statement/control-flow surface beyond the current `IF`/`ELSE`/`WHILE ... DO ... OD`/`DO ... UNTIL ... OD`/nested-loop/branch-combined path
 - [ ] broader procedure/function surface
 - [ ] full historical ACTION! source compatibility
 
@@ -124,6 +124,8 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
   `DO IF ... THEN ... FI DO IF ... THEN ... ELSE ... FI UNTIL ... OD UNTIL ... OD`
 - [x] mixed local/external branch calls inside nested `DO ... UNTIL ... OD`:
   `DO IF ... THEN W() ELSE ... FI DO IF ... THEN HELLO() ELSE ... FI UNTIL ... OD UNTIL ... OD`
+- [x] top-tested `WHILE ... DO ... OD` with false entry condition:
+  `WHILE 1 = 0 DO ... OD`
 - [x] compiler body-op stride widened to support the current nested-loop surface:
   `BODY_OPS_STRIDE = 48`
 - [x] compiler integer literal pool widened for the current nested-loop + nested-branch surface:
@@ -154,6 +156,8 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
   `b dp0p1ap2ghe0vdp3p4qhe1we2vp5p6qtop7p8qtoe3r`
 - [x] current widened nested loop + mixed branch local/external object emission:
   `b dp0p1ap2ghu0we1vdp3p4qhc0we2vp5p6qtop7p8qtoe3r`
+- [x] current widened `WHILE ... DO ... OD` object emission:
+  `b dp0p1qfe0xe1r`
 - [x] current widened additive object emission:
   `b e0u0p0p1ap2myp3p4mp5azr`
 - [x] current widened precedence object emission:
@@ -252,6 +256,8 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
   `OUTER`, `INNER`, `DONE`
 - [x] current harness runtime output for the nested loop + mixed branch local/external slice:
   `TOOL7`, `HELLO`, `DONE`
+- [x] current harness runtime output for the `WHILE ... DO ... OD` slice:
+  `DONE`
 
 ## Current Biggest Blockers
 

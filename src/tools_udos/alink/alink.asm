@@ -425,6 +425,8 @@ parse_body_ops_string_loop:
 	    beq parse_body_ops_store
     cmp #'h'
     beq parse_body_ops_store
+    cmp #'f'
+    beq parse_body_ops_store
     cmp #'t'
     beq parse_body_ops_store
     cmp #'w'
@@ -434,6 +436,8 @@ parse_body_ops_string_loop:
     cmp #'d'
     beq parse_body_ops_store
     cmp #'o'
+    beq parse_body_ops_store
+    cmp #'x'
     beq parse_body_ops_store
     cmp #'r'
     beq parse_body_ops_store
@@ -773,6 +777,8 @@ build_live_set_body_loop:
 	    beq build_live_set_single
 	    cmp #'h'
 	    beq build_live_set_single
+	    cmp #'f'
+	    beq build_live_set_single
 	    cmp #'t'
 	    beq build_live_set_single
 	    cmp #'w'
@@ -782,6 +788,8 @@ build_live_set_body_loop:
 	    cmp #'d'
 	    beq build_live_set_single
 	    cmp #'o'
+	    beq build_live_set_single
+	    cmp #'x'
 	    beq build_live_set_single
 	    cmp #'r'
 	    beq build_live_set_ret
@@ -1447,6 +1455,9 @@ emit_live_bytes_for_export_x_loop:
 	:   cmp #'d'
 	    bne :+
 	    jmp emit_live_bytes_for_export_x_do
+	:   cmp #'f'
+	    bne :+
+	    jmp emit_live_bytes_for_export_x_while
 	:   cmp #'h'
 	    bne :+
 	    jmp emit_live_bytes_for_export_x_if
@@ -1462,6 +1473,9 @@ emit_live_bytes_for_export_x_loop:
 	:   cmp #'o'
 	    bne :+
 	    jmp emit_live_bytes_for_export_x_od
+	:   cmp #'x'
+	    bne :+
+	    jmp emit_live_bytes_for_export_x_while_end
 	:   cmp #'r'
 	    bne :+
 	    jmp emit_live_bytes_for_export_x_ret
@@ -1613,6 +1627,16 @@ emit_live_bytes_for_export_x_print_top_common:
 emit_live_bytes_for_export_x_do:
 	    iny
 	    jmp emit_live_bytes_for_export_x_loop
+emit_live_bytes_for_export_x_while:
+	    jsr load_while_false_target_offset_or_fail
+	    lda #OPCODE_JZ
+	    jsr append_payload_byte
+	    lda current_bit_lo
+	    jsr append_payload_byte
+	    lda current_bit_hi
+	    jsr append_payload_byte
+	    iny
+	    jmp emit_live_bytes_for_export_x_loop
 emit_live_bytes_for_export_x_if:
 	    jsr load_if_false_target_offset_or_fail
 	    lda #OPCODE_JZ
@@ -1647,6 +1671,16 @@ emit_live_bytes_for_export_x_endif:
 	    iny
 	    jmp emit_live_bytes_for_export_x_loop
 emit_live_bytes_for_export_x_od:
+	    iny
+	    jmp emit_live_bytes_for_export_x_loop
+emit_live_bytes_for_export_x_while_end:
+	    jsr load_while_loop_start_target_offset_or_fail
+	    lda #OPCODE_JMP
+	    jsr append_payload_byte
+	    lda current_bit_lo
+	    jsr append_payload_byte
+	    lda current_bit_hi
+	    jsr append_payload_byte
 	    iny
 	    jmp emit_live_bytes_for_export_x_loop
 emit_live_bytes_for_export_x_ret:
@@ -1798,6 +1832,267 @@ load_if_false_target_offset_done:
 	    clc
 	    rts
 load_if_false_target_offset_fail:
+	    pla
+	    tay
+	    lda #<msg_bad_avo
+	    ldy #>msg_bad_avo
+	    jmp fail_with_ptr
+
+load_while_false_target_offset_or_fail:
+	    tya
+	    pha
+	    sta saved_state_hi
+	    lda main_flags_lo
+	    sta current_bit_lo
+	    lda main_flags_hi
+	    sta current_bit_hi
+	    lda #$03
+	    jsr add_if_false_target_size
+	    lda #$00
+	    sta compare_char
+	    ldy saved_state_hi
+load_while_false_target_offset_loop:
+	    iny
+	    lda (body_ptr),y
+	    bne :+
+	    jmp load_while_false_target_offset_fail
+:
+	    cmp #'c'
+	    beq load_while_false_target_offset_add_call
+	    cmp #'u'
+	    beq load_while_false_target_offset_add_call
+	    cmp #'p'
+	    beq load_while_false_target_offset_add_call
+	    cmp #'s'
+	    beq load_while_false_target_offset_add_string
+	    cmp #'e'
+	    beq load_while_false_target_offset_add_string
+	    cmp #'i'
+	    beq load_while_false_target_offset_add_int
+	    cmp #'j'
+	    beq load_while_false_target_offset_add_int
+	    cmp #'y'
+	    beq load_while_false_target_offset_add_single_int
+	    cmp #'z'
+	    beq load_while_false_target_offset_add_single_int
+	    cmp #'h'
+	    beq load_while_false_target_offset_add_single_int
+	    cmp #'f'
+	    beq load_while_false_target_offset_add_single_int
+	    cmp #'t'
+	    beq load_while_false_target_offset_add_single_int
+	    cmp #'w'
+	    beq load_while_false_target_offset_add_single_int
+	    cmp #'v'
+	    beq load_while_false_target_offset_skip
+	    cmp #'d'
+	    beq load_while_false_target_offset_push_do
+	    cmp #'o'
+	    beq load_while_false_target_offset_pop_do
+	    cmp #'x'
+	    beq load_while_false_target_offset_pop_while
+	    cmp #'a'
+	    beq load_while_false_target_offset_add_single
+	    cmp #'m'
+	    beq load_while_false_target_offset_add_single
+	    cmp #'q'
+	    beq load_while_false_target_offset_add_single
+	    cmp #'n'
+	    beq load_while_false_target_offset_add_single
+	    cmp #'l'
+	    beq load_while_false_target_offset_add_single
+	    cmp #'g'
+	    beq load_while_false_target_offset_add_single
+	    cmp #'r'
+	    beq load_while_false_target_offset_add_single
+	    jmp load_while_false_target_offset_fail
+load_while_false_target_offset_add_call:
+	    lda #$03
+	    jsr add_if_false_target_size
+	    iny
+	    jmp load_while_false_target_offset_loop
+load_while_false_target_offset_add_string:
+	    lda #$06
+	    jsr add_if_false_target_size
+	    iny
+	    jmp load_while_false_target_offset_loop
+load_while_false_target_offset_add_int:
+	    lda #$06
+	    jsr add_if_false_target_size
+	    iny
+	    jmp load_while_false_target_offset_loop
+load_while_false_target_offset_add_single_int:
+	    lda #$03
+	    jsr add_if_false_target_size
+	    jmp load_while_false_target_offset_loop
+load_while_false_target_offset_add_single:
+	    lda #$01
+	    jsr add_if_false_target_size
+	    jmp load_while_false_target_offset_loop
+load_while_false_target_offset_skip:
+	    jmp load_while_false_target_offset_loop
+load_while_false_target_offset_push_do:
+	    inc compare_char
+	    jmp load_while_false_target_offset_loop
+load_while_false_target_offset_pop_do:
+	    lda compare_char
+	    beq load_while_false_target_offset_fail
+	    dec compare_char
+	    jmp load_while_false_target_offset_loop
+load_while_false_target_offset_pop_while:
+	    lda #$03
+	    jsr add_if_false_target_size
+	    lda compare_char
+	    beq load_while_false_target_offset_done
+	    dec compare_char
+	    jmp load_while_false_target_offset_loop
+load_while_false_target_offset_done:
+	    pla
+	    tay
+	    clc
+	    rts
+load_while_false_target_offset_fail:
+	    pla
+	    tay
+	    lda #<msg_bad_avo
+	    ldy #>msg_bad_avo
+	    jmp fail_with_ptr
+
+load_while_loop_start_target_offset_or_fail:
+	    tya
+	    pha
+	    sta saved_state_hi
+	    ldx export_index
+	    jsr load_export_target_offset_from_x_or_fail
+	    lda #$00
+	    sta compare_char
+	    ldy #$00
+load_while_loop_start_target_offset_loop:
+	    lda (body_ptr),y
+	    bne :+
+	    jmp load_while_loop_start_target_offset_fail
+:
+	    cmp #'c'
+	    beq load_while_loop_start_target_offset_add_call
+	    cmp #'u'
+	    beq load_while_loop_start_target_offset_add_call
+	    cmp #'p'
+	    beq load_while_loop_start_target_offset_add_call
+	    cmp #'s'
+	    beq load_while_loop_start_target_offset_add_string
+	    cmp #'e'
+	    beq load_while_loop_start_target_offset_add_string
+	    cmp #'i'
+	    beq load_while_loop_start_target_offset_add_int
+	    cmp #'j'
+	    beq load_while_loop_start_target_offset_add_int
+	    cmp #'y'
+	    beq load_while_loop_start_target_offset_add_single_int
+	    cmp #'z'
+	    beq load_while_loop_start_target_offset_add_single_int
+	    cmp #'h'
+	    beq load_while_loop_start_target_offset_add_single_int
+	    cmp #'f'
+	    beq load_while_loop_start_target_offset_add_single_int
+	    cmp #'t'
+	    beq load_while_loop_start_target_offset_add_single_int
+	    cmp #'w'
+	    beq load_while_loop_start_target_offset_add_single_int
+	    cmp #'v'
+	    beq load_while_loop_start_target_offset_skip
+	    cmp #'d'
+	    beq load_while_loop_start_target_offset_push_do
+	    cmp #'o'
+	    beq load_while_loop_start_target_offset_pop_do
+	    cmp #'x'
+	    beq load_while_loop_start_target_offset_pop_while
+	    cmp #'a'
+	    beq load_while_loop_start_target_offset_add_single
+	    cmp #'m'
+	    beq load_while_loop_start_target_offset_add_single
+	    cmp #'q'
+	    beq load_while_loop_start_target_offset_add_single
+	    cmp #'n'
+	    beq load_while_loop_start_target_offset_add_single
+	    cmp #'l'
+	    beq load_while_loop_start_target_offset_add_single
+	    cmp #'g'
+	    beq load_while_loop_start_target_offset_add_single
+	    cmp #'r'
+	    beq load_while_loop_start_target_offset_add_single
+	    jmp load_while_loop_start_target_offset_fail
+load_while_loop_start_target_offset_add_call:
+	    lda #$03
+	    jsr add_if_false_target_size
+	    iny
+	    iny
+	    jmp load_while_loop_start_target_offset_loop
+load_while_loop_start_target_offset_add_string:
+	    lda #$06
+	    jsr add_if_false_target_size
+	    iny
+	    iny
+	    jmp load_while_loop_start_target_offset_loop
+load_while_loop_start_target_offset_add_int:
+	    lda #$06
+	    jsr add_if_false_target_size
+	    iny
+	    iny
+	    jmp load_while_loop_start_target_offset_loop
+load_while_loop_start_target_offset_add_single_int:
+	    lda #$03
+	    jsr add_if_false_target_size
+	    iny
+	    jmp load_while_loop_start_target_offset_loop
+load_while_loop_start_target_offset_add_single:
+	    lda #$01
+	    jsr add_if_false_target_size
+	    iny
+	    jmp load_while_loop_start_target_offset_loop
+load_while_loop_start_target_offset_skip:
+	    iny
+	    jmp load_while_loop_start_target_offset_loop
+load_while_loop_start_target_offset_push_do:
+	    ldx compare_char
+	    cpx #$08
+	    bcs load_while_loop_start_target_offset_fail
+	    lda current_bit_lo
+	    sta loop_offsets_lo,x
+	    lda current_bit_hi
+	    sta loop_offsets_hi,x
+	    inc compare_char
+	    iny
+	    jmp load_while_loop_start_target_offset_loop
+load_while_loop_start_target_offset_pop_do:
+	    lda compare_char
+	    beq load_while_loop_start_target_offset_fail
+	    dec compare_char
+	    iny
+	    jmp load_while_loop_start_target_offset_loop
+load_while_loop_start_target_offset_pop_while:
+	    cpy saved_state_hi
+	    beq load_while_loop_start_target_offset_done
+	    lda #$03
+	    jsr add_if_false_target_size
+	    lda compare_char
+	    beq load_while_loop_start_target_offset_fail
+	    dec compare_char
+	    iny
+	    jmp load_while_loop_start_target_offset_loop
+load_while_loop_start_target_offset_done:
+	    lda compare_char
+	    beq load_while_loop_start_target_offset_fail
+	    tax
+	    dex
+	    lda loop_offsets_lo,x
+	    sta current_bit_lo
+	    lda loop_offsets_hi,x
+	    sta current_bit_hi
+	    pla
+	    tay
+	    clc
+	    rts
+load_while_loop_start_target_offset_fail:
 	    pla
 	    tay
 	    lda #<msg_bad_avo

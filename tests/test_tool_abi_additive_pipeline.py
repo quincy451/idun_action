@@ -149,6 +149,9 @@ class TestToolAbiPipeline(unittest.TestCase):
     def test_nested_do_until_branch_mixed_pipeline_is_green_under_harness(self) -> None:
         self.run_scenario("nested_do_until_branch_mixed", "TOOL7\nHELLO\nDONE\n", 166, 135)
 
+    def test_while_block_pipeline_is_green_under_harness(self) -> None:
+        self.run_scenario("while_blocks", "DONE\n", 65, 49)
+
     def test_nested_if_pipeline_is_green_under_harness(self) -> None:
         self.run_scenario("nested_if", "INNERDONE\nOUTERDONE\n", 98, 77)
 

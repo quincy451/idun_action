@@ -4,6 +4,9 @@ Current local harness for UDOS-native tools:
 
 - source: [tool_abi_harness.c](/mnt/c/test/action/actionc64u/tools/tool_abi_harness.c)
 - build: [build_tool_abi_harness.sh](/mnt/c/test/action/actionc64u/tools/build_tool_abi_harness.sh)
+- harness-sized tool builds:
+  - [build_actc_harness_udos.sh](/mnt/c/test/action/actionc64u/tools/build_actc_harness_udos.sh)
+  - [build_alink_harness_udos.sh](/mnt/c/test/action/actionc64u/tools/build_alink_harness_udos.sh)
 
 ## Purpose
 
@@ -54,6 +57,10 @@ Build:
 cd /mnt/c/test/action/actionc64u
 ./tools/build_tool_abi_harness.sh
 ```
+
+The harness pipeline currently builds `ACTC` and `ALINK` with harness-specific
+linker configs so widening work can continue without the real UDOS tool-size
+ceiling blocking every new control-flow slice.
 
 Run the current additive widening proof end to end:
 
@@ -279,6 +286,13 @@ cd /mnt/c/test/action/actionc64u
 ./tools/run_tool_abi_additive_pipeline.py --scenario nested_do_until_branch_mixed --keep-workspace
 ```
 
+Run the current `WHILE ... DO ... OD` proof end to end:
+
+```sh
+cd /mnt/c/test/action/actionc64u
+./tools/run_tool_abi_additive_pipeline.py --scenario while_blocks --keep-workspace
+```
+
 That script:
 
 - clones a clean harness workspace from the current manual-pipeline fs tree
@@ -454,6 +468,8 @@ That now includes at least two stable scenarios:
   `OUTER`, `INNER`, `DONE`
 - nested loop + mixed branch local/external calls:
   `TOOL7`, `HELLO`, `DONE`
+- top-tested `WHILE ... DO ... OD`:
+  `DONE`
 - transitive unresolved-external closure inside branch control flow:
   `START`, `MID`, `END`, `DONE`
 - sibling unresolved-external calls from the root:

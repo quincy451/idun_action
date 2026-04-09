@@ -328,6 +328,7 @@ collect_proc_body_ops:
     sta string_count_data
     sta int_count_data
     sta extern_count_data
+    sta loop_depth_data
     lda #$FF
     sta current_proc_index_data
     lda #<body_ops_data
@@ -382,6 +383,13 @@ collect_proc_body_ops_after_space_check:
 	    sta const_ptr+1
 	    jsr pattern_matches_scan_ptr_keyword
 	    bcs collect_proc_body_ops_try_until
+	    jsr pop_loop_kind_to_compare_char_or_fail
+	    lda compare_char
+	    beq :+
+	    lda #'x'
+	    jsr append_body_op_no_arg_for_current_proc
+	    jmp collect_proc_body_ops_skip_line
+:
 	    lda #'o'
 	    jsr append_body_op_no_arg_for_current_proc
 	    jmp collect_proc_body_ops_skip_line
@@ -395,16 +403,36 @@ collect_proc_body_ops_try_until:
 	    bcs collect_proc_body_ops_try_do
 	    jsr advance_scan_ptr_by_const_ptr
 	    jsr store_small_runtime_until_from_scan_ptr
-	    bcs collect_proc_body_ops_if_bad_literal
+	    bcc :+
+	    jmp collect_proc_body_ops_if_bad_literal
+: 
 	    jmp collect_proc_body_ops_skip_line
 
 collect_proc_body_ops_try_do:
+	    lda #<pattern_while
+	    sta const_ptr
+	    lda #>pattern_while
+	    sta const_ptr+1
+	    jsr pattern_matches_scan_ptr_keyword
+	    bcs collect_proc_body_ops_try_do_keyword
+	    jsr push_while_loop_kind_or_fail
+	    lda #'d'
+	    jsr append_body_op_no_arg_for_current_proc
+	    jsr advance_scan_ptr_by_const_ptr
+	    lda #'f'
+	    sta expr_print_op
+	    jsr store_small_runtime_condition_core
+	    bcs collect_proc_body_ops_if_bad_literal
+	    jmp collect_proc_body_ops_skip_line
+
+collect_proc_body_ops_try_do_keyword:
 	    lda #<pattern_do
 	    sta const_ptr
 	    lda #>pattern_do
 	    sta const_ptr+1
 	    jsr pattern_matches_scan_ptr_keyword
 	    bcs collect_proc_body_ops_try_endif
+	    jsr push_do_loop_kind_or_fail
 	    lda #'d'
 	    jsr append_body_op_no_arg_for_current_proc
 	    jmp collect_proc_body_ops_skip_line
@@ -643,6 +671,32 @@ append_body_op_no_arg_for_current_proc_store:
     sta (body_ptr),y
     pla
     tay
+    rts
+
+push_do_loop_kind_or_fail:
+    lda #$00
+    jmp push_loop_kind_a_or_fail
+
+push_while_loop_kind_or_fail:
+    lda #$01
+
+push_loop_kind_a_or_fail:
+    ldx loop_depth_data
+    cpx #8
+    bcc :+
+    jmp collect_proc_body_ops_bad_proc
+:   sta loop_kind_stack,x
+    inc loop_depth_data
+    rts
+
+pop_loop_kind_to_compare_char_or_fail:
+    ldx loop_depth_data
+    bne :+
+    jmp collect_proc_body_ops_bad_proc
+:   dex
+    stx loop_depth_data
+    lda loop_kind_stack,x
+    sta compare_char
     rts
 
 set_body_ptr_from_x:
@@ -995,6 +1049,11 @@ store_small_runtime_condition_done_check:
     jsr require_then_or_line_end_at_scan_y
     bcc store_small_runtime_condition_done_ok
     jmp store_small_runtime_condition_fail
+:   cmp #'f'
+    bne :+
+    jsr require_do_or_line_end_at_scan_y
+    bcc store_small_runtime_condition_done_ok
+    jmp store_small_runtime_condition_fail
 :   jsr require_line_end_at_scan_y
     bcc store_small_runtime_condition_done_ok
 store_small_runtime_condition_fail:
@@ -1058,6 +1117,37 @@ require_then_or_line_end_at_scan_y_fail:
     sec
     rts
 require_then_or_line_end_at_scan_y_ok:
+    clc
+    rts
+
+require_do_or_line_end_at_scan_y:
+    jsr skip_inline_spaces_at_scan_y
+    lda (scan_ptr),y
+    beq require_do_or_line_end_at_scan_y_ok
+    cmp #10
+    beq require_do_or_line_end_at_scan_y_ok
+    cmp #13
+    beq require_do_or_line_end_at_scan_y_ok
+    jsr uppercase_ascii
+    cmp #'D'
+    bne require_do_or_line_end_at_scan_y_fail
+    iny
+    lda (scan_ptr),y
+    jsr uppercase_ascii
+    cmp #'O'
+    bne require_do_or_line_end_at_scan_y_fail
+    iny
+    jsr skip_inline_spaces_at_scan_y
+    lda (scan_ptr),y
+    beq require_do_or_line_end_at_scan_y_ok
+    cmp #10
+    beq require_do_or_line_end_at_scan_y_ok
+    cmp #13
+    beq require_do_or_line_end_at_scan_y_ok
+require_do_or_line_end_at_scan_y_fail:
+    sec
+    rts
+require_do_or_line_end_at_scan_y_ok:
     clc
     rts
 
@@ -1481,14 +1571,20 @@ compute_payload_layout_body_loop:
     cmp #'e'
     beq compute_payload_layout_add_string
     cmp #'i'
-    beq compute_payload_layout_add_int
+    bne :+
+    jmp compute_payload_layout_add_int
+: 
     cmp #'j'
-    beq compute_payload_layout_add_int
+    bne :+
+    jmp compute_payload_layout_add_int
+: 
 	    cmp #'y'
 	    beq compute_payload_layout_add_single_int
 	    cmp #'z'
 	    beq compute_payload_layout_add_single_int
 	    cmp #'h'
+	    beq compute_payload_layout_add_single_int
+	    cmp #'f'
 	    beq compute_payload_layout_add_single_int
 	    cmp #'t'
 	    beq compute_payload_layout_add_single_int
@@ -1500,6 +1596,8 @@ compute_payload_layout_body_loop:
 	    beq compute_payload_layout_add_zero
 	    cmp #'o'
 	    beq compute_payload_layout_add_zero
+	    cmp #'x'
+	    beq compute_payload_layout_add_single_int
 	    cmp #'a'
 	    beq compute_payload_layout_add_single
     cmp #'m'
@@ -1522,7 +1620,7 @@ compute_payload_layout_add_call:
     sta proc_sizes_data,x
     iny
     iny
-    bne compute_payload_layout_body_loop
+    jmp compute_payload_layout_body_loop
 compute_payload_layout_add_string:
     clc
     lda proc_sizes_data,x
@@ -1530,7 +1628,7 @@ compute_payload_layout_add_string:
     sta proc_sizes_data,x
     iny
     iny
-    bne compute_payload_layout_body_loop
+    jmp compute_payload_layout_body_loop
 compute_payload_layout_add_single:
     clc
     lda proc_sizes_data,x
@@ -2330,6 +2428,8 @@ pattern_proc:
     .asciiz "PROC"
 pattern_if:
     .asciiz "IF"
+pattern_while:
+    .asciiz "WHILE"
 pattern_do:
     .asciiz "DO"
 pattern_od:
@@ -2404,6 +2504,10 @@ current_proc_index_data:
     .res 1
 extern_count_data:
     .res 1
+loop_depth_data:
+    .res 1
+loop_kind_stack:
+    .res 8
 expr_saved_lo:
     .res 1
 expr_compare_lo:
