@@ -70,6 +70,10 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
   `PrintIE((2 + 3) * 4 = 20)` and `PrintIE((2 + 3 * 4) > 10)`
 - [x] direct comparison operator print-expression chains:
   `PrintIE(2 <> 3)`, `PrintIE(2 < 3)`, `PrintIE(3 <= 3)`, `PrintIE(4 >= 3)`
+- [x] string-literal pool indices widened through `F` on the harness line:
+  `PrintE("A")` through `PrintE("P")`
+- [x] integer-literal pool indices widened through `J` on the harness line:
+  `PrintIE(0)` through `PrintIE(19)`
 - [x] arithmetic/comparison conditions inside `IF ... THEN ... ELSE ... FI`:
   `IF 2 + 3 * 4 > 10 THEN ... ELSE ... FI`
 - [x] direct comparison operator conditions inside `IF ... THEN ... FI`:
@@ -224,6 +228,10 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
   `b p0p1azi2p3p4qzp5p6gzu0r`
 - [x] current widened direct-comparison object emission:
   `b p0p1nzp2p3lzp4p5gp6qzp7p8lp9qzpApBgpCqzpDpElpFqzr`
+- [x] current widened string-index object emission:
+  `b e0e1e2e3e4e5e6e7e8e9eAeBeCeDeEeFr`
+- [x] current widened int-index object emission:
+  `b i0i1i2i3i4i5i6i7i8i9iAiBiCiDiEiFiGiHiIiJr`
 - [x] current widened direct-comparison `IF` object emission:
   `b p0p1nhe0vp2p3lhe1vp4p5gp6qhe2vp7p8lp9qhe3vpApBgpCqhe4vpDpElpFqhe5vr`
 - [x] current widened direct-comparison loop object emission:

@@ -90,6 +90,20 @@ cd /mnt/c/test/action/actionc64u
 ./tools/run_tool_abi_additive_pipeline.py --scenario comparison_ops --keep-workspace
 ```
 
+Run the current high string-index proof end to end:
+
+```sh
+cd /mnt/c/test/action/actionc64u
+./tools/run_tool_abi_additive_pipeline.py --scenario many_string_indices --keep-workspace
+```
+
+Run the current high integer-index proof end to end:
+
+```sh
+cd /mnt/c/test/action/actionc64u
+./tools/run_tool_abi_additive_pipeline.py --scenario many_int_indices --keep-workspace
+```
+
 Run the current direct comparison-operator branch proof end to end:
 
 ```sh

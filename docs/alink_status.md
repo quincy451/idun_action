@@ -48,6 +48,10 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
   `PrintIE((2 + 3) * 4 = 20)` and `PrintIE((2 + 3 * 4) > 10)`
 - [x] also loads direct comparison-operator `ACTC` output for:
   `PrintIE(2 <> 3)`, `PrintIE(2 < 3)`, `PrintIE(3 <= 3)`, `PrintIE(4 >= 3)`
+- [x] also loads high string-index `ACTC` output through `F`:
+  `PrintE("A")` through `PrintE("P")`
+- [x] also loads high integer-index `ACTC` output through `J`:
+  `PrintIE(0)` through `PrintIE(19)`
 - [x] also loads arithmetic/comparison `IF/ELSE` `ACTC` output for:
   `IF 2 + 3 * 4 > 10 THEN ... ELSE ... FI`
 - [x] also loads direct comparison-operator branch and loop `ACTC` output for:
@@ -146,6 +150,8 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
 - [x] emits a precedence-slice `BIN/MAIN.AVM` of `31` bytes
 - [x] emits an arithmetic/comparison slice `BIN/MAIN.AVM` of `72` bytes
 - [x] emits a direct-comparison print slice `BIN/MAIN.AVM` of `91` bytes
+- [x] emits a high string-index slice `BIN/MAIN.AVM` of `143` bytes
+- [x] emits a high integer-index slice `BIN/MAIN.AVM` of `135` bytes
 - [x] emits a direct-comparison branch slice `BIN/MAIN.AVM` of `149` bytes
 - [x] emits a direct-comparison loop slice `BIN/MAIN.AVM` of `76` bytes
 - [x] emits a direct-comparison branch-call slice `BIN/MAIN.AVM` of `77` bytes
@@ -217,6 +223,10 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
   `14`, `5`, `1`, `1`, `TOOL7`
 - [x] current harness runtime output for the direct-comparison slice:
   `1`, `1`, `1`, `1`, `0`, `0`
+- [x] current harness runtime output for the high string-index slice:
+  `A` through `P`
+- [x] current harness runtime output for the high integer-index slice:
+  `0` through `19`
 - [x] current harness runtime output for the direct-comparison branch slice:
   `NE`, `LT`, `LE`, `GE`
 - [x] current harness runtime output for the direct-comparison loop slice:

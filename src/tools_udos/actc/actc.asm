@@ -10,6 +10,9 @@ BODY_OPS_STRIDE = 48
 .ifndef INT_LITERAL_MAX
 INT_LITERAL_MAX = 10
 .endif
+.ifndef STRING_LITERAL_MAX
+STRING_LITERAL_MAX = 8
+.endif
 
 IMPORT_PRINT_STR  = $01
 IMPORT_PRINT_LINE = $02
@@ -768,7 +771,7 @@ set_string_ptr_from_x_done:
 
 store_string_literal_from_scan_ptr:
     ldx string_count_data
-    cpx #8
+    cpx #STRING_LITERAL_MAX
     bcc :+
     sec
     rts
@@ -2514,7 +2517,7 @@ source_buffer:
 body_ops_data:
     .res BODY_OPS_STRIDE * 8
 string_literals:
-    .res 192
+    .res 24 * STRING_LITERAL_MAX
 int_values_lo:
     .res INT_LITERAL_MAX
 int_values_hi:
@@ -2524,7 +2527,7 @@ export_offsets:
 proc_sizes_data:
     .res 8
 string_offsets:
-    .res 8
+    .res STRING_LITERAL_MAX
 
 .segment "BSS"
 

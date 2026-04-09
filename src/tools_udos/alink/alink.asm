@@ -10,6 +10,13 @@ BODY_OPS_STRIDE = 48
 .ifndef INT_LITERAL_MAX
 INT_LITERAL_MAX = 10
 .endif
+.ifndef STRING_LITERAL_MAX
+STRING_LITERAL_MAX = 8
+.endif
+.if STRING_LITERAL_MAX > 16
+.error "STRING_LITERAL_MAX > 16 not supported"
+.endif
+STRING_LITERAL_BYTES = 24 * STRING_LITERAL_MAX
 AVM_VERSION = 2
 AVM_FLAG_ACHERON = 1
 AVM_HEADER_SIZE = 12
@@ -361,6 +368,94 @@ set_string_ptr_from_x_loop:
 set_string_ptr_from_x_done:
     rts
 
+clear_string_use_mask:
+    lda #$00
+    sta string_use_mask_lo
+    sta string_use_mask_hi
+    rts
+
+store_pending_string_use_mask_from_x:
+    lda string_use_mask_lo
+    sta pending_string_use_masks_lo,x
+    lda string_use_mask_hi
+    sta pending_string_use_masks_hi,x
+    rts
+
+load_pending_string_use_mask_from_x:
+    lda pending_string_use_masks_lo,x
+    sta string_use_mask_lo
+    lda pending_string_use_masks_hi,x
+    sta string_use_mask_hi
+    rts
+
+test_string_use_mask_for_x:
+    txa
+    sta string_mask_saved_x
+    and #$07
+    tax
+    lda bit_masks,x
+    sta string_mask_saved_bit
+    ldx string_mask_saved_x
+    cpx #8
+    bcc :+
+    lda string_mask_saved_bit
+    and string_use_mask_hi
+    pha
+    ldx string_mask_saved_x
+    pla
+    rts
+:   lda string_mask_saved_bit
+    and string_use_mask_lo
+    pha
+    ldx string_mask_saved_x
+    pla
+    rts
+
+or_string_use_mask_for_x:
+    txa
+    sta string_mask_saved_x
+    and #$07
+    tax
+    lda bit_masks,x
+    sta string_mask_saved_bit
+    ldx string_mask_saved_x
+    cpx #8
+    bcc :+
+    lda string_mask_saved_bit
+    ora string_use_mask_hi
+    sta string_use_mask_hi
+    ldx string_mask_saved_x
+    rts
+:   lda string_mask_saved_bit
+    ora string_use_mask_lo
+    sta string_use_mask_lo
+    ldx string_mask_saved_x
+    rts
+
+copy_string_literal_block:
+    lda saved_state_lo
+    ora saved_state_hi
+    beq copy_string_literal_block_done
+    ldy #$00
+copy_string_literal_block_loop:
+    lda (src_ptr),y
+    sta (const_ptr),y
+    inc src_ptr
+    bne :+
+    inc src_ptr+1
+:   inc const_ptr
+    bne :+
+    inc const_ptr+1
+:   lda saved_state_lo
+    bne :+
+    dec saved_state_hi
+:   dec saved_state_lo
+    lda saved_state_lo
+    ora saved_state_hi
+    bne copy_string_literal_block_loop
+copy_string_literal_block_done:
+    rts
+
 parse_body_ops_or_fail:
     lda #$00
     sta export_index
@@ -574,7 +669,7 @@ parse_strings_loop:
     bcs parse_strings_next_line
     jsr advance_scan_ptr_by_const_ptr
     ldx string_count
-    cpx #INT_LITERAL_MAX
+    cpx #STRING_LITERAL_MAX
     bcc :+
 parse_strings_bad:
     lda #<msg_bad_avo
@@ -977,9 +1072,9 @@ layout_payload_or_fail:
     lda #$00
     sta current_bit_lo
     sta current_bit_hi
-    sta string_use_mask
     sta pending_count
     sta save_mode
+    jsr clear_string_use_mask
     jsr layout_current_object_code_or_fail
     jsr copy_current_export_layout_to_root
     jsr save_current_string_state
@@ -1023,8 +1118,7 @@ layout_external_object_from_x_or_fail:
     sta current_bit_hi
     lda saved_state_lo
     sta current_bit_lo
-    lda #$00
-    sta string_use_mask
+    jsr clear_string_use_mask
     lda #$01
     sta save_mode
     jsr layout_current_object_code_or_fail
@@ -1038,8 +1132,7 @@ layout_external_object_from_x_or_fail:
     sta pending_offsets_hi,x
     jsr queue_current_external_symbols_or_fail
     ldx saved_pending_index
-    lda string_use_mask
-    sta pending_string_use_masks,x
+    jsr store_pending_string_use_mask_from_x
     lda #$00
     sta save_mode
     ldx saved_pending_index
@@ -1060,8 +1153,7 @@ layout_external_object_strings_from_x_or_fail:
     lda saved_state_lo
     sta current_bit_lo
     ldx saved_pending_index
-    lda pending_string_use_masks,x
-    sta string_use_mask
+    jsr load_pending_string_use_mask_from_x
     lda current_bit_lo
     sta pending_string_bases_lo,x
     lda current_bit_hi
@@ -1120,14 +1212,22 @@ note_strings_used_for_export_x_string:
     lda (body_ptr),y
     cmp #'0'
     bcc note_strings_used_for_export_x_bad
-    cmp #'7'+1
+    cmp #'9'+1
+    bcc :+
+    cmp #'A'
+    bcc note_strings_used_for_export_x_bad
+    cmp #'Z'+1
     bcs note_strings_used_for_export_x_bad
     sec
+    sbc #'A'
+    clc
+    adc #10
+    bne note_strings_used_for_export_x_index
+:   sec
     sbc #'0'
+note_strings_used_for_export_x_index:
     tax
-    lda bit_masks,x
-    ora string_use_mask
-    sta string_use_mask
+    jsr or_string_use_mask_for_x
     iny
     bne note_strings_used_for_export_x_loop
 note_strings_used_for_export_x_bad:
@@ -1196,8 +1296,7 @@ layout_current_object_strings_or_fail:
 layout_current_object_strings_loop:
     cpx string_count
     beq layout_current_object_strings_done
-    lda bit_masks,x
-    and string_use_mask
+    jsr test_string_use_mask_for_x
     beq layout_current_object_strings_next
     lda save_mode
     bne layout_current_object_strings_store_done
@@ -1245,9 +1344,8 @@ emit_payload_or_fail:
     lda #$00
     sta main_flags_lo
     sta main_flags_hi
-    lda #$00
-    sta string_use_mask
     sta save_mode
+    jsr clear_string_use_mask
     jsr emit_current_object_code_or_fail
     lda #$35
     sta debug_phase
@@ -1306,8 +1404,7 @@ emit_external_object_code_from_x_or_fail:
     lda #$01
     sta save_mode
     stx pending_active_index
-    lda pending_string_use_masks,x
-    sta string_use_mask
+    jsr load_pending_string_use_mask_from_x
     lda main_flags_hi
     sta saved_state_hi
     jsr layout_current_object_code_or_fail
@@ -1340,8 +1437,7 @@ emit_external_object_strings_from_x_or_fail:
     lda saved_state_lo
     sta main_flags_lo
     ldx saved_pending_index
-    lda pending_string_use_masks,x
-    sta string_use_mask
+    jsr load_pending_string_use_mask_from_x
     jsr emit_current_object_strings_or_fail
     lda #$63
     sta debug_phase_zp
@@ -1562,9 +1658,7 @@ emit_live_bytes_for_export_x_printe:
 emit_live_bytes_for_export_x_print_common:
     iny
     jsr load_body_digit_index_to_x_or_fail
-    lda bit_masks,x
-    ora string_use_mask
-    sta string_use_mask
+    jsr or_string_use_mask_for_x
     jsr load_string_target_offset_from_x_or_fail
     lda #OPCODE_SETP16
     jsr append_payload_byte
@@ -2651,8 +2745,7 @@ load_string_target_offset_from_x_or_fail:
 load_string_target_offset_pending_loop:
     cpx compare_char
     beq load_string_target_offset_pending_done
-    lda bit_masks,x
-    and string_use_mask
+    jsr test_string_use_mask_for_x
     beq load_string_target_offset_pending_next
     txa
     pha
@@ -2719,8 +2812,7 @@ emit_current_object_strings_or_fail:
 emit_current_object_strings_loop:
     cpx string_count
     beq emit_current_object_strings_done
-    lda bit_masks,x
-    and string_use_mask
+    jsr test_string_use_mask_for_x
     beq emit_current_object_strings_next
     txa
     pha
@@ -2818,29 +2910,45 @@ render_payload_as_binary_done:
 save_current_string_state:
     lda string_count
     sta saved_string_count
-    lda string_use_mask
-    sta saved_string_use_mask
-    ldx #$00
-save_current_string_state_loop:
-    lda string_literals,x
-    sta saved_string_literals,x
-    inx
-    cpx #192
-    bcc save_current_string_state_loop
+    lda string_use_mask_lo
+    sta saved_string_use_mask_lo
+    lda string_use_mask_hi
+    sta saved_string_use_mask_hi
+    lda #<string_literals
+    sta src_ptr
+    lda #>string_literals
+    sta src_ptr+1
+    lda #<saved_string_literals
+    sta const_ptr
+    lda #>saved_string_literals
+    sta const_ptr+1
+    lda #<STRING_LITERAL_BYTES
+    sta saved_state_lo
+    lda #>STRING_LITERAL_BYTES
+    sta saved_state_hi
+    jsr copy_string_literal_block
     rts
 
 restore_saved_string_state:
     lda saved_string_count
     sta string_count
-    lda saved_string_use_mask
-    sta string_use_mask
-    ldx #$00
-restore_saved_string_state_loop:
-    lda saved_string_literals,x
-    sta string_literals,x
-    inx
-    cpx #192
-    bcc restore_saved_string_state_loop
+    lda saved_string_use_mask_lo
+    sta string_use_mask_lo
+    lda saved_string_use_mask_hi
+    sta string_use_mask_hi
+    lda #<saved_string_literals
+    sta src_ptr
+    lda #>saved_string_literals
+    sta src_ptr+1
+    lda #<string_literals
+    sta const_ptr
+    lda #>string_literals
+    sta const_ptr+1
+    lda #<STRING_LITERAL_BYTES
+    sta saved_state_lo
+    lda #>STRING_LITERAL_BYTES
+    sta saved_state_hi
+    jsr copy_string_literal_block
     rts
 
 find_live_export_at_current_offset:
@@ -3306,11 +3414,11 @@ current_export_offsets_lo:
 current_export_offsets_hi:
     .res 8
 string_literals:
-    .res 192
+    .res STRING_LITERAL_BYTES
 string_count:
     .res 1
 saved_string_literals:
-    .res 192
+    .res STRING_LITERAL_BYTES
 saved_string_count:
     .res 1
 save_mode:
@@ -3350,18 +3458,22 @@ entry_export_index:
 root_entry_export_index:
     .res 1
 root_string_offsets_lo:
-    .res 8
+    .res STRING_LITERAL_MAX
 root_string_offsets_hi:
-    .res 8
+    .res STRING_LITERAL_MAX
 loop_offsets_lo:
     .res 8
 loop_offsets_hi:
     .res 8
 live_flags:
     .res 8
-string_use_mask:
+string_use_mask_lo:
     .res 1
-saved_string_use_mask:
+string_use_mask_hi:
+    .res 1
+saved_string_use_mask_lo:
+    .res 1
+saved_string_use_mask_hi:
     .res 1
 body_ops_data:
     .res BODY_OPS_STRIDE * 8
@@ -3377,8 +3489,14 @@ pending_offsets_lo:
     .res PENDING_SYMBOL_MAX
 pending_offsets_hi:
     .res PENDING_SYMBOL_MAX
-pending_string_use_masks:
+pending_string_use_masks_lo:
     .res PENDING_SYMBOL_MAX
+pending_string_use_masks_hi:
+    .res PENDING_SYMBOL_MAX
+string_mask_saved_x:
+    .res 1
+string_mask_saved_bit:
+    .res 1
 pending_string_bases_lo:
     .res PENDING_SYMBOL_MAX
 pending_string_bases_hi:
