@@ -776,6 +776,323 @@ SCENARIOS = {
         ),
         "expected_console": "LOCAL\nMID\nEND\nDONE\n",
     },
+    "repeated_root_externals": {
+        "out_fs_name": "harness-actc-alink-avmrun-repeated-root-externals",
+        "sources": {
+            "MAIN": (
+                'MODULE MAIN\r'
+                'PROC MAIN()\r'
+                'PrintE("START")\r'
+                'W()\r'
+                'Z()\r'
+                'W()\r'
+                'PrintE("DONE")\r'
+                'RETURN\r'
+            ),
+            "W": (
+                'MODULE W\r'
+                'PROC W()\r'
+                'PrintE("MID1")\r'
+                'RETURN\r'
+            ),
+            "Z": (
+                'MODULE Z\r'
+                'PROC Z()\r'
+                'PrintE("MID2")\r'
+                'RETURN\r'
+            ),
+        },
+        "compile_modules": ["W", "Z", "MAIN"],
+        "expected_objects": {
+            "MAIN": (
+                "AVO1\n"
+                "x main 0 22\n"
+                "b e0u0u1u0e1r\n"
+                "u w\n"
+                "u z\n"
+                "s START\n"
+                "s DONE\n"
+                "k 2\n"
+                "n main\n"
+            ),
+            "W": (
+                "AVO1\n"
+                "x w 0 7\n"
+                "b e0r\n"
+                "s MID1\n"
+                "k 2\n"
+                "n w\n"
+            ),
+            "Z": (
+                "AVO1\n"
+                "x z 0 7\n"
+                "b e0r\n"
+                "s MID2\n"
+                "k 2\n"
+                "n z\n"
+            ),
+        },
+        "expected_avm": bytes(
+            [
+                65, 86, 77, 49, 2, 59, 0, 0, 0, 1, 38, 0, 97, 38, 0, 73,
+                16, 255, 69, 24, 0, 69, 31, 0, 69, 24, 0, 97, 44, 0, 73,
+                16, 255, 73, 32, 255, 97, 49, 0, 73, 16, 255, 72, 97, 54,
+                0, 73, 16, 255, 72, 83, 84, 65, 82, 84, 0, 68, 79, 78, 69,
+                0, 77, 73, 68, 49, 0, 77, 73, 68, 50, 0,
+            ]
+        ),
+        "expected_console": "START\nMID1\nMID2\nMID1\nDONE\n",
+    },
+    "shared_transitive_external": {
+        "out_fs_name": "harness-actc-alink-avmrun-shared-transitive-external",
+        "sources": {
+            "MAIN": (
+                'MODULE MAIN\r'
+                'PROC MAIN()\r'
+                'PrintE("START")\r'
+                'W()\r'
+                'Q()\r'
+                'PrintE("DONE")\r'
+                'RETURN\r'
+            ),
+            "W": (
+                'MODULE W\r'
+                'PROC W()\r'
+                'PrintE("MID1")\r'
+                'Z()\r'
+                'RETURN\r'
+            ),
+            "Q": (
+                'MODULE Q\r'
+                'PROC Q()\r'
+                'PrintE("MID2")\r'
+                'Z()\r'
+                'RETURN\r'
+            ),
+            "Z": (
+                'MODULE Z\r'
+                'PROC Z()\r'
+                'PrintE("END")\r'
+                'RETURN\r'
+            ),
+        },
+        "compile_modules": ["W", "Q", "Z", "MAIN"],
+        "expected_objects": {
+            "MAIN": (
+                "AVO1\n"
+                "x main 0 19\n"
+                "b e0u0u1e1r\n"
+                "u w\n"
+                "u q\n"
+                "s START\n"
+                "s DONE\n"
+                "k 2\n"
+                "n main\n"
+            ),
+            "W": (
+                "AVO1\n"
+                "x w 0 10\n"
+                "b e0u0r\n"
+                "u z\n"
+                "s MID1\n"
+                "k 2\n"
+                "n w\n"
+            ),
+            "Q": (
+                "AVO1\n"
+                "x q 0 10\n"
+                "b e0u0r\n"
+                "u z\n"
+                "s MID2\n"
+                "k 2\n"
+                "n q\n"
+            ),
+            "Z": (
+                "AVO1\n"
+                "x z 0 7\n"
+                "b e0r\n"
+                "s END\n"
+                "k 2\n"
+                "n z\n"
+            ),
+        },
+        "expected_avm": bytes(
+            [
+                65, 86, 77, 49, 2, 73, 0, 0, 0, 1, 48, 0, 97, 48, 0, 73,
+                16, 255, 69, 21, 0, 69, 31, 0, 97, 54, 0, 73, 16, 255, 73,
+                32, 255, 97, 59, 0, 73, 16, 255, 69, 41, 0, 72, 97, 64, 0,
+                73, 16, 255, 69, 41, 0, 72, 97, 69, 0, 73, 16, 255, 72, 83,
+                84, 65, 82, 84, 0, 68, 79, 78, 69, 0, 77, 73, 68, 49, 0, 77,
+                73, 68, 50, 0, 69, 78, 68, 0,
+            ]
+        ),
+        "expected_console": "START\nMID1\nEND\nMID2\nEND\nDONE\n",
+    },
+    "branch_sibling_externals": {
+        "out_fs_name": "harness-actc-alink-avmrun-branch-sibling-externals",
+        "sources": {
+            "MAIN": (
+                'MODULE MAIN\r'
+                'PROC MAIN()\r'
+                'IF 2 + 3 * 4 > 10 THEN\r'
+                'W()\r'
+                'Z()\r'
+                'ELSE\r'
+                'PrintE("BAD")\r'
+                'FI\r'
+                'PrintE("DONE")\r'
+                'RETURN\r'
+            ),
+            "W": (
+                'MODULE W\r'
+                'PROC W()\r'
+                'PrintE("MID1")\r'
+                'RETURN\r'
+            ),
+            "Z": (
+                'MODULE Z\r'
+                'PROC Z()\r'
+                'PrintE("MID2")\r'
+                'RETURN\r'
+            ),
+        },
+        "compile_modules": ["W", "Z", "MAIN"],
+        "expected_objects": {
+            "MAIN": (
+                "AVO1\n"
+                "x main 0 36\n"
+                "b p0p1ap2ghu0u1we0ve1r\n"
+                "u w\n"
+                "u z\n"
+                "s BAD\n"
+                "s DONE\n"
+                "i 2\n"
+                "i 12\n"
+                "i 10\n"
+                "k 2\n"
+                "n main\n"
+            ),
+            "W": (
+                "AVO1\n"
+                "x w 0 7\n"
+                "b e0r\n"
+                "s MID1\n"
+                "k 2\n"
+                "n w\n"
+            ),
+            "Z": (
+                "AVO1\n"
+                "x z 0 7\n"
+                "b e0r\n"
+                "s MID2\n"
+                "k 2\n"
+                "n z\n"
+            ),
+        },
+        "expected_avm": bytes(
+            [
+                65, 86, 77, 49, 2, 71, 0, 0, 0, 1, 52, 0, 17, 2, 0, 17,
+                12, 0, 20, 17, 10, 0, 29, 24, 23, 0, 69, 38, 0, 69, 45, 0,
+                25, 29, 0, 97, 52, 0, 73, 16, 255, 97, 56, 0, 73, 16, 255,
+                73, 32, 255, 97, 61, 0, 73, 16, 255, 72, 97, 66, 0, 73, 16,
+                255, 72, 66, 65, 68, 0, 68, 79, 78, 69, 0, 77, 73, 68, 49,
+                0, 77, 73, 68, 50, 0,
+            ]
+        ),
+        "expected_console": "MID1\nMID2\nDONE\n",
+    },
+    "branch_shared_transitive": {
+        "out_fs_name": "harness-actc-alink-avmrun-branch-shared-transitive",
+        "sources": {
+            "MAIN": (
+                'MODULE MAIN\r'
+                'PROC MAIN()\r'
+                'IF 2 + 3 * 4 > 10 THEN\r'
+                'W()\r'
+                'Q()\r'
+                'ELSE\r'
+                'PrintE("BAD")\r'
+                'FI\r'
+                'PrintE("DONE")\r'
+                'RETURN\r'
+            ),
+            "W": (
+                'MODULE W\r'
+                'PROC W()\r'
+                'PrintE("MID1")\r'
+                'Z()\r'
+                'RETURN\r'
+            ),
+            "Q": (
+                'MODULE Q\r'
+                'PROC Q()\r'
+                'PrintE("MID2")\r'
+                'Z()\r'
+                'RETURN\r'
+            ),
+            "Z": (
+                'MODULE Z\r'
+                'PROC Z()\r'
+                'PrintE("END")\r'
+                'RETURN\r'
+            ),
+        },
+        "compile_modules": ["W", "Q", "Z", "MAIN"],
+        "expected_objects": {
+            "MAIN": (
+                "AVO1\n"
+                "x main 0 36\n"
+                "b p0p1ap2ghu0u1we0ve1r\n"
+                "u w\n"
+                "u q\n"
+                "s BAD\n"
+                "s DONE\n"
+                "i 2\n"
+                "i 12\n"
+                "i 10\n"
+                "k 2\n"
+                "n main\n"
+            ),
+            "W": (
+                "AVO1\n"
+                "x w 0 10\n"
+                "b e0u0r\n"
+                "u z\n"
+                "s MID1\n"
+                "k 2\n"
+                "n w\n"
+            ),
+            "Q": (
+                "AVO1\n"
+                "x q 0 10\n"
+                "b e0u0r\n"
+                "u z\n"
+                "s MID2\n"
+                "k 2\n"
+                "n q\n"
+            ),
+            "Z": (
+                "AVO1\n"
+                "x z 0 7\n"
+                "b e0r\n"
+                "s END\n"
+                "k 2\n"
+                "n z\n"
+            ),
+        },
+        "expected_avm": bytes(
+            [
+                65, 86, 77, 49, 2, 88, 0, 0, 0, 1, 65, 0, 17, 2, 0, 17,
+                12, 0, 20, 17, 10, 0, 29, 24, 23, 0, 69, 38, 0, 69, 48, 0,
+                25, 29, 0, 97, 65, 0, 73, 16, 255, 97, 69, 0, 73, 16, 255,
+                73, 32, 255, 97, 74, 0, 73, 16, 255, 69, 58, 0, 72, 97, 79,
+                0, 73, 16, 255, 69, 58, 0, 72, 97, 84, 0, 73, 16, 255, 72,
+                66, 65, 68, 0, 68, 79, 78, 69, 0, 77, 73, 68, 49, 0, 77, 73,
+                68, 50, 0, 69, 78, 68, 0,
+            ]
+        ),
+        "expected_console": "MID1\nEND\nMID2\nEND\nDONE\n",
+    },
     "procedures": {
         "out_fs_name": "harness-actc-alink-avmrun-procedures",
         "source": (

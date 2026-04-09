@@ -153,6 +153,34 @@ cd /mnt/c/test/action/actionc64u
 ./tools/run_tool_abi_additive_pipeline.py --scenario branch_transitive_local --keep-workspace
 ```
 
+Run the current repeated-root unresolved-external proof end to end:
+
+```sh
+cd /mnt/c/test/action/actionc64u
+./tools/run_tool_abi_additive_pipeline.py --scenario repeated_root_externals --keep-workspace
+```
+
+Run the current shared-transitive unresolved-external proof end to end:
+
+```sh
+cd /mnt/c/test/action/actionc64u
+./tools/run_tool_abi_additive_pipeline.py --scenario shared_transitive_external --keep-workspace
+```
+
+Run the current branch-sibling unresolved-external proof end to end:
+
+```sh
+cd /mnt/c/test/action/actionc64u
+./tools/run_tool_abi_additive_pipeline.py --scenario branch_sibling_externals --keep-workspace
+```
+
+Run the current branch-shared-transitive unresolved-external proof end to end:
+
+```sh
+cd /mnt/c/test/action/actionc64u
+./tools/run_tool_abi_additive_pipeline.py --scenario branch_shared_transitive --keep-workspace
+```
+
 Run the current local-procedure-call proof end to end:
 
 ```sh
@@ -363,6 +391,14 @@ That now includes at least two stable scenarios:
   `START`, `MID`, `END1`, `END2`, `DONE`
 - local call plus transitive unresolved-external branch:
   `LOCAL`, `MID`, `END`, `DONE`
+- repeated root unresolved-external reuse:
+  `START`, `MID1`, `MID2`, `MID1`, `DONE`
+- shared transitive unresolved-external reuse:
+  `START`, `MID1`, `END`, `MID2`, `END`, `DONE`
+- sibling unresolved-external calls inside branch control flow:
+  `MID1`, `MID2`, `DONE`
+- shared transitive unresolved-external calls inside branch control flow:
+  `MID1`, `END`, `MID2`, `END`, `DONE`
 - local user procedure call:
   `ONE`, `TWO`
 - single-branch `IF` control flow:

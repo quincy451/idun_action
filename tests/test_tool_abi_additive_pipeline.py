@@ -98,6 +98,18 @@ class TestToolAbiPipeline(unittest.TestCase):
     def test_branch_transitive_local_pipeline_is_green_under_harness(self) -> None:
         self.run_scenario("branch_transitive_local", "LOCAL\nMID\nEND\nDONE\n", 108, 97)
 
+    def test_repeated_root_external_pipeline_is_green_under_harness(self) -> None:
+        self.run_scenario("repeated_root_externals", "START\nMID1\nMID2\nMID1\nDONE\n", 65, 71)
+
+    def test_shared_transitive_external_pipeline_is_green_under_harness(self) -> None:
+        self.run_scenario("shared_transitive_external", "START\nMID1\nEND\nMID2\nEND\nDONE\n", 63, 85)
+
+    def test_branch_sibling_external_pipeline_is_green_under_harness(self) -> None:
+        self.run_scenario("branch_sibling_externals", "MID1\nMID2\nDONE\n", 86, 83)
+
+    def test_branch_shared_transitive_pipeline_is_green_under_harness(self) -> None:
+        self.run_scenario("branch_shared_transitive", "MID1\nEND\nMID2\nEND\nDONE\n", 86, 100)
+
     def test_procedure_pipeline_is_green_under_harness(self) -> None:
         self.run_scenario("procedures", "ONE\nTWO\n", 66, 39)
 

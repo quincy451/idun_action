@@ -83,6 +83,14 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
   `W()` with `Z()` and `Q()`
 - [x] local procedure calls mixed with transitive unresolved externals inside branch control flow:
   `IF ... THEN LOCAL() W() ...` with `W -> Z`
+- [x] repeated root unresolved-external reuse from multiple call sites:
+  `W()`, `Z()`, `W()`
+- [x] shared transitive unresolved-external reuse:
+  `W -> Z` and `Q -> Z`
+- [x] sibling unresolved-external calls inside arithmetic/comparison-driven control flow:
+  `IF ... THEN W() Z() ...`
+- [x] shared transitive unresolved-external calls inside arithmetic/comparison-driven control flow:
+  `IF ... THEN W() Q() ...` with `W -> Z` and `Q -> Z`
 - [x] single-branch control flow:
   `IF 1 = 0 THEN ... FI` and `IF 1 = 1 THEN ... FI`
 - [x] `ELSE` control flow:
@@ -127,6 +135,10 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
   `b e0u0u1r`
 - [x] current widened branch-local + transitive-external object emission:
   `b p0p1ap2ghc0u0we1ve2r`
+- [x] current widened repeated-root-external object emission:
+  `b e0u0u1u0e1r`
+- [x] current widened branch-sibling-external object emission:
+  `b p0p1ap2ghu0u1we0ve1r`
 - [x] harness proof exists through:
   `ACTC -> ALINK -> AVMRUN`
 - [x] current harness runtime output for that widened slice:
@@ -157,6 +169,14 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
   `START`, `MID`, `END1`, `END2`, `DONE`
 - [x] current harness runtime output for the branch-local + transitive-external slice:
   `LOCAL`, `MID`, `END`, `DONE`
+- [x] current harness runtime output for the repeated-root-external slice:
+  `START`, `MID1`, `MID2`, `MID1`, `DONE`
+- [x] current harness runtime output for the shared-transitive-external slice:
+  `START`, `MID1`, `END`, `MID2`, `END`, `DONE`
+- [x] current harness runtime output for the branch-sibling-external slice:
+  `MID1`, `MID2`, `DONE`
+- [x] current harness runtime output for the branch-shared-transitive slice:
+  `MID1`, `END`, `MID2`, `END`, `DONE`
 - [x] current harness runtime output for the local-procedure slice:
   `ONE`, `TWO`
 - [x] current harness runtime output for the `IF` slice:

@@ -70,6 +70,14 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
   `W()` with `Z()` and `Q()`
 - [x] also loads branch-local call + transitive unresolved-external `ACTC` output:
   `IF ... THEN LOCAL() W() ...` with `W -> Z`
+- [x] also loads repeated root unresolved-external reuse:
+  `W()`, `Z()`, `W()`
+- [x] also loads shared transitive unresolved-external reuse:
+  `W -> Z` and `Q -> Z`
+- [x] also loads sibling unresolved-external calls inside arithmetic/comparison-driven control flow:
+  `IF ... THEN W() Z() ...`
+- [x] also loads shared transitive unresolved-external calls inside arithmetic/comparison-driven control flow:
+  `IF ... THEN W() Q() ...` with `W -> Z` and `Q -> Z`
 - [x] also loads single-branch `IF` control-flow `ACTC` output for:
   `IF 1 = 0 THEN ... FI` and `IF 1 = 1 THEN ... FI`
 - [x] also loads `ELSE` control-flow `ACTC` output for:
@@ -84,6 +92,8 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
   `OBJ/W.AVO` and `OBJ/Z.AVO`
 - [x] resolves sibling child objects from a child module:
   `OBJ/Z.AVO` and `OBJ/Q.AVO`
+- [x] reuses the same root child object across repeated call sites
+- [x] reuses the same transitive child object across multiple parents
 - [x] emits a widened `BIN/MAIN.AVM` of `76` bytes on that slice
 - [x] emits a precedence-slice `BIN/MAIN.AVM` of `31` bytes
 - [x] emits an arithmetic/comparison slice `BIN/MAIN.AVM` of `72` bytes
@@ -98,6 +108,10 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
 - [x] emits a sibling-external `BIN/MAIN.AVM` of `68` bytes
 - [x] emits a child-sibling-external `BIN/MAIN.AVM` of `82` bytes
 - [x] emits a branch-local + transitive-external `BIN/MAIN.AVM` of `97` bytes
+- [x] emits a repeated-root-external `BIN/MAIN.AVM` of `71` bytes
+- [x] emits a shared-transitive-external `BIN/MAIN.AVM` of `85` bytes
+- [x] emits a branch-sibling-external `BIN/MAIN.AVM` of `83` bytes
+- [x] emits a branch-shared-transitive `BIN/MAIN.AVM` of `100` bytes
 - [x] emits an `IF` slice `BIN/MAIN.AVM` of `65` bytes
 - [x] emits an `ELSE` slice `BIN/MAIN.AVM` of `60` bytes
 - [x] emits a nested-`IF` slice `BIN/MAIN.AVM` of `77` bytes
@@ -132,6 +146,14 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
   `START`, `MID`, `END1`, `END2`, `DONE`
 - [x] current harness runtime output for the branch-local + transitive-external slice:
   `LOCAL`, `MID`, `END`, `DONE`
+- [x] current harness runtime output for the repeated-root-external slice:
+  `START`, `MID1`, `MID2`, `MID1`, `DONE`
+- [x] current harness runtime output for the shared-transitive-external slice:
+  `START`, `MID1`, `END`, `MID2`, `END`, `DONE`
+- [x] current harness runtime output for the branch-sibling-external slice:
+  `MID1`, `MID2`, `DONE`
+- [x] current harness runtime output for the branch-shared-transitive slice:
+  `MID1`, `END`, `MID2`, `END`, `DONE`
 - [x] current harness runtime output for the local-procedure slice:
   `ONE`, `TWO`
 - [x] current harness runtime output for the `IF` slice:
