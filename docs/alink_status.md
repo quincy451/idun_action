@@ -1,6 +1,6 @@
 # `ALINK` Status
 
-Current as of `2026-04-08`.
+Current as of `2026-04-09`.
 
 This file is a focused ledger for the UDOS-native `ALINK.PRG` tool.
 It tracks the real linker slice separately from the broader [action_matrix.md](/mnt/c/test/action/actionc64u/docs/action_matrix.md).
@@ -114,6 +114,10 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
 - [x] also loads local/external calls inside nested top-tested `WHILE ... DO ... OD`
 - [x] also loads mixed local/external branch content inside nested top-tested `WHILE ... DO ... OD`
 - [x] also loads shared transitive unresolved-external reuse inside top-tested `WHILE ... DO ... OD`
+- [x] also loads `DO ... UNTIL ... OD` containing nested `WHILE ... DO ... OD`
+- [x] also loads `WHILE ... DO ... OD` containing nested `DO ... UNTIL ... OD`
+- [x] also loads mixed local/external and branch content across `DO`/`WHILE` mixed nesting
+- [x] also loads shared transitive unresolved-external reuse across `WHILE` containing nested `DO ... UNTIL ... OD`
 - [x] resolves the current widened child-object closure including `OBJ/W.AVO`
 - [x] resolves the current widened transitive child-object closure including `OBJ/W.AVO` and `OBJ/Z.AVO`
 - [x] resolves sibling child objects from the root:
@@ -162,6 +166,12 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
 - [x] emits a nested `WHILE` + call/external slice `BIN/MAIN.AVM` of `89` bytes
 - [x] emits a nested `WHILE` + mixed branch local/external slice `BIN/MAIN.AVM` of `141` bytes
 - [x] emits a `WHILE` + shared-transitive slice `BIN/MAIN.AVM` of `86` bytes
+- [x] emits a `DO` + nested `WHILE` slice `BIN/MAIN.AVM` of `73` bytes
+- [x] emits a `WHILE` + nested `DO` slice `BIN/MAIN.AVM` of `73` bytes
+- [x] emits a `DO` + nested `WHILE` + call/external slice `BIN/MAIN.AVM` of `86` bytes
+- [x] emits a `WHILE` + nested `DO` + call/external slice `BIN/MAIN.AVM` of `86` bytes
+- [x] emits a mixed `DO`/`WHILE` + branch local/external slice `BIN/MAIN.AVM` of `138` bytes
+- [x] emits a `WHILE` + nested `DO` + shared-transitive slice `BIN/MAIN.AVM` of `96` bytes
 - [x] harness proof exists through:
   `ACTC -> ALINK -> AVMRUN`
 - [x] current harness runtime output for that widened slice:
@@ -245,6 +255,18 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
 - [x] current harness runtime output for the nested `WHILE` + mixed branch local/external slice:
   `DONE`
 - [x] current harness runtime output for the `WHILE` + shared-transitive slice:
+  `DONE`
+- [x] current harness runtime output for the `DO` + nested `WHILE` slice:
+  `OUTER`, `DONE`
+- [x] current harness runtime output for the `WHILE` + nested `DO` slice:
+  `DONE`
+- [x] current harness runtime output for the `DO` + nested `WHILE` + call/external slice:
+  `HELLO`, `DONE`
+- [x] current harness runtime output for the `WHILE` + nested `DO` + call/external slice:
+  `DONE`
+- [x] current harness runtime output for the mixed `DO`/`WHILE` + branch local/external slice:
+  `TOOL7`, `DONE`
+- [x] current harness runtime output for the `WHILE` + nested `DO` + shared-transitive slice:
   `DONE`
 
 ## Current Biggest Blockers

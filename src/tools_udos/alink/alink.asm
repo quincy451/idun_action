@@ -2256,11 +2256,15 @@ load_until_loop_start_target_offset_loop:
 	    beq load_until_loop_start_target_offset_add_single_int
 	    cmp #'h'
 	    beq load_until_loop_start_target_offset_add_single_int
+	    cmp #'f'
+	    beq load_until_loop_start_target_offset_add_single_int
 	    cmp #'t'
 	    bne :+
 	    jmp load_until_loop_start_target_offset_until
 : 
 	    cmp #'w'
+	    beq load_until_loop_start_target_offset_add_single_int
+	    cmp #'x'
 	    beq load_until_loop_start_target_offset_add_single_int
 	    cmp #'v'
 	    beq load_until_loop_start_target_offset_skip

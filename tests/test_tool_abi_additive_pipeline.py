@@ -176,6 +176,24 @@ class TestToolAbiPipeline(unittest.TestCase):
     def test_while_shared_transitive_pipeline_is_green_under_harness(self) -> None:
         self.run_scenario("while_shared_transitive", "DONE\n", 69, 86)
 
+    def test_do_until_nested_while_pipeline_is_green_under_harness(self) -> None:
+        self.run_scenario("do_until_nested_while", "OUTER\nDONE\n", 93, 73)
+
+    def test_while_nested_do_until_pipeline_is_green_under_harness(self) -> None:
+        self.run_scenario("while_nested_do_until", "DONE\n", 93, 73)
+
+    def test_do_until_nested_while_call_pipeline_is_green_under_harness(self) -> None:
+        self.run_scenario("do_until_nested_while_calls", "HELLO\nDONE\n", 107, 86)
+
+    def test_while_nested_do_until_call_pipeline_is_green_under_harness(self) -> None:
+        self.run_scenario("while_nested_do_until_calls", "DONE\n", 107, 86)
+
+    def test_do_until_nested_while_branch_mixed_pipeline_is_green_under_harness(self) -> None:
+        self.run_scenario("do_until_nested_while_branch_mixed", "TOOL7\nDONE\n", 166, 138)
+
+    def test_while_nested_do_until_shared_transitive_pipeline_is_green_under_harness(self) -> None:
+        self.run_scenario("while_nested_do_until_shared_transitive", "DONE\n", 85, 96)
+
     def test_nested_if_pipeline_is_green_under_harness(self) -> None:
         self.run_scenario("nested_if", "INNERDONE\nOUTERDONE\n", 98, 77)
 

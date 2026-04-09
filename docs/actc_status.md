@@ -1,6 +1,6 @@
 # `ACTC` Status
 
-Current as of `2026-04-08`.
+Current as of `2026-04-09`.
 
 This file is a focused ledger for the UDOS-native `ACTC.PRG` tool.
 It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/test/action/actionc64u/docs/action_matrix.md).
@@ -44,6 +44,9 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
 - [x] unresolved-external branch calls inside `DO ... UNTIL ... OD`
 - [x] nested `DO ... UNTIL ... OD`
 - [x] local and unresolved-external calls inside nested `DO ... UNTIL ... OD`
+- [x] `DO ... UNTIL ... OD` containing nested `WHILE ... DO ... OD`
+- [x] `WHILE ... DO ... OD` containing nested `DO ... UNTIL ... OD`
+- [x] mixed local/external and branch content across `DO`/`WHILE` mixed nesting
 
 ## Current Widening Work
 
@@ -182,6 +185,18 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
   `b dp0p1qfp2p3ap4ghu0we1vdp5p6qfp7p8qhc0we2vxxe3r`
 - [x] current widened `WHILE` + shared-transitive object emission:
   `b dp0p1qfu0u1xe0r`
+- [x] current widened `DO` + nested `WHILE` object emission:
+  `b de0dp0p1qfe1xp2p3qtoe2r`
+- [x] current widened `WHILE` + nested `DO` object emission:
+  `b dp0p1qfe0de1p2p3qtoxe2r`
+- [x] current widened `DO` + nested `WHILE` + call/external object emission:
+  `b dc0dp0p1qfu0xp2p3qtoe1r`
+- [x] current widened `WHILE` + nested `DO` + call/external object emission:
+  `b dp0p1qfc0du0p2p3qtoxe1r`
+- [x] current widened mixed `DO`/`WHILE` + branch local/external object emission:
+  `b dp0p1ap2ghu0we1vdp3p4qfp5p6qhc0we2vxp7p8qtoe3r`
+- [x] current widened `WHILE` + nested `DO` + shared-transitive object emission:
+  `b dp0p1qfu0du1p2p3qtoxe0r`
 - [x] current widened additive object emission:
   `b e0u0p0p1ap2myp3p4mp5azr`
 - [x] current widened precedence object emission:
@@ -238,6 +253,18 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
   `START`, `MID`, `END`, `DONE`
 - [x] current harness runtime output for the transitive-branch-external slice:
   `START`, `MID`, `END`, `DONE`
+- [x] current harness runtime output for the `DO` + nested `WHILE` slice:
+  `OUTER`, `DONE`
+- [x] current harness runtime output for the `WHILE` + nested `DO` slice:
+  `DONE`
+- [x] current harness runtime output for the `DO` + nested `WHILE` + call/external slice:
+  `HELLO`, `DONE`
+- [x] current harness runtime output for the `WHILE` + nested `DO` + call/external slice:
+  `DONE`
+- [x] current harness runtime output for the mixed `DO`/`WHILE` + branch local/external slice:
+  `TOOL7`, `DONE`
+- [x] current harness runtime output for the `WHILE` + nested `DO` + shared-transitive slice:
+  `DONE`
 - [x] current harness runtime output for the sibling-external slice:
   `START`, `MID1`, `MID2`, `DONE`
 - [x] current harness runtime output for the child-sibling-external slice:

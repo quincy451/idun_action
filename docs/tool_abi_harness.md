@@ -349,6 +349,48 @@ cd /mnt/c/test/action/actionc64u
 ./tools/run_tool_abi_additive_pipeline.py --scenario while_shared_transitive --keep-workspace
 ```
 
+Run the current `DO ... UNTIL ... OD` containing nested `WHILE` proof end to end:
+
+```sh
+cd /mnt/c/test/action/actionc64u
+./tools/run_tool_abi_additive_pipeline.py --scenario do_until_nested_while --keep-workspace
+```
+
+Run the current `WHILE ... DO ... OD` containing nested `DO ... UNTIL ... OD` proof end to end:
+
+```sh
+cd /mnt/c/test/action/actionc64u
+./tools/run_tool_abi_additive_pipeline.py --scenario while_nested_do_until --keep-workspace
+```
+
+Run the current `DO` + nested `WHILE` + local/external call proof end to end:
+
+```sh
+cd /mnt/c/test/action/actionc64u
+./tools/run_tool_abi_additive_pipeline.py --scenario do_until_nested_while_calls --keep-workspace
+```
+
+Run the current `WHILE` + nested `DO` + local/external call proof end to end:
+
+```sh
+cd /mnt/c/test/action/actionc64u
+./tools/run_tool_abi_additive_pipeline.py --scenario while_nested_do_until_calls --keep-workspace
+```
+
+Run the current mixed `DO`/`WHILE` + branch local/external proof end to end:
+
+```sh
+cd /mnt/c/test/action/actionc64u
+./tools/run_tool_abi_additive_pipeline.py --scenario do_until_nested_while_branch_mixed --keep-workspace
+```
+
+Run the current `WHILE` + nested `DO` + shared-transitive proof end to end:
+
+```sh
+cd /mnt/c/test/action/actionc64u
+./tools/run_tool_abi_additive_pipeline.py --scenario while_nested_do_until_shared_transitive --keep-workspace
+```
+
 That script:
 
 - clones a clean harness workspace from the current manual-pipeline fs tree
@@ -494,7 +536,7 @@ On the real widened manual-pipeline object workspace, the harness proves:
 So the current widened `ACTC -> ALINK -> AVMRUN` slice is working under the
 harness when the resident/VICE service path is removed from the equation.
 
-That now includes at least two stable scenarios:
+That now includes a widening set of stable scenarios:
 
 - additive chains with an external call:
   `HELLO`, `TOOL7`, `5459`
@@ -537,6 +579,18 @@ That now includes at least two stable scenarios:
 - nested `WHILE`:
   `DONE`
 - nested `WHILE` + local/external call:
+  `DONE`
+- `DO ... UNTIL ... OD` containing nested `WHILE`:
+  `OUTER`, `DONE`
+- `WHILE ... DO ... OD` containing nested `DO ... UNTIL ... OD`:
+  `DONE`
+- `DO` + nested `WHILE` + local/external call:
+  `HELLO`, `DONE`
+- `WHILE` + nested `DO` + local/external call:
+  `DONE`
+- mixed `DO`/`WHILE` + branch local/external call:
+  `TOOL7`, `DONE`
+- `WHILE` + nested `DO` + shared-transitive externals:
   `DONE`
 - nested `WHILE` + mixed branch local/external content:
   `DONE`
