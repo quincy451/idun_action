@@ -2335,7 +2335,11 @@ append_small_decimal_tens_done:
     jsr append_char
 append_small_decimal_emit_tens:
     pla
+    bne :+
+    lda compare_char
     beq append_small_decimal_ones_pop
+    lda #$00
+: 
     clc
     adc #'0'
     jsr append_char

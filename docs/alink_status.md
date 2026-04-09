@@ -52,6 +52,14 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
   `PrintE("A")` through `PrintE("P")`
 - [x] also loads high integer-index `ACTC` output through `J`:
   `PrintIE(0)` through `PrintIE(19)`
+- [x] also loads high string-index `IF/ELSE` control-flow `ACTC` output:
+  `IF 1 = 0 THEN ... ELSE PrintE("I") ... PrintE("P") FI`
+- [x] also loads high string-index `DO ... UNTIL ... OD` control-flow `ACTC` output:
+  `DO PrintE("A") ... PrintE("P") UNTIL 1 = 1 OD`
+- [x] also loads high integer-index `IF/ELSE` control-flow `ACTC` output:
+  `IF 1 = 0 THEN PrintIE(0..7) ELSE PrintIE(8..15) FI`
+- [x] also loads high string-index branch-local unresolved-external output:
+  `IF 1 = 1 THEN W() PrintE("A") ... PrintE("L") ELSE PrintE("BAD") FI`
 - [x] also loads arithmetic/comparison `IF/ELSE` `ACTC` output for:
   `IF 2 + 3 * 4 > 10 THEN ... ELSE ... FI`
 - [x] also loads direct comparison-operator branch and loop `ACTC` output for:
@@ -152,6 +160,10 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
 - [x] emits a direct-comparison print slice `BIN/MAIN.AVM` of `91` bytes
 - [x] emits a high string-index slice `BIN/MAIN.AVM` of `143` bytes
 - [x] emits a high integer-index slice `BIN/MAIN.AVM` of `135` bytes
+- [x] emits a high string-index `IF/ELSE` slice `BIN/MAIN.AVM` of `156` bytes
+- [x] emits a high string-index `DO ... UNTIL ... OD` slice `BIN/MAIN.AVM` of `153` bytes
+- [x] emits a high integer-index `IF/ELSE` slice `BIN/MAIN.AVM` of `124` bytes
+- [x] emits a high string-index branch-external slice `BIN/MAIN.AVM` of `155` bytes
 - [x] emits a direct-comparison branch slice `BIN/MAIN.AVM` of `149` bytes
 - [x] emits a direct-comparison loop slice `BIN/MAIN.AVM` of `76` bytes
 - [x] emits a direct-comparison branch-call slice `BIN/MAIN.AVM` of `77` bytes
@@ -227,6 +239,14 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
   `A` through `P`
 - [x] current harness runtime output for the high integer-index slice:
   `0` through `19`
+- [x] current harness runtime output for the high string-index `IF/ELSE` slice:
+  `I` through `P`
+- [x] current harness runtime output for the high string-index `DO ... UNTIL ... OD` slice:
+  `A` through `P`
+- [x] current harness runtime output for the high integer-index `IF/ELSE` slice:
+  `8` through `15`
+- [x] current harness runtime output for the high string-index branch-external slice:
+  `TOOL7` then `A` through `L`
 - [x] current harness runtime output for the direct-comparison branch slice:
   `NE`, `LT`, `LE`, `GE`
 - [x] current harness runtime output for the direct-comparison loop slice:

@@ -74,6 +74,14 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
   `PrintE("A")` through `PrintE("P")`
 - [x] integer-literal pool indices widened through `J` on the harness line:
   `PrintIE(0)` through `PrintIE(19)`
+- [x] high string-index control flow under `IF/ELSE`:
+  `IF 1 = 0 THEN ... ELSE PrintE("I") ... PrintE("P") FI`
+- [x] high string-index loop bodies:
+  `DO PrintE("A") ... PrintE("P") UNTIL 1 = 1 OD`
+- [x] high int-index control flow under `IF/ELSE`:
+  `IF 1 = 0 THEN PrintIE(0..7) ELSE PrintIE(8..15) FI`
+- [x] high string indices mixed with unresolved externals under branch control:
+  `IF 1 = 1 THEN W() PrintE("A") ... PrintE("L") ELSE PrintE("BAD") FI`
 - [x] arithmetic/comparison conditions inside `IF ... THEN ... ELSE ... FI`:
   `IF 2 + 3 * 4 > 10 THEN ... ELSE ... FI`
 - [x] direct comparison operator conditions inside `IF ... THEN ... FI`:
@@ -232,6 +240,14 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
   `b e0e1e2e3e4e5e6e7e8e9eAeBeCeDeEeFr`
 - [x] current widened int-index object emission:
   `b i0i1i2i3i4i5i6i7i8i9iAiBiCiDiEiFiGiHiIiJr`
+- [x] current widened high string-index `IF/ELSE` object emission:
+  `b p0p1qhe0e1e2e3e4e5e6e7we8e9eAeBeCeDeEeFvr`
+- [x] current widened high string-index `DO ... UNTIL ... OD` object emission:
+  `b de0e1e2e3e4e5e6e7e8e9eAeBeCeDeEeFp0p1qtor`
+- [x] current widened high int-index `IF/ELSE` object emission:
+  `b p0p1qhi2i3i4i5i6i7i8i9wiAiBiCiDiEiFiGiHvr`
+- [x] current widened high string-index branch-external object emission:
+  `b p0p1qhu0e0e1e2e3e4e5e6e7e8e9eAeBweCvr`
 - [x] current widened direct-comparison `IF` object emission:
   `b p0p1nhe0vp2p3lhe1vp4p5gp6qhe2vp7p8lp9qhe3vpApBgpCqhe4vpDpElpFqhe5vr`
 - [x] current widened direct-comparison loop object emission:

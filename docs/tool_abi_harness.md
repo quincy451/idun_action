@@ -97,11 +97,32 @@ cd /mnt/c/test/action/actionc64u
 ./tools/run_tool_abi_additive_pipeline.py --scenario many_string_indices --keep-workspace
 ```
 
+Run the current high string-index `IF/ELSE` proof end to end:
+
+```sh
+cd /mnt/c/test/action/actionc64u
+./tools/run_tool_abi_additive_pipeline.py --scenario many_string_if_else --keep-workspace
+```
+
+Run the current high string-index `DO ... UNTIL ... OD` proof end to end:
+
+```sh
+cd /mnt/c/test/action/actionc64u
+./tools/run_tool_abi_additive_pipeline.py --scenario many_string_do_until --keep-workspace
+```
+
 Run the current high integer-index proof end to end:
 
 ```sh
 cd /mnt/c/test/action/actionc64u
 ./tools/run_tool_abi_additive_pipeline.py --scenario many_int_indices --keep-workspace
+```
+
+Run the current high integer-index `IF/ELSE` proof end to end:
+
+```sh
+cd /mnt/c/test/action/actionc64u
+./tools/run_tool_abi_additive_pipeline.py --scenario many_int_if_else --keep-workspace
 ```
 
 Run the current direct comparison-operator branch proof end to end:
@@ -130,6 +151,13 @@ Run the current direct comparison-operator branch-call proof end to end:
 ```sh
 cd /mnt/c/test/action/actionc64u
 ./tools/run_tool_abi_additive_pipeline.py --scenario comparison_ops_branch_calls --keep-workspace
+```
+
+Run the current high string-index branch-external proof end to end:
+
+```sh
+cd /mnt/c/test/action/actionc64u
+./tools/run_tool_abi_additive_pipeline.py --scenario many_string_branch_external --keep-workspace
 ```
 
 Run the current branch-local procedure-call proof end to end:
