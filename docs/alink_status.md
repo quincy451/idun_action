@@ -106,6 +106,10 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
   `DO IF ... THEN W() ELSE ... FI DO IF ... THEN HELLO() ELSE ... FI UNTIL ... OD UNTIL ... OD`
 - [x] also loads top-tested `WHILE ... DO ... OD` `ACTC` output for:
   `WHILE 1 = 0 DO ... OD`
+- [x] also loads local/external calls inside top-tested `WHILE ... DO ... OD`
+- [x] also loads `IF ... THEN ... ELSE ... FI` inside top-tested `WHILE ... DO ... OD`
+- [x] also loads local branch calls inside top-tested `WHILE ... DO ... OD`
+- [x] also loads unresolved-external branch calls inside top-tested `WHILE ... DO ... OD`
 - [x] resolves the current widened child-object closure including `OBJ/W.AVO`
 - [x] resolves the current widened transitive child-object closure including `OBJ/W.AVO` and `OBJ/Z.AVO`
 - [x] resolves sibling child objects from the root:
@@ -146,6 +150,10 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
 - [x] emits a nested loop + nested-branch slice `BIN/MAIN.AVM` of `107` bytes
 - [x] emits a nested loop + mixed branch local/external slice `BIN/MAIN.AVM` of `135` bytes
 - [x] emits a `WHILE ... DO ... OD` slice `BIN/MAIN.AVM` of `49` bytes
+- [x] emits a `WHILE` + call/external slice `BIN/MAIN.AVM` of `76` bytes
+- [x] emits a `WHILE` + branch slice `BIN/MAIN.AVM` of `78` bytes
+- [x] emits a `WHILE` + branch-call slice `BIN/MAIN.AVM` of `86` bytes
+- [x] emits a `WHILE` + branch-external slice `BIN/MAIN.AVM` of `87` bytes
 - [x] harness proof exists through:
   `ACTC -> ALINK -> AVMRUN`
 - [x] current harness runtime output for that widened slice:
@@ -213,6 +221,14 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
 - [x] current harness runtime output for the nested loop + mixed branch local/external slice:
   `TOOL7`, `HELLO`, `DONE`
 - [x] current harness runtime output for the `WHILE ... DO ... OD` slice:
+  `DONE`
+- [x] current harness runtime output for the `WHILE` + call/external slice:
+  `DONE`
+- [x] current harness runtime output for the `WHILE` + branch slice:
+  `DONE`
+- [x] current harness runtime output for the `WHILE` + branch-call slice:
+  `DONE`
+- [x] current harness runtime output for the `WHILE` + branch-external slice:
   `DONE`
 
 ## Current Biggest Blockers

@@ -126,6 +126,10 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
   `DO IF ... THEN W() ELSE ... FI DO IF ... THEN HELLO() ELSE ... FI UNTIL ... OD UNTIL ... OD`
 - [x] top-tested `WHILE ... DO ... OD` with false entry condition:
   `WHILE 1 = 0 DO ... OD`
+- [x] local and unresolved-external calls inside top-tested `WHILE ... DO ... OD`
+- [x] `IF ... THEN ... ELSE ... FI` inside top-tested `WHILE ... DO ... OD`
+- [x] local branch calls inside top-tested `WHILE ... DO ... OD`
+- [x] unresolved-external branch calls inside top-tested `WHILE ... DO ... OD`
 - [x] compiler body-op stride widened to support the current nested-loop surface:
   `BODY_OPS_STRIDE = 48`
 - [x] compiler integer literal pool widened for the current nested-loop + nested-branch surface:
@@ -158,6 +162,14 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
   `b dp0p1ap2ghu0we1vdp3p4qhc0we2vp5p6qtop7p8qtoe3r`
 - [x] current widened `WHILE ... DO ... OD` object emission:
   `b dp0p1qfe0xe1r`
+- [x] current widened `WHILE` + call/external object emission:
+  `b dp0p1qfc0u0xe1r`
+- [x] current widened `WHILE` + branch object emission:
+  `b dp0p1qfp2p3ap4ghe0we1vxe2r`
+- [x] current widened `WHILE` + branch-call object emission:
+  `b dp0p1qfp2p3ap4ghc0wc1vxe2r`
+- [x] current widened `WHILE` + branch-external object emission:
+  `b dp0p1qfp2p3ap4ghu0we0vxe1r`
 - [x] current widened additive object emission:
   `b e0u0p0p1ap2myp3p4mp5azr`
 - [x] current widened precedence object emission:
@@ -257,6 +269,14 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
 - [x] current harness runtime output for the nested loop + mixed branch local/external slice:
   `TOOL7`, `HELLO`, `DONE`
 - [x] current harness runtime output for the `WHILE ... DO ... OD` slice:
+  `DONE`
+- [x] current harness runtime output for the `WHILE` + call/external slice:
+  `DONE`
+- [x] current harness runtime output for the `WHILE` + branch slice:
+  `DONE`
+- [x] current harness runtime output for the `WHILE` + branch-call slice:
+  `DONE`
+- [x] current harness runtime output for the `WHILE` + branch-external slice:
   `DONE`
 
 ## Current Biggest Blockers

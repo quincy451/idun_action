@@ -1745,10 +1745,14 @@ load_if_false_target_offset_loop:
 	    beq load_if_false_target_offset_add_single_int
 	    cmp #'h'
 	    beq load_if_false_target_offset_add_if
+	    cmp #'f'
+	    beq load_if_false_target_offset_add_single_int
 	    cmp #'t'
 	    beq load_if_false_target_offset_add_single_int
 	    cmp #'w'
 	    beq load_if_false_target_offset_add_else
+	    cmp #'x'
+	    beq load_if_false_target_offset_add_single_int
 	    cmp #'v'
 	    beq load_if_false_target_offset_pop_if
 	    cmp #'d'
@@ -2138,10 +2142,14 @@ load_else_end_target_offset_loop:
 	    beq load_else_end_target_offset_add_single_int
 	    cmp #'h'
 	    beq load_else_end_target_offset_add_if
+	    cmp #'f'
+	    beq load_else_end_target_offset_add_single_int
 	    cmp #'t'
 	    beq load_else_end_target_offset_add_single_int
 	    cmp #'w'
 	    beq load_else_end_target_offset_add_else
+	    cmp #'x'
+	    beq load_else_end_target_offset_add_single_int
 	    cmp #'v'
 	    beq load_else_end_target_offset_pop_if
 	    cmp #'d'
