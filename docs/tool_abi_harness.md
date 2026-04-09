@@ -776,6 +776,10 @@ That now includes a widening set of stable scenarios:
   `145`
 - arithmetic + comparisons + external call:
   `14`, `5`, `1`, `1`, `TOOL7`
+- module-scope integer variable read/assignment:
+  `0`, `1`
+- module-scope integer variable state through `DO ... UNTIL ... OD`:
+  `0`, `1`, `DONE`
 - arithmetic/comparison condition with `IF/ELSE`:
   `YES`, `DONE`
 - branch-local procedure call:

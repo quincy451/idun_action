@@ -813,6 +813,14 @@ patch_payload_loop:
     bne :+
     jmp patch_literal_word_arg
 :
+    cmp #OPCODE_STORE
+    bne :+
+    jmp patch_word_arg
+:
+    cmp #OPCODE_LOAD
+    bne :+
+    jmp patch_word_arg
+:
     cmp #OPCODE_NATIVE
     bne :+
     jmp patch_payload_done
@@ -1059,6 +1067,12 @@ interpret_payload_loop:
 :   cmp #OPCODE_PUSH16
     bne :+
     jmp interpret_push16
+:   cmp #OPCODE_STORE
+    bne :+
+    jmp interpret_store
+:   cmp #OPCODE_LOAD
+    bne :+
+    jmp interpret_load
 :   cmp #OPCODE_ADD
     bne :+
     jmp interpret_add
@@ -1129,6 +1143,62 @@ interpret_push16:
     sta word_tmp
     iny
     lda (scan_ptr),y
+    sta word_tmp+1
+    jsr interp_push_word_tmp
+    bcc :+
+    jmp interpret_payload_fail
+:   lda #$03
+    jsr advance_scan_ptr
+    jmp interpret_payload_loop
+
+interpret_store:
+    jsr ensure_scan_room_3
+    bcc :+
+    jmp interpret_payload_fail
+:   ldy #$01
+    lda (scan_ptr),y
+    sta word_tmp
+    iny
+    lda (scan_ptr),y
+    sta word_tmp+1
+    jsr interpret_resolve_word_tmp_to_absolute
+    bcc :+
+    jmp interpret_payload_fail
+:   jsr interp_pop_to_svc_retptr
+    bcc :+
+    jmp interpret_payload_fail
+:   ldy #$00
+    lda svc_retptr
+    sta (word_tmp),y
+    iny
+    lda svc_retptr+1
+    sta (word_tmp),y
+    lda #$03
+    jsr advance_scan_ptr
+    jmp interpret_payload_loop
+
+interpret_load:
+    jsr ensure_scan_room_3
+    bcc :+
+    jmp interpret_payload_fail
+:   ldy #$01
+    lda (scan_ptr),y
+    sta word_tmp
+    iny
+    lda (scan_ptr),y
+    sta word_tmp+1
+    jsr interpret_resolve_word_tmp_to_absolute
+    bcc :+
+    jmp interpret_payload_fail
+:   lda word_tmp
+    sta svc_retptr
+    lda word_tmp+1
+    sta svc_retptr+1
+    ldy #$00
+    lda (svc_retptr),y
+    sta word_tmp
+    iny
+    lda (svc_retptr),y
     sta word_tmp+1
     jsr interp_push_word_tmp
     bcc :+

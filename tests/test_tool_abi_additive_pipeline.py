@@ -60,10 +60,16 @@ class TestToolAbiPipeline(unittest.TestCase):
         self.run_scenario("additive", "HELLO\nTOOL7\n5459\n", 92, 76)
 
     def test_precedence_pipeline_is_green_under_harness(self) -> None:
-        self.run_scenario("precedence", "145\n", 53, 31)
+        self.run_scenario("precedence", "145\n", 54, 31)
 
     def test_comparisons_pipeline_is_green_under_harness(self) -> None:
-        self.run_scenario("comparisons", "14\n5\n1\n1\nTOOL7\n", 91, 72)
+        self.run_scenario("comparisons", "14\n5\n1\n1\nTOOL7\n", 92, 72)
+
+    def test_int_vars_basic_pipeline_is_green_under_harness(self) -> None:
+        self.run_scenario("int_vars_basic", "0\n1\n", 55, 39)
+
+    def test_int_vars_do_until_pipeline_is_green_under_harness(self) -> None:
+        self.run_scenario("int_vars_do_until", "0\n1\nDONE\n", 73, 54)
 
     def test_comparison_ops_pipeline_is_green_under_harness(self) -> None:
         self.run_scenario("comparison_ops", "1\n1\n1\n1\n0\n0\n", 144, 91)
@@ -81,13 +87,13 @@ class TestToolAbiPipeline(unittest.TestCase):
         self.run_scenario("many_string_do_until_if_else", "I\nJ\nK\nL\nM\nN\nO\nP\n", 161, 166)
 
     def test_many_int_indices_pipeline_is_green_under_harness(self) -> None:
-        self.run_scenario("many_int_indices", "0\n1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12\n13\n14\n15\n16\n17\n18\n19\n", 163, 135)
+        self.run_scenario("many_int_indices", "0\n1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12\n13\n14\n15\n16\n17\n18\n19\n", 183, 135)
 
     def test_many_int_if_else_pipeline_is_green_under_harness(self) -> None:
-        self.run_scenario("many_int_if_else", "8\n9\n10\n11\n12\n13\n14\n15\n", 151, 124)
+        self.run_scenario("many_int_if_else", "8\n9\n10\n11\n12\n13\n14\n15\n", 167, 124)
 
     def test_many_int_do_until_if_else_pipeline_is_green_under_harness(self) -> None:
-        self.run_scenario("many_int_do_until_if_else", "8\n9\n10\n11\n12\n13\n14\n15\n", 167, 134)
+        self.run_scenario("many_int_do_until_if_else", "8\n9\n10\n11\n12\n13\n14\n15\n", 183, 134)
 
     def test_comparison_ops_if_else_pipeline_is_green_under_harness(self) -> None:
         self.run_scenario("comparison_ops_if_else", "NE\nLT\nLE\nGE\n", 197, 149)
@@ -126,7 +132,7 @@ class TestToolAbiPipeline(unittest.TestCase):
         self.run_scenario("many_string_nested_branch_shared_transitive", "MID1\nEND\nMID2\nEND\nA\nB\nC\nD\nE\nF\nG\nH\n", 151, 178)
 
     def test_many_int_nested_loops_if_else_pipeline_is_green_under_harness(self) -> None:
-        self.run_scenario("many_int_nested_loops_if_else", "8\n9\n10\n11\n12\n13\n14\n15\n", 183, 147)
+        self.run_scenario("many_int_nested_loops_if_else", "8\n9\n10\n11\n12\n13\n14\n15\n", 199, 147)
 
     def test_many_string_nested_loops_if_else_pipeline_is_green_under_harness(self) -> None:
         self.run_scenario("many_string_nested_loops_if_else", "I\nJ\nK\nL\nM\nN\nO\nP\n", 177, 179)

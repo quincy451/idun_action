@@ -13,6 +13,9 @@ INT_LITERAL_MAX = 10
 .ifndef STRING_LITERAL_MAX
 STRING_LITERAL_MAX = 8
 .endif
+.ifndef VAR_MAX
+VAR_MAX = 8
+.endif
 .if STRING_LITERAL_MAX > 32
 .error "STRING_LITERAL_MAX > 32 not supported"
 .endif
@@ -24,6 +27,8 @@ AVM_HEADER_SIZE = 12
 
 PENDING_SYMBOL_MAX = 7
 OPCODE_PUSH16 = $11
+OPCODE_STORE = $12
+OPCODE_LOAD = $13
 OPCODE_ADD = $14
 OPCODE_SUB = $15
 OPCODE_EQ = $16
@@ -76,6 +81,7 @@ start:
     jsr parse_external_symbols_or_fail
     jsr parse_strings_or_fail
     jsr parse_ints_or_fail
+    jsr parse_vars_or_fail
     jsr compute_code_bytes
     jsr build_live_set
     jsr build_avm_binary_content_or_fail
@@ -307,6 +313,26 @@ set_external_ptr_from_x_loop:
     dex
     bne set_external_ptr_from_x_loop
 set_external_ptr_from_x_done:
+    rts
+
+set_var_ptr_from_x:
+    lda #<var_names
+    sta export_ptr
+    lda #>var_names
+    sta export_ptr+1
+set_var_ptr_from_x_loop:
+    cpx #$00
+    beq set_var_ptr_from_x_done
+    clc
+    lda export_ptr
+    adc #25
+    sta export_ptr
+    lda export_ptr+1
+    adc #$00
+    sta export_ptr+1
+    dex
+    bne set_var_ptr_from_x_loop
+set_var_ptr_from_x_done:
     rts
 
 set_pending_ptr_from_x:
@@ -766,6 +792,91 @@ parse_ints_next_line:
 parse_ints_done:
     rts
 
+parse_vars_or_fail:
+    lda #$00
+    sta var_count
+    jsr reset_scan_ptr_after_header
+parse_vars_loop:
+    jsr skip_line_breaks
+    ldy #$00
+    lda (scan_ptr),y
+    beq parse_vars_done
+    lda #<line_var
+    sta const_ptr
+    lda #>line_var
+    sta const_ptr+1
+    jsr pattern_matches_scan_ptr
+    bcs parse_vars_next_line
+    jsr advance_scan_ptr_by_const_ptr
+    ldx var_count
+    cpx #VAR_MAX
+    bcc :+
+    lda #<msg_bad_avo
+    ldy #>msg_bad_avo
+    jmp fail_with_ptr
+:   jsr copy_var_symbol_line_or_fail
+    jsr require_space_or_fail
+    jsr parse_decimal_byte_or_fail
+    ldx var_count
+    sta var_init_lo,x
+    lda #$00
+    sta var_init_hi,x
+    inc var_count
+parse_vars_next_line:
+    jsr skip_current_line
+    jmp parse_vars_loop
+parse_vars_done:
+    rts
+
+copy_var_symbol_line_or_fail:
+    ldx var_count
+    jsr set_var_ptr_from_x
+    ldy #$00
+copy_var_symbol_line_or_fail_loop:
+    lda (scan_ptr),y
+    beq copy_var_symbol_line_or_fail_done
+    cmp #' '
+    beq copy_var_symbol_line_or_fail_done
+    cmp #10
+    beq copy_var_symbol_line_or_fail_done
+    cmp #13
+    beq copy_var_symbol_line_or_fail_done
+    jsr lowercase_ascii
+    cmp #'a'
+    bcc copy_var_symbol_line_or_fail_symbol
+    cmp #'z'+1
+    bcc copy_var_symbol_line_or_fail_store
+copy_var_symbol_line_or_fail_symbol:
+    cmp #'0'
+    bcc copy_var_symbol_line_or_fail_check_underscore
+    cmp #'9'+1
+    bcc copy_var_symbol_line_or_fail_store
+copy_var_symbol_line_or_fail_check_underscore:
+    cmp #'_'
+    bne copy_var_symbol_line_or_fail_bad
+copy_var_symbol_line_or_fail_store:
+    sta (export_ptr),y
+    iny
+    cpy #24
+    bcc copy_var_symbol_line_or_fail_loop
+copy_var_symbol_line_or_fail_bad:
+    lda #<msg_bad_avo
+    ldy #>msg_bad_avo
+    jmp fail_with_ptr
+copy_var_symbol_line_or_fail_done:
+    cpy #$00
+    beq copy_var_symbol_line_or_fail_bad
+    lda #$00
+    sta (export_ptr),y
+copy_var_symbol_line_or_fail_advance_loop:
+    cpy #$00
+    beq copy_var_symbol_line_or_fail_advanced
+    jsr advance_scan_ptr
+    dey
+    bne copy_var_symbol_line_or_fail_advance_loop
+copy_var_symbol_line_or_fail_advanced:
+    rts
+
 reset_scan_ptr_after_header:
     lda #<(source_buffer+4)
     sta scan_ptr
@@ -900,6 +1011,10 @@ build_live_set_body_loop:
     cmp #'j'
     beq build_live_set_skip_pair_branch
     cmp #'p'
+    beq build_live_set_skip_pair_branch
+    cmp #'L'
+    beq build_live_set_skip_pair_branch
+    cmp #'S'
     beq build_live_set_skip_pair_branch
     cmp #'a'
     beq build_live_set_single_branch
@@ -1116,13 +1231,22 @@ layout_payload_pending_loop:
     ldx #$00
 layout_payload_pending_next:
     cpx pending_count
-    beq layout_payload_root_strings
+    beq layout_payload_root_vars
     jsr layout_external_object_from_x_or_fail
     inx
     bne layout_payload_pending_next
-layout_payload_root_strings:
+layout_payload_root_vars:
     lda current_bit_lo
     sta code_limit_data
+    jsr layout_current_object_vars_or_fail
+    ldx #$00
+layout_payload_external_vars_next:
+    cpx pending_count
+    beq layout_payload_root_strings
+    jsr layout_external_object_vars_from_x_or_fail
+    inx
+    bne layout_payload_external_vars_next
+layout_payload_root_strings:
     jsr restore_saved_string_state
     lda #$00
     sta save_mode
@@ -1227,6 +1351,49 @@ layout_current_object_code_gap:
     bne layout_current_object_code_loop
 layout_current_object_code_done:
     rts
+
+layout_current_object_vars_or_fail:
+    ldx #$00
+layout_current_object_vars_loop:
+    cpx var_count
+    beq layout_current_object_vars_done
+    lda current_bit_lo
+    sta root_var_offsets_lo,x
+    lda current_bit_hi
+    sta root_var_offsets_hi,x
+    clc
+    lda current_bit_lo
+    adc #$02
+    sta current_bit_lo
+    bcc :+
+    inc current_bit_hi
+:   inx
+    bne layout_current_object_vars_loop
+layout_current_object_vars_done:
+    rts
+
+layout_external_object_vars_from_x_or_fail:
+    stx saved_pending_index
+    jsr save_module_name
+    ldx saved_pending_index
+    lda current_bit_lo
+    sta saved_state_lo
+    lda current_bit_hi
+    sta saved_state_hi
+    jsr copy_pending_symbol_to_module_name_from_x
+    jsr load_current_object_link_state_or_fail
+    lda saved_state_hi
+    sta current_bit_hi
+    lda saved_state_lo
+    sta current_bit_lo
+    ldx saved_pending_index
+    lda current_bit_lo
+    sta pending_var_bases_lo,x
+    lda current_bit_hi
+    sta pending_var_bases_hi,x
+    jsr add_current_var_bytes_to_layout
+    ldx saved_pending_index
+    jmp restore_module_name
 
 note_strings_used_for_export_x_or_fail:
     jsr set_body_ptr_from_x
@@ -1368,6 +1535,22 @@ add_current_string_length_to_layout_done:
     inc current_bit_hi
 :   rts
 
+add_current_var_bytes_to_layout:
+    ldx #$00
+add_current_var_bytes_to_layout_loop:
+    cpx var_count
+    beq add_current_var_bytes_to_layout_done
+    clc
+    lda current_bit_lo
+    adc #$02
+    sta current_bit_lo
+    bcc :+
+    inc current_bit_hi
+:   inx
+    bne add_current_var_bytes_to_layout_loop
+add_current_var_bytes_to_layout_done:
+    rts
+
 emit_payload_or_fail:
     jsr load_current_object_link_state_or_fail
     lda entry_export_index
@@ -1387,16 +1570,27 @@ emit_payload_pending_loop:
     ldx #$00
 emit_payload_pending_next:
     cpx pending_count
-    beq emit_payload_root_strings
+    beq emit_payload_root_vars
     jsr emit_external_object_code_from_x_or_fail
     inx
     bne emit_payload_pending_next
-emit_payload_root_strings:
+emit_payload_root_vars:
     lda #$36
+    sta debug_phase
+    jsr emit_current_object_vars_or_fail
+    ldx #$00
+emit_payload_external_vars_next:
+    cpx pending_count
+    beq emit_payload_root_strings
+    jsr emit_external_object_vars_from_x_or_fail
+    inx
+    bne emit_payload_external_vars_next
+emit_payload_root_strings:
+    lda #$37
     sta debug_phase
     jsr restore_saved_string_state
     jsr emit_current_object_strings_or_fail
-    lda #$37
+    lda #$38
     sta debug_phase
     ldx #$00
 emit_payload_external_strings_next:
@@ -1406,7 +1600,7 @@ emit_payload_external_strings_next:
     inx
     bne emit_payload_external_strings_next
 emit_payload_done:
-    lda #$38
+    lda #$39
     sta debug_phase
     rts
 
@@ -1429,6 +1623,8 @@ emit_external_object_code_from_x_or_fail:
     sta main_flags_hi
     lda saved_state_lo
     sta main_flags_lo
+    ldx saved_pending_index
+    jsr load_current_var_offsets_from_pending_x
     ldx saved_pending_index
     lda pending_offsets_lo,x
     sta current_bit_lo
@@ -1477,6 +1673,24 @@ emit_external_object_strings_from_x_or_fail:
     ldx saved_pending_index
     jmp restore_module_name
 
+emit_external_object_vars_from_x_or_fail:
+    stx saved_pending_index
+    jsr save_module_name
+    ldx saved_pending_index
+    jsr copy_pending_symbol_to_module_name_from_x
+    lda main_flags_lo
+    sta saved_state_lo
+    lda main_flags_hi
+    sta saved_state_hi
+    jsr load_current_object_link_state_or_fail
+    lda saved_state_hi
+    sta main_flags_hi
+    lda saved_state_lo
+    sta main_flags_lo
+    jsr emit_current_object_vars_or_fail
+    ldx saved_pending_index
+    jmp restore_module_name
+
 load_current_object_link_state_or_fail:
     lda #$70
     sta $03FC
@@ -1519,12 +1733,16 @@ load_current_object_link_state_or_fail:
     lda #$79
     sta $03FC
     sta debug_phase_zp
-    jsr compute_code_bytes
+    jsr parse_vars_or_fail
     lda #$7A
     sta $03FC
     sta debug_phase_zp
-    jsr build_live_set
+    jsr compute_code_bytes
     lda #$7B
+    sta $03FC
+    sta debug_phase_zp
+    jsr build_live_set
+    lda #$7C
     sta $03FC
     sta debug_phase_zp
     rts
@@ -1610,6 +1828,12 @@ emit_live_bytes_for_export_x_loop:
 :   cmp #'p'
     bne :+
     jmp emit_live_bytes_for_export_x_push
+:   cmp #'L'
+    bne :+
+    jmp emit_live_bytes_for_export_x_load
+:   cmp #'S'
+    bne :+
+    jmp emit_live_bytes_for_export_x_store
 :   cmp #'a'
     bne :+
     jmp emit_live_bytes_for_export_x_add
@@ -1756,6 +1980,30 @@ emit_live_bytes_for_export_x_push:
     jsr append_payload_byte
     pla
     tax
+    iny
+    jmp emit_live_bytes_for_export_x_loop
+emit_live_bytes_for_export_x_load:
+    iny
+    jsr load_body_digit_index_to_x_or_fail
+    jsr load_var_target_offset_from_x_or_fail
+    lda #OPCODE_LOAD
+    jsr append_payload_byte
+    lda current_bit_lo
+    jsr append_payload_byte
+    lda current_bit_hi
+    jsr append_payload_byte
+    iny
+    jmp emit_live_bytes_for_export_x_loop
+emit_live_bytes_for_export_x_store:
+    iny
+    jsr load_body_digit_index_to_x_or_fail
+    jsr load_var_target_offset_from_x_or_fail
+    lda #OPCODE_STORE
+    jsr append_payload_byte
+    lda current_bit_lo
+    jsr append_payload_byte
+    lda current_bit_hi
+    jsr append_payload_byte
     iny
     jmp emit_live_bytes_for_export_x_loop
 emit_live_bytes_for_export_x_add:
@@ -1931,6 +2179,10 @@ load_next_root_return_target_offset_loop:
 	    beq load_next_root_return_target_offset_add_call
 	    cmp #'p'
 	    beq load_next_root_return_target_offset_add_call
+	    cmp #'L'
+	    beq load_next_root_return_target_offset_add_call
+	    cmp #'S'
+	    beq load_next_root_return_target_offset_add_call
 	    cmp #'s'
 	    beq load_next_root_return_target_offset_add_string
 	    cmp #'e'
@@ -2039,6 +2291,10 @@ load_if_false_target_offset_loop:
 	    cmp #'u'
 	    beq load_if_false_target_offset_add_call
 	    cmp #'p'
+	    beq load_if_false_target_offset_add_call
+	    cmp #'L'
+	    beq load_if_false_target_offset_add_call
+	    cmp #'S'
 	    beq load_if_false_target_offset_add_call
 	    cmp #'s'
 	    beq load_if_false_target_offset_add_string
@@ -2181,6 +2437,10 @@ load_while_false_target_offset_loop:
 	    beq load_while_false_target_offset_add_call
 	    cmp #'p'
 	    beq load_while_false_target_offset_add_call
+	    cmp #'L'
+	    beq load_while_false_target_offset_add_call
+	    cmp #'S'
+	    beq load_while_false_target_offset_add_call
 	    cmp #'s'
 	    beq load_while_false_target_offset_add_string
 	    cmp #'e'
@@ -2299,6 +2559,10 @@ load_while_loop_start_target_offset_loop:
 	    cmp #'u'
 	    beq load_while_loop_start_target_offset_add_call
 	    cmp #'p'
+	    beq load_while_loop_start_target_offset_add_call
+	    cmp #'L'
+	    beq load_while_loop_start_target_offset_add_call
+	    cmp #'S'
 	    beq load_while_loop_start_target_offset_add_call
 	    cmp #'s'
 	    beq load_while_loop_start_target_offset_add_string
@@ -2453,6 +2717,10 @@ load_else_end_target_offset_loop:
 	    beq load_else_end_target_offset_add_call
 	    cmp #'p'
 	    beq load_else_end_target_offset_add_call
+	    cmp #'L'
+	    beq load_else_end_target_offset_add_call
+	    cmp #'S'
+	    beq load_else_end_target_offset_add_call
 	    cmp #'s'
 	    beq load_else_end_target_offset_add_string
 	    cmp #'e'
@@ -2570,6 +2838,10 @@ load_until_loop_start_target_offset_loop:
 	    cmp #'u'
 	    beq load_until_loop_start_target_offset_add_call
 	    cmp #'p'
+	    beq load_until_loop_start_target_offset_add_call
+	    cmp #'L'
+	    beq load_until_loop_start_target_offset_add_call
+	    cmp #'S'
 	    beq load_until_loop_start_target_offset_add_call
 	    cmp #'s'
 	    beq load_until_loop_start_target_offset_add_string
@@ -2763,6 +3035,20 @@ load_export_target_offset_from_x_or_fail:
     sta current_bit_hi
     rts
 
+load_var_target_offset_from_x_or_fail:
+    lda save_mode
+    beq :+
+    lda current_var_offsets_lo,x
+    sta current_bit_lo
+    lda current_var_offsets_hi,x
+    sta current_bit_hi
+    rts
+:   lda root_var_offsets_lo,x
+    sta current_bit_lo
+    lda root_var_offsets_hi,x
+    sta current_bit_hi
+    rts
+
 load_string_target_offset_from_x_or_fail:
     tya
     pha
@@ -2866,6 +3152,44 @@ emit_current_object_strings_next:
     inx
     bne emit_current_object_strings_loop
 emit_current_object_strings_done:
+    rts
+
+emit_current_object_vars_or_fail:
+    ldx #$00
+emit_current_object_vars_loop:
+    cpx var_count
+    beq emit_current_object_vars_done
+    lda var_init_lo,x
+    jsr append_payload_byte
+    lda var_init_hi,x
+    jsr append_payload_byte
+    inx
+    bne emit_current_object_vars_loop
+emit_current_object_vars_done:
+    rts
+
+load_current_var_offsets_from_pending_x:
+    lda pending_var_bases_lo,x
+    sta current_bit_lo
+    lda pending_var_bases_hi,x
+    sta current_bit_hi
+    ldx #$00
+load_current_var_offsets_from_pending_x_loop:
+    cpx var_count
+    beq load_current_var_offsets_from_pending_x_done
+    lda current_bit_lo
+    sta current_var_offsets_lo,x
+    lda current_bit_hi
+    sta current_var_offsets_hi,x
+    clc
+    lda current_bit_lo
+    adc #$02
+    sta current_bit_lo
+    bcc :+
+    inc current_bit_hi
+:   inx
+    bne load_current_var_offsets_from_pending_x_loop
+load_current_var_offsets_from_pending_x_done:
     rts
 
 append_payload_byte:
@@ -3413,6 +3737,8 @@ line_string:
     .byte "s ",0
 line_int:
     .byte "i ",0
+line_var:
+    .byte "v ",0
 
 bit_masks:
     .byte $01,$02,$04,$08,$10,$20,$40,$80
@@ -3444,6 +3770,14 @@ export_offsets:
     .res 8
 proc_sizes:
     .res 8
+var_names:
+    .res 25 * VAR_MAX
+var_init_lo:
+    .res VAR_MAX
+var_init_hi:
+    .res VAR_MAX
+var_count:
+    .res 1
 root_export_offsets_lo:
     .res 8
 root_export_offsets_hi:
@@ -3452,6 +3786,14 @@ current_export_offsets_lo:
     .res 8
 current_export_offsets_hi:
     .res 8
+root_var_offsets_lo:
+    .res VAR_MAX
+root_var_offsets_hi:
+    .res VAR_MAX
+current_var_offsets_lo:
+    .res VAR_MAX
+current_var_offsets_hi:
+    .res VAR_MAX
 string_literals:
     .res STRING_LITERAL_BYTES
 string_count:
@@ -3523,6 +3865,10 @@ pending_count:
 pending_offsets_lo:
     .res PENDING_SYMBOL_MAX
 pending_offsets_hi:
+    .res PENDING_SYMBOL_MAX
+pending_var_bases_lo:
+    .res PENDING_SYMBOL_MAX
+pending_var_bases_hi:
     .res PENDING_SYMBOL_MAX
 pending_string_use_masks:
     .res PENDING_SYMBOL_MAX * STRING_MASK_BYTES

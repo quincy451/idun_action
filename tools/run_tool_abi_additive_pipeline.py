@@ -72,7 +72,7 @@ SCENARIOS = {
         "expected_avo": (
             "AVO1\n"
             "x main 0 17\n"
-            "b p0p1ayi2r\n"
+            "b p0p1ayp2zr\n"
             "i 2\n"
             "i 12\n"
             "i 5\n"
@@ -102,7 +102,7 @@ SCENARIOS = {
         "expected_avo": (
             "AVO1\n"
             "x main 0 40\n"
-            "b p0p1azi2p3p4qzp5p6gzu0r\n"
+            "b p0p1azp2zp3p4qzp5p6gzu0r\n"
             "u w\n"
             "i 2\n"
             "i 12\n"
@@ -124,6 +124,70 @@ SCENARIOS = {
             ]
         ),
         "expected_console": "14\n5\n1\n1\nTOOL7\n",
+    },
+    "int_vars_basic": {
+        "out_fs_name": "harness-actc-alink-avmrun-int-vars-basic",
+        "source": (
+            'MODULE MAIN\r'
+            'INT X=[0]\r'
+            'PROC MAIN()\r'
+            'PrintIE(X)\r'
+            'X=X+1\r'
+            'PrintIE(X)\r'
+            'RETURN\r'
+        ),
+        "expected_avo": (
+            "AVO1\n"
+            "x main 0 23\n"
+            "b L0zL0p0aS0L0zr\n"
+            "i 1\n"
+            "v x 0\n"
+            "k 6\n"
+            "n main\n"
+        ),
+        "expected_avm": bytes(
+            [
+                65, 86, 77, 49, 2, 27, 0, 0, 0, 1, 25, 0, 19, 25, 0, 73,
+                49, 255, 19, 25, 0, 17, 1, 0, 20, 18, 25, 0, 19, 25, 0,
+                73, 49, 255, 73, 32, 255, 0, 0,
+            ]
+        ),
+        "expected_console": "0\n1\n",
+    },
+    "int_vars_do_until": {
+        "out_fs_name": "harness-actc-alink-avmrun-int-vars-do-until",
+        "source": (
+            'MODULE MAIN\r'
+            'INT X=[0]\r'
+            'PROC MAIN()\r'
+            'DO\r'
+            'PrintIE(X)\r'
+            'X=X+1\r'
+            'UNTIL X=2\r'
+            'OD\r'
+            'PrintE("DONE")\r'
+            'RETURN\r'
+        ),
+        "expected_avo": (
+            "AVO1\n"
+            "x main 0 33\n"
+            "b dL0zL0p0aS0L0p1qtoe0r\n"
+            "s DONE\n"
+            "i 1\n"
+            "i 2\n"
+            "v x 0\n"
+            "k 6\n"
+            "n main\n"
+        ),
+        "expected_avm": bytes(
+            [
+                65, 86, 77, 49, 2, 42, 0, 0, 0, 1, 35, 0, 19, 35, 0, 73,
+                49, 255, 19, 35, 0, 17, 1, 0, 20, 18, 35, 0, 19, 35, 0,
+                17, 2, 0, 22, 24, 0, 0, 97, 37, 0, 73, 16, 255, 73, 32,
+                255, 0, 0, 68, 79, 78, 69, 0,
+            ]
+        ),
+        "expected_console": "0\n1\nDONE\n",
     },
     "comparison_ops": {
         "out_fs_name": "harness-actc-alink-avmrun-comparison-ops",
@@ -403,7 +467,7 @@ SCENARIOS = {
         "expected_avo": (
             "AVO1\n"
             "x main 0 121\n"
-            "b i0i1i2i3i4i5i6i7i8i9iAiBiCiDiEiFiGiHiIiJr\n"
+            "b p0zp1zp2zp3zp4zp5zp6zp7zp8zp9zpAzpBzpCzpDzpEzpFzpGzpHzpIzpJzr\n"
             "i 0\n"
             "i 1\n"
             "i 2\n"
@@ -472,7 +536,7 @@ SCENARIOS = {
         "expected_avo": (
             "AVO1\n"
             "x main 0 110\n"
-            "b p0p1qhi2i3i4i5i6i7i8i9wiAiBiCiDiEiFiGiHvr\n"
+            "b p0p1qhp2zp3zp4zp5zp6zp7zp8zp9zwpAzpBzpCzpDzpEzpFzpGzpHzvr\n"
             "i 1\n"
             "i 0\n"
             "i 0\n"
@@ -875,7 +939,7 @@ SCENARIOS = {
         "expected_avo": (
             "AVO1\n"
             "x main 0 120\n"
-            "b dp0p1qhi2i3i4i5i6i7i8i9wiAiBiCiDiEiFiGiHvpIpJqtor\n"
+            "b dp0p1qhp2zp3zp4zp5zp6zp7zp8zp9zwpAzpBzpCzpDzpEzpFzpGzpHzvpIpJqtor\n"
             "i 1\n"
             "i 0\n"
             "i 0\n"
@@ -1916,7 +1980,7 @@ SCENARIOS = {
         "expected_avo": (
             "AVO1\n"
             "x main 0 133\n"
-            "b ddp0p1qfxp2p3qhi4i5i6i7i8i9iAiBwiCiDiEiFiGiHiIiJvpKpLqtor\n"
+            "b ddp0p1qfxp2p3qhp4zp5zp6zp7zp8zp9zpAzpBzwpCzpDzpEzpFzpGzpHzpIzpJzvpKpLqtor\n"
             "i 1\n"
             "i 0\n"
             "i 1\n"
