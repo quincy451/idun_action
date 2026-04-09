@@ -62,6 +62,12 @@ The harness pipeline currently builds `ACTC` and `ALINK` with harness-specific
 linker configs so widening work can continue without the real UDOS tool-size
 ceiling blocking every new control-flow slice.
 
+Current harness build widening knobs:
+
+- `ACTC`: `SOURCE_LIMIT=511`
+- `ACTC`: `STRING_LITERAL_MAX=32`
+- `ALINK`: `STRING_LITERAL_MAX=32`
+
 Run the current additive widening proof end to end:
 
 ```sh
@@ -188,6 +194,13 @@ cd /mnt/c/test/action/actionc64u
 ./tools/run_tool_abi_additive_pipeline.py --scenario many_string_branch_shared_transitive --keep-workspace
 ```
 
+Run the current 17-root-string shared-transitive branch proof end to end:
+
+```sh
+cd /mnt/c/test/action/actionc64u
+./tools/run_tool_abi_additive_pipeline.py --scenario many_string17_branch_shared_transitive --keep-workspace
+```
+
 Run the current high string-index shared-transitive `DO ... UNTIL ... OD` proof end to end:
 
 ```sh
@@ -209,11 +222,18 @@ cd /mnt/c/test/action/actionc64u
 ./tools/run_tool_abi_additive_pipeline.py --scenario many_string_nested_loops_external --keep-workspace
 ```
 
-Run the current compact high int-index nested-loop `IF/ELSE` proof end to end:
+Run the current full high int-index nested-loop `IF/ELSE` proof end to end:
 
 ```sh
 cd /mnt/c/test/action/actionc64u
 ./tools/run_tool_abi_additive_pipeline.py --scenario many_int_nested_loops_if_else --keep-workspace
+```
+
+Run the current high string-index nested-loop `IF/ELSE` proof end to end:
+
+```sh
+cd /mnt/c/test/action/actionc64u
+./tools/run_tool_abi_additive_pipeline.py --scenario many_string_nested_loops_if_else --keep-workspace
 ```
 
 Run the current branch-local procedure-call proof end to end:

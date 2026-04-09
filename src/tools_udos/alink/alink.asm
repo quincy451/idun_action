@@ -13,10 +13,11 @@ INT_LITERAL_MAX = 10
 .ifndef STRING_LITERAL_MAX
 STRING_LITERAL_MAX = 8
 .endif
-.if STRING_LITERAL_MAX > 16
-.error "STRING_LITERAL_MAX > 16 not supported"
+.if STRING_LITERAL_MAX > 32
+.error "STRING_LITERAL_MAX > 32 not supported"
 .endif
 STRING_LITERAL_BYTES = 24 * STRING_LITERAL_MAX
+STRING_MASK_BYTES = (STRING_LITERAL_MAX + 7) / 8
 AVM_VERSION = 2
 AVM_FLAG_ACHERON = 1
 AVM_HEADER_SIZE = 12
@@ -369,23 +370,58 @@ set_string_ptr_from_x_done:
     rts
 
 clear_string_use_mask:
+    ldy #$00
+:   lda #$00
+    sta string_use_mask,y
+    iny
+    cpy #STRING_MASK_BYTES
+    bcc :-
     lda #$00
-    sta string_use_mask_lo
-    sta string_use_mask_hi
+    rts
+
+set_pending_string_mask_ptr_from_x:
+    stx string_mask_saved_x
+    lda #<pending_string_use_masks
+    sta const_ptr
+    lda #>pending_string_use_masks
+    sta const_ptr+1
+    ldx string_mask_saved_x
+set_pending_string_mask_ptr_from_x_loop:
+    cpx #$00
+    beq set_pending_string_mask_ptr_from_x_done
+    clc
+    lda const_ptr
+    adc #STRING_MASK_BYTES
+    sta const_ptr
+    lda const_ptr+1
+    adc #$00
+    sta const_ptr+1
+    dex
+    bne set_pending_string_mask_ptr_from_x_loop
+set_pending_string_mask_ptr_from_x_done:
+    ldx string_mask_saved_x
     rts
 
 store_pending_string_use_mask_from_x:
-    lda string_use_mask_lo
-    sta pending_string_use_masks_lo,x
-    lda string_use_mask_hi
-    sta pending_string_use_masks_hi,x
+    jsr set_pending_string_mask_ptr_from_x
+    ldy #$00
+store_pending_string_use_mask_from_x_loop:
+    lda string_use_mask,y
+    sta (const_ptr),y
+    iny
+    cpy #STRING_MASK_BYTES
+    bcc store_pending_string_use_mask_from_x_loop
     rts
 
 load_pending_string_use_mask_from_x:
-    lda pending_string_use_masks_lo,x
-    sta string_use_mask_lo
-    lda pending_string_use_masks_hi,x
-    sta string_use_mask_hi
+    jsr set_pending_string_mask_ptr_from_x
+    ldy #$00
+load_pending_string_use_mask_from_x_loop:
+    lda (const_ptr),y
+    sta string_use_mask,y
+    iny
+    cpy #STRING_MASK_BYTES
+    bcc load_pending_string_use_mask_from_x_loop
     rts
 
 test_string_use_mask_for_x:
@@ -396,22 +432,20 @@ test_string_use_mask_for_x:
     lda bit_masks,x
     sta string_mask_saved_bit
     ldx string_mask_saved_x
-    cpx #8
-    bcc :+
+    txa
+    lsr
+    lsr
+    lsr
+    tay
     lda string_mask_saved_bit
-    and string_use_mask_hi
-    pha
-    ldx string_mask_saved_x
-    pla
-    rts
-:   lda string_mask_saved_bit
-    and string_use_mask_lo
+    and string_use_mask,y
     pha
     ldx string_mask_saved_x
     pla
     rts
 
 or_string_use_mask_for_x:
+    sty string_mask_saved_y
     txa
     sta string_mask_saved_x
     and #$07
@@ -419,17 +453,16 @@ or_string_use_mask_for_x:
     lda bit_masks,x
     sta string_mask_saved_bit
     ldx string_mask_saved_x
-    cpx #8
-    bcc :+
+    txa
+    lsr
+    lsr
+    lsr
+    tay
     lda string_mask_saved_bit
-    ora string_use_mask_hi
-    sta string_use_mask_hi
+    ora string_use_mask,y
+    sta string_use_mask,y
     ldx string_mask_saved_x
-    rts
-:   lda string_mask_saved_bit
-    ora string_use_mask_lo
-    sta string_use_mask_lo
-    ldx string_mask_saved_x
+    ldy string_mask_saved_y
     rts
 
 copy_string_literal_block:
@@ -2910,10 +2943,13 @@ render_payload_as_binary_done:
 save_current_string_state:
     lda string_count
     sta saved_string_count
-    lda string_use_mask_lo
-    sta saved_string_use_mask_lo
-    lda string_use_mask_hi
-    sta saved_string_use_mask_hi
+    ldy #$00
+save_current_string_mask_loop:
+    lda string_use_mask,y
+    sta saved_string_use_mask,y
+    iny
+    cpy #STRING_MASK_BYTES
+    bcc save_current_string_mask_loop
     lda #<string_literals
     sta src_ptr
     lda #>string_literals
@@ -2932,10 +2968,13 @@ save_current_string_state:
 restore_saved_string_state:
     lda saved_string_count
     sta string_count
-    lda saved_string_use_mask_lo
-    sta string_use_mask_lo
-    lda saved_string_use_mask_hi
-    sta string_use_mask_hi
+    ldy #$00
+restore_saved_string_mask_loop:
+    lda saved_string_use_mask,y
+    sta string_use_mask,y
+    iny
+    cpy #STRING_MASK_BYTES
+    bcc restore_saved_string_mask_loop
     lda #<saved_string_literals
     sta src_ptr
     lda #>saved_string_literals
@@ -3467,14 +3506,10 @@ loop_offsets_hi:
     .res 8
 live_flags:
     .res 8
-string_use_mask_lo:
-    .res 1
-string_use_mask_hi:
-    .res 1
-saved_string_use_mask_lo:
-    .res 1
-saved_string_use_mask_hi:
-    .res 1
+string_use_mask:
+    .res STRING_MASK_BYTES
+saved_string_use_mask:
+    .res STRING_MASK_BYTES
 body_ops_data:
     .res BODY_OPS_STRIDE * 8
 manifest_entry:
@@ -3489,13 +3524,13 @@ pending_offsets_lo:
     .res PENDING_SYMBOL_MAX
 pending_offsets_hi:
     .res PENDING_SYMBOL_MAX
-pending_string_use_masks_lo:
-    .res PENDING_SYMBOL_MAX
-pending_string_use_masks_hi:
-    .res PENDING_SYMBOL_MAX
+pending_string_use_masks:
+    .res PENDING_SYMBOL_MAX * STRING_MASK_BYTES
 string_mask_saved_x:
     .res 1
 string_mask_saved_bit:
+    .res 1
+string_mask_saved_y:
     .res 1
 pending_string_bases_lo:
     .res PENDING_SYMBOL_MAX
