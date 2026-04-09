@@ -258,6 +258,21 @@ cd /mnt/c/test/action/actionc64u
 ./tools/run_tool_abi_additive_pipeline.py --scenario nested_if_early_return --keep-workspace
 ```
 
+Run the current early-return local/external call proofs end to end:
+
+```sh
+cd /mnt/c/test/action/actionc64u
+./tools/run_tool_abi_additive_pipeline.py --scenario if_return_external --keep-workspace
+./tools/run_tool_abi_additive_pipeline.py --scenario while_return_local_external --keep-workspace
+```
+
+Run the current nested early-return transitive-external proof end to end:
+
+```sh
+cd /mnt/c/test/action/actionc64u
+./tools/run_tool_abi_additive_pipeline.py --scenario nested_if_return_transitive --keep-workspace
+```
+
 Run the current `DO ... UNTIL ... OD` loop proof end to end:
 
 ```sh

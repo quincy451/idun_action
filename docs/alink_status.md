@@ -88,6 +88,10 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
   `IF 1 = 1 THEN IF 1 = 0 THEN ... ELSE ... FI ELSE ... FI`
 - [x] also loads explicit early-return control-flow `ACTC` output for:
   `IF ... THEN RETURN FI`, `IF ... ELSE RETURN FI`, `DO ... RETURN UNTIL ... OD`, `WHILE ... RETURN OD`
+- [x] also loads explicit early-return control flow after local/external calls:
+  `IF HELLO() RETURN FI`, `IF W() RETURN FI`, `WHILE HELLO() W() RETURN OD`
+- [x] also loads explicit early-return control flow with transitive externals under nested branches:
+  `IF ... THEN IF ... THEN W() RETURN FI ... FI` with `W -> Z`
 - [x] also loads `DO ... UNTIL ... OD` loop `ACTC` output for:
   `DO ... UNTIL 1 = 1 OD`
 - [x] also loads local-call plus unresolved-external loop `ACTC` output for:
@@ -155,6 +159,12 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
 - [x] emits an early-return `DO ... UNTIL ... OD` slice `BIN/MAIN.AVM` of `62` bytes
 - [x] emits an early-return `WHILE ... DO ... OD` slice `BIN/MAIN.AVM` of `65` bytes
 - [x] emits a nested early-return `IF` slice `BIN/MAIN.AVM` of `105` bytes
+- [x] emits an early-return local-call `IF` slice `BIN/MAIN.AVM` of `66` bytes
+- [x] emits an early-return external `IF` slice `BIN/MAIN.AVM` of `66` bytes
+- [x] emits an early-return external `ELSE` slice `BIN/MAIN.AVM` of `68` bytes
+- [x] emits an early-return external `DO ... UNTIL ... OD` slice `BIN/MAIN.AVM` of `66` bytes
+- [x] emits an early-return `WHILE` local/external slice `BIN/MAIN.AVM` of `85` bytes
+- [x] emits a nested early-return transitive-external `IF` slice `BIN/MAIN.AVM` of `121` bytes
 - [x] emits a `DO ... UNTIL ... OD` slice `BIN/MAIN.AVM` of `47` bytes
 - [x] emits a call/external `DO ... UNTIL ... OD` slice `BIN/MAIN.AVM` of `73` bytes
 - [x] emits a branch `DO ... UNTIL ... OD` slice `BIN/MAIN.AVM` of `73` bytes
@@ -237,6 +247,18 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
   `START`, `EARLY`
 - [x] current harness runtime output for the nested early-return `IF` slice:
   `START`, `EARLY`
+- [x] current harness runtime output for the early-return local-call `IF` slice:
+  `START`, `HELLO`
+- [x] current harness runtime output for the early-return external `IF` slice:
+  `START`, `TOOL7`
+- [x] current harness runtime output for the early-return external `ELSE` slice:
+  `TOOL7`
+- [x] current harness runtime output for the early-return external `DO ... UNTIL ... OD` slice:
+  `START`, `TOOL7`
+- [x] current harness runtime output for the early-return `WHILE` local/external slice:
+  `START`, `HELLO`, `TOOL7`
+- [x] current harness runtime output for the nested early-return transitive-external `IF` slice:
+  `START`, `MID`, `END`
 - [x] current harness runtime output for the `DO ... UNTIL ... OD` slice:
   `BODY`, `DONE`
 - [x] current harness runtime output for the call/external loop slice:
