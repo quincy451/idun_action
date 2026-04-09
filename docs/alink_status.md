@@ -65,6 +65,10 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
   `WHILE X<Y DO ... OD`
 - [x] also loads multiple module-scope integer vars driving local/external calls:
   `IF X<Y THEN HELLO() W() FI`
+- [x] also loads multiple module-scope integer vars driving shared-transitive external closure under branch control:
+  `IF X<Y THEN W() Q() FI` with `W -> Z` and `Q -> Z`
+- [x] also loads multiple module-scope integer vars driving shared-transitive external closure under `WHILE` control:
+  `WHILE X<Y DO W() Q() X=X+1 OD` with `W -> Z` and `Q -> Z`
 - [x] also loads direct comparison-operator `ACTC` output for:
   `PrintIE(2 <> 3)`, `PrintIE(2 < 3)`, `PrintIE(3 <= 3)`, `PrintIE(4 >= 3)`
 - [x] also loads high string-index `ACTC` output through `F`:

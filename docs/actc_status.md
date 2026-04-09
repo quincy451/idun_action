@@ -123,6 +123,10 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
   `WHILE X<Y DO ... OD`
 - [x] multiple module-scope integer variables driving local/external calls under branch control:
   `IF X<Y THEN HELLO() W() FI`
+- [x] multiple module-scope integer variables driving shared-transitive external closure under branch control:
+  `IF X<Y THEN W() Q() FI` with `W -> Z` and `Q -> Z`
+- [x] multiple module-scope integer variables driving shared-transitive external closure under `WHILE` control:
+  `WHILE X<Y DO W() Q() X=X+1 OD` with `W -> Z` and `Q -> Z`
 - [x] direct comparison operator conditions inside `IF ... THEN ... FI`:
   `IF 2 <> 3 THEN ... FI`, `IF 2 < 3 THEN ... FI`, `IF 3 <= 3 THEN ... FI`, `IF 4 >= 3 THEN ... FI`
 - [x] direct comparison operator conditions inside loop forms:

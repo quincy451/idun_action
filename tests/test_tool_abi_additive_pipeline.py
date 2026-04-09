@@ -92,6 +92,12 @@ class TestToolAbiPipeline(unittest.TestCase):
     def test_int_vars_multi_branch_calls_pipeline_is_green_under_harness(self) -> None:
         self.run_scenario("int_vars_multi_branch_calls", "HELLO\nTOOL7\n", 85, 66)
 
+    def test_int_vars_multi_branch_shared_transitive_pipeline_is_green_under_harness(self) -> None:
+        self.run_scenario("int_vars_multi_branch_shared_transitive", "MID1\nEND\nMID2\nEND\nDONE\n", 72, 87)
+
+    def test_int_vars_multi_while_shared_transitive_pipeline_is_green_under_harness(self) -> None:
+        self.run_scenario("int_vars_multi_while_shared_transitive", "MID1\nEND\nMID2\nEND\nDONE\n", 84, 100)
+
     def test_int_vars_multi_add_rhs_var_pipeline_is_green_under_harness(self) -> None:
         self.run_scenario("int_vars_multi_add_rhs_var", "3\n", 54, 35)
 

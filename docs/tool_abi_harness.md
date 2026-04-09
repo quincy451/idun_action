@@ -794,6 +794,10 @@ That now includes a widening set of stable scenarios:
   `0`, `1`, `2`
 - multiple module-scope integer vars driving local/external branch calls:
   `HELLO`, `TOOL7`
+- multiple module-scope integer vars driving shared-transitive externals under branch control:
+  `MID1`, `END`, `MID2`, `END`, `DONE`
+- multiple module-scope integer vars driving shared-transitive externals under `WHILE` control:
+  `MID1`, `END`, `MID2`, `END`, `DONE`
 - variable-to-variable arithmetic assignment:
   `3`
 - arithmetic/comparison condition with `IF/ELSE`:

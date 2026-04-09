@@ -468,6 +468,187 @@ SCENARIOS = {
         ),
         "expected_console": "HELLO\nTOOL7\n",
     },
+    "int_vars_multi_branch_shared_transitive": {
+        "out_fs_name": "harness-actc-alink-avmrun-int-vars-multi-branch-shared-transitive",
+        "sources": {
+            "MAIN": (
+                'MODULE MAIN\r'
+                'INT X=[1]\r'
+                'INT Y=[2]\r'
+                'PROC MAIN()\r'
+                'IF X<Y THEN\r'
+                'W()\r'
+                'Q()\r'
+                'FI\r'
+                'PrintE("DONE")\r'
+                'RETURN\r'
+            ),
+            "W": (
+                'MODULE W\r'
+                'PROC W()\r'
+                'PrintE("MID1")\r'
+                'Z()\r'
+                'RETURN\r'
+            ),
+            "Q": (
+                'MODULE Q\r'
+                'PROC Q()\r'
+                'PrintE("MID2")\r'
+                'Z()\r'
+                'RETURN\r'
+            ),
+            "Z": (
+                'MODULE Z\r'
+                'PROC Z()\r'
+                'PrintE("END")\r'
+                'RETURN\r'
+            ),
+        },
+        "compile_modules": ["MAIN", "W", "Q", "Z"],
+        "expected_objects": {
+            "MAIN": (
+                "AVO1\n"
+                "x main 0 23\n"
+                "b L0L1lhu0u1ve0r\n"
+                "u w\n"
+                "u q\n"
+                "s DONE\n"
+                "v x 1\n"
+                "v y 2\n"
+                "k 2\n"
+                "n main\n"
+            ),
+            "W": (
+                "AVO1\n"
+                "x w 0 10\n"
+                "b e0u0r\n"
+                "u z\n"
+                "s MID1\n"
+                "k 2\n"
+                "n w\n"
+            ),
+            "Q": (
+                "AVO1\n"
+                "x q 0 10\n"
+                "b e0u0r\n"
+                "u z\n"
+                "s MID2\n"
+                "k 2\n"
+                "n q\n"
+            ),
+            "Z": (
+                "AVO1\n"
+                "x z 0 7\n"
+                "b e0r\n"
+                "s END\n"
+                "k 2\n"
+                "n z\n"
+            ),
+        },
+        "expected_avm": bytes(
+            [
+                65, 86, 77, 49, 2, 75, 0, 0, 0, 1, 52, 0, 19, 52, 0, 19,
+                54, 0, 28, 24, 16, 0, 69, 25, 0, 69, 35, 0, 97, 56, 0, 73,
+                16, 255, 73, 32, 255, 97, 61, 0, 73, 16, 255, 69, 45, 0,
+                72, 97, 66, 0, 73, 16, 255, 69, 45, 0, 72, 97, 71, 0, 73,
+                16, 255, 72, 1, 0, 2, 0, 68, 79, 78, 69, 0, 77, 73, 68, 49,
+                0, 77, 73, 68, 50, 0, 69, 78, 68, 0,
+            ]
+        ),
+        "expected_console": "MID1\nEND\nMID2\nEND\nDONE\n",
+    },
+    "int_vars_multi_while_shared_transitive": {
+        "out_fs_name": "harness-actc-alink-avmrun-int-vars-multi-while-shared-transitive",
+        "sources": {
+            "MAIN": (
+                'MODULE MAIN\r'
+                'INT X=[0]\r'
+                'INT Y=[1]\r'
+                'PROC MAIN()\r'
+                'WHILE X<Y DO\r'
+                'W()\r'
+                'Q()\r'
+                'X=X+1\r'
+                'OD\r'
+                'PrintE("DONE")\r'
+                'RETURN\r'
+            ),
+            "W": (
+                'MODULE W\r'
+                'PROC W()\r'
+                'PrintE("MID1")\r'
+                'Z()\r'
+                'RETURN\r'
+            ),
+            "Q": (
+                'MODULE Q\r'
+                'PROC Q()\r'
+                'PrintE("MID2")\r'
+                'Z()\r'
+                'RETURN\r'
+            ),
+            "Z": (
+                'MODULE Z\r'
+                'PROC Z()\r'
+                'PrintE("END")\r'
+                'RETURN\r'
+            ),
+        },
+        "compile_modules": ["MAIN", "W", "Q", "Z"],
+        "expected_objects": {
+            "MAIN": (
+                "AVO1\n"
+                "x main 0 36\n"
+                "b dL0L1lfu0u1L0p0aS0xe0r\n"
+                "u w\n"
+                "u q\n"
+                "s DONE\n"
+                "i 1\n"
+                "v x 0\n"
+                "v y 1\n"
+                "k 2\n"
+                "n main\n"
+            ),
+            "W": (
+                "AVO1\n"
+                "x w 0 10\n"
+                "b e0u0r\n"
+                "u z\n"
+                "s MID1\n"
+                "k 2\n"
+                "n w\n"
+            ),
+            "Q": (
+                "AVO1\n"
+                "x q 0 10\n"
+                "b e0u0r\n"
+                "u z\n"
+                "s MID2\n"
+                "k 2\n"
+                "n q\n"
+            ),
+            "Z": (
+                "AVO1\n"
+                "x z 0 7\n"
+                "b e0r\n"
+                "s END\n"
+                "k 2\n"
+                "n z\n"
+            ),
+        },
+        "expected_avm": bytes(
+            [
+                65, 86, 77, 49, 2, 88, 0, 0, 0, 1, 65, 0, 19, 65, 0, 19,
+                67, 0, 28, 24, 29, 0, 69, 38, 0, 69, 48, 0, 19, 65, 0, 17,
+                1, 0, 20, 18, 65, 0, 25, 0, 0, 97, 69, 0, 73, 16, 255, 73,
+                32, 255, 97, 74, 0, 73, 16, 255, 69, 58, 0, 72, 97, 79, 0,
+                73, 16, 255, 69, 58, 0, 72, 97, 84, 0, 73, 16, 255, 72, 0,
+                0, 1, 0, 68, 79, 78, 69, 0, 77, 73, 68, 49, 0, 77, 73, 68,
+                50, 0, 69, 78, 68, 0,
+            ]
+        ),
+        "expected_console": "MID1\nEND\nMID2\nEND\nDONE\n",
+    },
     "int_vars_multi_add_rhs_var": {
         "out_fs_name": "harness-actc-alink-avmrun-int-vars-multi-add-rhs-var",
         "source": (
