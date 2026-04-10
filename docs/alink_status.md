@@ -98,6 +98,8 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
   `X=(X<Y AND W(5)=7) OR Z(1)=1`, `RETURN N<3`, and `PrintIE(INC((X<Y AND W(5)=7) OR Z(1)=1))`
 - [x] also loads compound boolean/comparison print-value expressions:
   `PrintIE((X<Y AND W(5)=7) OR Z(1)=1)`, `PrintIE((INC(X)=2 AND W(Y+5)=9) OR NOT(Z(1)=1))`, and `PrintI((X<Y AND W(5)=7) OR Z(1)=1)`
+- [x] also loads parenthesized boolean/comparison value expressions reused as arithmetic factors:
+  `RETURN (N<3)+1`, `X=((X<Y AND W(5)=7) OR Z(1)=1)+1`, `PrintIE(INC(((X<Y AND W(5)=7) OR Z(1)=1)+1))`, and `PrintIE(((X<Y AND W(5)=7) OR Z(1)=1)+1)`
 - [x] also loads direct comparison-operator `ACTC` output for:
   `PrintIE(2 <> 3)`, `PrintIE(2 < 3)`, `PrintIE(3 <= 3)`, `PrintIE(4 >= 3)`
 - [x] also loads high string-index `ACTC` output through `F`:

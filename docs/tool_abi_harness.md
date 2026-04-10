@@ -82,6 +82,10 @@ Recent harness-proven widening additions now covered by named scenarios:
 - `printie_bool_compound`: compound boolean/comparison expressions printed through `PrintIE(...)`
 - `printie_bool_local_external`: compound boolean/comparison expressions printed through `PrintIE(...)` with mixed local/external calls
 - `printi_bool_compound`: compound boolean/comparison expressions printed through `PrintI(...)`
+- `return_bool_plus_one`: parenthesized boolean/comparison value expressions reused inside return arithmetic
+- `assign_bool_plus_one`: parenthesized boolean/comparison value expressions reused inside assignment arithmetic
+- `arg_bool_plus_one`: parenthesized boolean/comparison value expressions reused inside call-argument arithmetic
+- `printie_bool_plus_one`: parenthesized boolean/comparison value expressions reused inside print arithmetic
 - `if_return_external_args_multi`: multi-arg external calls under branch-gated early return
 - `do_until_return_branch_args_mixed`: mixed local/external multi-arg calls under `DO ... UNTIL ... OD` early return
 - `while_nested_do_until_return_args_transitive`: nested mixed-loop early return with multi-arg transitive external calls

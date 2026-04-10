@@ -1026,10 +1026,15 @@ store_small_decimal_literal_from_scan_ptr_fail:
 
 store_small_runtime_expr_from_scan_ptr:
     ldy #$00
+    jsr scan_value_expr_for_top_level_arith_from_scan_y
+    bcs :+
+    jmp store_small_runtime_expr_sum_entry
+: 
     jsr scan_print_expr_for_bool_keywords_from_scan_y
     bcs :+
     jmp store_small_runtime_expr_bool_entry
 : 
+store_small_runtime_expr_sum_entry:
     lda #$00
     sta expr_runtime_post_zero
     jsr emit_runtime_sum_from_scan_y_or_fail
@@ -1298,10 +1303,39 @@ emit_runtime_term_push_literal:
     tay
     jsr emit_runtime_call_term_from_scan_y_or_fail
     bcc :+
+    tya
+    pha
     jsr parse_small_decimal_term_at_scan_y
+    bcc emit_runtime_term_push_literal_decimal
+    pla
+    tay
+    jsr emit_runtime_group_value_term_from_scan_y_or_fail
     bcs emit_runtime_expr_push_fail
+    clc
+    rts
+emit_runtime_term_push_literal_decimal:
+    pla
     jmp emit_current_expr_push_or_fail
 :   clc
+    rts
+
+emit_runtime_group_value_term_from_scan_y_or_fail:
+    jsr skip_inline_spaces_at_scan_y
+    lda (scan_ptr),y
+    cmp #'('
+    bne emit_runtime_group_value_term_from_scan_y_or_fail_fail
+    iny
+    jsr emit_runtime_value_from_scan_y_or_fail
+    bcs emit_runtime_group_value_term_from_scan_y_or_fail_fail
+    jsr skip_inline_spaces_at_scan_y
+    lda (scan_ptr),y
+    cmp #')'
+    bne emit_runtime_group_value_term_from_scan_y_or_fail_fail
+    iny
+    clc
+    rts
+emit_runtime_group_value_term_from_scan_y_or_fail_fail:
+    sec
     rts
 
 emit_runtime_call_term_from_scan_y_or_fail:
@@ -1424,6 +1458,10 @@ emit_call_args_from_scan_y_or_fail_fail:
     rts
 
 emit_runtime_value_from_scan_y_or_fail:
+    jsr scan_value_expr_for_top_level_arith_from_scan_y
+    bcs :+
+    jmp emit_runtime_sum_from_scan_y_or_fail
+: 
     jsr scan_value_expr_for_bool_tokens_from_scan_y
     bcc emit_runtime_value_from_scan_y_or_fail_bool
     jmp emit_runtime_sum_from_scan_y_or_fail
@@ -1431,6 +1469,60 @@ emit_runtime_value_from_scan_y_or_fail_bool:
     lda #$00
     sta bool_ops_used_data
     jmp emit_runtime_bool_or_from_scan_y_or_fail
+
+scan_value_expr_for_top_level_arith_from_scan_y:
+    sty symbol_start_y_data
+    lda #$00
+    sta hex_work
+scan_value_expr_for_top_level_arith_from_scan_y_loop:
+    lda (scan_ptr),y
+    beq scan_value_expr_for_top_level_arith_from_scan_y_not_found
+    cmp #10
+    beq scan_value_expr_for_top_level_arith_from_scan_y_not_found
+    cmp #13
+    beq scan_value_expr_for_top_level_arith_from_scan_y_not_found
+    cmp #','
+    beq scan_value_expr_for_top_level_arith_from_scan_y_comma
+    cmp #')'
+    beq scan_value_expr_for_top_level_arith_from_scan_y_rparen
+    cmp #'('
+    beq scan_value_expr_for_top_level_arith_from_scan_y_lparen
+    ldx hex_work
+    bne scan_value_expr_for_top_level_arith_from_scan_y_next
+    cmp #'+'
+    beq scan_value_expr_for_top_level_arith_from_scan_y_found
+    cmp #'-'
+    beq scan_value_expr_for_top_level_arith_from_scan_y_found
+    cmp #'*'
+    beq scan_value_expr_for_top_level_arith_from_scan_y_found
+    cmp #'/'
+    beq scan_value_expr_for_top_level_arith_from_scan_y_found
+scan_value_expr_for_top_level_arith_from_scan_y_next:
+    iny
+    bne scan_value_expr_for_top_level_arith_from_scan_y_loop
+scan_value_expr_for_top_level_arith_from_scan_y_not_found:
+    ldy symbol_start_y_data
+    sec
+    rts
+scan_value_expr_for_top_level_arith_from_scan_y_comma:
+    lda hex_work
+    beq scan_value_expr_for_top_level_arith_from_scan_y_not_found
+    iny
+    jmp scan_value_expr_for_top_level_arith_from_scan_y_loop
+scan_value_expr_for_top_level_arith_from_scan_y_rparen:
+    lda hex_work
+    beq scan_value_expr_for_top_level_arith_from_scan_y_not_found
+    dec hex_work
+    iny
+    jmp scan_value_expr_for_top_level_arith_from_scan_y_loop
+scan_value_expr_for_top_level_arith_from_scan_y_lparen:
+    inc hex_work
+    iny
+    jmp scan_value_expr_for_top_level_arith_from_scan_y_loop
+scan_value_expr_for_top_level_arith_from_scan_y_found:
+    ldy symbol_start_y_data
+    clc
+    rts
 
 scan_print_expr_for_bool_keywords_from_scan_y:
     sty symbol_start_y_data
