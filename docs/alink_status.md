@@ -96,6 +96,8 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
   `IF (X<Y AND W(5)=7) OR Z(1)=1 THEN ... FI` and `IF (INC(X)=2 AND W(Y+5)=9) OR NOT(Z(1)=1) THEN ... FI`
 - [x] also loads boolean/comparison value expressions outside control-flow conditions:
   `X=(X<Y AND W(5)=7) OR Z(1)=1`, `RETURN N<3`, and `PrintIE(INC((X<Y AND W(5)=7) OR Z(1)=1))`
+- [x] also loads compound boolean/comparison print-value expressions:
+  `PrintIE((X<Y AND W(5)=7) OR Z(1)=1)`, `PrintIE((INC(X)=2 AND W(Y+5)=9) OR NOT(Z(1)=1))`, and `PrintI((X<Y AND W(5)=7) OR Z(1)=1)`
 - [x] also loads direct comparison-operator `ACTC` output for:
   `PrintIE(2 <> 3)`, `PrintIE(2 < 3)`, `PrintIE(3 <= 3)`, `PrintIE(4 >= 3)`
 - [x] also loads high string-index `ACTC` output through `F`:

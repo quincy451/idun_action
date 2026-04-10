@@ -1658,6 +1658,248 @@ SCENARIOS = {
         ),
         "expected_console": "2\n",
     },
+    "printie_bool_compound": {
+        "out_fs_name": "harness-actc-alink-avmrun-printie-bool-compound",
+        "sources": {
+            "MAIN": (
+                'MODULE MAIN\r'
+                'INT X=[1]\r'
+                'INT Y=[2]\r'
+                'PROC MAIN()\r'
+                'PrintIE((X<Y AND W(5)=7) OR Z(1)=1)\r'
+                'RETURN\r'
+            ),
+            "W": (
+                'MODULE W\r'
+                'PROC W(N)\r'
+                'RETURN N+2\r'
+            ),
+            "Z": (
+                'MODULE Z\r'
+                'PROC Z(N)\r'
+                'RETURN N-1\r'
+            ),
+        },
+        "compile_modules": ["MAIN", "W", "Z"],
+        "expected_objects": {
+            "MAIN": (
+                "AVO1\n"
+                "x main 0 57\n"
+                "b L0L1lp0np1u0p2qp3nap4gp5np6u1p7qp8nap9gzr\n"
+                "u w\n"
+                "u z\n"
+                "i 0\n"
+                "i 5\n"
+                "i 7\n"
+                "i 0\n"
+                "i 1\n"
+                "i 0\n"
+                "i 1\n"
+                "i 1\n"
+                "i 0\n"
+                "i 0\n"
+                "v x 1\n"
+                "v y 2\n"
+                "k 6\n"
+                "n main\n"
+            ),
+            "W": (
+                "AVO1\n"
+                "x w 0 11\n"
+                "b S0L0p0ar\n"
+                "i 2\n"
+                "v n 0\n"
+                "k 0\n"
+                "n w\n"
+            ),
+            "Z": (
+                "AVO1\n"
+                "x z 0 11\n"
+                "b S0L0p0mr\n"
+                "i 1\n"
+                "v n 0\n"
+                "k 0\n"
+                "n z\n"
+            ),
+        },
+        "expected_avm": bytes(
+            [
+                65, 86, 77, 49, 2, 89, 0, 0, 0, 1, 81, 0, 19, 81, 0, 19,
+                83, 0, 28, 17, 0, 0, 23, 17, 5, 0, 69, 59, 0, 17, 7, 0,
+                22, 17, 0, 0, 23, 20, 17, 1, 0, 29, 17, 0, 0, 23, 17, 1,
+                0, 69, 70, 0, 17, 1, 0, 22, 17, 0, 0, 23, 20, 17, 0, 0,
+                29, 73, 49, 255, 73, 32, 255, 18, 85, 0, 19, 85, 0, 17,
+                2, 0, 20, 72, 18, 87, 0, 19, 87, 0, 17, 1, 0, 21, 72, 1,
+                0, 2, 0, 0, 0, 0, 0,
+            ]
+        ),
+        "expected_console": "1\n",
+    },
+    "printie_bool_local_external": {
+        "out_fs_name": "harness-actc-alink-avmrun-printie-bool-local-external",
+        "sources": {
+            "MAIN": (
+                'MODULE MAIN\r'
+                'INT X=[1]\r'
+                'INT Y=[2]\r'
+                'PROC INC(N)\r'
+                'RETURN N+1\r'
+                'PROC MAIN()\r'
+                'PrintIE((INC(X)=2 AND W(Y+5)=9) OR NOT(Z(1)=1))\r'
+                'RETURN\r'
+            ),
+            "W": (
+                'MODULE W\r'
+                'PROC W(N)\r'
+                'RETURN N+2\r'
+            ),
+            "Z": (
+                'MODULE Z\r'
+                'PROC Z(N)\r'
+                'RETURN N-1\r'
+            ),
+        },
+        "compile_modules": ["MAIN", "W", "Z"],
+        "expected_objects": {
+            "MAIN": (
+                "AVO1\n"
+                "x inc 0 11\n"
+                "x main 11 72\n"
+                "b S2L2p0ar\n"
+                "b L0c0p1qp2nL1p3au0p4qp5nap6gp7np8u1p9qpAnpBqpCnapDgzr\n"
+                "u w\n"
+                "u z\n"
+                "i 1\n"
+                "i 2\n"
+                "i 0\n"
+                "i 5\n"
+                "i 9\n"
+                "i 0\n"
+                "i 1\n"
+                "i 0\n"
+                "i 1\n"
+                "i 1\n"
+                "i 0\n"
+                "i 0\n"
+                "i 0\n"
+                "i 0\n"
+                "v x 1\n"
+                "v y 2\n"
+                "v n 0\n"
+                "k 6\n"
+                "n main\n"
+            ),
+            "W": (
+                "AVO1\n"
+                "x w 0 11\n"
+                "b S0L0p0ar\n"
+                "i 2\n"
+                "v n 0\n"
+                "k 0\n"
+                "n w\n"
+            ),
+            "Z": (
+                "AVO1\n"
+                "x z 0 11\n"
+                "b S0L0p0mr\n"
+                "i 1\n"
+                "v n 0\n"
+                "k 0\n"
+                "n z\n"
+            ),
+        },
+        "expected_avm": bytes(
+            [
+                65, 86, 77, 49, 2, 117, 0, 11, 0, 1, 107, 0, 18, 111, 0,
+                19, 111, 0, 17, 1, 0, 20, 72, 19, 107, 0, 69, 0, 0, 17, 2,
+                0, 22, 17, 0, 0, 23, 19, 109, 0, 17, 5, 0, 20, 69, 85, 0,
+                17, 9, 0, 22, 17, 0, 0, 23, 20, 17, 1, 0, 29, 17, 0, 0,
+                23, 17, 1, 0, 69, 96, 0, 17, 1, 0, 22, 17, 0, 0, 23, 17,
+                0, 0, 22, 17, 0, 0, 23, 20, 17, 0, 0, 29, 73, 49, 255, 73,
+                32, 255, 18, 113, 0, 19, 113, 0, 17, 2, 0, 20, 72, 18, 115,
+                0, 19, 115, 0, 17, 1, 0, 21, 72, 1, 0, 2, 0, 0, 0, 0, 0,
+                0, 0,
+            ]
+        ),
+        "expected_console": "1\n",
+    },
+    "printi_bool_compound": {
+        "out_fs_name": "harness-actc-alink-avmrun-printi-bool-compound",
+        "sources": {
+            "MAIN": (
+                'MODULE MAIN\r'
+                'INT X=[1]\r'
+                'INT Y=[2]\r'
+                'PROC MAIN()\r'
+                'PrintI((X<Y AND W(5)=7) OR Z(1)=1)\r'
+                'RETURN\r'
+            ),
+            "W": (
+                'MODULE W\r'
+                'PROC W(N)\r'
+                'RETURN N+2\r'
+            ),
+            "Z": (
+                'MODULE Z\r'
+                'PROC Z(N)\r'
+                'RETURN N-1\r'
+            ),
+        },
+        "compile_modules": ["MAIN", "W", "Z"],
+        "expected_objects": {
+            "MAIN": (
+                "AVO1\n"
+                "x main 0 57\n"
+                "b L0L1lp0np1u0p2qp3nap4gp5np6u1p7qp8nap9gyr\n"
+                "u w\n"
+                "u z\n"
+                "i 0\n"
+                "i 5\n"
+                "i 7\n"
+                "i 0\n"
+                "i 1\n"
+                "i 0\n"
+                "i 1\n"
+                "i 1\n"
+                "i 0\n"
+                "i 0\n"
+                "v x 1\n"
+                "v y 2\n"
+                "k 5\n"
+                "n main\n"
+            ),
+            "W": (
+                "AVO1\n"
+                "x w 0 11\n"
+                "b S0L0p0ar\n"
+                "i 2\n"
+                "v n 0\n"
+                "k 0\n"
+                "n w\n"
+            ),
+            "Z": (
+                "AVO1\n"
+                "x z 0 11\n"
+                "b S0L0p0mr\n"
+                "i 1\n"
+                "v n 0\n"
+                "k 0\n"
+                "n z\n"
+            ),
+        },
+        "expected_avm": bytes(
+            [
+                65, 86, 77, 49, 2, 89, 0, 0, 0, 1, 81, 0, 19, 81, 0, 19,
+                83, 0, 28, 17, 0, 0, 23, 17, 5, 0, 69, 59, 0, 17, 7, 0,
+                22, 17, 0, 0, 23, 20, 17, 1, 0, 29, 17, 0, 0, 23, 17, 1,
+                0, 69, 70, 0, 17, 1, 0, 22, 17, 0, 0, 23, 20, 17, 0, 0,
+                29, 73, 48, 255, 73, 32, 255, 18, 85, 0, 19, 85, 0, 17,
+                2, 0, 20, 72, 18, 87, 0, 19, 87, 0, 17, 1, 0, 21, 72, 1,
+                0, 2, 0, 0, 0, 0, 0,
+            ]
+        ),
+        "expected_console": "1",
+    },
     "bool_not_external": {
         "out_fs_name": "harness-actc-alink-avmrun-bool-not-external",
         "sources": {

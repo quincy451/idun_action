@@ -1026,6 +1026,10 @@ store_small_decimal_literal_from_scan_ptr_fail:
 
 store_small_runtime_expr_from_scan_ptr:
     ldy #$00
+    jsr scan_print_expr_for_bool_keywords_from_scan_y
+    bcs :+
+    jmp store_small_runtime_expr_bool_entry
+: 
     lda #$00
     sta expr_runtime_post_zero
     jsr emit_runtime_sum_from_scan_y_or_fail
@@ -1127,6 +1131,17 @@ store_small_runtime_expr_print:
     jsr append_body_op_no_arg_for_current_proc
     clc
     rts
+
+store_small_runtime_expr_bool_entry:
+    lda #$00
+    sta bool_ops_used_data
+    jsr emit_runtime_bool_or_from_scan_y_or_fail
+    bcs store_small_runtime_expr_fail
+    jsr skip_inline_spaces_at_scan_y
+    lda (scan_ptr),y
+    cmp #')'
+    bne store_small_runtime_expr_fail
+    jmp store_small_runtime_expr_print
 
 store_small_runtime_condition_from_scan_ptr:
     lda #'h'
@@ -1416,6 +1431,62 @@ emit_runtime_value_from_scan_y_or_fail_bool:
     lda #$00
     sta bool_ops_used_data
     jmp emit_runtime_bool_or_from_scan_y_or_fail
+
+scan_print_expr_for_bool_keywords_from_scan_y:
+    sty symbol_start_y_data
+    lda #$00
+    sta hex_work
+scan_print_expr_for_bool_keywords_from_scan_y_loop:
+    lda (scan_ptr),y
+    beq scan_print_expr_for_bool_keywords_from_scan_y_not_found
+    cmp #10
+    beq scan_print_expr_for_bool_keywords_from_scan_y_not_found
+    cmp #13
+    beq scan_print_expr_for_bool_keywords_from_scan_y_not_found
+    cmp #')'
+    beq scan_print_expr_for_bool_keywords_from_scan_y_rparen
+    cmp #'('
+    beq scan_print_expr_for_bool_keywords_from_scan_y_lparen
+    jsr uppercase_ascii
+    cmp #'A'
+    beq scan_print_expr_for_bool_keywords_from_scan_y_try_and
+    cmp #'O'
+    beq scan_print_expr_for_bool_keywords_from_scan_y_try_or
+    cmp #'N'
+    beq scan_print_expr_for_bool_keywords_from_scan_y_try_not
+scan_print_expr_for_bool_keywords_from_scan_y_next:
+    iny
+    bne scan_print_expr_for_bool_keywords_from_scan_y_loop
+scan_print_expr_for_bool_keywords_from_scan_y_not_found:
+    ldy symbol_start_y_data
+    sec
+    rts
+scan_print_expr_for_bool_keywords_from_scan_y_rparen:
+    lda hex_work
+    beq scan_print_expr_for_bool_keywords_from_scan_y_not_found
+    dec hex_work
+    iny
+    jmp scan_print_expr_for_bool_keywords_from_scan_y_loop
+scan_print_expr_for_bool_keywords_from_scan_y_lparen:
+    inc hex_work
+    iny
+    jmp scan_print_expr_for_bool_keywords_from_scan_y_loop
+scan_print_expr_for_bool_keywords_from_scan_y_try_and:
+    jsr consume_and_keyword_from_scan_y
+    bcc scan_print_expr_for_bool_keywords_from_scan_y_found
+    jmp scan_print_expr_for_bool_keywords_from_scan_y_next
+scan_print_expr_for_bool_keywords_from_scan_y_try_or:
+    jsr consume_or_keyword_from_scan_y
+    bcc scan_print_expr_for_bool_keywords_from_scan_y_found
+    jmp scan_print_expr_for_bool_keywords_from_scan_y_next
+scan_print_expr_for_bool_keywords_from_scan_y_try_not:
+    jsr consume_not_keyword_from_scan_y
+    bcc scan_print_expr_for_bool_keywords_from_scan_y_found
+    jmp scan_print_expr_for_bool_keywords_from_scan_y_next
+scan_print_expr_for_bool_keywords_from_scan_y_found:
+    ldy symbol_start_y_data
+    clc
+    rts
 
 scan_value_expr_for_bool_tokens_from_scan_y:
     sty symbol_start_y_data

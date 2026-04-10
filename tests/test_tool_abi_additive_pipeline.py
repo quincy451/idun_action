@@ -158,6 +158,15 @@ class TestToolAbiPipeline(unittest.TestCase):
     def test_bool_arg_local_external_pipeline_is_green_under_harness(self) -> None:
         self.run_scenario("bool_arg_local_external", "2\n", 167, 117)
 
+    def test_printie_bool_compound_pipeline_is_green_under_harness(self) -> None:
+        self.run_scenario("printie_bool_compound", "1\n", 132, 101)
+
+    def test_printie_bool_local_external_pipeline_is_green_under_harness(self) -> None:
+        self.run_scenario("printie_bool_local_external", "1\n", 188, 129)
+
+    def test_printi_bool_compound_pipeline_is_green_under_harness(self) -> None:
+        self.run_scenario("printi_bool_compound", "1", 132, 101)
+
     def test_bool_not_external_pipeline_is_green_under_harness(self) -> None:
         self.run_scenario("bool_not_external", "OK\n", 77, 59)
 
