@@ -65,12 +65,14 @@ ceiling blocking every new control-flow slice.
 Current harness build widening knobs:
 
 - `ACTC`: `SOURCE_LIMIT=511`
+- `ACTC`: `BODY_OPS_STRIDE=160`
 - `ACTC`: `INT_LITERAL_MAX=36`
 - `ACTC`: `STRING_LITERAL_MAX=36`
 - `ACTC`: `EXPORT_MAX=16`
 - `ACTC`: `EXTERNAL_MAX=16`
 - `ACTC`: `LOOP_MAX=16`
 - `ALINK`: `SOURCE_LIMIT=511`
+- `ALINK`: `BODY_OPS_STRIDE=160`
 - `ALINK`: `INT_LITERAL_MAX=36`
 - `ALINK`: `STRING_LITERAL_MAX=36`
 - `ALINK`: `EXPORT_MAX=16`
@@ -109,6 +111,7 @@ Recent harness-proven widening additions now covered by named scenarios:
 - `loop9_while`: nested `WHILE ... DO ... OD` widened past the old `8`-deep loop ceiling, proving `9` nested loops fall through to `DONE`
 - `string36_high_index`: string literal pools widened through base-36 slot `Z`, proving dead-stripped locals can still reserve `0..Y` while `MAIN` emits `eZ`
 - `int36_high_index`: integer literal pools widened through base-36 slot `Z`, proving dead-stripped locals can still reserve `0..34` while `MAIN` emits `pZz`
+- `body152_local_calls`: dense local-call proc bodies widened past the old `96`-char harness ceiling, proving `74` local calls plus `PrintIE(X)` in one `MAIN` body
 - `if_return_external_args_multi`: multi-arg external calls under branch-gated early return
 - `do_until_return_branch_args_mixed`: mixed local/external multi-arg calls under `DO ... UNTIL ... OD` early return
 - `while_nested_do_until_return_args_transitive`: nested mixed-loop early return with multi-arg transitive external calls

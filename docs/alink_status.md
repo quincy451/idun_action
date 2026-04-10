@@ -126,6 +126,8 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
   `MAIN -> W1`
 - [x] harness linker object loading now accepts compiler-emitted `.AVO` objects beyond the old `255`-byte ceiling:
   `large_object_proc_local_inits` proves a `291`-byte `MAIN.AVO`
+- [x] also loads dense local-call compiler output beyond the old `96`-char harness body ceiling:
+  `PROC MAIN() T() ... T() PrintIE(X) RETURN` with `74` local calls, proving a `152`-char root body line
 - [x] also loads direct comparison-operator `ACTC` output for:
   `PrintIE(2 <> 3)`, `PrintIE(2 < 3)`, `PrintIE(3 <= 3)`, `PrintIE(4 >= 3)`
 - [x] also loads high string-index `ACTC` output through `Z` with dead-stripped locals:
@@ -296,6 +298,7 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
 - [x] emits a shared-transitive-external `BIN/MAIN.AVM` of `85` bytes
 - [x] emits a branch-sibling-external `BIN/MAIN.AVM` of `83` bytes
 - [x] emits a branch-shared-transitive `BIN/MAIN.AVM` of `100` bytes
+- [x] emits a dense local-call body slice `BIN/MAIN.AVM` of `256` bytes
 - [x] emits an `IF` slice `BIN/MAIN.AVM` of `65` bytes
 - [x] emits an `ELSE` slice `BIN/MAIN.AVM` of `60` bytes
 - [x] emits a nested-`IF` slice `BIN/MAIN.AVM` of `77` bytes

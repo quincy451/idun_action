@@ -80,6 +80,8 @@ Current lowering note:
   `PROC F() PrintE("0") ... PrintE("Y") RETURN` and `PROC MAIN() PrintE("Z") RETURN`
 - [x] integer-literal pool indices widened through `Z` on the harness line with dead-stripped locals:
   `PROC F() PrintIE(0..30) RETURN`, `PROC G() PrintIE(31..34) RETURN`, `PROC MAIN() PrintIE(35) RETURN`
+- [x] dense local-call proc bodies widened beyond the old `96`-char harness ceiling:
+  `PROC MAIN() T() ... T() PrintIE(X) RETURN` with `74` local calls in one body
 - [x] high string-index control flow under `IF/ELSE`:
   `IF 1 = 0 THEN ... ELSE PrintE("I") ... PrintE("P") FI`
 - [x] high string-index loop bodies:
@@ -280,6 +282,8 @@ Current lowering note:
   `INT_LITERAL_MAX = 10`
 - [x] harness `ACTC` source-load limit widened beyond one page for dense source scenarios:
   `SOURCE_LIMIT = 511`
+- [x] harness `ACTC` per-proc body-op storage widened beyond the old `96`-char ceiling for dense local-call bodies:
+  `BODY_OPS_STRIDE = 160`
 - [x] harness `ACTC` integer-literal pool widened through base-36 slot `Z` for dense local dead-strip proofs:
   `INT_LITERAL_MAX = 36`
 - [x] harness `ACTC` string-literal pool widened through base-36 slot `Z` for dense module graphs:

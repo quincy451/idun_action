@@ -3142,6 +3142,40 @@ SCENARIOS = {
         ),
         "expected_console": "35\n",
     },
+    "body152_local_calls": {
+        "out_fs_name": "harness-actc-alink-avmrun-body152-local-calls",
+        "source": (
+            'MODULE MAIN\r'
+            'INT X=[0]\r'
+            'PROC T()\r'
+            'X=X+1\r'
+            'RETURN\r'
+            'PROC MAIN()\r'
+            + ('T()\r' * 74)
+            + 'PrintIE(X)\r'
+            'RETURN\r'
+        ),
+        "expected_avo": (
+            "AVO1\n"
+            "x t 0 11\n"
+            "x main 11 229\n"
+            "b L0p0aS0r\n"
+            + "b " + ("c0" * 74) + "L0zr\n"
+            + "i 1\n"
+            "v x 0\n"
+            "k 6\n"
+            "n main\n"
+        ),
+        "expected_avm": bytes(
+            [
+                65, 86, 77, 49, 2, 244, 0, 11, 0, 1, 242, 0, 19, 242, 0,
+                17, 1, 0, 20, 18, 242, 0, 72,
+            ]
+            + ([69, 0, 0] * 74)
+            + [19, 242, 0, 73, 49, 255, 73, 32, 255, 0, 0]
+        ),
+        "expected_console": "74\n",
+    },
     "bool_not_external": {
         "out_fs_name": "harness-actc-alink-avmrun-bool-not-external",
         "sources": {
