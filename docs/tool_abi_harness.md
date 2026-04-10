@@ -90,6 +90,8 @@ Recent harness-proven widening additions now covered by named scenarios:
 - `proc_local_param_loop`: proc-local `INT` initialization from a proc parameter under loop control, like `PROC COUNT(N) INT X=[N] DO ... UNTIL X=2 OD`
 - `var16_module_slots`: 16 module-scope vars allocated through slot `F`, like `INT A=[0] ... INT P=[15]` with `P=P+1`
 - `var16_proc_slots`: one proc parameter plus 15 proc-local vars allocated through slot `F`, like `PROC SHOW(Z) INT A ... INT O` with `O=Z+2`
+- `digit_symbol_names`: digit-bearing var/proc/param/local names like `INT V0=[1]`, `PROC ADD1(N1)`, `INT X2=[N1+1]`
+- `digit_external_module_names`: digit-bearing external module/proc names like `MAIN -> W1`
 - `if_return_external_args_multi`: multi-arg external calls under branch-gated early return
 - `do_until_return_branch_args_mixed`: mixed local/external multi-arg calls under `DO ... UNTIL ... OD` early return
 - `while_nested_do_until_return_args_transitive`: nested mixed-loop early return with multi-arg transitive external calls

@@ -186,6 +186,10 @@ Current lowering note:
   `INT A=[0] ... INT P=[15]`, `PrintIE(K)`, `PrintIE(P)`, `P=P+1`
 - [x] proc-local integer storage/read/write reaches the current slot-`F` ceiling with params plus locals:
   `PROC SHOW(Z) INT A ... INT O`, `O=Z+2`, `PrintIE(O)`
+- [x] identifiers can include digits after the first character across vars, proc names, params, and locals:
+  `INT V0=[1]`, `PROC ADD1(N1)`, `INT X2=[N1+1]`, `ADD1(5)`
+- [x] digit-bearing module/proc names compile through command-line module selection and module-header validation:
+  `ACTC.PRG W1` on `MODULE W1`, `PROC W1()`
 - [x] local user procedure calls inside `IF ... THEN ... ELSE ... FI`:
   `IF 1 = 1 THEN HELLO() ELSE BYE() FI`
 - [x] arithmetic/comparison-driven local procedure calls inside `IF ... THEN ... ELSE ... FI`:

@@ -2428,6 +2428,90 @@ SCENARIOS = {
         ),
         "expected_console": "7\n",
     },
+    "digit_symbol_names": {
+        "out_fs_name": "harness-actc-alink-avmrun-digit-symbol-names",
+        "source": (
+            'MODULE MAIN\r'
+            'INT V0=[1]\r'
+            'PROC ADD1(N1)\r'
+            'INT X2=[N1+1]\r'
+            'PrintIE(X2)\r'
+            'RETURN\r'
+            'PROC MAIN()\r'
+            'PrintIE(V0)\r'
+            'V0=V0+1\r'
+            'PrintIE(V0)\r'
+            'ADD1(5)\r'
+            'RETURN\r'
+        ),
+        "expected_avo": (
+            "AVO1\n"
+            "x add1 0 20\n"
+            "x main 20 29\n"
+            "b S1L1p0aS2L2zr\n"
+            "b L0zL0p1aS0L0zp2c0r\n"
+            "i 1\n"
+            "i 1\n"
+            "i 5\n"
+            "v v0 1\n"
+            "v n1 0\n"
+            "v x2 0\n"
+            "k 6\n"
+            "n main\n"
+        ),
+        "expected_avm": bytes(
+            [
+                65, 86, 77, 49, 2, 57, 0, 20, 0, 1, 51, 0, 18, 53, 0, 19,
+                53, 0, 17, 1, 0, 20, 18, 55, 0, 19, 55, 0, 73, 49, 255,
+                72, 19, 51, 0, 73, 49, 255, 19, 51, 0, 17, 1, 0, 20, 18,
+                51, 0, 19, 51, 0, 73, 49, 255, 17, 5, 0, 69, 0, 0, 73,
+                32, 255, 1, 0, 0, 0, 0, 0,
+            ]
+        ),
+        "expected_console": "1\n2\n6\n",
+    },
+    "digit_external_module_names": {
+        "out_fs_name": "harness-actc-alink-avmrun-digit-external-module-names",
+        "sources": {
+            "MAIN": (
+                'MODULE MAIN\r'
+                'PROC MAIN()\r'
+                'PrintIE(W1())\r'
+                'RETURN\r'
+            ),
+            "W1": (
+                'MODULE W1\r'
+                'PROC W1()\r'
+                'RETURN 7\r'
+            ),
+        },
+        "compile_modules": ["MAIN", "W1"],
+        "expected_objects": {
+            "MAIN": (
+                "AVO1\n"
+                "x main 0 7\n"
+                "b u0zr\n"
+                "u w1\n"
+                "k 6\n"
+                "n main\n"
+            ),
+            "W1": (
+                "AVO1\n"
+                "x w1 0 4\n"
+                "b p0r\n"
+                "i 7\n"
+                "k 0\n"
+                "n w1\n"
+            ),
+        },
+        "expected_avm": bytes(
+            [
+                65, 86, 77, 49, 2, 13, 0, 0, 0, 1, 13, 0, 69, 9, 0, 73,
+                49, 255, 73, 32, 255, 17, 7, 0, 72,
+            ]
+        ),
+        "expected_console": "7\n",
+    },
     "bool_not_external": {
         "out_fs_name": "harness-actc-alink-avmrun-bool-not-external",
         "sources": {

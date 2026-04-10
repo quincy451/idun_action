@@ -114,6 +114,10 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
   `INT A=[0] ... INT P=[15]`, `PrintIE(K)`, `PrintIE(P)`, `P=P+1`
 - [x] also loads proc-local integer storage/read/write at the current slot-`F` ceiling with params plus locals:
   `PROC SHOW(Z) INT A ... INT O`, `O=Z+2`, `PrintIE(O)`
+- [x] also loads digit-bearing symbol names in compiler-emitted object metadata:
+  `v v0 1`, `v n1 0`, `v x2 0`, and `x add1 ...`
+- [x] also resolves digit-bearing external module/proc names:
+  `MAIN -> W1`
 - [x] also loads direct comparison-operator `ACTC` output for:
   `PrintIE(2 <> 3)`, `PrintIE(2 < 3)`, `PrintIE(3 <= 3)`, `PrintIE(4 >= 3)`
 - [x] also loads high string-index `ACTC` output through `F`:

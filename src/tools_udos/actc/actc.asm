@@ -247,17 +247,15 @@ copy_declared_module_or_fail_loop:
     lda (scan_ptr),y
     beq copy_declared_module_or_fail_bad
     jsr uppercase_ascii
-    cmp #'A'
-    bcc copy_declared_module_or_fail_done
-    cmp #'Z'+1
+    cpy #$00
+    bne copy_declared_module_or_fail_body
+    jsr uppercase_symbol_start_valid
     bcc copy_declared_module_or_fail_store
-    cmp #'0'
-    bcc copy_declared_module_or_fail_symbol
-    cmp #'9'+1
+    jmp copy_declared_module_or_fail_done
+copy_declared_module_or_fail_body:
+    jsr uppercase_symbol_body_valid
     bcc copy_declared_module_or_fail_store
-copy_declared_module_or_fail_symbol:
-    cmp #'_'
-    bne copy_declared_module_or_fail_done
+    jmp copy_declared_module_or_fail_done
 copy_declared_module_or_fail_store:
     sta declared_module_name,y
     iny
@@ -2967,17 +2965,15 @@ store_proc_export_from_scan_ptr_or_fail_loop:
     cmp #13
     beq store_proc_export_from_scan_ptr_or_fail_done
     jsr uppercase_ascii
-    cmp #'A'
-    bcc store_proc_export_from_scan_ptr_or_fail_bad
-    cmp #'Z'+1
+    cpy #$00
+    bne store_proc_export_from_scan_ptr_or_fail_body
+    jsr uppercase_symbol_start_valid
     bcc store_proc_export_from_scan_ptr_or_fail_store
-    cmp #'0'
-    bcc store_proc_export_from_scan_ptr_or_fail_symbol
-    cmp #'9'+1
+    jmp store_proc_export_from_scan_ptr_or_fail_bad
+store_proc_export_from_scan_ptr_or_fail_body:
+    jsr uppercase_symbol_body_valid
     bcc store_proc_export_from_scan_ptr_or_fail_store
-store_proc_export_from_scan_ptr_or_fail_symbol:
-    cmp #'_'
-    bne store_proc_export_from_scan_ptr_or_fail_bad
+    jmp store_proc_export_from_scan_ptr_or_fail_bad
 store_proc_export_from_scan_ptr_or_fail_store:
     sta (export_ptr),y
     iny
@@ -3137,17 +3133,15 @@ copy_symbol_from_scan_ptr_loop:
     lda (scan_ptr),y
     beq copy_symbol_from_scan_ptr_done
     jsr uppercase_ascii
-    cmp #'A'
-    bcc copy_symbol_from_scan_ptr_done
-    cmp #'Z'+1
+    cpy #$00
+    bne copy_symbol_from_scan_ptr_body
+    jsr uppercase_symbol_start_valid
     bcc copy_symbol_from_scan_ptr_store
-    cmp #'0'
-    bcc copy_symbol_from_scan_ptr_symbol
-    cmp #'9'+1
+    jmp copy_symbol_from_scan_ptr_done
+copy_symbol_from_scan_ptr_body:
+    jsr uppercase_symbol_body_valid
     bcc copy_symbol_from_scan_ptr_store
-copy_symbol_from_scan_ptr_symbol:
-    cmp #'_'
-    bne copy_symbol_from_scan_ptr_done
+    jmp copy_symbol_from_scan_ptr_done
 copy_symbol_from_scan_ptr_store:
     sta declared_module_name,y
     iny
@@ -3177,17 +3171,15 @@ copy_symbol_from_scan_y_loop:
     lda (scan_ptr),y
     beq copy_symbol_from_scan_y_done_check
     jsr uppercase_ascii
-    cmp #'A'
-    bcc copy_symbol_from_scan_y_done_check
-    cmp #'Z'+1
+    cpx #$00
+    bne copy_symbol_from_scan_y_body
+    jsr uppercase_symbol_start_valid
     bcc copy_symbol_from_scan_y_store
-    cmp #'0'
-    bcc copy_symbol_from_scan_y_symbol
-    cmp #'9'+1
+    jmp copy_symbol_from_scan_y_done_check
+copy_symbol_from_scan_y_body:
+    jsr uppercase_symbol_body_valid
     bcc copy_symbol_from_scan_y_store
-copy_symbol_from_scan_y_symbol:
-    cmp #'_'
-    bne copy_symbol_from_scan_y_done_check
+    jmp copy_symbol_from_scan_y_done_check
 copy_symbol_from_scan_y_store:
     sta declared_module_name,x
     iny
@@ -3591,6 +3583,36 @@ uppercase_ascii:
     bcs uppercase_ascii_done
     and #$DF
 uppercase_ascii_done:
+    rts
+
+uppercase_symbol_start_valid:
+    cmp #'A'
+    bcc uppercase_symbol_start_valid_fail
+    cmp #'Z'+1
+    bcs uppercase_symbol_start_valid_fail
+    clc
+    rts
+uppercase_symbol_start_valid_fail:
+    sec
+    rts
+
+uppercase_symbol_body_valid:
+    cmp #'A'
+    bcc uppercase_symbol_body_valid_check_digit
+    cmp #'Z'+1
+    bcc uppercase_symbol_body_valid_ok
+uppercase_symbol_body_valid_check_digit:
+    cmp #'0'
+    bcc uppercase_symbol_body_valid_check_underscore
+    cmp #'9'+1
+    bcc uppercase_symbol_body_valid_ok
+uppercase_symbol_body_valid_check_underscore:
+    cmp #'_'
+    beq uppercase_symbol_body_valid_ok
+    sec
+    rts
+uppercase_symbol_body_valid_ok:
+    clc
     rts
 
 lowercase_ascii:
