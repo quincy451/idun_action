@@ -356,6 +356,16 @@ store_module_var_from_scan_ptr_or_fail:
 :   sty compare_char
     jsr find_module_var_index_from_declared
     bcc store_module_var_from_scan_ptr_or_fail_bad
+    ldy #$00
+store_module_var_from_scan_ptr_or_fail_save_name_loop:
+    lda declared_module_name,y
+    sta saved_var_name_data,y
+    beq store_module_var_from_scan_ptr_or_fail_save_name_done
+    iny
+    cpy #25
+    bcc store_module_var_from_scan_ptr_or_fail_save_name_loop
+    jmp store_module_var_from_scan_ptr_or_fail_bad
+store_module_var_from_scan_ptr_or_fail_save_name_done:
     lda #$00
     sta expr_value_lo
     sta expr_term_lo
@@ -375,7 +385,7 @@ store_module_var_from_scan_ptr_or_fail:
     cmp #'['
     bne store_module_var_from_scan_ptr_or_fail_parse_value
     iny
-    jsr parse_small_decimal_expr_at_scan_y
+    jsr parse_small_value_expr_at_scan_y
     bcs store_module_var_from_scan_ptr_or_fail_bad
     jsr skip_inline_spaces_at_scan_y
     lda (scan_ptr),y
@@ -384,7 +394,7 @@ store_module_var_from_scan_ptr_or_fail:
     iny
     jmp store_module_var_from_scan_ptr_or_fail_after_value
 store_module_var_from_scan_ptr_or_fail_parse_value:
-    jsr parse_small_decimal_expr_at_scan_y
+    jsr parse_small_value_expr_at_scan_y
     bcs store_module_var_from_scan_ptr_or_fail_bad
 store_module_var_from_scan_ptr_or_fail_after_value:
     jsr require_line_end_at_scan_y
@@ -401,7 +411,7 @@ store_module_var_from_scan_ptr_or_fail_store:
     jsr set_var_ptr_from_x
     ldy #$00
 store_module_var_from_scan_ptr_or_fail_copy_loop:
-    lda declared_module_name,y
+    lda saved_var_name_data,y
     sta (export_ptr),y
     beq store_module_var_from_scan_ptr_or_fail_copy_done
     iny
@@ -1011,7 +1021,7 @@ store_small_decimal_literal_from_scan_ptr:
     sec
     rts
 :   ldy #$00
-    jsr parse_small_decimal_expr_at_scan_y
+    jsr parse_small_value_expr_at_scan_y
     bcs store_small_decimal_literal_from_scan_ptr_fail
     lda expr_value_lo
     sta int_values_lo,x
@@ -1938,6 +1948,240 @@ store_expr_value_as_int_literal:
     clc
     rts
 
+parse_small_value_expr_at_scan_y:
+    jsr skip_inline_spaces_at_scan_y
+    jsr scan_value_expr_for_top_level_arith_from_scan_y
+    bcc parse_small_value_expr_at_scan_y_sum_entry
+    jsr scan_value_expr_for_bool_tokens_from_scan_y
+    bcc parse_small_value_expr_at_scan_y_bool_entry
+parse_small_value_expr_at_scan_y_sum_entry:
+    jmp parse_small_decimal_expr_at_scan_y
+parse_small_value_expr_at_scan_y_bool_entry:
+    jmp parse_small_bool_or_at_scan_y
+
+normalize_small_expr_value_to_bool:
+    lda expr_value_lo
+    beq :+
+    lda #$01
+    sta expr_value_lo
+:   clc
+    rts
+
+parse_small_bool_or_at_scan_y:
+    jsr parse_small_bool_and_at_scan_y
+    bcs parse_small_bool_or_at_scan_y_fail
+parse_small_bool_or_at_scan_y_loop:
+    jsr consume_or_keyword_from_scan_y
+    bcs parse_small_bool_or_at_scan_y_done
+    jsr normalize_small_expr_value_to_bool
+    lda expr_value_lo
+    sta expr_saved_lo
+    jsr parse_small_bool_and_at_scan_y
+    bcs parse_small_bool_or_at_scan_y_fail
+    jsr normalize_small_expr_value_to_bool
+    lda expr_saved_lo
+    ora expr_value_lo
+    beq parse_small_bool_or_at_scan_y_store
+    lda #$01
+parse_small_bool_or_at_scan_y_store:
+    sta expr_value_lo
+    jmp parse_small_bool_or_at_scan_y_loop
+parse_small_bool_or_at_scan_y_done:
+    clc
+    rts
+parse_small_bool_or_at_scan_y_fail:
+    sec
+    rts
+
+parse_small_bool_and_at_scan_y:
+    jsr parse_small_bool_not_at_scan_y
+    bcs parse_small_bool_and_at_scan_y_fail
+parse_small_bool_and_at_scan_y_loop:
+    jsr consume_and_keyword_from_scan_y
+    bcs parse_small_bool_and_at_scan_y_done
+    jsr normalize_small_expr_value_to_bool
+    lda expr_value_lo
+    sta expr_saved_lo
+    jsr parse_small_bool_not_at_scan_y
+    bcs parse_small_bool_and_at_scan_y_fail
+    jsr normalize_small_expr_value_to_bool
+    lda expr_saved_lo
+    and expr_value_lo
+    beq parse_small_bool_and_at_scan_y_store
+    lda #$01
+parse_small_bool_and_at_scan_y_store:
+    sta expr_value_lo
+    jmp parse_small_bool_and_at_scan_y_loop
+parse_small_bool_and_at_scan_y_done:
+    clc
+    rts
+parse_small_bool_and_at_scan_y_fail:
+    sec
+    rts
+
+parse_small_bool_not_at_scan_y:
+    jsr consume_not_keyword_from_scan_y
+    bcs parse_small_bool_primary_at_scan_y
+    jsr parse_small_bool_not_at_scan_y
+    bcs parse_small_bool_not_at_scan_y_fail
+    jsr normalize_small_expr_value_to_bool
+    lda expr_value_lo
+    eor #$01
+    sta expr_value_lo
+    clc
+    rts
+parse_small_bool_not_at_scan_y_fail:
+    sec
+    rts
+
+parse_small_bool_primary_at_scan_y:
+    jsr skip_inline_spaces_at_scan_y
+    lda (scan_ptr),y
+    cmp #'('
+    bne parse_small_bool_condition_clause_at_scan_y
+    tya
+    pha
+    iny
+    jsr parse_small_bool_or_at_scan_y
+    bcs parse_small_bool_primary_restore_clause
+    jsr skip_inline_spaces_at_scan_y
+    lda (scan_ptr),y
+    cmp #')'
+    bne parse_small_bool_primary_restore_clause
+    iny
+    sty compare_char
+    jsr skip_inline_spaces_at_scan_y
+    lda (scan_ptr),y
+    cmp #'='
+    beq parse_small_bool_primary_restore_clause
+    cmp #'<'
+    beq parse_small_bool_primary_restore_clause
+    cmp #'>'
+    beq parse_small_bool_primary_restore_clause
+    ldy compare_char
+    pla
+    clc
+    rts
+parse_small_bool_primary_restore_clause:
+    pla
+    tay
+parse_small_bool_condition_clause_at_scan_y:
+    jmp parse_small_condition_clause_at_scan_y
+
+parse_small_condition_clause_at_scan_y:
+    jsr skip_inline_spaces_at_scan_y
+    jsr parse_small_decimal_sum_at_scan_y
+    bcc parse_small_condition_clause_lhs_ok
+    jmp parse_small_condition_clause_at_scan_y_fail
+parse_small_condition_clause_lhs_ok:
+    lda expr_value_lo
+    sta expr_compare_lo
+    jsr skip_inline_spaces_at_scan_y
+    lda (scan_ptr),y
+    cmp #'='
+    beq parse_small_condition_clause_eq
+    cmp #'<'
+    beq parse_small_condition_clause_lt_entry
+    cmp #'>'
+    beq parse_small_condition_clause_gt_entry
+    lda expr_compare_lo
+    sta expr_value_lo
+    clc
+    rts
+
+parse_small_condition_clause_eq:
+    iny
+    jsr parse_small_decimal_sum_at_scan_y
+    bcc parse_small_condition_clause_eq_ok
+    jmp parse_small_condition_clause_at_scan_y_fail
+parse_small_condition_clause_eq_ok:
+    lda expr_compare_lo
+    cmp expr_value_lo
+    beq parse_small_condition_clause_true
+    jmp parse_small_condition_clause_false
+
+parse_small_condition_clause_lt_entry:
+    iny
+    lda (scan_ptr),y
+    cmp #'='
+    beq parse_small_condition_clause_le
+    cmp #'>'
+    beq parse_small_condition_clause_ne
+    jsr parse_small_decimal_sum_at_scan_y
+    bcc parse_small_condition_clause_lt_ok
+    jmp parse_small_condition_clause_at_scan_y_fail
+parse_small_condition_clause_lt_ok:
+    lda expr_compare_lo
+    cmp expr_value_lo
+    bcc parse_small_condition_clause_true
+    jmp parse_small_condition_clause_false
+
+parse_small_condition_clause_gt_entry:
+    iny
+    lda (scan_ptr),y
+    cmp #'='
+    beq parse_small_condition_clause_ge
+    jsr parse_small_decimal_sum_at_scan_y
+    bcc parse_small_condition_clause_gt_ok
+    jmp parse_small_condition_clause_at_scan_y_fail
+parse_small_condition_clause_gt_ok:
+    lda expr_compare_lo
+    cmp expr_value_lo
+    beq parse_small_condition_clause_false
+    bcs parse_small_condition_clause_true
+    jmp parse_small_condition_clause_false
+
+parse_small_condition_clause_le:
+    iny
+    jsr parse_small_decimal_sum_at_scan_y
+    bcc parse_small_condition_clause_le_ok
+    jmp parse_small_condition_clause_at_scan_y_fail
+parse_small_condition_clause_le_ok:
+    lda expr_compare_lo
+    cmp expr_value_lo
+    beq parse_small_condition_clause_true
+    bcc parse_small_condition_clause_true
+    jmp parse_small_condition_clause_false
+
+parse_small_condition_clause_ge:
+    iny
+    jsr parse_small_decimal_sum_at_scan_y
+    bcc parse_small_condition_clause_ge_ok
+    jmp parse_small_condition_clause_at_scan_y_fail
+parse_small_condition_clause_ge_ok:
+    lda expr_compare_lo
+    cmp expr_value_lo
+    beq parse_small_condition_clause_true
+    bcs parse_small_condition_clause_true
+    jmp parse_small_condition_clause_false
+
+parse_small_condition_clause_ne:
+    iny
+    jsr parse_small_decimal_sum_at_scan_y
+    bcc parse_small_condition_clause_ne_ok
+    jmp parse_small_condition_clause_at_scan_y_fail
+parse_small_condition_clause_ne_ok:
+    lda expr_compare_lo
+    cmp expr_value_lo
+    beq parse_small_condition_clause_false
+    jmp parse_small_condition_clause_true
+
+parse_small_condition_clause_true:
+    lda #$01
+    sta expr_value_lo
+    clc
+    rts
+
+parse_small_condition_clause_false:
+    lda #$00
+    sta expr_value_lo
+    clc
+    rts
+
+parse_small_condition_clause_at_scan_y_fail:
+    sec
+    rts
+
 parse_small_decimal_expr_at_scan_y:
     jsr skip_inline_spaces_at_scan_y
     jsr parse_small_decimal_sum_at_scan_y
@@ -2075,8 +2319,9 @@ parse_small_decimal_expr_at_scan_y_fail:
 parse_small_decimal_sum_at_scan_y:
     jsr skip_inline_spaces_at_scan_y
     jsr parse_small_decimal_term_at_scan_y
-    bcs parse_small_decimal_sum_at_scan_y_fail
-    lda expr_value_lo
+    bcc :+
+    jmp parse_small_decimal_sum_at_scan_y_fail
+:   lda expr_value_lo
     sta expr_saved_lo
 parse_small_decimal_sum_loop:
     jsr skip_inline_spaces_at_scan_y
@@ -2095,28 +2340,53 @@ parse_small_decimal_sum_loop:
     beq parse_small_decimal_sum_done
     cmp #'>'
     beq parse_small_decimal_sum_done
-    bne parse_small_decimal_sum_at_scan_y_fail
+    jsr uppercase_ascii
+    cmp #'A'
+    beq parse_small_decimal_sum_try_and
+    cmp #'O'
+    beq parse_small_decimal_sum_try_or
+    jmp parse_small_decimal_sum_at_scan_y_fail
+
+parse_small_decimal_sum_try_and:
+    sty symbol_start_y_data
+    jsr consume_and_keyword_from_scan_y
+    bcc :+
+    jmp parse_small_decimal_sum_at_scan_y_fail
+:   ldy symbol_start_y_data
+    jmp parse_small_decimal_sum_done
+
+parse_small_decimal_sum_try_or:
+    sty symbol_start_y_data
+    jsr consume_or_keyword_from_scan_y
+    bcc :+
+    jmp parse_small_decimal_sum_at_scan_y_fail
+:   ldy symbol_start_y_data
+    jmp parse_small_decimal_sum_done
 
 parse_small_decimal_sum_add:
     iny
     jsr parse_small_decimal_term_at_scan_y
-    bcs parse_small_decimal_sum_at_scan_y_fail
-    lda expr_saved_lo
+    bcc :+
+    jmp parse_small_decimal_sum_at_scan_y_fail
+:   lda expr_saved_lo
     clc
     adc expr_value_lo
-    bcs parse_small_decimal_sum_at_scan_y_fail
-    sta expr_saved_lo
+    bcc :+
+    jmp parse_small_decimal_sum_at_scan_y_fail
+:   sta expr_saved_lo
     jmp parse_small_decimal_sum_loop
 
 parse_small_decimal_sum_sub:
     iny
     jsr parse_small_decimal_term_at_scan_y
-    bcs parse_small_decimal_sum_at_scan_y_fail
-    lda expr_saved_lo
+    bcc :+
+    jmp parse_small_decimal_sum_at_scan_y_fail
+:   lda expr_saved_lo
     sec
     sbc expr_value_lo
-    bcc parse_small_decimal_sum_at_scan_y_fail
-    sta expr_saved_lo
+    bcs :+
+    jmp parse_small_decimal_sum_at_scan_y_fail
+:   sta expr_saved_lo
     jmp parse_small_decimal_sum_loop
 
 parse_small_decimal_sum_done:
@@ -2202,7 +2472,7 @@ parse_small_decimal_factor_at_scan_y:
 
 parse_small_decimal_factor_group:
     iny
-    jsr parse_small_decimal_expr_at_scan_y
+    jsr parse_small_value_expr_at_scan_y
     bcs parse_small_decimal_factor_at_scan_y_fail
     jsr skip_inline_spaces_at_scan_y
     lda (scan_ptr),y
@@ -3590,6 +3860,8 @@ string_offsets:
 .segment "BSS"
 
 declared_module_name:
+    .res 25
+saved_var_name_data:
     .res 25
 manifest_entry:
     .res 32

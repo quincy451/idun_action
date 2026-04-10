@@ -167,6 +167,10 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
   `PrintIE((X<Y AND W(5)=7) OR Z(1)=1)`, `PrintIE((INC(X)=2 AND W(Y+5)=9) OR NOT(Z(1)=1))`, and `PrintI((X<Y AND W(5)=7) OR Z(1)=1)`
 - [x] parenthesized boolean/comparison value expressions reused as arithmetic factors:
   `RETURN (N<3)+1`, `X=((X<Y AND W(5)=7) OR Z(1)=1)+1`, `PrintIE(INC(((X<Y AND W(5)=7) OR Z(1)=1)+1))`, and `PrintIE(((X<Y AND W(5)=7) OR Z(1)=1)+1)`
+- [x] module-scope integer initializers from composed boolean/comparison literal expressions:
+  `INT X=[(1<2 AND 2<3) OR NOT(0=1)]`
+- [x] module-scope integer initializers from parenthesized boolean/comparison literal expressions reused as arithmetic factors:
+  `INT X=[((1<2 AND 2<3) OR NOT(0=1))+1]`
 - [x] local user procedure calls inside `IF ... THEN ... ELSE ... FI`:
   `IF 1 = 1 THEN HELLO() ELSE BYE() FI`
 - [x] arithmetic/comparison-driven local procedure calls inside `IF ... THEN ... ELSE ... FI`:

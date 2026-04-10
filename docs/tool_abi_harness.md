@@ -851,6 +851,10 @@ That now includes a widening set of stable scenarios:
   `OK`
 - composed boolean conditions with `NOT` and external returns:
   `OK`
+- module-scope integer initializer from composed boolean/comparison literals:
+  `1`
+- module-scope integer initializer from grouped boolean/comparison arithmetic:
+  `2`
 - arithmetic/comparison condition with `IF/ELSE`:
   `YES`, `DONE`
 - branch-local procedure call:

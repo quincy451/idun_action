@@ -2174,6 +2174,56 @@ SCENARIOS = {
         ),
         "expected_console": "2\n",
     },
+    "init_bool_compound": {
+        "out_fs_name": "harness-actc-alink-avmrun-init-bool-compound",
+        "source": (
+            'MODULE MAIN\r'
+            'INT X=[(1<2 AND 2<3) OR NOT(0=1)]\r'
+            'PROC MAIN()\r'
+            'PrintIE(X)\r'
+            'RETURN\r'
+        ),
+        "expected_avo": (
+            "AVO1\n"
+            "x main 0 7\n"
+            "b L0zr\n"
+            "v x 1\n"
+            "k 6\n"
+            "n main\n"
+        ),
+        "expected_avm": bytes(
+            [
+                65, 86, 77, 49, 2, 11, 0, 0, 0, 1, 9, 0, 19, 9, 0, 73,
+                49, 255, 73, 32, 255, 1, 0,
+            ]
+        ),
+        "expected_console": "1\n",
+    },
+    "init_bool_plus_one": {
+        "out_fs_name": "harness-actc-alink-avmrun-init-bool-plus-one",
+        "source": (
+            'MODULE MAIN\r'
+            'INT X=[((1<2 AND 2<3) OR NOT(0=1))+1]\r'
+            'PROC MAIN()\r'
+            'PrintIE(X)\r'
+            'RETURN\r'
+        ),
+        "expected_avo": (
+            "AVO1\n"
+            "x main 0 7\n"
+            "b L0zr\n"
+            "v x 2\n"
+            "k 6\n"
+            "n main\n"
+        ),
+        "expected_avm": bytes(
+            [
+                65, 86, 77, 49, 2, 11, 0, 0, 0, 1, 9, 0, 19, 9, 0, 73,
+                49, 255, 73, 32, 255, 2, 0,
+            ]
+        ),
+        "expected_console": "2\n",
+    },
     "bool_not_external": {
         "out_fs_name": "harness-actc-alink-avmrun-bool-not-external",
         "sources": {
