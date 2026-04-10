@@ -227,6 +227,9 @@ class TestToolAbiPipeline(unittest.TestCase):
     def test_body152_local_calls_pipeline_is_green_under_harness(self) -> None:
         self.run_scenario("body152_local_calls", "74\n", 215, 256)
 
+    def test_payload265_local_calls_pipeline_is_green_under_harness(self) -> None:
+        self.run_scenario("payload265_local_calls", "77\n", 221, 265)
+
     def test_bool_not_external_pipeline_is_green_under_harness(self) -> None:
         self.run_scenario("bool_not_external", "OK\n", 77, 59)
 

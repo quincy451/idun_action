@@ -30,6 +30,9 @@ PENDING_SYMBOL_MAX = 7
 .ifndef LOOP_MAX
 LOOP_MAX = 8
 .endif
+.ifndef CONTENT_BUFFER_SIZE
+CONTENT_BUFFER_SIZE = 256
+.endif
 .if STRING_LITERAL_MAX > 36
 .error "STRING_LITERAL_MAX > 36 not supported"
 .endif
@@ -41,6 +44,10 @@ STRING_MASK_BYTES = (STRING_LITERAL_MAX + 7) / 8
 AVM_VERSION = 2
 AVM_FLAG_ACHERON = 1
 AVM_HEADER_SIZE = 12
+PAYLOAD_LIMIT = CONTENT_BUFFER_SIZE - AVM_HEADER_SIZE
+.if PAYLOAD_LIMIT > 255
+.error "CONTENT_BUFFER_SIZE payload > 255 not supported"
+.endif
 
 OPCODE_PUSH16 = $11
 OPCODE_STORE = $12
@@ -3255,12 +3262,15 @@ render_payload_as_binary_or_fail:
     ldy #>msg_too_large
     jmp fail_with_ptr
 :   lda main_flags_lo
-    cmp #245
+.if PAYLOAD_LIMIT < 255
+    cmp #(PAYLOAD_LIMIT + 1)
     bcc :+
     lda #<msg_too_large
     ldy #>msg_too_large
     jmp fail_with_ptr
-:   ldx main_flags_lo
+: 
+.endif
+    ldx main_flags_lo
     beq render_payload_as_binary_header
     dex
 render_payload_as_binary_shift_loop:
@@ -3797,7 +3807,7 @@ source_buffer:
 content_buffer_pad:
     .res $0010
 content_buffer:
-    .res 256
+    .res CONTENT_BUFFER_SIZE
 export_names:
     .res 25 * EXPORT_MAX
 export_offsets:
