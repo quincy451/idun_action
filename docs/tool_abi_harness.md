@@ -812,6 +812,16 @@ That now includes a widening set of stable scenarios:
   `OK`
 - unresolved-external zero-arg integer returns inside arithmetic:
   `8`
+- local procedure argument passing with expression-valued args:
+  `6`
+- multiple local procedure args:
+  `5`
+- unresolved-external procedure args:
+  `7`
+- composed boolean conditions with `AND` / `OR` and external returns:
+  `OK`
+- composed boolean conditions with `NOT` and external returns:
+  `OK`
 - arithmetic/comparison condition with `IF/ELSE`:
   `YES`, `DONE`
 - branch-local procedure call:

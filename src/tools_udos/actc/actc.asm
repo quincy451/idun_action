@@ -296,6 +296,7 @@ compare_declared_module_or_fail_done:
 collect_module_vars_or_fail:
     lda #$00
     sta var_count_data
+    sta module_var_count_data
     lda #<source_buffer
     sta scan_ptr
     lda #>source_buffer
@@ -336,6 +337,8 @@ collect_module_vars_or_fail_bad:
     ldy #>msg_bad_var
     jmp fail_with_ptr
 collect_module_vars_or_fail_done:
+    lda var_count_data
+    sta module_var_count_data
     rts
 
 store_module_var_from_scan_ptr_or_fail:
@@ -351,7 +354,7 @@ store_module_var_from_scan_ptr_or_fail:
     ldy #>msg_bad_var
     jmp fail_with_ptr
 :   sty compare_char
-    jsr find_var_index_from_declared
+    jsr find_module_var_index_from_declared
     bcc store_module_var_from_scan_ptr_or_fail_bad
     lda #$00
     sta expr_value_lo
@@ -744,13 +747,13 @@ collect_proc_body_ops_try_assignment:
     bne collect_proc_body_ops_try_local_call
     jsr find_var_index_from_declared
     bcs collect_proc_body_ops_bad_var
-    stx proc_index
+    stx assignment_target_index_data
     iny
     jsr emit_runtime_sum_from_scan_y_or_fail
     bcs collect_proc_body_ops_bad_literal
     jsr require_line_end_at_scan_y
     bcs collect_proc_body_ops_bad_literal
-    ldx proc_index
+    ldx assignment_target_index_data
     lda #'S'
     jsr append_body_op_for_current_proc
     jmp collect_proc_body_ops_skip_line
@@ -760,17 +763,14 @@ collect_proc_body_ops_try_local_call:
     lda (scan_ptr),y
     cmp #'('
     bne collect_proc_body_ops_skip_line
-    jsr find_export_index_from_declared
-    bcc :+
-    jsr find_or_store_external_from_declared
+    sty symbol_end_y_data
+    jsr resolve_call_target_from_declared_or_fail
     bcs collect_proc_body_ops_bad_proc
-    lda #'u'
-    jsr append_body_op_for_current_proc
-    jmp collect_proc_body_ops_skip_line
-:
-    cpx current_proc_index_data
-    beq collect_proc_body_ops_skip_line
-    lda #'c'
+    ldy symbol_end_y_data
+    jsr emit_call_args_from_scan_y_or_fail
+    bcs collect_proc_body_ops_bad_proc
+    lda call_target_kind
+    ldx call_target_index_data
     jsr append_body_op_for_current_proc
 collect_proc_body_ops_skip_line:
     jsr skip_source_line
@@ -783,6 +783,7 @@ collect_proc_body_ops_proc_decl:
     jsr find_export_index_from_declared
     bcs collect_proc_body_ops_bad_proc
     stx current_proc_index_data
+    jsr emit_current_proc_param_binds_or_fail
     jsr skip_source_line
     jmp collect_proc_body_ops_loop
 collect_proc_body_ops_advance_blank:
@@ -893,6 +894,29 @@ push_loop_kind_a_or_fail:
     jmp collect_proc_body_ops_bad_proc
 :   sta loop_kind_stack,x
     inc loop_depth_data
+    rts
+
+emit_current_proc_param_binds_or_fail:
+    ldx current_proc_index_data
+    lda proc_param_count_data,x
+    beq emit_current_proc_param_binds_or_fail_done
+    sta param_bind_count_data
+    lda proc_param_var_base_data,x
+    sta param_bind_base_data
+emit_current_proc_param_binds_or_fail_loop:
+    lda param_bind_count_data
+    beq emit_current_proc_param_binds_or_fail_done
+    clc
+    lda param_bind_base_data
+    adc param_bind_count_data
+    sec
+    sbc #$01
+    tax
+    lda #'S'
+    jsr append_body_op_for_current_proc
+    dec param_bind_count_data
+    jmp emit_current_proc_param_binds_or_fail_loop
+emit_current_proc_param_binds_or_fail_done:
     rts
 
 pop_loop_kind_to_compare_char_or_fail:
@@ -1113,92 +1137,13 @@ store_small_runtime_until_from_scan_ptr:
     lda #'t'
     sta expr_print_op
 store_small_runtime_condition_core:
+    lda #$00
+    sta bool_ops_used_data
     ldy #$00
-    jsr emit_runtime_sum_from_scan_y_or_fail
-    bcc :+
+    jsr emit_runtime_bool_or_from_scan_y_or_fail
+    bcc store_small_runtime_condition_done_check
     sec
     rts
-:   jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
-    sta expr_compare_lo
-    cmp #'='
-    beq store_small_runtime_condition_compare_entry
-    cmp #'<'
-    beq store_small_runtime_condition_compare_entry
-    cmp #'>'
-    beq store_small_runtime_condition_compare_entry
-    jmp store_small_runtime_condition_done_check
-
-store_small_runtime_condition_compare_entry:
-    lda #$00
-    sta expr_runtime_post_zero
-    lda expr_compare_lo
-    cmp #'='
-    beq store_small_runtime_condition_eq
-    cmp #'<'
-    beq store_small_runtime_condition_lt_entry
-    cmp #'>'
-    beq store_small_runtime_condition_gt_entry
-    sec
-    rts
-store_small_runtime_condition_eq:
-    lda #'q'
-    sta expr_runtime_op
-    iny
-    jmp store_small_runtime_condition_rhs
-store_small_runtime_condition_lt_entry:
-    iny
-    lda (scan_ptr),y
-    cmp #'>'
-    beq store_small_runtime_condition_ne
-    cmp #'='
-    beq store_small_runtime_condition_le
-    lda #'l'
-    sta expr_runtime_op
-    jmp store_small_runtime_condition_rhs
-store_small_runtime_condition_gt_entry:
-    iny
-    lda (scan_ptr),y
-    cmp #'='
-    beq store_small_runtime_condition_ge
-    lda #'g'
-    sta expr_runtime_op
-    jmp store_small_runtime_condition_rhs
-store_small_runtime_condition_le:
-    lda #'g'
-    sta expr_runtime_op
-    lda #$01
-    sta expr_runtime_post_zero
-    iny
-    jmp store_small_runtime_condition_rhs
-store_small_runtime_condition_ge:
-    lda #'l'
-    sta expr_runtime_op
-    lda #$01
-    sta expr_runtime_post_zero
-    iny
-    jmp store_small_runtime_condition_rhs
-store_small_runtime_condition_ne:
-    lda #'n'
-    sta expr_runtime_op
-    iny
-store_small_runtime_condition_rhs:
-    jsr emit_runtime_sum_from_scan_y_or_fail
-    bcc :+
-    sec
-    rts
-:   lda expr_runtime_op
-    jsr append_body_op_no_arg_for_current_proc
-    lda expr_runtime_post_zero
-    beq store_small_runtime_condition_done_check
-    lda #$00
-    sta expr_value_lo
-    jsr store_expr_value_as_int_literal
-    bcs store_small_runtime_condition_fail
-    lda #'p'
-    jsr append_body_op_for_current_proc
-    lda #'q'
-    jsr append_body_op_no_arg_for_current_proc
 store_small_runtime_condition_done_check:
     lda expr_print_op
     cmp #'h'
@@ -1349,47 +1294,367 @@ emit_runtime_call_term_from_scan_y_or_fail:
     bcc :+
     sec
     rts
-:   jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
-    cmp #'('
-    bne emit_runtime_call_term_from_scan_y_or_fail_fail
-    iny
-    jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
-    cmp #')'
-    bne emit_runtime_call_term_from_scan_y_or_fail_fail
-    iny
-    tya
-    pha
-    jsr find_export_index_from_declared
-    bcc emit_runtime_call_term_from_scan_y_or_fail_local
-    jsr find_or_store_external_from_declared
-    bcs emit_runtime_call_term_from_scan_y_or_fail_fail_restore
-    lda #'u'
+:
+    sty symbol_end_y_data
+    jsr resolve_call_target_from_declared_or_fail
+    bcs emit_runtime_call_term_from_scan_y_or_fail_fail
+    ldy symbol_end_y_data
+    jsr emit_call_args_from_scan_y_or_fail
+    bcs emit_runtime_call_term_from_scan_y_or_fail_fail
+    lda call_target_kind
+    ldx call_target_index_data
     jsr append_body_op_for_current_proc
-    pla
-    tay
     clc
     rts
-emit_runtime_call_term_from_scan_y_or_fail_local:
-    cpx current_proc_index_data
-    beq emit_runtime_call_term_from_scan_y_or_fail_fail_restore
-    lda #'c'
-    jsr append_body_op_for_current_proc
-    pla
-    tay
-    clc
-    rts
-emit_runtime_call_term_from_scan_y_or_fail_fail_restore:
-    pla
-    tay
 emit_runtime_call_term_from_scan_y_or_fail_fail:
     sec
     rts
 
+resolve_call_target_from_declared_or_fail:
+    jsr find_export_index_from_declared
+    bcc resolve_call_target_from_declared_or_fail_local
+    jsr find_or_store_external_from_declared
+    bcs resolve_call_target_from_declared_or_fail_fail
+    stx call_target_index_data
+    lda #'u'
+    sta call_target_kind
+    lda #$FF
+    sta call_expected_arg_count
+    clc
+    rts
+resolve_call_target_from_declared_or_fail_local:
+    cpx current_proc_index_data
+    beq resolve_call_target_from_declared_or_fail_fail
+    stx call_target_index_data
+    lda #'c'
+    sta call_target_kind
+    lda proc_param_count_data,x
+    sta call_expected_arg_count
+    clc
+    rts
+resolve_call_target_from_declared_or_fail_fail:
+    sec
+    rts
+
+emit_call_args_from_scan_y_or_fail:
+    jsr skip_inline_spaces_at_scan_y
+    lda (scan_ptr),y
+    cmp #'('
+    beq :+
+    sec
+    rts
+:   iny
+    lda #$00
+    sta call_arg_count_data
+    jsr skip_inline_spaces_at_scan_y
+    lda (scan_ptr),y
+    cmp #')'
+    beq emit_call_args_from_scan_y_or_fail_done
+emit_call_args_from_scan_y_or_fail_loop:
+    lda call_arg_count_data
+    pha
+    lda call_expected_arg_count
+    pha
+    lda call_target_index_data
+    pha
+    lda call_target_kind
+    pha
+    jsr emit_runtime_sum_from_scan_y_or_fail
+    bcc emit_call_args_from_scan_y_or_fail_restore_ok
+    pla
+    sta call_target_kind
+    pla
+    sta call_target_index_data
+    pla
+    sta call_expected_arg_count
+    pla
+    sta call_arg_count_data
+    sec
+    rts
+emit_call_args_from_scan_y_or_fail_restore_ok:
+    pla
+    sta call_target_kind
+    pla
+    sta call_target_index_data
+    pla
+    sta call_expected_arg_count
+    pla
+    sta call_arg_count_data
+    inc call_arg_count_data
+    jsr skip_inline_spaces_at_scan_y
+    lda (scan_ptr),y
+    cmp #','
+    beq emit_call_args_from_scan_y_or_fail_next
+    cmp #')'
+    beq emit_call_args_from_scan_y_or_fail_done
+    sec
+    rts
+emit_call_args_from_scan_y_or_fail_next:
+    iny
+    jsr skip_inline_spaces_at_scan_y
+    jmp emit_call_args_from_scan_y_or_fail_loop
+emit_call_args_from_scan_y_or_fail_done:
+    iny
+    lda call_target_kind
+    cmp #'c'
+    bne emit_call_args_from_scan_y_or_fail_ok
+    lda call_arg_count_data
+    cmp call_expected_arg_count
+    bne emit_call_args_from_scan_y_or_fail_fail
+emit_call_args_from_scan_y_or_fail_ok:
+    clc
+    rts
+emit_call_args_from_scan_y_or_fail_fail:
+    sec
+    rts
+
+emit_runtime_bool_or_from_scan_y_or_fail:
+    jsr emit_runtime_bool_and_from_scan_y_or_fail
+    bcc :+
+    jmp emit_runtime_expr_push_fail
+: 
+emit_runtime_bool_or_from_scan_y_or_fail_loop:
+    jsr consume_or_keyword_from_scan_y
+    bcs emit_runtime_bool_or_from_scan_y_or_fail_done
+    lda #$01
+    sta bool_ops_used_data
+    jsr normalize_runtime_top_to_bool_or_fail
+    bcc :+
+    jmp emit_runtime_expr_push_fail
+: 
+    jsr emit_runtime_bool_and_from_scan_y_or_fail
+    bcc :+
+    jmp emit_runtime_expr_push_fail
+: 
+    jsr normalize_runtime_top_to_bool_or_fail
+    bcc :+
+    jmp emit_runtime_expr_push_fail
+: 
+    lda #'a'
+    jsr append_body_op_no_arg_for_current_proc
+    lda #$00
+    sta expr_value_lo
+    jsr store_expr_value_as_int_literal
+    bcc :+
+    jmp emit_runtime_expr_push_fail
+: 
+    lda #'p'
+    jsr append_body_op_for_current_proc
+    lda #'g'
+    jsr append_body_op_no_arg_for_current_proc
+    jmp emit_runtime_bool_or_from_scan_y_or_fail_loop
+emit_runtime_bool_or_from_scan_y_or_fail_done:
+    clc
+    rts
+
+emit_runtime_bool_and_from_scan_y_or_fail:
+    jsr emit_runtime_bool_not_from_scan_y_or_fail
+    bcc :+
+    jmp emit_runtime_expr_push_fail
+: 
+emit_runtime_bool_and_from_scan_y_or_fail_loop:
+    jsr consume_and_keyword_from_scan_y
+    bcs emit_runtime_bool_and_from_scan_y_or_fail_done
+    lda #$01
+    sta bool_ops_used_data
+    jsr normalize_runtime_top_to_bool_or_fail
+    bcc :+
+    jmp emit_runtime_expr_push_fail
+: 
+    jsr emit_runtime_bool_not_from_scan_y_or_fail
+    bcc :+
+    jmp emit_runtime_expr_push_fail
+: 
+    jsr normalize_runtime_top_to_bool_or_fail
+    bcc :+
+    jmp emit_runtime_expr_push_fail
+: 
+    lda #'a'
+    jsr append_body_op_no_arg_for_current_proc
+    lda #$01
+    sta expr_value_lo
+    jsr store_expr_value_as_int_literal
+    bcc :+
+    jmp emit_runtime_expr_push_fail
+: 
+    lda #'p'
+    jsr append_body_op_for_current_proc
+    lda #'g'
+    jsr append_body_op_no_arg_for_current_proc
+    jmp emit_runtime_bool_and_from_scan_y_or_fail_loop
+emit_runtime_bool_and_from_scan_y_or_fail_done:
+    clc
+    rts
+
+emit_runtime_bool_not_from_scan_y_or_fail:
+    jsr consume_not_keyword_from_scan_y
+    bcs emit_runtime_bool_primary_from_scan_y_or_fail
+    lda #$01
+    sta bool_ops_used_data
+    jsr emit_runtime_bool_not_from_scan_y_or_fail
+    bcc :+
+    jmp emit_runtime_expr_push_fail
+: 
+    jsr normalize_runtime_top_to_bool_or_fail
+    bcc :+
+    jmp emit_runtime_expr_push_fail
+: 
+    lda #$00
+    sta expr_value_lo
+    jsr store_expr_value_as_int_literal
+    bcc :+
+    jmp emit_runtime_expr_push_fail
+: 
+    lda #'p'
+    jsr append_body_op_for_current_proc
+    lda #'q'
+    jsr append_body_op_no_arg_for_current_proc
+    clc
+    rts
+
+emit_runtime_bool_primary_from_scan_y_or_fail:
+    jsr skip_inline_spaces_at_scan_y
+    lda (scan_ptr),y
+    cmp #'('
+    bne emit_runtime_condition_clause_from_scan_y_or_fail
+    tya
+    pha
+    iny
+    jsr emit_runtime_bool_or_from_scan_y_or_fail
+    bcs emit_runtime_bool_primary_restore_clause
+    jsr skip_inline_spaces_at_scan_y
+    lda (scan_ptr),y
+    cmp #')'
+    bne emit_runtime_bool_primary_restore_clause
+    iny
+    sty compare_char
+    jsr skip_inline_spaces_at_scan_y
+    lda (scan_ptr),y
+    cmp #'='
+    beq emit_runtime_bool_primary_restore_clause
+    cmp #'<'
+    beq emit_runtime_bool_primary_restore_clause
+    cmp #'>'
+    beq emit_runtime_bool_primary_restore_clause
+    ldy compare_char
+    pla
+    clc
+    rts
+emit_runtime_bool_primary_restore_clause:
+    pla
+    tay
+    jmp emit_runtime_condition_clause_from_scan_y_or_fail
+
+emit_runtime_condition_clause_from_scan_y_or_fail:
+    jsr emit_runtime_sum_from_scan_y_or_fail
+    bcc :+
+    sec
+    rts
+:   jsr skip_inline_spaces_at_scan_y
+    lda (scan_ptr),y
+    sta expr_compare_lo
+    cmp #'='
+    beq emit_runtime_condition_clause_compare_entry
+    cmp #'<'
+    beq emit_runtime_condition_clause_compare_entry
+    cmp #'>'
+    beq emit_runtime_condition_clause_compare_entry
+    jmp emit_runtime_condition_clause_done
+emit_runtime_condition_clause_compare_entry:
+    lda #$00
+    sta expr_runtime_post_zero
+    lda expr_compare_lo
+    cmp #'='
+    beq emit_runtime_condition_clause_eq
+    cmp #'<'
+    beq emit_runtime_condition_clause_lt_entry
+    cmp #'>'
+    beq emit_runtime_condition_clause_gt_entry
+    sec
+    rts
+emit_runtime_condition_clause_eq:
+    lda #'q'
+    sta expr_runtime_op
+    iny
+    jmp emit_runtime_condition_clause_rhs
+emit_runtime_condition_clause_lt_entry:
+    iny
+    lda (scan_ptr),y
+    cmp #'>'
+    beq emit_runtime_condition_clause_ne
+    cmp #'='
+    beq emit_runtime_condition_clause_le
+    lda #'l'
+    sta expr_runtime_op
+    jmp emit_runtime_condition_clause_rhs
+emit_runtime_condition_clause_gt_entry:
+    iny
+    lda (scan_ptr),y
+    cmp #'='
+    beq emit_runtime_condition_clause_ge
+    lda #'g'
+    sta expr_runtime_op
+    jmp emit_runtime_condition_clause_rhs
+emit_runtime_condition_clause_le:
+    lda #'g'
+    sta expr_runtime_op
+    lda #$01
+    sta expr_runtime_post_zero
+    iny
+    jmp emit_runtime_condition_clause_rhs
+emit_runtime_condition_clause_ge:
+    lda #'l'
+    sta expr_runtime_op
+    lda #$01
+    sta expr_runtime_post_zero
+    iny
+    jmp emit_runtime_condition_clause_rhs
+emit_runtime_condition_clause_ne:
+    lda #'n'
+    sta expr_runtime_op
+    iny
+emit_runtime_condition_clause_rhs:
+    jsr emit_runtime_sum_from_scan_y_or_fail
+    bcc :+
+    jmp emit_runtime_expr_push_fail
+: 
+    lda expr_runtime_op
+    jsr append_body_op_no_arg_for_current_proc
+    lda expr_runtime_post_zero
+    beq emit_runtime_condition_clause_done
+    lda #$00
+    sta expr_value_lo
+    jsr store_expr_value_as_int_literal
+    bcc :+
+    jmp emit_runtime_expr_push_fail
+: 
+    lda #'p'
+    jsr append_body_op_for_current_proc
+    lda #'q'
+    jsr append_body_op_no_arg_for_current_proc
+emit_runtime_condition_clause_done:
+    clc
+    rts
+
+normalize_runtime_top_to_bool_or_fail:
+    lda #$00
+    sta expr_value_lo
+    jsr store_expr_value_as_int_literal
+    bcc :+
+    jmp emit_runtime_expr_push_fail
+: 
+    lda #'p'
+    jsr append_body_op_for_current_proc
+    lda #'n'
+    jsr append_body_op_no_arg_for_current_proc
+    clc
+    rts
+
 emit_runtime_sum_from_scan_y_or_fail:
     jsr emit_runtime_term_push_from_scan_y_or_fail
-    bcs emit_runtime_expr_push_fail
+    bcc :+
+    jmp emit_runtime_expr_push_fail
+: 
 emit_runtime_sum_from_scan_y_loop:
     jsr skip_inline_spaces_at_scan_y
     lda (scan_ptr),y
@@ -1973,7 +2238,11 @@ store_proc_export_from_scan_ptr_or_fail:
     ldy #>msg_bad_proc
     jmp fail_with_ptr
 :   ldx export_count_data
+    txa
+    pha
     jsr set_export_ptr_from_x
+    pla
+    tax
     ldy #$00
 store_proc_export_from_scan_ptr_or_fail_loop:
     lda (scan_ptr),y
@@ -2016,7 +2285,83 @@ store_proc_export_from_scan_ptr_or_fail_done:
     beq store_proc_export_from_scan_ptr_or_fail_bad
     lda #$00
     sta (export_ptr),y
+    txa
+    pha
+    jsr store_proc_params_from_scan_y_for_current_export_or_fail
+    pla
+    tax
     inc export_count_data
+    rts
+
+store_proc_params_from_scan_y_for_current_export_or_fail:
+    stx proc_index
+    ldx proc_index
+    lda #$00
+    sta proc_param_count_data,x
+    lda var_count_data
+    sta proc_param_var_base_data,x
+    jsr skip_inline_spaces_at_scan_y
+    lda (scan_ptr),y
+    cmp #'('
+    beq :+
+    clc
+    rts
+:   iny
+    jsr skip_inline_spaces_at_scan_y
+    lda (scan_ptr),y
+    cmp #')'
+    beq store_proc_params_from_scan_y_for_current_export_done
+store_proc_params_from_scan_y_for_current_export_loop:
+    jsr copy_symbol_from_scan_y
+    bcc :+
+    jmp store_proc_export_from_scan_ptr_or_fail_bad
+:   sty symbol_end_y_data
+    jsr find_module_var_index_from_declared
+    bcs :+
+    jmp store_proc_export_from_scan_ptr_or_fail_bad
+:   ldx proc_index
+    jsr find_current_proc_param_index_from_declared_for_proc_x
+    bcs :+
+    jmp store_proc_export_from_scan_ptr_or_fail_bad
+:   ldx var_count_data
+    cpx #VAR_MAX
+    bcc :+
+    jmp store_proc_export_from_scan_ptr_or_fail_bad
+:   txa
+    pha
+    jsr set_var_ptr_from_x
+    pla
+    tax
+    ldy #$00
+store_proc_params_from_scan_y_for_current_export_copy_loop:
+    lda declared_module_name,y
+    sta (export_ptr),y
+    beq store_proc_params_from_scan_y_for_current_export_copy_done
+    iny
+    cpy #25
+    bcc store_proc_params_from_scan_y_for_current_export_copy_loop
+    jmp store_proc_export_from_scan_ptr_or_fail_bad
+store_proc_params_from_scan_y_for_current_export_copy_done:
+    lda #$00
+    sta var_init_lo,x
+    sta var_init_hi,x
+    inc var_count_data
+    ldx proc_index
+    inc proc_param_count_data,x
+    ldy symbol_end_y_data
+    jsr skip_inline_spaces_at_scan_y
+    lda (scan_ptr),y
+    cmp #','
+    beq store_proc_params_from_scan_y_for_current_export_next
+    cmp #')'
+    beq store_proc_params_from_scan_y_for_current_export_done
+    jmp store_proc_export_from_scan_ptr_or_fail_bad
+store_proc_params_from_scan_y_for_current_export_next:
+    iny
+    jsr skip_inline_spaces_at_scan_y
+    jmp store_proc_params_from_scan_y_for_current_export_loop
+store_proc_params_from_scan_y_for_current_export_done:
+    clc
     rts
 
 set_export_ptr_from_x:
@@ -2157,20 +2502,75 @@ copy_symbol_from_scan_y_done_check:
     clc
     rts
 
-find_var_index_from_scan_y:
+consume_and_keyword_from_scan_y:
+    lda #<pattern_and
+    sta const_ptr
+    lda #>pattern_and
+    sta const_ptr+1
+    jmp consume_keyword_from_scan_y
+
+consume_or_keyword_from_scan_y:
+    lda #<pattern_or
+    sta const_ptr
+    lda #>pattern_or
+    sta const_ptr+1
+    jmp consume_keyword_from_scan_y
+
+consume_not_keyword_from_scan_y:
+    lda #<pattern_not
+    sta const_ptr
+    lda #>pattern_not
+    sta const_ptr+1
+
+consume_keyword_from_scan_y:
     sty hex_work
+    jsr skip_inline_spaces_at_scan_y
     jsr copy_symbol_from_scan_y
     bcc :+
     ldy hex_work
     sec
     rts
 :   sty compare_char
-    jsr find_var_index_from_declared
+    jsr symbol_buffer_matches_const_ptr
     bcc :+
     ldy hex_work
     sec
     rts
 :   ldy compare_char
+    clc
+    rts
+
+symbol_buffer_matches_const_ptr:
+    ldy #$00
+symbol_buffer_matches_const_ptr_loop:
+    lda (const_ptr),y
+    cmp declared_module_name,y
+    bne symbol_buffer_matches_const_ptr_fail
+    lda declared_module_name,y
+    beq symbol_buffer_matches_const_ptr_done
+    iny
+    bne symbol_buffer_matches_const_ptr_loop
+symbol_buffer_matches_const_ptr_fail:
+    sec
+    rts
+symbol_buffer_matches_const_ptr_done:
+    clc
+    rts
+
+find_var_index_from_scan_y:
+    sty symbol_start_y_data
+    jsr copy_symbol_from_scan_y
+    bcc :+
+    ldy symbol_start_y_data
+    sec
+    rts
+:   sty symbol_end_y_data
+    jsr find_var_index_from_declared
+    bcc :+
+    ldy symbol_start_y_data
+    sec
+    rts
+:   ldy symbol_end_y_data
     clc
     rts
 
@@ -2202,30 +2602,74 @@ find_export_index_from_declared_done:
     rts
 
 find_var_index_from_declared:
+    lda current_proc_index_data
+    cmp #$FF
+    beq find_module_var_index_from_declared
+    tax
+    jsr find_current_proc_param_index_from_declared_for_proc_x
+    bcs find_module_var_index_from_declared
+    clc
+    rts
+
+find_module_var_index_from_declared:
     ldx #$00
-find_var_index_from_declared_loop:
-    cpx var_count_data
+find_module_var_index_from_declared_loop:
+    cpx module_var_count_data
     beq find_var_index_from_declared_fail
     stx hex_work
     jsr set_var_ptr_from_x
     ldx hex_work
     ldy #$00
-find_var_index_from_declared_compare_loop:
+find_module_var_index_from_declared_compare_loop:
     lda (export_ptr),y
     cmp declared_module_name,y
-    bne find_var_index_from_declared_next
+    bne find_module_var_index_from_declared_next
     lda declared_module_name,y
     beq find_var_index_from_declared_done
     iny
-    bne find_var_index_from_declared_compare_loop
-find_var_index_from_declared_next:
+    bne find_module_var_index_from_declared_compare_loop
+find_module_var_index_from_declared_next:
     inx
-    bne find_var_index_from_declared_loop
+    bne find_module_var_index_from_declared_loop
 find_var_index_from_declared_fail:
     sec
     rts
 find_var_index_from_declared_done:
     clc
+    rts
+
+find_current_proc_param_index_from_declared_for_proc_x:
+    stx proc_index
+    lda proc_param_count_data,x
+    beq find_current_proc_param_index_from_declared_for_proc_x_fail
+    lda proc_param_var_base_data,x
+    sta hex_work
+find_current_proc_param_index_from_declared_for_proc_x_loop:
+    ldx proc_index
+    lda proc_param_var_base_data,x
+    clc
+    adc proc_param_count_data,x
+    sta compare_char
+    ldx hex_work
+    cpx compare_char
+    beq find_current_proc_param_index_from_declared_for_proc_x_fail
+    stx hex_work
+    jsr set_var_ptr_from_x
+    ldx hex_work
+    ldy #$00
+find_current_proc_param_index_from_declared_for_proc_x_compare_loop:
+    lda (export_ptr),y
+    cmp declared_module_name,y
+    bne find_current_proc_param_index_from_declared_for_proc_x_next
+    lda declared_module_name,y
+    beq find_var_index_from_declared_done
+    iny
+    bne find_current_proc_param_index_from_declared_for_proc_x_compare_loop
+find_current_proc_param_index_from_declared_for_proc_x_next:
+    inc hex_work
+    jmp find_current_proc_param_index_from_declared_for_proc_x_loop
+find_current_proc_param_index_from_declared_for_proc_x_fail:
+    sec
     rts
 
 find_or_store_external_from_declared:
@@ -2842,6 +3286,12 @@ pattern_od:
     .asciiz "OD"
 pattern_until:
     .asciiz "UNTIL"
+pattern_and:
+    .asciiz "AND"
+pattern_or:
+    .asciiz "OR"
+pattern_not:
+    .asciiz "NOT"
 pattern_else:
     .asciiz "ELSE"
 pattern_fi:
@@ -2914,10 +3364,16 @@ int_count_data:
     .res 1
 var_count_data:
     .res 1
+module_var_count_data:
+    .res 1
 current_proc_index_data:
     .res 1
 extern_count_data:
     .res 1
+proc_param_count_data:
+    .res 8
+proc_param_var_base_data:
+    .res 8
 loop_depth_data:
     .res 1
 loop_kind_stack:
@@ -2943,6 +3399,26 @@ compare_char:
 actc_trace_byte:
     .res 1
 save_stack_top:
+    .res 1
+call_target_kind:
+    .res 1
+call_target_index_data:
+    .res 1
+call_expected_arg_count:
+    .res 1
+call_arg_count_data:
+    .res 1
+param_bind_count_data:
+    .res 1
+param_bind_base_data:
+    .res 1
+symbol_start_y_data:
+    .res 1
+symbol_end_y_data:
+    .res 1
+assignment_target_index_data:
+    .res 1
+bool_ops_used_data:
     .res 1
 hex_work:
     .res 1

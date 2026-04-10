@@ -37,7 +37,7 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
 - [ ] more robust final save/return path under the current dirty VICE debug line
 - [ ] larger body-op surface than the current arithmetic/procedure/branch/`WHILE`/nested-loop-combined slice
 - [ ] broader variable/data surface beyond the current multi-var module-scope integer storage/read/write/control slice
-- [ ] broader procedure/function surface beyond the current zero-arg integer return/call slice
+- [ ] broader procedure/function surface beyond the current local/external integer arg/return slice
 - [ ] full historical dead-strip/link behavior
 
 ## Harness-Proven Current Widening Line
@@ -78,6 +78,14 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
   `PrintIE(W())`, `PrintIE(W()+1)`
 - [x] also loads returned values used in assignment and control flow:
   `X=NEXT()` and `IF W()=7 THEN ... FI`
+- [x] also loads local procedure parameters and expression-valued call arguments:
+  `PROC INC(N) RETURN N+1`, `PrintIE(INC(2+3))`
+- [x] also loads multiple local procedure parameters:
+  `PROC ADD(X,Y) RETURN X+Y`, `PrintIE(ADD(2,3))`
+- [x] also loads unresolved-external procedure parameters:
+  `PrintIE(W(5))` with `PROC W(N) RETURN N+2`
+- [x] also loads composed boolean conditions with `AND`, `OR`, and `NOT`:
+  `IF (X<Y AND W()=7) OR Z()=1 THEN ... FI` and `IF NOT(Z()=1) THEN ... FI`
 - [x] also loads direct comparison-operator `ACTC` output for:
   `PrintIE(2 <> 3)`, `PrintIE(2 < 3)`, `PrintIE(3 <= 3)`, `PrintIE(4 >= 3)`
 - [x] also loads high string-index `ACTC` output through `F`:
