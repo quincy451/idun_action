@@ -81,6 +81,7 @@ source_loaded:
     jsr parse_module_header_or_fail
     jsr collect_module_vars_or_fail
     jsr collect_proc_exports_or_fail
+    jsr collect_proc_locals_or_fail
     jsr collect_proc_body_ops
     lda body_ops_data+0
     sta $03E8
@@ -474,6 +475,126 @@ collect_proc_exports_or_fail_done_check:
 collect_proc_exports_or_fail_done:
     rts
 
+collect_proc_locals_or_fail:
+    lda #$00
+    ldx #$00
+collect_proc_locals_or_fail_clear_loop:
+    sta proc_local_count_data,x
+    sta proc_local_var_base_data,x
+    inx
+    cpx #8
+    bcc collect_proc_locals_or_fail_clear_loop
+    lda #$FF
+    sta current_proc_index_data
+    lda #<source_buffer
+    sta scan_ptr
+    lda #>source_buffer
+    sta scan_ptr+1
+collect_proc_locals_or_fail_loop:
+    ldy #$00
+    lda (scan_ptr),y
+    beq collect_proc_locals_or_fail_done
+    cmp #10
+    beq collect_proc_locals_or_fail_advance_blank
+    cmp #13
+    beq collect_proc_locals_or_fail_advance_blank
+    jsr skip_source_spaces
+    ldy #$00
+    lda (scan_ptr),y
+    beq collect_proc_locals_or_fail_done
+    lda #<pattern_proc
+    sta const_ptr
+    lda #>pattern_proc
+    sta const_ptr+1
+    jsr pattern_matches_scan_ptr
+    bcs collect_proc_locals_or_fail_try_int_decl
+    jsr advance_scan_ptr_by_const_ptr
+    jsr skip_source_spaces
+    jsr copy_symbol_from_scan_ptr
+    bcs collect_proc_locals_or_fail_bad_proc
+    jsr find_export_index_from_declared
+    bcs collect_proc_locals_or_fail_bad_proc
+    stx current_proc_index_data
+    lda var_count_data
+    sta proc_local_var_base_data,x
+    lda #$00
+    sta proc_local_count_data,x
+    jsr skip_source_line
+    jmp collect_proc_locals_or_fail_loop
+collect_proc_locals_or_fail_try_int_decl:
+    lda current_proc_index_data
+    cmp #$FF
+    beq collect_proc_locals_or_fail_skip_line
+    lda #<pattern_int_decl
+    sta const_ptr
+    lda #>pattern_int_decl
+    sta const_ptr+1
+    jsr pattern_matches_scan_ptr_keyword
+    bcs collect_proc_locals_or_fail_skip_line
+    jsr store_proc_local_var_from_scan_ptr_or_fail
+collect_proc_locals_or_fail_skip_line:
+    jsr skip_source_line
+    jmp collect_proc_locals_or_fail_loop
+collect_proc_locals_or_fail_advance_blank:
+    jsr advance_scan_ptr
+    jmp collect_proc_locals_or_fail_loop
+collect_proc_locals_or_fail_bad_proc:
+    lda #<msg_bad_proc
+    ldy #>msg_bad_proc
+    jmp fail_with_ptr
+collect_proc_locals_or_fail_done:
+    lda #$FF
+    sta current_proc_index_data
+    rts
+
+store_proc_local_var_from_scan_ptr_or_fail:
+    lda #<pattern_int_decl
+    sta const_ptr
+    lda #>pattern_int_decl
+    sta const_ptr+1
+    jsr advance_scan_ptr_by_const_ptr
+    jsr skip_source_spaces
+    jsr copy_symbol_from_scan_ptr
+    bcc :+
+    jmp store_proc_local_var_from_scan_ptr_or_fail_bad
+:   ldx current_proc_index_data
+    jsr find_current_proc_param_index_from_declared_for_proc_x
+    bcs :+
+    jmp store_proc_local_var_from_scan_ptr_or_fail_bad
+:   ldx current_proc_index_data
+    jsr find_current_proc_local_index_from_declared_for_proc_x
+    bcs :+
+    jmp store_proc_local_var_from_scan_ptr_or_fail_bad
+:   ldx var_count_data
+    cpx #VAR_MAX
+    bcc :+
+    jmp store_proc_local_var_from_scan_ptr_or_fail_bad
+:   txa
+    pha
+    jsr set_var_ptr_from_x
+    pla
+    tax
+    ldy #$00
+store_proc_local_var_from_scan_ptr_or_fail_copy_loop:
+    lda declared_module_name,y
+    sta (export_ptr),y
+    beq store_proc_local_var_from_scan_ptr_or_fail_copy_done
+    iny
+    cpy #25
+    bcc store_proc_local_var_from_scan_ptr_or_fail_copy_loop
+store_proc_local_var_from_scan_ptr_or_fail_bad:
+    lda #<msg_bad_var
+    ldy #>msg_bad_var
+    jmp fail_with_ptr
+store_proc_local_var_from_scan_ptr_or_fail_copy_done:
+    lda #$00
+    sta var_init_lo,x
+    sta var_init_hi,x
+    inc var_count_data
+    ldx current_proc_index_data
+    inc proc_local_count_data,x
+    rts
+
 collect_proc_body_ops:
     lda #$00
     sta string_count_data
@@ -528,6 +649,81 @@ collect_proc_body_ops_after_space_check:
 	    bne :+
 	    jmp collect_proc_body_ops_skip_line
 	:
+        lda #<pattern_int_decl
+        sta const_ptr
+        lda #>pattern_int_decl
+        sta const_ptr+1
+        jsr pattern_matches_scan_ptr_keyword
+        bcc :+
+        jmp collect_proc_body_ops_try_od
+: 
+        jsr advance_scan_ptr_by_const_ptr
+        jsr skip_source_spaces
+        jsr copy_symbol_from_scan_ptr
+        bcc :+
+        jmp collect_proc_body_ops_bad_var
+: 
+        sty symbol_end_y_data
+        ldx current_proc_index_data
+        jsr find_current_proc_local_index_from_declared_for_proc_x
+        bcc :+
+        jmp collect_proc_body_ops_bad_var
+: 
+        stx assignment_target_index_data
+        ldy symbol_end_y_data
+        jsr skip_inline_spaces_at_scan_y
+        lda (scan_ptr),y
+        bne :+
+        jmp collect_proc_body_ops_skip_line
+: 
+        cmp #10
+        bne :+
+        jmp collect_proc_body_ops_skip_line
+: 
+        cmp #13
+        bne :+
+        jmp collect_proc_body_ops_skip_line
+: 
+        cmp #'='
+        beq :+
+        jmp collect_proc_body_ops_bad_var
+: 
+        iny
+        jsr skip_inline_spaces_at_scan_y
+        lda (scan_ptr),y
+        cmp #'['
+        beq :+
+        jmp collect_proc_body_ops_try_local_int_parse_value
+: 
+        iny
+        jsr emit_runtime_value_from_scan_y_or_fail
+        bcc :+
+        jmp collect_proc_body_ops_bad_literal
+: 
+        jsr skip_inline_spaces_at_scan_y
+        lda (scan_ptr),y
+        cmp #']'
+        beq :+
+        jmp collect_proc_body_ops_bad_literal
+: 
+        iny
+        jmp collect_proc_body_ops_try_local_int_after_value
+collect_proc_body_ops_try_local_int_parse_value:
+        jsr emit_runtime_value_from_scan_y_or_fail
+        bcc :+
+        jmp collect_proc_body_ops_bad_literal
+: 
+collect_proc_body_ops_try_local_int_after_value:
+        jsr require_line_end_at_scan_y
+        bcc :+
+        jmp collect_proc_body_ops_bad_literal
+: 
+        ldx assignment_target_index_data
+        lda #'S'
+        jsr append_body_op_for_current_proc
+        jmp collect_proc_body_ops_skip_line
+
+collect_proc_body_ops_try_od:
 	    lda #<pattern_od
 	    sta const_ptr
 	    lda #>pattern_od
@@ -3117,6 +3313,9 @@ find_var_index_from_declared:
     cmp #$FF
     beq find_module_var_index_from_declared
     tax
+    jsr find_current_proc_local_index_from_declared_for_proc_x
+    bcc find_var_index_from_declared_done
+    ldx current_proc_index_data
     jsr find_current_proc_param_index_from_declared_for_proc_x
     bcs find_module_var_index_from_declared
     clc
@@ -3180,6 +3379,40 @@ find_current_proc_param_index_from_declared_for_proc_x_next:
     inc hex_work
     jmp find_current_proc_param_index_from_declared_for_proc_x_loop
 find_current_proc_param_index_from_declared_for_proc_x_fail:
+    sec
+    rts
+
+find_current_proc_local_index_from_declared_for_proc_x:
+    stx proc_index
+    lda proc_local_count_data,x
+    beq find_current_proc_local_index_from_declared_for_proc_x_fail
+    lda proc_local_var_base_data,x
+    sta hex_work
+find_current_proc_local_index_from_declared_for_proc_x_loop:
+    ldx proc_index
+    lda proc_local_var_base_data,x
+    clc
+    adc proc_local_count_data,x
+    sta compare_char
+    ldx hex_work
+    cpx compare_char
+    beq find_current_proc_local_index_from_declared_for_proc_x_fail
+    stx hex_work
+    jsr set_var_ptr_from_x
+    ldx hex_work
+    ldy #$00
+find_current_proc_local_index_from_declared_for_proc_x_compare_loop:
+    lda (export_ptr),y
+    cmp declared_module_name,y
+    bne find_current_proc_local_index_from_declared_for_proc_x_next
+    lda declared_module_name,y
+    beq find_var_index_from_declared_done
+    iny
+    bne find_current_proc_local_index_from_declared_for_proc_x_compare_loop
+find_current_proc_local_index_from_declared_for_proc_x_next:
+    inc hex_work
+    jmp find_current_proc_local_index_from_declared_for_proc_x_loop
+find_current_proc_local_index_from_declared_for_proc_x_fail:
     sec
     rts
 
@@ -3886,6 +4119,10 @@ extern_count_data:
 proc_param_count_data:
     .res 8
 proc_param_var_base_data:
+    .res 8
+proc_local_count_data:
+    .res 8
+proc_local_var_base_data:
     .res 8
 loop_depth_data:
     .res 1

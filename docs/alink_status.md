@@ -104,6 +104,12 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
   `INT X=[(1<2 AND 2<3) OR NOT(0=1)]`
 - [x] also loads module-scope integer initializers from parenthesized boolean/comparison literal expressions reused as arithmetic factors:
   `INT X=[((1<2 AND 2<3) OR NOT(0=1))+1]`
+- [x] also loads proc-local integer slots emitted by widened `ACTC` output:
+  `PROC TICK() INT X=[0] ...`
+- [x] also loads proc-local integer declaration-site reinitialization across repeated calls:
+  `TICK()` then `TICK()` prints `0`, `1`, `0`, `1`
+- [x] also loads proc-local integer initializers driven by proc parameters under loop control:
+  `PROC COUNT(N) INT X=[N] DO ... UNTIL X=2 OD`
 - [x] also loads direct comparison-operator `ACTC` output for:
   `PrintIE(2 <> 3)`, `PrintIE(2 < 3)`, `PrintIE(3 <= 3)`, `PrintIE(4 >= 3)`
 - [x] also loads high string-index `ACTC` output through `F`:

@@ -19,6 +19,10 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
 - [x] Supports the current narrow decimal print-expression subset for object emission
 - [x] Integrated narrow proof exists through `ACTC -> ALINK -> AVMRUN`
 
+Current lowering note:
+
+- [x] proc-local `INT` declarations currently lower to proc-scoped static slots plus declaration-site runtime init stores; this is not a stack-frame model yet
+
 ## Proven Narrow Source Surface
 
 - [x] `MODULE <name>`
@@ -171,6 +175,12 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
   `INT X=[(1<2 AND 2<3) OR NOT(0=1)]`
 - [x] module-scope integer initializers from parenthesized boolean/comparison literal expressions reused as arithmetic factors:
   `INT X=[((1<2 AND 2<3) OR NOT(0=1))+1]`
+- [x] proc-local integer declarations with declaration-site runtime initialization:
+  `PROC TICK() INT X=[0] ...`
+- [x] proc-local integer initializers rerun on each call:
+  `TICK()` then `TICK()` prints `0`, `1`, `0`, `1`
+- [x] proc-local integer initializers can read proc parameters and drive loop control:
+  `PROC COUNT(N) INT X=[N] DO ... UNTIL X=2 OD`
 - [x] local user procedure calls inside `IF ... THEN ... ELSE ... FI`:
   `IF 1 = 1 THEN HELLO() ELSE BYE() FI`
 - [x] arithmetic/comparison-driven local procedure calls inside `IF ... THEN ... ELSE ... FI`:

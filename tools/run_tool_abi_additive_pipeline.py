@@ -2224,6 +2224,83 @@ SCENARIOS = {
         ),
         "expected_console": "2\n",
     },
+    "proc_local_reinit": {
+        "out_fs_name": "harness-actc-alink-avmrun-proc-local-reinit",
+        "source": (
+            'MODULE MAIN\r'
+            'PROC TICK()\r'
+            'INT X=[0]\r'
+            'PrintIE(X)\r'
+            'X=X+1\r'
+            'PrintIE(X)\r'
+            'RETURN\r'
+            'PROC MAIN()\r'
+            'TICK()\r'
+            'TICK()\r'
+            'RETURN\r'
+        ),
+        "expected_avo": (
+            "AVO1\n"
+            "x tick 0 29\n"
+            "x main 29 7\n"
+            "b p0S0L0zL0p1aS0L0zr\n"
+            "b c0c0r\n"
+            "i 0\n"
+            "i 1\n"
+            "v x 0\n"
+            "k 6\n"
+            "n main\n"
+        ),
+        "expected_avm": bytes(
+            [
+                65, 86, 77, 49, 2, 40, 0, 29, 0, 1, 38, 0, 17, 0, 0, 18,
+                38, 0, 19, 38, 0, 73, 49, 255, 19, 38, 0, 17, 1, 0, 20,
+                18, 38, 0, 19, 38, 0, 73, 49, 255, 72, 69, 0, 0, 69, 0,
+                0, 73, 32, 255, 0, 0,
+            ]
+        ),
+        "expected_console": "0\n1\n0\n1\n",
+    },
+    "proc_local_param_loop": {
+        "out_fs_name": "harness-actc-alink-avmrun-proc-local-param-loop",
+        "source": (
+            'MODULE MAIN\r'
+            'PROC COUNT(N)\r'
+            'INT X=[N]\r'
+            'DO\r'
+            'PrintIE(X)\r'
+            'X=X+1\r'
+            'UNTIL X=2\r'
+            'OD\r'
+            'RETURN\r'
+            'PROC MAIN()\r'
+            'COUNT(0)\r'
+            'RETURN\r'
+        ),
+        "expected_avo": (
+            "AVO1\n"
+            "x count 0 36\n"
+            "x main 36 7\n"
+            "b S0L0S1dL1zL1p0aS1L1p1qtor\n"
+            "b p2c0r\n"
+            "i 1\n"
+            "i 2\n"
+            "i 0\n"
+            "v n 0\n"
+            "v x 0\n"
+            "k 6\n"
+            "n main\n"
+        ),
+        "expected_avm": bytes(
+            [
+                65, 86, 77, 49, 2, 49, 0, 36, 0, 1, 45, 0, 18, 45, 0, 19,
+                45, 0, 18, 47, 0, 19, 47, 0, 73, 49, 255, 19, 47, 0, 17,
+                1, 0, 20, 18, 47, 0, 19, 47, 0, 17, 2, 0, 22, 24, 9, 0,
+                72, 17, 0, 0, 69, 0, 0, 73, 32, 255, 0, 0, 0, 0,
+            ]
+        ),
+        "expected_console": "0\n1\n",
+    },
     "bool_not_external": {
         "out_fs_name": "harness-actc-alink-avmrun-bool-not-external",
         "sources": {
