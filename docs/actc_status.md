@@ -161,6 +161,8 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
   `IF 1 = 1 THEN PrintIE(INC(2+3)) ELSE ... FI` and `WHILE X < 2 DO PrintIE(W(X+5)) X=X+1 OD`
 - [x] composed boolean predicates driven by arg-bearing local/external calls:
   `IF (X<Y AND W(5)=7) OR Z(1)=1 THEN ... FI` and `IF (INC(X)=2 AND W(Y+5)=9) OR NOT(Z(1)=1) THEN ... FI`
+- [x] boolean/comparison expressions used as value expressions in assignment, return, and call-arg position:
+  `X=(X<Y AND W(5)=7) OR Z(1)=1`, `RETURN N<3`, and `PrintIE(INC((X<Y AND W(5)=7) OR Z(1)=1))`
 - [x] local user procedure calls inside `IF ... THEN ... ELSE ... FI`:
   `IF 1 = 1 THEN HELLO() ELSE BYE() FI`
 - [x] arithmetic/comparison-driven local procedure calls inside `IF ... THEN ... ELSE ... FI`:
@@ -207,6 +209,10 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
   `DO IF ... THEN W() ELSE HELLO() FI RETURN UNTIL ... OD`
 - [x] explicit early return inside nested loop forms with transitive externals:
   `WHILE ... DO DO W() RETURN UNTIL ... OD OD` with `W -> Z`
+- [x] multi-arg local/external calls inside early-return control flow:
+  `IF 1 = 1 THEN PrintIE(W(X,Y)) RETURN FI` and `DO IF X<Y THEN PrintIE(ADD(X,Y)) PrintIE(W(X+1,Y+1)) RETURN FI UNTIL 1 = 1 OD`
+- [x] multi-arg transitive external calls inside nested mixed-loop early return:
+  `WHILE X<3 DO DO IF W(X,Y)=3 THEN PrintIE(Q(X+3,Y+4)) RETURN FI UNTIL 1 = 1 OD X=X+1 OD` with `Q -> Z`
 - [x] `DO ... UNTIL ... OD` loop control flow:
   `DO ... UNTIL 1 = 1 OD`
 - [x] local and unresolved-external calls inside `DO ... UNTIL ... OD`:

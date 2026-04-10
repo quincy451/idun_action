@@ -76,6 +76,12 @@ Recent harness-proven widening additions now covered by named scenarios:
 - `while_external_args`: external arg-bearing calls under `WHILE ... DO ... OD`
 - `bool_compound_args`: compound boolean predicates using external arg calls
 - `bool_local_external_args`: compound boolean predicates mixing local and external arg calls
+- `bool_return_local`: boolean/comparison expressions returned from procedures like `RETURN N<3`
+- `bool_assign_external`: boolean/comparison expressions stored into variables like `X=(X<Y AND W(5)=7) OR Z(1)=1`
+- `bool_arg_local_external`: boolean/comparison expressions reused as call args
+- `if_return_external_args_multi`: multi-arg external calls under branch-gated early return
+- `do_until_return_branch_args_mixed`: mixed local/external multi-arg calls under `DO ... UNTIL ... OD` early return
+- `while_nested_do_until_return_args_transitive`: nested mixed-loop early return with multi-arg transitive external calls
 
 Use any one of them with:
 

@@ -94,6 +94,8 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
   `IF 1 = 1 THEN PrintIE(INC(2+3)) ELSE ... FI` and `WHILE X < 2 DO PrintIE(W(X+5)) X=X+1 OD`
 - [x] also loads composed boolean predicates driven by arg-bearing local/external calls:
   `IF (X<Y AND W(5)=7) OR Z(1)=1 THEN ... FI` and `IF (INC(X)=2 AND W(Y+5)=9) OR NOT(Z(1)=1) THEN ... FI`
+- [x] also loads boolean/comparison value expressions outside control-flow conditions:
+  `X=(X<Y AND W(5)=7) OR Z(1)=1`, `RETURN N<3`, and `PrintIE(INC((X<Y AND W(5)=7) OR Z(1)=1))`
 - [x] also loads direct comparison-operator `ACTC` output for:
   `PrintIE(2 <> 3)`, `PrintIE(2 < 3)`, `PrintIE(3 <= 3)`, `PrintIE(4 >= 3)`
 - [x] also loads high string-index `ACTC` output through `F`:
@@ -180,6 +182,10 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
   `IF ... THEN IF ... THEN W() RETURN FI ... FI` with `W -> Z`
 - [x] also loads explicit early-return mixed branch/local-external loop control:
   `DO IF ... THEN W() ELSE HELLO() FI RETURN UNTIL ... OD`
+- [x] also loads multi-arg local/external calls under early-return control:
+  `IF 1 = 1 THEN PrintIE(W(X,Y)) RETURN FI` and `DO IF X<Y THEN PrintIE(ADD(X,Y)) PrintIE(W(X+1,Y+1)) RETURN FI UNTIL 1 = 1 OD`
+- [x] also loads nested mixed-loop early return with multi-arg transitive externals:
+  `WHILE X<3 DO DO IF W(X,Y)=3 THEN PrintIE(Q(X+3,Y+4)) RETURN FI UNTIL 1 = 1 OD X=X+1 OD` with `Q -> Z`
 - [x] also loads explicit early-return nested-loop control with transitive externals:
   `WHILE ... DO DO W() RETURN UNTIL ... OD OD` with `W -> Z`
 - [x] also loads `DO ... UNTIL ... OD` loop `ACTC` output for:

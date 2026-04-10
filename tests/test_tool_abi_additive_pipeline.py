@@ -119,6 +119,9 @@ class TestToolAbiPipeline(unittest.TestCase):
     def test_return_external_add_pipeline_is_green_under_harness(self) -> None:
         self.run_scenario("return_external_add", "8\n", 46, 29)
 
+    def test_bool_return_local_pipeline_is_green_under_harness(self) -> None:
+        self.run_scenario("bool_return_local", "1\n", 75, 37)
+
     def test_local_args_basic_pipeline_is_green_under_harness(self) -> None:
         self.run_scenario("local_args_basic", "6\n", 81, 41)
 
@@ -148,6 +151,12 @@ class TestToolAbiPipeline(unittest.TestCase):
 
     def test_bool_local_external_args_pipeline_is_green_under_harness(self) -> None:
         self.run_scenario("bool_local_external_args", "OK\n", 205, 151)
+
+    def test_bool_assign_external_pipeline_is_green_under_harness(self) -> None:
+        self.run_scenario("bool_assign_external", "1\n", 136, 107)
+
+    def test_bool_arg_local_external_pipeline_is_green_under_harness(self) -> None:
+        self.run_scenario("bool_arg_local_external", "2\n", 167, 117)
 
     def test_bool_not_external_pipeline_is_green_under_harness(self) -> None:
         self.run_scenario("bool_not_external", "OK\n", 77, 59)
@@ -368,6 +377,9 @@ class TestToolAbiPipeline(unittest.TestCase):
     def test_if_return_external_pipeline_is_green_under_harness(self) -> None:
         self.run_scenario("if_return_external", "START\nTOOL7\n", 72, 66)
 
+    def test_if_return_external_args_multi_pipeline_is_green_under_harness(self) -> None:
+        self.run_scenario("if_return_external_args_multi", "START\n5\n", 89, 84)
+
     def test_else_return_external_pipeline_is_green_under_harness(self) -> None:
         self.run_scenario("else_return_external", "TOOL7\n", 72, 68)
 
@@ -383,6 +395,9 @@ class TestToolAbiPipeline(unittest.TestCase):
     def test_do_until_return_branch_mixed_pipeline_is_green_under_harness(self) -> None:
         self.run_scenario("do_until_return_branch_mixed", "START\nTOOL7\n", 126, 99)
 
+    def test_do_until_return_branch_args_mixed_pipeline_is_green_under_harness(self) -> None:
+        self.run_scenario("do_until_return_branch_args_mixed", "START\n5\n7\n", 165, 146)
+
     def test_nested_do_until_return_external_pipeline_is_green_under_harness(self) -> None:
         self.run_scenario("nested_do_until_return_external", "START\nTOOL7\n", 89, 76)
 
@@ -391,6 +406,9 @@ class TestToolAbiPipeline(unittest.TestCase):
 
     def test_while_nested_do_until_return_transitive_pipeline_is_green_under_harness(self) -> None:
         self.run_scenario("while_nested_do_until_return_transitive", "START\nMID\nEND\n", 89, 91)
+
+    def test_while_nested_do_until_return_args_transitive_pipeline_is_green_under_harness(self) -> None:
+        self.run_scenario("while_nested_do_until_return_args_transitive", "START\n10\n", 146, 169)
 
     def test_dense_mixed_nested_shared_transitive_pipeline_is_green_under_harness(self) -> None:
         self.run_scenario("dense_mixed_nested_shared_transitive", "MID2\nEND\nA\nB\nC\nD\nE\nF\nG\nH\nI\nJ\nK\nL\nM\nN\nO\nP\n", 181, 223)

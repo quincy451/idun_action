@@ -724,7 +724,7 @@ collect_proc_body_ops_try_return:
     beq collect_proc_body_ops_try_return_emit
     cmp #13
     beq collect_proc_body_ops_try_return_emit
-    jsr emit_runtime_sum_from_scan_y_or_fail
+    jsr emit_runtime_value_from_scan_y_or_fail
     bcc :+
     jmp collect_proc_body_ops_bad_literal
 : 
@@ -749,7 +749,7 @@ collect_proc_body_ops_try_assignment:
     bcs collect_proc_body_ops_bad_var
     stx assignment_target_index_data
     iny
-    jsr emit_runtime_sum_from_scan_y_or_fail
+    jsr emit_runtime_value_from_scan_y_or_fail
     bcs collect_proc_body_ops_bad_literal
     jsr require_line_end_at_scan_y
     bcs collect_proc_body_ops_bad_literal
@@ -1359,7 +1359,7 @@ emit_call_args_from_scan_y_or_fail_loop:
     pha
     lda call_target_kind
     pha
-    jsr emit_runtime_sum_from_scan_y_or_fail
+    jsr emit_runtime_value_from_scan_y_or_fail
     bcc emit_call_args_from_scan_y_or_fail_restore_ok
     pla
     sta call_target_kind
@@ -1406,6 +1406,84 @@ emit_call_args_from_scan_y_or_fail_ok:
     rts
 emit_call_args_from_scan_y_or_fail_fail:
     sec
+    rts
+
+emit_runtime_value_from_scan_y_or_fail:
+    jsr scan_value_expr_for_bool_tokens_from_scan_y
+    bcc emit_runtime_value_from_scan_y_or_fail_bool
+    jmp emit_runtime_sum_from_scan_y_or_fail
+emit_runtime_value_from_scan_y_or_fail_bool:
+    lda #$00
+    sta bool_ops_used_data
+    jmp emit_runtime_bool_or_from_scan_y_or_fail
+
+scan_value_expr_for_bool_tokens_from_scan_y:
+    sty symbol_start_y_data
+    lda #$00
+    sta hex_work
+scan_value_expr_for_bool_tokens_from_scan_y_loop:
+    lda (scan_ptr),y
+    beq scan_value_expr_for_bool_tokens_from_scan_y_not_found
+    cmp #10
+    beq scan_value_expr_for_bool_tokens_from_scan_y_not_found
+    cmp #13
+    beq scan_value_expr_for_bool_tokens_from_scan_y_not_found
+    cmp #','
+    beq scan_value_expr_for_bool_tokens_from_scan_y_comma
+    cmp #')'
+    beq scan_value_expr_for_bool_tokens_from_scan_y_rparen
+    cmp #'('
+    beq scan_value_expr_for_bool_tokens_from_scan_y_lparen
+    cmp #'='
+    beq scan_value_expr_for_bool_tokens_from_scan_y_found
+    cmp #'<'
+    beq scan_value_expr_for_bool_tokens_from_scan_y_found
+    cmp #'>'
+    beq scan_value_expr_for_bool_tokens_from_scan_y_found
+    jsr uppercase_ascii
+    cmp #'A'
+    beq scan_value_expr_for_bool_tokens_from_scan_y_try_and
+    cmp #'O'
+    beq scan_value_expr_for_bool_tokens_from_scan_y_try_or
+    cmp #'N'
+    beq scan_value_expr_for_bool_tokens_from_scan_y_try_not
+scan_value_expr_for_bool_tokens_from_scan_y_next:
+    iny
+    bne scan_value_expr_for_bool_tokens_from_scan_y_loop
+scan_value_expr_for_bool_tokens_from_scan_y_not_found:
+    ldy symbol_start_y_data
+    sec
+    rts
+scan_value_expr_for_bool_tokens_from_scan_y_comma:
+    lda hex_work
+    beq scan_value_expr_for_bool_tokens_from_scan_y_not_found
+    iny
+    jmp scan_value_expr_for_bool_tokens_from_scan_y_loop
+scan_value_expr_for_bool_tokens_from_scan_y_rparen:
+    lda hex_work
+    beq scan_value_expr_for_bool_tokens_from_scan_y_not_found
+    dec hex_work
+    iny
+    jmp scan_value_expr_for_bool_tokens_from_scan_y_loop
+scan_value_expr_for_bool_tokens_from_scan_y_lparen:
+    inc hex_work
+    iny
+    jmp scan_value_expr_for_bool_tokens_from_scan_y_loop
+scan_value_expr_for_bool_tokens_from_scan_y_try_and:
+    jsr consume_and_keyword_from_scan_y
+    bcc scan_value_expr_for_bool_tokens_from_scan_y_found
+    jmp scan_value_expr_for_bool_tokens_from_scan_y_next
+scan_value_expr_for_bool_tokens_from_scan_y_try_or:
+    jsr consume_or_keyword_from_scan_y
+    bcc scan_value_expr_for_bool_tokens_from_scan_y_found
+    jmp scan_value_expr_for_bool_tokens_from_scan_y_next
+scan_value_expr_for_bool_tokens_from_scan_y_try_not:
+    jsr consume_not_keyword_from_scan_y
+    bcc scan_value_expr_for_bool_tokens_from_scan_y_found
+    jmp scan_value_expr_for_bool_tokens_from_scan_y_next
+scan_value_expr_for_bool_tokens_from_scan_y_found:
+    ldy symbol_start_y_data
+    clc
     rts
 
 emit_runtime_bool_or_from_scan_y_or_fail:
