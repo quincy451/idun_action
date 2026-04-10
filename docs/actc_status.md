@@ -1,6 +1,6 @@
 # `ACTC` Status
 
-Current as of `2026-04-09`.
+Current as of `2026-04-10`.
 
 This file is a focused ledger for the UDOS-native `ACTC.PRG` tool.
 It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/test/action/actionc64u/docs/action_matrix.md).
@@ -186,6 +186,8 @@ Current lowering note:
   `INT A=[0] ... INT P=[15]`, `PrintIE(K)`, `PrintIE(P)`, `P=P+1`
 - [x] proc-local integer storage/read/write reaches the current slot-`F` ceiling with params plus locals:
   `PROC SHOW(Z) INT A ... INT O`, `O=Z+2`, `PrintIE(O)`
+- [x] harness local procedure export tables reach the current slot-`A` ceiling with live calls beyond `7`:
+  `PROC MAIN() P7() P8() P9() RETURN` with `PROC P0() ... PROC P9()`, proving `c8`, `c9`, and `cA` body-op emission
 - [x] identifiers can include digits after the first character across vars, proc names, params, and locals:
   `INT V0=[1]`, `PROC ADD1(N1)`, `INT X2=[N1+1]`, `ADD1(5)`
 - [x] digit-bearing module/proc names compile through command-line module selection and module-header validation:
@@ -276,6 +278,8 @@ Current lowering note:
   `SOURCE_LIMIT = 511`
 - [x] harness `ACTC` string-literal pool widened beyond the old `16`-literal ceiling for dense module graphs:
   `STRING_LITERAL_MAX = 32`
+- [x] harness `ACTC` local export/proc table widened beyond the old `8`-proc ceiling for dense modules:
+  `EXPORT_MAX = 16`
 - [x] current widened control-flow object emission:
   `b p0p1qhe0vp2p3qhe1ve2r`
 - [x] current widened `ELSE` object emission:

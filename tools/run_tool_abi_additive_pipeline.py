@@ -2597,6 +2597,79 @@ SCENARIOS = {
         ),
         "expected_console": "16\n",
     },
+    "export16_local_calls": {
+        "out_fs_name": "harness-actc-alink-avmrun-export16-local-calls",
+        "source": (
+            'MODULE MAIN\r'
+            'PROC MAIN()\r'
+            'P7()\r'
+            'P8()\r'
+            'P9()\r'
+            'RETURN\r'
+            'PROC P0()\r'
+            'RETURN\r'
+            'PROC P1()\r'
+            'RETURN\r'
+            'PROC P2()\r'
+            'RETURN\r'
+            'PROC P3()\r'
+            'RETURN\r'
+            'PROC P4()\r'
+            'RETURN\r'
+            'PROC P5()\r'
+            'RETURN\r'
+            'PROC P6()\r'
+            'RETURN\r'
+            'PROC P7()\r'
+            'PrintE("SEVEN")\r'
+            'RETURN\r'
+            'PROC P8()\r'
+            'PrintE("EIGHT")\r'
+            'RETURN\r'
+            'PROC P9()\r'
+            'PrintE("NINE")\r'
+            'RETURN\r'
+        ),
+        "expected_avo": (
+            "AVO1\n"
+            "x main 0 10\n"
+            "x p0 10 1\n"
+            "x p1 11 1\n"
+            "x p2 12 1\n"
+            "x p3 13 1\n"
+            "x p4 14 1\n"
+            "x p5 15 1\n"
+            "x p6 16 1\n"
+            "x p7 17 7\n"
+            "x p8 24 7\n"
+            "x p9 31 7\n"
+            "b c8c9cAr\n"
+            "b r\n"
+            "b r\n"
+            "b r\n"
+            "b r\n"
+            "b r\n"
+            "b r\n"
+            "b r\n"
+            "b e0r\n"
+            "b e1r\n"
+            "b e2r\n"
+            "s SEVEN\n"
+            "s EIGHT\n"
+            "s NINE\n"
+            "k 2\n"
+            "n main\n"
+        ),
+        "expected_avm": bytes(
+            [
+                65, 86, 77, 49, 2, 50, 0, 0, 0, 1, 33, 0, 69, 12, 0, 69,
+                19, 0, 69, 26, 0, 73, 32, 255, 97, 33, 0, 73, 16, 255, 72,
+                97, 39, 0, 73, 16, 255, 72, 97, 45, 0, 73, 16, 255, 72, 83,
+                69, 86, 69, 78, 0, 69, 73, 71, 72, 84, 0, 78, 73, 78, 69, 0,
+            ]
+        ),
+        "expected_console": "SEVEN\nEIGHT\nNINE\n",
+    },
     "bool_not_external": {
         "out_fs_name": "harness-actc-alink-avmrun-bool-not-external",
         "sources": {

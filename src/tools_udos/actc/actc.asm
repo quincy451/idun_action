@@ -18,6 +18,9 @@ STRING_LITERAL_MAX = 8
 .ifndef VAR_MAX
 VAR_MAX = 16
 .endif
+.ifndef EXPORT_MAX
+EXPORT_MAX = 8
+.endif
 
 IMPORT_PRINT_STR  = $01
 IMPORT_PRINT_LINE = $02
@@ -480,7 +483,7 @@ collect_proc_locals_or_fail_clear_loop:
     sta proc_local_count_data,x
     sta proc_local_var_base_data,x
     inx
-    cpx #8
+    cpx #EXPORT_MAX
     bcc collect_proc_locals_or_fail_clear_loop
     lda #$FF
     sta current_proc_index_data
@@ -2937,7 +2940,7 @@ skip_source_line_done:
 
 store_proc_export_from_scan_ptr_or_fail:
     lda export_count_data
-    cmp #8
+    cmp #EXPORT_MAX
     bcc :+
     lda #<msg_bad_proc
     ldy #>msg_bad_proc
@@ -4094,7 +4097,7 @@ target_path:
 source_buffer:
     .res SOURCE_LIMIT+1
 body_ops_data:
-    .res BODY_OPS_STRIDE * 8
+    .res BODY_OPS_STRIDE * EXPORT_MAX
 string_literals:
     .res 24 * STRING_LITERAL_MAX
 int_values_lo:
@@ -4106,9 +4109,9 @@ var_init_lo:
 var_init_hi:
     .res VAR_MAX
 export_offsets:
-    .res 8
+    .res EXPORT_MAX
 proc_sizes_data:
-    .res 8
+    .res EXPORT_MAX
 string_offsets:
     .res STRING_LITERAL_MAX
 
@@ -4139,13 +4142,13 @@ current_proc_index_data:
 extern_count_data:
     .res 1
 proc_param_count_data:
-    .res 8
+    .res EXPORT_MAX
 proc_param_var_base_data:
-    .res 8
+    .res EXPORT_MAX
 proc_local_count_data:
-    .res 8
+    .res EXPORT_MAX
 proc_local_var_base_data:
-    .res 8
+    .res EXPORT_MAX
 loop_depth_data:
     .res 1
 loop_kind_stack:
@@ -4195,7 +4198,7 @@ bool_ops_used_data:
 hex_work:
     .res 1
 export_names:
-    .res 200
+    .res 25 * EXPORT_MAX
 external_names:
     .res 200
 var_names:

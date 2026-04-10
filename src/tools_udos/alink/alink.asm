@@ -18,6 +18,9 @@ STRING_LITERAL_MAX = 8
 .ifndef VAR_MAX
 VAR_MAX = 16
 .endif
+.ifndef EXPORT_MAX
+EXPORT_MAX = 8
+.endif
 .if STRING_LITERAL_MAX > 32
 .error "STRING_LITERAL_MAX > 32 not supported"
 .endif
@@ -241,7 +244,7 @@ parse_exports_done:
 
 copy_export_symbol_line_or_fail:
     lda export_count
-    cmp #8
+    cmp #EXPORT_MAX
     bcc :+
     lda #<msg_bad_avo
     ldy #>msg_bad_avo
@@ -963,7 +966,7 @@ build_live_set:
     lda #$00
     ldx #$00
 build_live_set_clear_loop:
-    cpx #8
+    cpx #EXPORT_MAX
     beq build_live_set_seed
     sta live_flags,x
     inx
@@ -1483,7 +1486,7 @@ add_root_return_bonus_from_x_done:
 copy_current_export_layout_to_root:
     ldx #$00
 copy_current_export_layout_to_root_loop:
-    cpx #8
+    cpx #EXPORT_MAX
     beq copy_current_export_layout_to_root_done
     lda current_export_offsets_lo,x
     sta root_export_offsets_lo,x
@@ -3785,11 +3788,11 @@ content_buffer_pad:
 content_buffer:
     .res 256
 export_names:
-    .res 200
+    .res 25 * EXPORT_MAX
 export_offsets:
-    .res 8
+    .res EXPORT_MAX
 proc_sizes:
-    .res 8
+    .res EXPORT_MAX
 var_names:
     .res 25 * VAR_MAX
 var_init_lo:
@@ -3799,13 +3802,13 @@ var_init_hi:
 var_count:
     .res 1
 root_export_offsets_lo:
-    .res 8
+    .res EXPORT_MAX
 root_export_offsets_hi:
-    .res 8
+    .res EXPORT_MAX
 current_export_offsets_lo:
-    .res 8
+    .res EXPORT_MAX
 current_export_offsets_hi:
-    .res 8
+    .res EXPORT_MAX
 root_var_offsets_lo:
     .res VAR_MAX
 root_var_offsets_hi:
@@ -3867,13 +3870,13 @@ loop_offsets_lo:
 loop_offsets_hi:
     .res 8
 live_flags:
-    .res 8
+    .res EXPORT_MAX
 string_use_mask:
     .res STRING_MASK_BYTES
 saved_string_use_mask:
     .res STRING_MASK_BYTES
 body_ops_data:
-    .res BODY_OPS_STRIDE * 8
+    .res BODY_OPS_STRIDE * EXPORT_MAX
 manifest_entry:
     .res 32
 external_names:

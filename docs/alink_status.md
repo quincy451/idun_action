@@ -1,6 +1,6 @@
 # `ALINK` Status
 
-Current as of `2026-04-09`.
+Current as of `2026-04-10`.
 
 This file is a focused ledger for the UDOS-native `ALINK.PRG` tool.
 It tracks the real linker slice separately from the broader [action_matrix.md](/mnt/c/test/action/actionc64u/docs/action_matrix.md).
@@ -114,6 +114,8 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
   `INT A=[0] ... INT P=[15]`, `PrintIE(K)`, `PrintIE(P)`, `P=P+1`
 - [x] also loads proc-local integer storage/read/write at the current slot-`F` ceiling with params plus locals:
   `PROC SHOW(Z) INT A ... INT O`, `O=Z+2`, `PrintIE(O)`
+- [x] also loads harness local procedure export tables beyond the old `8`-proc ceiling:
+  `PROC MAIN() P7() P8() P9() RETURN` with `PROC P0() ... PROC P9()`, proving linker parse/live-set/emit of `c8`, `c9`, and `cA`
 - [x] also loads digit-bearing symbol names in compiler-emitted object metadata:
   `v v0 1`, `v n1 0`, `v x2 0`, and `x add1 ...`
 - [x] also resolves digit-bearing external module/proc names:
