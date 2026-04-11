@@ -2750,6 +2750,7 @@ skip_inline_spaces_at_scan_y_advance:
 compute_payload_layout:
     lda #$00
     sta payload_offset
+    sta payload_offset_hi
     sta proc_index
 compute_payload_layout_loop:
     ldx proc_index
@@ -2759,6 +2760,8 @@ compute_payload_layout_loop:
 :
     lda payload_offset
     sta export_offsets,x
+    lda payload_offset_hi
+    sta export_offsets_hi,x
     lda #1
     sta proc_sizes_data,x
     jsr set_body_ptr_from_x
@@ -2891,6 +2894,9 @@ compute_payload_layout_ret:
     lda payload_offset
     adc proc_sizes_data,x
     sta payload_offset
+    bcc :+
+    inc payload_offset_hi
+: 
     inc proc_index
     jmp compute_payload_layout_loop
 compute_payload_layout_done:
@@ -2908,10 +2914,16 @@ compute_payload_layout_string_len_loop:
     lda (body_ptr),y
     beq compute_payload_layout_string_done
     inc payload_offset
+    bne :+
+    inc payload_offset_hi
+: 
     iny
     bne compute_payload_layout_string_len_loop
 compute_payload_layout_string_done:
     inc payload_offset
+    bne :+
+    inc payload_offset_hi
+: 
     pla
     tax
     inx
@@ -3699,7 +3711,8 @@ append_export_list_symbol_done:
     jsr append_char
     ldx export_index
     lda export_offsets,x
-    jsr append_small_decimal
+    ldy export_offsets_hi,x
+    jsr append_word_decimal
     lda #' '
     jsr append_char
     ldx export_index
@@ -3929,6 +3942,118 @@ append_small_decimal_ones_pop:
     adc #'0'
     jmp append_char
 
+append_word_decimal:
+    sta expr_value_lo
+    sty compare_char
+    lda #$00
+    sta expr_digit_count
+    ldx #$00
+append_word_decimal_10000_loop:
+    lda compare_char
+    cmp #$27
+    bcc append_word_decimal_10000_done
+    bne append_word_decimal_10000_sub
+    lda expr_value_lo
+    cmp #$10
+    bcc append_word_decimal_10000_done
+append_word_decimal_10000_sub:
+    lda expr_value_lo
+    sec
+    sbc #$10
+    sta expr_value_lo
+    lda compare_char
+    sbc #$27
+    sta compare_char
+    inx
+    bne append_word_decimal_10000_loop
+append_word_decimal_10000_done:
+    txa
+    jsr append_word_decimal_emit_digit_if_needed
+    ldx #$00
+append_word_decimal_1000_loop:
+    lda compare_char
+    cmp #$03
+    bcc append_word_decimal_1000_done
+    bne append_word_decimal_1000_sub
+    lda expr_value_lo
+    cmp #$E8
+    bcc append_word_decimal_1000_done
+append_word_decimal_1000_sub:
+    lda expr_value_lo
+    sec
+    sbc #$E8
+    sta expr_value_lo
+    lda compare_char
+    sbc #$03
+    sta compare_char
+    inx
+    bne append_word_decimal_1000_loop
+append_word_decimal_1000_done:
+    txa
+    jsr append_word_decimal_emit_digit_if_needed
+    ldx #$00
+append_word_decimal_100_loop:
+    lda compare_char
+    bne append_word_decimal_100_sub
+    lda expr_value_lo
+    cmp #100
+    bcc append_word_decimal_100_done
+append_word_decimal_100_sub:
+    lda expr_value_lo
+    sec
+    sbc #100
+    sta expr_value_lo
+    lda compare_char
+    sbc #$00
+    sta compare_char
+    inx
+    bne append_word_decimal_100_loop
+append_word_decimal_100_done:
+    txa
+    jsr append_word_decimal_emit_digit_if_needed
+    ldx #$00
+append_word_decimal_10_loop:
+    lda compare_char
+    bne append_word_decimal_10_sub
+    lda expr_value_lo
+    cmp #10
+    bcc append_word_decimal_10_done
+append_word_decimal_10_sub:
+    lda expr_value_lo
+    sec
+    sbc #10
+    sta expr_value_lo
+    lda compare_char
+    sbc #$00
+    sta compare_char
+    inx
+    bne append_word_decimal_10_loop
+append_word_decimal_10_done:
+    txa
+    jsr append_word_decimal_emit_digit_if_needed
+    lda expr_value_lo
+    clc
+    adc #'0'
+    jmp append_char
+
+append_word_decimal_emit_digit_if_needed:
+    pha
+    txa
+    bne append_word_decimal_emit_digit
+    lda expr_digit_count
+    beq append_word_decimal_skip_digit
+append_word_decimal_emit_digit:
+    pla
+    clc
+    adc #'0'
+    jsr append_char
+    lda #$01
+    sta expr_digit_count
+    rts
+append_word_decimal_skip_digit:
+    pla
+    rts
+
 append_const_ptr:
     ldy #$00
 append_const_ptr_loop:
@@ -4122,6 +4247,8 @@ var_init_hi:
     .res VAR_MAX
 export_offsets:
     .res EXPORT_MAX
+export_offsets_hi:
+    .res EXPORT_MAX
 proc_sizes_data:
     .res EXPORT_MAX
 string_offsets:
@@ -4165,6 +4292,8 @@ loop_depth_data:
     .res 1
 loop_kind_stack:
     .res LOOP_MAX
+payload_offset_hi:
+    .res 1
 expr_saved_lo:
     .res 1
 expr_compare_lo:

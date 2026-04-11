@@ -82,6 +82,8 @@ Current lowering note:
   `PROC F() PrintIE(0..30) RETURN`, `PROC G() PrintIE(31..34) RETURN`, `PROC MAIN() PrintIE(35) RETURN`
 - [x] dense local-call proc bodies widened beyond the old `96`-char harness ceiling:
   `PROC MAIN() T() ... T() PrintIE(X) RETURN` with `74` local calls in one body
+- [x] compiler-emitted export offsets now print past `255` on the harness line:
+  `PROC T() RETURN`, `PROC F() T() ...`, `PROC G() T() ...`, `PROC MAIN() PrintE("OK") RETURN`, proving `x main 261 7` in one `AVO1`
 - [x] high string-index control flow under `IF/ELSE`:
   `IF 1 = 0 THEN ... ELSE PrintE("I") ... PrintE("P") FI`
 - [x] high string-index loop bodies:

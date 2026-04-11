@@ -3249,6 +3249,44 @@ SCENARIOS = {
         ),
         "expected_console": "77\n",
     },
+    "code268_dead_local_calls": {
+        "out_fs_name": "harness-actc-alink-avmrun-code268-dead-local-calls",
+        "source": (
+            'MODULE MAIN\r'
+            'PROC T()\r'
+            'RETURN\r'
+            'PROC F()\r'
+            + ('T()\r' * 40)
+            + 'RETURN\r'
+            'PROC G()\r'
+            + ('T()\r' * 46)
+            + 'RETURN\r'
+            'PROC MAIN()\r'
+            'PrintE("OK")\r'
+            'RETURN\r'
+        ),
+        "expected_avo": (
+            "AVO1\n"
+            "x t 0 1\n"
+            "x f 1 121\n"
+            "x g 122 139\n"
+            "x main 261 7\n"
+            "b r\n"
+            + "b " + ("c0" * 40) + "r\n"
+            + "b " + ("c0" * 46) + "r\n"
+            + "b e0r\n"
+            "s OK\n"
+            "k 2\n"
+            "n main\n"
+        ),
+        "expected_avm": bytes(
+            [
+                65, 86, 77, 49, 2, 12, 0, 0, 0, 1, 9, 0, 97, 9, 0, 73,
+                16, 255, 73, 32, 255, 79, 75, 0,
+            ]
+        ),
+        "expected_console": "OK\n",
+    },
     "bool_not_external": {
         "out_fs_name": "harness-actc-alink-avmrun-bool-not-external",
         "sources": {

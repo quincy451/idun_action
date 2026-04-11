@@ -132,6 +132,8 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
   `payload265_local_calls` proves a `265`-byte `BIN/MAIN.AVM`
 - [x] harness linker payload path now emits payloads beyond the old `255`-byte payload ceiling:
   `payload269_local_calls` proves a `257`-byte payload in a `269`-byte `BIN/MAIN.AVM`
+- [x] harness linker now parses and scans compiler-emitted source code spans past `255` bytes:
+  `code268_dead_local_calls` proves an object with `x main 261 7` and total source code span `268`, while dead-strip still links a `24`-byte `BIN/MAIN.AVM`
 - [x] also loads direct comparison-operator `ACTC` output for:
   `PrintIE(2 <> 3)`, `PrintIE(2 < 3)`, `PrintIE(3 <= 3)`, `PrintIE(4 >= 3)`
 - [x] also loads high string-index `ACTC` output through `Z` with dead-stripped locals:

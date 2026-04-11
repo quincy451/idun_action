@@ -238,9 +238,12 @@ parse_exports_loop:
     jsr advance_scan_ptr_by_const_ptr
     jsr copy_export_symbol_line_or_fail
     jsr require_space_or_fail
-    jsr parse_decimal_byte_or_fail
+    jsr parse_decimal_word_or_fail
     ldx export_count
+    lda current_bit_lo
     sta export_offsets,x
+    lda current_bit_hi
+    sta export_offsets_hi,x
     jsr require_space_or_fail
     jsr parse_decimal_byte_or_fail
     ldx export_count
@@ -921,21 +924,93 @@ require_space_or_fail_ok:
 compute_code_bytes:
     lda #$00
     sta payload_bytes_data
+    sta payload_bytes_data_hi
     ldx #$00
 compute_code_bytes_loop:
     cpx export_count
     beq compute_code_bytes_done
     lda export_offsets,x
+    sta current_bit_lo
+    lda export_offsets_hi,x
+    sta current_bit_hi
     clc
+    lda current_bit_lo
     adc proc_sizes,x
+    sta current_bit_lo
+    bcc :+
+    inc current_bit_hi
+:   lda current_bit_hi
+    cmp payload_bytes_data_hi
+    bcc compute_code_bytes_next
+    bne compute_code_bytes_store
+    lda current_bit_lo
     cmp payload_bytes_data
     bcc compute_code_bytes_next
+compute_code_bytes_store:
+    lda current_bit_lo
     sta payload_bytes_data
+    lda current_bit_hi
+    sta payload_bytes_data_hi
 compute_code_bytes_next:
     inx
     bne compute_code_bytes_loop
 compute_code_bytes_done:
     rts
+
+parse_decimal_word_or_fail:
+    lda #$00
+    sta current_bit_lo
+    sta current_bit_hi
+    sta compare_char
+parse_decimal_word_or_fail_loop:
+    ldy #$00
+    lda (scan_ptr),y
+    cmp #'0'
+    bcc parse_decimal_word_or_fail_done_check
+    cmp #'9'+1
+    bcs parse_decimal_word_or_fail_done_check
+    sec
+    sbc #'0'
+    pha
+    lda current_bit_lo
+    sta parse_word_temp_lo
+    lda current_bit_hi
+    sta parse_word_temp_hi
+    asl current_bit_lo
+    rol current_bit_hi
+    asl parse_word_temp_lo
+    rol parse_word_temp_hi
+    asl parse_word_temp_lo
+    rol parse_word_temp_hi
+    asl parse_word_temp_lo
+    rol parse_word_temp_hi
+    clc
+    lda current_bit_lo
+    adc parse_word_temp_lo
+    sta current_bit_lo
+    lda current_bit_hi
+    adc parse_word_temp_hi
+    sta current_bit_hi
+    bcs parse_decimal_word_or_fail_bad
+    pla
+    clc
+    adc current_bit_lo
+    sta current_bit_lo
+    bcc :+
+    inc current_bit_hi
+    beq parse_decimal_word_or_fail_bad
+:   lda #$01
+    sta compare_char
+    jsr advance_scan_ptr
+    jmp parse_decimal_word_or_fail_loop
+parse_decimal_word_or_fail_done_check:
+    lda compare_char
+    beq parse_decimal_word_or_fail_bad
+    rts
+parse_decimal_word_or_fail_bad:
+    lda #<msg_bad_avo
+    ldy #>msg_bad_avo
+    jmp fail_with_ptr
 
 parse_decimal_byte_or_fail:
     lda #$00
@@ -1348,11 +1423,16 @@ layout_external_object_strings_from_x_or_fail:
 
 layout_current_object_code_or_fail:
     lda #$00
+    sta main_flags_lo
     sta main_flags_hi
 layout_current_object_code_loop:
     lda main_flags_hi
+    cmp payload_bytes_data_hi
+    bne :+
+    lda main_flags_lo
     cmp payload_bytes_data
     beq layout_current_object_code_done
+: 
     jsr find_live_export_at_current_offset
     bcs layout_current_object_code_gap
     stx export_index
@@ -1365,15 +1445,17 @@ layout_current_object_code_loop:
     ldx export_index
     jsr add_proc_size_to_layout_from_x
     clc
-    lda main_flags_hi
+    lda main_flags_lo
     adc proc_sizes,x
-    sta main_flags_hi
+    sta main_flags_lo
     bcc layout_current_object_code_loop
-    beq layout_current_object_code_done
+    inc main_flags_hi
     jmp layout_current_object_code_loop
 layout_current_object_code_gap:
-    inc main_flags_hi
+    inc main_flags_lo
     bne layout_current_object_code_loop
+    inc main_flags_hi
+    jmp layout_current_object_code_loop
 layout_current_object_code_done:
     rts
 
@@ -1660,11 +1742,15 @@ emit_external_object_code_from_x_or_fail:
     sta save_mode
     stx pending_active_index
     jsr load_pending_string_use_mask_from_x
+    lda main_flags_lo
+    sta saved_state_lo
     lda main_flags_hi
     sta saved_state_hi
     jsr layout_current_object_code_or_fail
     lda #$53
     sta debug_phase_zp
+    lda saved_state_lo
+    sta main_flags_lo
     lda saved_state_hi
     sta main_flags_hi
     jsr emit_current_object_code_or_fail
@@ -1775,31 +1861,42 @@ load_current_object_link_state_or_fail:
 
 emit_current_object_code_or_fail:
     lda #$00
+    sta current_bit_lo
     sta current_bit_hi
 emit_current_object_code_loop:
     lda current_bit_hi
+    cmp payload_bytes_data_hi
+    bne :+
+    lda current_bit_lo
     cmp payload_bytes_data
     beq emit_current_object_code_done
+: 
     jsr find_live_export_at_emit_offset
     bcs emit_current_object_code_gap
     stx export_index
     ldx export_index
+    lda current_bit_lo
+    pha
     lda current_bit_hi
     pha
     jsr emit_live_bytes_for_export_x_or_fail
     pla
     sta current_bit_hi
+    pla
+    sta current_bit_lo
     ldx export_index
     clc
-    lda current_bit_hi
+    lda current_bit_lo
     adc proc_sizes,x
-    sta current_bit_hi
+    sta current_bit_lo
     bcc emit_current_object_code_loop
-    beq emit_current_object_code_done
+    inc current_bit_hi
     jmp emit_current_object_code_loop
 emit_current_object_code_gap:
-    inc current_bit_hi
+    inc current_bit_lo
     bne emit_current_object_code_loop
+    inc current_bit_hi
+    jmp emit_current_object_code_loop
 emit_current_object_code_done:
     rts
 
@@ -1810,8 +1907,11 @@ find_live_export_at_emit_offset_loop:
     beq find_live_export_at_emit_offset_fail
     lda live_flags,x
     beq find_live_export_at_emit_offset_next
-    lda export_offsets,x
+    lda export_offsets_hi,x
     cmp current_bit_hi
+    bne find_live_export_at_emit_offset_next
+    lda export_offsets,x
+    cmp current_bit_lo
     beq find_live_export_at_emit_offset_done
 find_live_export_at_emit_offset_next:
     inx
@@ -3367,8 +3467,11 @@ find_live_export_at_current_offset_loop:
     beq find_live_export_at_current_offset_fail
     lda live_flags,x
     beq find_live_export_at_current_offset_next
-    lda export_offsets,x
+    lda export_offsets_hi,x
     cmp main_flags_hi
+    bne find_live_export_at_current_offset_next
+    lda export_offsets,x
+    cmp main_flags_lo
     beq find_live_export_at_current_offset_done
 find_live_export_at_current_offset_next:
     inx
@@ -3814,6 +3917,8 @@ export_names:
     .res 25 * EXPORT_MAX
 export_offsets:
     .res EXPORT_MAX
+export_offsets_hi:
+    .res EXPORT_MAX
 proc_sizes:
     .res EXPORT_MAX
 var_names:
@@ -3872,11 +3977,17 @@ saved_state_lo:
     .res 1
 saved_state_hi:
     .res 1
+parse_word_temp_lo:
+    .res 1
+parse_word_temp_hi:
+    .res 1
 truncated_flag:
     .res 1
 debug_phase_zp:
     .res 1
 payload_bytes_data:
+    .res 1
+payload_bytes_data_hi:
     .res 1
 code_limit_data:
     .res 1
