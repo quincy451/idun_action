@@ -22,6 +22,20 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
 - [x] Narrow exact-byte proof exists for the emitted image
 - [x] Narrow integrated proof exists through `ALINK -> AVMRUN`
 - [x] Narrow integrated proof also exists through `ACTC -> ALINK -> AVMRUN`
+- [x] Current shipped UDOS build links again under the real target after widening the tool load window from `$2000` to `$4000`
+- [x] Current workspace exporter is green again with `--build-udos-tools`
+
+Current real-target build note:
+
+- `./tools/build_alink_udos.sh` is green again
+- current shipped `ALINK` map footprint is:
+  - `CODE`: `$204B`
+  - `BSS`: `$0B06`
+  - total runtime span from `$0900` through `$3450`
+- `make -C ../udos vice-action-alink` now reaches:
+  - `RUN ALINK.PRG`
+  - `ARGS MAIN`
+- the next real-target blocker is no longer launch or ld65 overflow; it is the in-tool `LOAD FAIL` path after launch
 
 ## Proven Linker Behaviors
 

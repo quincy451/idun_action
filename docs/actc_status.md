@@ -18,6 +18,15 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
 - [x] Emits current inferred runtime-import lines
 - [x] Supports the current narrow decimal print-expression subset for object emission
 - [x] Integrated narrow proof exists through `ACTC -> ALINK -> AVMRUN`
+- [x] Current shipped UDOS build links again under the real target after widening the tool load window from `$2000` to `$4000`
+
+Current real-target build note:
+
+- `./tools/build_actc_udos.sh` is green again
+- current shipped `ACTC` map footprint is:
+  - `CODE`: `$24B9`
+  - `BSS`: `$06F9`
+  - total runtime span from `$0900` through `$34B1`
 
 Current lowering note:
 

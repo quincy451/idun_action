@@ -12,6 +12,8 @@ INC="$BUILD_DIR/udos_services.inc"
 OBJ="$BUILD_DIR/alink.o"
 BIN="$BUILD_DIR/alink.bin"
 PRG="$BUILD_DIR/ALINK.PRG"
+CURRENT_LABELS="$BUILD_DIR/alink.current.labels"
+CURRENT_MAP="$BUILD_DIR/alink.current.map"
 
 mkdir -p "$BUILD_DIR"
 
@@ -26,7 +28,7 @@ fi
 python3 "$ROOT_DIR/tools/generate_udos_service_inc.py" --labels "$LABELS" --output "$INC"
 
 ca65 -g -o "$OBJ" "$SRC" -I "$BUILD_DIR"
-ld65 -C "$CFG" -o "$BIN" "$OBJ"
+ld65 -C "$CFG" -o "$BIN" "$OBJ" -Ln "$CURRENT_LABELS" -m "$CURRENT_MAP"
 printf '\x00\x09' > "$PRG"
 cat "$BIN" >> "$PRG"
 printf '%s\n' "$PRG"
