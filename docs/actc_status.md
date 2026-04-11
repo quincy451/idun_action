@@ -84,6 +84,8 @@ Current lowering note:
   `PROC MAIN() T() ... T() PrintIE(X) RETURN` with `74` local calls in one body
 - [x] compiler-emitted export offsets now print past `255` on the harness line:
   `PROC T() RETURN`, `PROC F() T() ...`, `PROC G() T() ...`, `PROC MAIN() PrintE("OK") RETURN`, proving `x main 261 7` in one `AVO1`
+- [x] compiler-emitted proc sizes now print past `255` on the harness line:
+  `PROC BIG() PrintI(X) ... RETURN`, `PROC MAIN() PrintE("OK") RETURN`, proving `x big 0 259`
 - [x] high string-index control flow under `IF/ELSE`:
   `IF 1 = 0 THEN ... ELSE PrintE("I") ... PrintE("P") FI`
 - [x] high string-index loop bodies:

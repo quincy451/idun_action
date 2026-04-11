@@ -2764,6 +2764,8 @@ compute_payload_layout_loop:
     sta export_offsets_hi,x
     lda #1
     sta proc_sizes_data,x
+    lda #0
+    sta proc_sizes_hi,x
     jsr set_body_ptr_from_x
     ldy #$00
 compute_payload_layout_body_loop:
@@ -2831,40 +2833,30 @@ compute_payload_layout_body_loop:
     beq compute_payload_layout_add_single
     jmp compute_payload_layout_bad
 compute_payload_layout_add_call:
-    clc
-    lda proc_sizes_data,x
-    adc #3
-    sta proc_sizes_data,x
+    lda #3
+    jsr add_a_to_proc_size_x
     iny
     iny
     jmp compute_payload_layout_body_loop
 compute_payload_layout_add_string:
-    clc
-    lda proc_sizes_data,x
-    adc #6
-    sta proc_sizes_data,x
+    lda #6
+    jsr add_a_to_proc_size_x
     iny
     iny
     jmp compute_payload_layout_body_loop
 compute_payload_layout_add_single:
-    clc
-    lda proc_sizes_data,x
-    adc #1
-    sta proc_sizes_data,x
+    lda #1
+    jsr add_a_to_proc_size_x
     iny
     jmp compute_payload_layout_body_loop
 compute_payload_layout_add_single_int:
-	    clc
-	    lda proc_sizes_data,x
-	    adc #3
-	    sta proc_sizes_data,x
+	    lda #3
+	    jsr add_a_to_proc_size_x
 	    iny
 	    jmp compute_payload_layout_body_loop
 compute_payload_layout_add_single_int_pair:
-	    clc
-	    lda proc_sizes_data,x
-	    adc #3
-	    sta proc_sizes_data,x
+	    lda #3
+	    jsr add_a_to_proc_size_x
 	    iny
 	    iny
 	    jmp compute_payload_layout_body_loop
@@ -2872,10 +2864,8 @@ compute_payload_layout_add_zero:
 	    iny
 	    jmp compute_payload_layout_body_loop
 compute_payload_layout_add_int:
-    clc
-    lda proc_sizes_data,x
-    adc #6
-    sta proc_sizes_data,x
+    lda #6
+    jsr add_a_to_proc_size_x
     iny
     iny
     beq :+
@@ -2883,20 +2873,24 @@ compute_payload_layout_add_int:
 :
 compute_payload_layout_ret:
     cpy #$00
-    beq :+
+    beq compute_payload_layout_ret_add
     dey
     lda (body_ptr),y
     cmp #'r'
-    bne :+
+    bne compute_payload_layout_ret_add
+    lda proc_sizes_data,x
+    bne compute_payload_layout_ret_dec
+    dec proc_sizes_hi,x
+compute_payload_layout_ret_dec:
     dec proc_sizes_data,x
-:
+compute_payload_layout_ret_add:
     clc
     lda payload_offset
     adc proc_sizes_data,x
     sta payload_offset
-    bcc :+
-    inc payload_offset_hi
-: 
+    lda payload_offset_hi
+    adc proc_sizes_hi,x
+    sta payload_offset_hi
     inc proc_index
     jmp compute_payload_layout_loop
 compute_payload_layout_done:
@@ -3717,7 +3711,8 @@ append_export_list_symbol_done:
     jsr append_char
     ldx export_index
     lda proc_sizes_data,x
-    jsr append_small_decimal
+    ldy proc_sizes_hi,x
+    jsr append_word_decimal
     jsr append_newline
     inc export_index
     jmp append_export_list_loop
@@ -4054,6 +4049,15 @@ append_word_decimal_skip_digit:
     pla
     rts
 
+add_a_to_proc_size_x:
+    clc
+    adc proc_sizes_data,x
+    sta proc_sizes_data,x
+    bcc add_a_to_proc_size_x_done
+    inc proc_sizes_hi,x
+add_a_to_proc_size_x_done:
+    rts
+
 append_const_ptr:
     ldy #$00
 append_const_ptr_loop:
@@ -4250,6 +4254,8 @@ export_offsets:
 export_offsets_hi:
     .res EXPORT_MAX
 proc_sizes_data:
+    .res EXPORT_MAX
+proc_sizes_hi:
     .res EXPORT_MAX
 string_offsets:
     .res STRING_LITERAL_MAX

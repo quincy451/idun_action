@@ -3287,6 +3287,37 @@ SCENARIOS = {
         ),
         "expected_console": "OK\n",
     },
+    "proc259_dead_printi_var": {
+        "out_fs_name": "harness-actc-alink-avmrun-proc259-dead-printi-var",
+        "source": (
+            'MODULE MAIN\r'
+            'INT X=[0]\r'
+            'PROC BIG()\r'
+            + ('PrintI(X)\r' * 43)
+            + 'RETURN\r'
+            'PROC MAIN()\r'
+            'PrintE("OK")\r'
+            'RETURN\r'
+        ),
+        "expected_avo": (
+            "AVO1\n"
+            "x big 0 259\n"
+            "x main 259 7\n"
+            + "b " + ("L0y" * 43) + "r\n"
+            + "b e0r\n"
+            + "s OK\n"
+            + "v x 0\n"
+            + "k 7\n"
+            + "n main\n"
+        ),
+        "expected_avm": bytes(
+            [
+                65, 86, 77, 49, 2, 14, 0, 0, 0, 1, 9, 0, 97, 11, 0, 73,
+                16, 255, 73, 32, 255, 0, 0, 79, 75, 0,
+            ]
+        ),
+        "expected_console": "OK\n",
+    },
     "bool_not_external": {
         "out_fs_name": "harness-actc-alink-avmrun-bool-not-external",
         "sources": {

@@ -236,6 +236,9 @@ class TestToolAbiPipeline(unittest.TestCase):
     def test_code268_dead_local_calls_pipeline_is_green_under_harness(self) -> None:
         self.run_scenario("code268_dead_local_calls", "OK\n", 254, 24)
 
+    def test_proc259_dead_printi_var_pipeline_is_green_under_harness(self) -> None:
+        self.run_scenario("proc259_dead_printi_var", "OK\n", 191, 26)
+
     def test_bool_not_external_pipeline_is_green_under_harness(self) -> None:
         self.run_scenario("bool_not_external", "OK\n", 77, 59)
 

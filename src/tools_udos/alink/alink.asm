@@ -245,9 +245,12 @@ parse_exports_loop:
     lda current_bit_hi
     sta export_offsets_hi,x
     jsr require_space_or_fail
-    jsr parse_decimal_byte_or_fail
+    jsr parse_decimal_word_or_fail
     ldx export_count
+    lda current_bit_lo
     sta proc_sizes,x
+    lda current_bit_hi
+    sta proc_sizes_hi,x
     inc export_count
 parse_exports_next_line:
     jsr skip_current_line
@@ -937,9 +940,10 @@ compute_code_bytes_loop:
     lda current_bit_lo
     adc proc_sizes,x
     sta current_bit_lo
-    bcc :+
-    inc current_bit_hi
-:   lda current_bit_hi
+    lda current_bit_hi
+    adc proc_sizes_hi,x
+    sta current_bit_hi
+    lda current_bit_hi
     cmp payload_bytes_data_hi
     bcc compute_code_bytes_next
     bne compute_code_bytes_store
@@ -1448,8 +1452,9 @@ layout_current_object_code_loop:
     lda main_flags_lo
     adc proc_sizes,x
     sta main_flags_lo
-    bcc layout_current_object_code_loop
-    inc main_flags_hi
+    lda main_flags_hi
+    adc proc_sizes_hi,x
+    sta main_flags_hi
     jmp layout_current_object_code_loop
 layout_current_object_code_gap:
     inc main_flags_lo
@@ -1549,9 +1554,10 @@ add_proc_size_to_layout_from_x:
     lda current_bit_lo
     adc proc_sizes,x
     sta current_bit_lo
-    bcc :+
-    inc current_bit_hi
-:   lda save_mode
+    lda current_bit_hi
+    adc proc_sizes_hi,x
+    sta current_bit_hi
+    lda save_mode
     bne add_proc_size_to_layout_from_x_done
     txa
     cmp entry_export_index
@@ -1889,8 +1895,9 @@ emit_current_object_code_loop:
     lda current_bit_lo
     adc proc_sizes,x
     sta current_bit_lo
-    bcc emit_current_object_code_loop
-    inc current_bit_hi
+    lda current_bit_hi
+    adc proc_sizes_hi,x
+    sta current_bit_hi
     jmp emit_current_object_code_loop
 emit_current_object_code_gap:
     inc current_bit_lo
@@ -3920,6 +3927,8 @@ export_offsets:
 export_offsets_hi:
     .res EXPORT_MAX
 proc_sizes:
+    .res EXPORT_MAX
+proc_sizes_hi:
     .res EXPORT_MAX
 var_names:
     .res 25 * VAR_MAX

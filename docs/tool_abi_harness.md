@@ -116,6 +116,7 @@ Recent harness-proven widening additions now covered by named scenarios:
 - `payload265_local_calls`: linker payload emission widened past the old `256`-byte image ceiling, proving `77` local calls plus `PrintIE(X)` link into a `265`-byte `MAIN.AVM`
 - `payload269_local_calls`: linker payload emission widened past the old `255`-byte payload ceiling, proving `77` local calls plus three module vars link into a `269`-byte `MAIN.AVM`
 - `code268_dead_local_calls`: compiler/linker source code-span bookkeeping widened past `255`, proving one object can carry `x main 261 7` and total source code span `268` while dead-strip still links a `24`-byte `MAIN.AVM`
+- `proc259_dead_printi_var`: compiler/linker proc-size bookkeeping widened past `255`, proving one object can carry `x big 0 259` while dead-strip still links a `26`-byte `MAIN.AVM`
 - `if_return_external_args_multi`: multi-arg external calls under branch-gated early return
 - `do_until_return_branch_args_mixed`: mixed local/external multi-arg calls under `DO ... UNTIL ... OD` early return
 - `while_nested_do_until_return_args_transitive`: nested mixed-loop early return with multi-arg transitive external calls
