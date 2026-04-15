@@ -100,8 +100,14 @@ save_manifest_buffer:
     sta save_params+2
     lda #>manifest_buffer
     sta save_params+3
-    lda #$00
-    sta save_params+4
+    ldy #$00
+save_manifest_buffer_len_loop:
+    lda manifest_buffer,y
+    beq save_manifest_buffer_len_done
+    iny
+    bne save_manifest_buffer_len_loop
+save_manifest_buffer_len_done:
+    sty save_params+4
     sta save_params+5
     lda #tool_file_status_fail
     sta save_params+6
