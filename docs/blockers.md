@@ -1,50 +1,27 @@
 # Current Blockers
 
-The current workspace does not yet have the toolchain pieces needed to build and
-run `vmhello.com` end to end.
+No local UDOS-native blocker is recorded right now.
 
-## Missing Here Now
+## Active Path
 
-- missing command: ca65
-- missing command: ld65
-- missing file: Acheron generated include (/mnt/c/test/action/actionc64u/../acheronvm/bin/acheron.inc)
-- missing file: Acheron runtime object (/mnt/c/test/action/actionc64u/../acheronvm/obj/acheron.o)
-- missing file: CP/M-65 cpmemu (/mnt/c/test/action/actionc64u/../cpm65-u64/bin/cpmemu)
+The active runtime path is the standalone UDOS toolchain for the C64 Ultimate
+environment. Work should target the UDOS resident, the `src/tools_udos/`
+programs, and the host-side UDOS/Vice harnesses.
 
-## Commands to Unblock
+## Current Gates
 
-Install the cc65 toolchain on Debian/Ubuntu so `ca65` and `ld65` exist:
+Use these from `/mnt/c/test/action/udos` when validating compiler/linker
+progress:
 
 ```bash
-sudo apt-get update
-sudo apt-get install -y cc65
+make PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-actc
+make PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-alink
+make PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-alink-avmrun
+make PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-actc-alink-avmrun
 ```
 
-Build the local AcheronVM runtime and generated include file:
+## Legacy Reference
 
-```bash
-cd /mnt/c/test/action/acheronvm
-make acheron
-```
-
-Build the local CP/M-65 tree so `bin/cpmemu` exists:
-
-```bash
-cd /mnt/c/test/action/cpm65-u64
-make LLVM=<path-to-llvm-mos-bin>/ -j$(nproc)
-```
-
-If you want the llvm-mos fallback path available too, ensure
-`mos-cpm65-clang` is on `PATH` or set:
-
-```bash
-export LLVM=<path-to-llvm-mos-bin>/
-```
-
-## Remaining Integration Task
-
-Once those dependencies are present, this repo still needs a verified CP/M-65
-link recipe that combines the AcheronVM runtime with a relocatable `.com`
-program image. The staged `src/vm/vmhello/vmhello.asm` source captures the
-intended execution flow, and `tools/build_vmhello.sh` reports the exact
-prerequisites before that final link step can be automated safely.
+The CP/M-65 directories and `.COM` flows are legacy/reference material only.
+They are not blockers for the current UDOS-native compiler, linker, or runtime
+tool work unless a future task explicitly asks to mine that code for reference.

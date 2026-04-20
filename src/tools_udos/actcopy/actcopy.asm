@@ -19,6 +19,10 @@ msg_bad_copy:
     .asciiz "BAD COPY"
 msg_no_such_file:
     .asciiz "NO SUCH FILE"
+msg_exists:
+    .asciiz "EXISTS"
+msg_too_large:
+    .asciiz "TOO LARGE"
 msg_copy_fail:
     .asciiz "COPY FAIL"
 
@@ -65,6 +69,10 @@ have_two_args:
     beq copy_ok
     cmp #tool_file_status_nofile
     beq copy_nofile
+    cmp #tool_file_status_exists
+    beq copy_exists
+    cmp #tool_file_status_too_large
+    beq copy_too_large
     lda #<msg_copy_fail
     ldy #>msg_copy_fail
     jmp fail_with_ptr
@@ -72,6 +80,16 @@ have_two_args:
 copy_nofile:
     lda #<msg_no_such_file
     ldy #>msg_no_such_file
+    jmp fail_with_ptr
+
+copy_exists:
+    lda #<msg_exists
+    ldy #>msg_exists
+    jmp fail_with_ptr
+
+copy_too_large:
+    lda #<msg_too_large
+    ldy #>msg_too_large
     jmp fail_with_ptr
 
 copy_ok:

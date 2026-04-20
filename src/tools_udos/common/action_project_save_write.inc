@@ -7,9 +7,26 @@ save_content_buffer_to_target:
     sta save_params+2
     lda #>content_buffer
     sta save_params+3
+    lda save_params+2
+    sta svc_retptr
+    lda save_params+3
+    sta svc_retptr+1
     lda #$00
     sta save_params+4
     sta save_params+5
+save_content_buffer_len_loop:
+    ldy #$00
+    lda (svc_retptr),y
+    beq save_content_buffer_len_done
+    inc svc_retptr
+    bne :+
+    inc svc_retptr+1
+:
+    inc save_params+4
+    bne save_content_buffer_len_loop
+    inc save_params+5
+    bne save_content_buffer_len_loop
+save_content_buffer_len_done:
     lda #tool_file_status_fail
     sta save_params+6
     ldx #save_params

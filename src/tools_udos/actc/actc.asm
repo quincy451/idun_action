@@ -159,8 +159,6 @@ clear_post_build_state:
     rts
 
 save_and_exit_clean_stack:
-    ldx #$FF
-    txs
     jsr save_content_buffer_to_target
     lda #$20
     sta actc_trace_byte
