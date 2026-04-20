@@ -86,6 +86,9 @@ class TestToolAbiPipeline(unittest.TestCase):
     def test_int_vars_multi_basic_pipeline_is_green_under_harness(self) -> None:
         self.run_scenario("int_vars_multi_basic", "0\n2\n3\n", 64, 47)
 
+    def test_byte_card_vars_basic_pipeline_is_green_under_harness(self) -> None:
+        self.run_scenario("byte_card_vars_basic", "0\n2\n3\n", 64, 47)
+
     def test_int_vars_multi_while_pipeline_is_green_under_harness(self) -> None:
         self.run_scenario("int_vars_multi_while", "0\n1\n2\n", 69, 54)
 
@@ -187,6 +190,9 @@ class TestToolAbiPipeline(unittest.TestCase):
 
     def test_proc_local_reinit_pipeline_is_green_under_harness(self) -> None:
         self.run_scenario("proc_local_reinit", "0\n1\n0\n1\n", 83, 52)
+
+    def test_byte_proc_local_reinit_pipeline_is_green_under_harness(self) -> None:
+        self.run_scenario("byte_proc_local_reinit", "0\n1\n0\n1\n", 83, 52)
 
     def test_proc_local_param_loop_pipeline_is_green_under_harness(self) -> None:
         self.run_scenario("proc_local_param_loop", "0\n1\n", 101, 61)

@@ -1,6 +1,6 @@
 # `ALINK` Status
 
-Current as of `2026-04-19`.
+Current as of `2026-04-20`.
 
 This file is a focused ledger for the UDOS-native `ALINK.PRG` tool.
 It tracks the real linker slice separately from the broader [action_matrix.md](/mnt/c/test/action/actionc64u/docs/action_matrix.md).
@@ -53,7 +53,8 @@ Current real-target build note:
 - [ ] more robust child-object load diagnostics for future wider object graphs
 - [ ] more robust final save/return diagnostics for future larger outputs
 - [ ] larger body-op surface than the current arithmetic/procedure/branch/`WHILE`/nested-loop-combined slice
-- [ ] broader variable/data surface beyond the current multi-var module-scope integer storage/read/write/control slice
+- [ ] broader variable/data surface beyond the current multi-var module-scope
+  integer storage/read/write/control plus narrow `BYTE`/`CARD` declaration slice
 - [ ] broader procedure/function surface beyond the current local/external integer arg/return slice
 - [ ] full historical dead-strip/link behavior
 
@@ -77,6 +78,9 @@ Current real-target build note:
   `IF X=1 THEN HELLO() ...`, `IF X=2 THEN W() FI`, `WHILE X<1 DO W() ... OD`
 - [x] also loads multiple module-scope integer vars in one module:
   `INT X=[0]`, `INT Y=[2]`, `PrintIE(X)`, `PrintIE(Y)`, `X=Y+1`
+- [x] also loads narrow compiler output from module-scope `BYTE`/`CARD`
+  declarations through the existing 16-bit variable slot path:
+  `BYTE X=[0]`, `CARD Y=[2]`, `PrintIE(X)`, `PrintIE(Y)`, `X=Y+1`
 - [x] also loads variable-to-variable arithmetic assignment:
   `X=X+Y`
 - [x] also loads multiple module-scope integer vars under `WHILE` control:
@@ -123,6 +127,9 @@ Current real-target build note:
   `INT X=[((1<2 AND 2<3) OR NOT(0=1))+1]`
 - [x] also loads proc-local integer slots emitted by widened `ACTC` output:
   `PROC TICK() INT X=[0] ...`
+- [x] also loads narrow proc-local `BYTE` declarations emitted by widened
+  `ACTC` through the existing declaration-site initialization path:
+  `PROC TICK() BYTE X=[0] ...`
 - [x] also loads proc-local integer declaration-site reinitialization across repeated calls:
   `TICK()` then `TICK()` prints `0`, `1`, `0`, `1`
 - [x] also loads proc-local integer initializers driven by proc parameters under loop control:

@@ -1,6 +1,6 @@
 # `ACTC` Roadmap
 
-Current as of `2026-04-19`.
+Current as of `2026-04-20`.
 
 This is the short planning document for the UDOS-native Action compiler, `ACTC.PRG`.
 For the detailed proof ledger, see [actc_status.md](./actc_status.md).
@@ -40,7 +40,10 @@ Current dirty-tree verification:
 - Source loading from `SRC/`.
 - Module-header validation.
 - Current narrow parser for arithmetic, comparisons, branching, loops, local calls, and unresolved external calls.
-- Current narrow integer variable surface for module-scope and proc-local `INT` declarations.
+- Current narrow integer variable surface for module-scope and proc-local
+  `INT` declarations.
+- Narrow `BYTE`/`CARD` declaration acceptance through the existing 16-bit
+  variable slot path.
 
 ## Object Emission
 
@@ -58,6 +61,7 @@ Current dirty-tree verification:
 - `DO ... UNTIL ... OD`.
 - Mixed arithmetic/comparison conditions.
 - Current multi-variable integer state slice.
+- Narrow module-scope `BYTE`/`CARD` and proc-local `BYTE` declaration slice.
 - Current local/external integer arg/return slice.
 - Current larger-object and larger-proc-size coverage proved through the harness.
 

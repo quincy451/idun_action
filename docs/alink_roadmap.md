@@ -1,6 +1,6 @@
 # `ALINK` Roadmap
 
-Current as of `2026-04-19`.
+Current as of `2026-04-20`.
 
 This is the short planning document for the UDOS-native Action linker, `ALINK.PRG`.
 For the detailed proof ledger, see [alink_status.md](./alink_status.md).
@@ -60,6 +60,8 @@ Current working-tree verification:
 - Larger procedure sizes past `255` bytes.
 - Deeper child-object closure than the old small-graph limit.
 - Current loop/control-flow/body-op slice emitted by the widened compiler.
+- Narrow `BYTE`/`CARD` compiler declaration output through the existing
+  16-bit variable slot path.
 
 ## Remaining Work
 

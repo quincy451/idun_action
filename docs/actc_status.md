@@ -1,6 +1,6 @@
 # `ACTC` Status
 
-Current as of `2026-04-19`.
+Current as of `2026-04-20`.
 
 This file is a focused ledger for the UDOS-native `ACTC.PRG` tool.
 It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/test/action/actionc64u/docs/action_matrix.md).
@@ -70,7 +70,8 @@ Current lowering note:
 
 - [ ] broader runtime-emitted integer expression chains beyond the already-proven narrow path
 - [ ] larger statement/control-flow surface beyond the current `IF`/`ELSE`/`WHILE ... DO ... OD`/`DO ... UNTIL ... OD`/nested-loop/branch-combined path
-- [ ] broader stateful variable surface beyond the current multi-var module-scope `INT`/read/write/control slice
+- [ ] broader stateful variable surface beyond the current multi-var module-scope
+  `INT` plus narrow `BYTE`/`CARD` declaration slice
 - [ ] broader procedure/function surface beyond the current local/external integer arg/return slice
 - [ ] full historical ACTION! source compatibility
 
@@ -140,6 +141,9 @@ Current lowering note:
   `IF X=1 THEN HELLO() ...`, `IF X=2 THEN W() FI`, `WHILE X<1 DO W() ... OD`
 - [x] multiple module-scope integer variables in one module:
   `INT X=[0]`, `INT Y=[2]`, `PrintIE(X)`, `PrintIE(Y)`, `X=Y+1`
+- [x] narrow module-scope `BYTE`/`CARD` declarations lower through the existing
+  16-bit variable slot path:
+  `BYTE X=[0]`, `CARD Y=[2]`, `PrintIE(X)`, `PrintIE(Y)`, `X=Y+1`
 - [x] variable-to-variable arithmetic assignment:
   `X=X+Y`
 - [x] multiple module-scope integer variables driving `WHILE ... DO ... OD`:
@@ -196,6 +200,9 @@ Current lowering note:
   `INT X=[((1<2 AND 2<3) OR NOT(0=1))+1]`
 - [x] proc-local integer declarations with declaration-site runtime initialization:
   `PROC TICK() INT X=[0] ...`
+- [x] narrow proc-local `BYTE` declarations use the existing declaration-site
+  runtime initialization path:
+  `PROC TICK() BYTE X=[0] ...`
 - [x] proc-local integer initializers rerun on each call:
   `TICK()` then `TICK()` prints `0`, `1`, `0`, `1`
 - [x] proc-local integer initializers can read proc parameters and drive loop control:

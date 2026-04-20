@@ -332,11 +332,7 @@ collect_module_vars_or_fail_loop:
     sta const_ptr+1
     jsr pattern_matches_scan_ptr_keyword
     bcc collect_module_vars_or_fail_done
-    lda #<pattern_int_decl
-    sta const_ptr
-    lda #>pattern_int_decl
-    sta const_ptr+1
-    jsr pattern_matches_scan_ptr_keyword
+    jsr match_scalar_decl_at_scan_ptr
     bcs collect_module_vars_or_fail_bad
     jsr store_module_var_from_scan_ptr_or_fail
     jsr skip_source_line
@@ -354,10 +350,10 @@ collect_module_vars_or_fail_done:
     rts
 
 store_module_var_from_scan_ptr_or_fail:
-    lda #<pattern_int_decl
-    sta const_ptr
-    lda #>pattern_int_decl
-    sta const_ptr+1
+    jsr match_scalar_decl_at_scan_ptr
+    bcc :+
+    jmp store_module_var_from_scan_ptr_or_fail_bad
+:
     jsr advance_scan_ptr_by_const_ptr
     jsr skip_source_spaces
     jsr copy_symbol_from_scan_ptr
@@ -536,11 +532,7 @@ collect_proc_locals_or_fail_try_int_decl:
     lda current_proc_index_data
     cmp #$FF
     beq collect_proc_locals_or_fail_skip_line
-    lda #<pattern_int_decl
-    sta const_ptr
-    lda #>pattern_int_decl
-    sta const_ptr+1
-    jsr pattern_matches_scan_ptr_keyword
+    jsr match_scalar_decl_at_scan_ptr
     bcs collect_proc_locals_or_fail_skip_line
     jsr store_proc_local_var_from_scan_ptr_or_fail
 collect_proc_locals_or_fail_skip_line:
@@ -559,10 +551,8 @@ collect_proc_locals_or_fail_done:
     rts
 
 store_proc_local_var_from_scan_ptr_or_fail:
-    lda #<pattern_int_decl
-    sta const_ptr
-    lda #>pattern_int_decl
-    sta const_ptr+1
+    jsr match_scalar_decl_at_scan_ptr
+    bcs store_proc_local_var_from_scan_ptr_or_fail_bad
     jsr advance_scan_ptr_by_const_ptr
     jsr skip_source_spaces
     jsr copy_symbol_from_scan_ptr
@@ -660,14 +650,10 @@ collect_proc_body_ops_after_space_check:
 	    bne :+
 	    jmp collect_proc_body_ops_skip_line
 	:
-        lda #<pattern_int_decl
-        sta const_ptr
-        lda #>pattern_int_decl
-        sta const_ptr+1
-        jsr pattern_matches_scan_ptr_keyword
+        jsr match_scalar_decl_at_scan_ptr
         bcc :+
         jmp collect_proc_body_ops_try_od
-: 
+:
         jsr advance_scan_ptr_by_const_ptr
         jsr skip_source_spaces
         jsr copy_symbol_from_scan_ptr
@@ -3581,6 +3567,31 @@ pattern_matches_scan_ptr_keyword_ok:
     clc
     rts
 
+match_scalar_decl_at_scan_ptr:
+    lda #<pattern_int_decl
+    sta const_ptr
+    lda #>pattern_int_decl
+    sta const_ptr+1
+    jsr pattern_matches_scan_ptr_keyword
+    bcc match_scalar_decl_at_scan_ptr_ok
+    lda #<pattern_byte_decl
+    sta const_ptr
+    lda #>pattern_byte_decl
+    sta const_ptr+1
+    jsr pattern_matches_scan_ptr_keyword
+    bcc match_scalar_decl_at_scan_ptr_ok
+    lda #<pattern_card_decl
+    sta const_ptr
+    lda #>pattern_card_decl
+    sta const_ptr+1
+    jsr pattern_matches_scan_ptr_keyword
+    bcc match_scalar_decl_at_scan_ptr_ok
+    sec
+    rts
+match_scalar_decl_at_scan_ptr_ok:
+    clc
+    rts
+
 advance_scan_ptr_by_const_ptr:
     ldy #$00
 advance_scan_ptr_by_const_ptr_loop:
@@ -4179,6 +4190,10 @@ pattern_module:
     .asciiz "MODULE"
 pattern_int_decl:
     .asciiz "INT"
+pattern_byte_decl:
+    .asciiz "BYTE"
+pattern_card_decl:
+    .asciiz "CARD"
 pattern_proc:
     .asciiz "PROC"
 pattern_if:
