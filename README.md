@@ -2,25 +2,30 @@
 
 ActionC64U is a clean-room Action!-style toolchain project for the Commodore 64.
 
-The current checked-in toolchain is still the older CP/M-65 bootstrap path. It
-remains in the repo as a language/runtime reference and regression target while
-the UDOS-native tool replacements are built.
+The active project path is UDOS-native. Action tools are built as standalone
+`.PRG` programs that run under the sibling `../udos` shell/runtime and use the
+UDOS resident service layer to reach Commodore 64 Ultimate ROM/Ultimate DOS
+services.
 
-The current alpha ships:
+The older CP/M-65 bootstrap path remains in this repository as historical
+reference material only. It is not the active implementation target and should
+not drive feature work. See [docs/active_direction.md](./docs/active_direction.md).
 
-- `alink.com`: on-target dead-strip linker for `.avo` objects
-- `actc.com`: on-target compiler
-- `vm.com`: VM runner for `.avm` payloads
-- `actmon.com`: monitor-style front end
+The current UDOS-facing alpha ships:
+
+- `ALINK.PRG`: UDOS-native linker for `.AVO` objects
+- `ACTC.PRG`: UDOS-native compiler front end
+- `AVMRUN.PRG`: UDOS-native VM runner for `.AVM` payloads
+- `ACTMON.PRG`: monitor-style front end
+- workspace/project helper tools under `src/tools_udos/`
 - dead-strip linkable runtime modules
-- REAL, REU, and overlay bootstrap support
-- a reproducible C64 release disk image plus VICE verification
+- a reproducible UDOS release/workspace image plus VICE verification
 
 ## Prerequisites
 
 Required local sibling trees:
 
-- `../cpm65-u64`
+- `../udos`
 - `../acheronvm`
 
 Required host tools:
@@ -30,14 +35,14 @@ Required host tools:
 - `make`
 - a C compiler and C++ compiler
 - `pytest`
-- `llvm-mos` with `mos-cpm65-clang`
+- `cc65` tools for UDOS `.PRG` assembly
 
 The repo also carries a minimal `pytest` shim for constrained environments, but
 a normal `pytest` install is still recommended.
 
-Release-image and C64 verification tools:
+Release-image and C64/VICE verification tools:
 
-- `cpmtools` (`cpmcp`, `cpmls`, `cpmchattr`)
+- `c1541`
 - `x64sc` from VICE for automated C64 validation
 
 Quick environment check:
@@ -54,6 +59,39 @@ Strict required-dependency check:
 
 WSL setup notes live in [docs/setup_wsl.md](/mnt/c/test/action/actionc64u/docs/setup_wsl.md).
 
+## Active UDOS Verification
+
+Use the sibling UDOS repo as the source of truth for current development:
+
+```sh
+make -C ../udos PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-actc
+make -C ../udos PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-alink
+make -C ../udos PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-alink-avmrun
+make -C ../udos PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-actc-alink-avmrun
+```
+
+These gates build the UDOS release image, install the Action `.PRG` tools, boot
+UDOS under VICE, and validate the real tool path:
+
+```text
+ACTC.PRG -> ALINK.PRG -> AVMRUN.PRG
+```
+
+## Build UDOS Tools
+
+Build individual UDOS-native tools:
+
+```sh
+./tools/build_actc_udos.sh
+./tools/build_alink_udos.sh
+./tools/build_avmrun_udos.sh
+./tools/build_actmon_udos.sh
+```
+
+The outputs are written under:
+
+- `build/udos_tools/`
+
 ## Host Tests
 
 Run the full host-side suite:
@@ -65,14 +103,17 @@ python3 -m pytest -q
 This covers:
 
 - host compiler/linker behavior
-- CP/M-65 `cpmemu` integration
-- on-target `actc.com` / `vm.com` flows under `cpmemu`
-- release-image build checks
+- legacy CP/M-65 bootstrap/reference checks
+- UDOS workspace export checks
 - VICE verification when `x64sc` is installed
 
-## Build CP/M Tools
+Host tests are useful, but they are not the current target proof. UDOS VICE
+gates above are authoritative for current toolchain work.
 
-Build the shipped CP/M executables:
+## Legacy CP/M Reference
+
+The CP/M-65 path is preserved as reference material. Build it only when
+intentionally maintaining the older bootstrap:
 
 ```sh
 ./tools/build_alink.sh
@@ -81,30 +122,12 @@ Build the shipped CP/M executables:
 ./tools/build_actmon.sh
 ```
 
-Or use the one-command build:
+Legacy outputs include:
 
-```sh
-./tools/build_all.sh
-```
-
-`build_all.sh` does not run `sudo`. If a dependency is missing, it fails with
-instructions and points back to `./tools/env_check.sh`.
-
-## Build The Release Disk Image
-
-Build the distributable C64 CP/M-65 disk image:
-
-```sh
-python3 tools/build_release_image.py
-```
-
-Output:
-
-- `build/actionc64u_c64.d64`
-- `build/actionc64u_c64.dir.txt`
-
-The build output directory is ignored by git, so generated release images stay
-out of version control.
+- `build/alink.com`
+- `build/actc.com`
+- `build/vm.com`
+- `build/actmon.com`
 
 ## Export A UDOS Workspace
 
@@ -119,42 +142,24 @@ Default output:
 
 - `build/udos-action-fs/IMAGES/ACTION.DNP`
 
-This export is the current bridge artifact from the bootstrap Action repo into
-the UDOS shell/runtime.
+This export is the current bridge artifact from the Action tool repo into the
+UDOS shell/runtime.
 
-## Run Automated VICE Verification
+## Legacy CP/M Release Image
 
-Run the release verification harness:
+The old CP/M release-image scripts remain for historical comparison only:
 
 ```sh
+python3 tools/build_release_image.py
 python3 tools/verify_release.py
 ```
 
-This:
-
-- builds or reuses the release image
-- injects a host-built `HELLO.AVM`
-- injects `$$$.SUB` so CP/M autoruns `VM HELLO.AVM`
-- waits for `HELLO FROM ACTIONC64U` on the C64 screen
-- writes `build/verify_transcript.txt`
-
-The automated VICE path uses CP/M submit-file autorun because that is more
-reliable than live post-boot keyboard typing on this target.
+Do not use these as the current project success criteria.
 
 ## One-Command Smoke Pass
 
-For a quick end-to-end sanity check:
-
-```sh
-./tools/smoke.sh
-```
-
-This runs:
-
-- `env_check`
-- `pytest`
-- release-image build
-- optional VICE verification when `x64sc` is available
+For current development, prefer the UDOS VICE gates listed above over the
+historical `tools/smoke.sh` path.
 
 ## Documentation Map
 
@@ -162,6 +167,7 @@ Key docs:
 
 - [docs/actc_roadmap.md](/mnt/c/test/action/actionc64u/docs/actc_roadmap.md)
 - [docs/alink_roadmap.md](/mnt/c/test/action/actionc64u/docs/alink_roadmap.md)
+- [docs/active_direction.md](/mnt/c/test/action/actionc64u/docs/active_direction.md)
 - [docs/cpmemu.md](/mnt/c/test/action/actionc64u/docs/cpmemu.md)
 - [docs/vice.md](/mnt/c/test/action/actionc64u/docs/vice.md)
 - [docs/spec.md](/mnt/c/test/action/actionc64u/docs/spec.md)
