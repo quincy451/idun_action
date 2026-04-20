@@ -1,6 +1,6 @@
 # `ACTC` Status
 
-Current as of `2026-04-10`.
+Current as of `2026-04-19`.
 
 This file is a focused ledger for the UDOS-native `ACTC.PRG` tool.
 It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/test/action/actionc64u/docs/action_matrix.md).
@@ -23,6 +23,9 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
 Current real-target build note:
 
 - `./tools/build_actc_udos.sh` is green again
+- `make -C ../udos vice-action-actc` is green again on the current working tree
+- `make -C ../udos vice-action-actc-alink-avmrun` is green again on the
+  current working tree
 - current shipped `ACTC` map footprint is:
   - `CODE`: `$24B9`
   - `BSS`: `$06F9`
@@ -520,14 +523,17 @@ Current lowering note:
 - [x] current harness runtime output for the dense branch-gated early-return nested mixed-loop + shared-transitive slice:
   `MID1`, `END`, `MID2`, `END`, `A` through `P`
 
-## Current Biggest Blockers
+## Current Biggest Risks
 
-- Resident/VICE tool-service ABI instability.
-  The harness now proves the current additive compiler logic cleanly. The main blocker to proving the same slice under VICE is still the resident-facing load/save path, not the compiler core.
+- Resident/VICE tool-service ABI sensitivity.
+  The previous resident-facing load/save blocker is cleared on the current
+  working tree, but this remains the first area to watch when widening compiler
+  output.
 - Probe stability.
   VICE automation is good enough to prove narrow slices, but it still costs time whenever a dirty line perturbs boot, mount, or prompt timing.
 - Dirty-line versus committed-line drift.
-  The committed narrow compiler/linker/runtime path is real. The active work is widening it without reintroducing the older ABI sensitivity.
+  The current narrow compiler/linker/runtime path is green again. The active
+  work is widening it without reintroducing the older ABI sensitivity.
 
 ## What Is Not Claimed Here
 

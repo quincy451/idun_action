@@ -1,6 +1,6 @@
 # `ALINK` Status
 
-Current as of `2026-04-10`.
+Current as of `2026-04-19`.
 
 This file is a focused ledger for the UDOS-native `ALINK.PRG` tool.
 It tracks the real linker slice separately from the broader [action_matrix.md](/mnt/c/test/action/actionc64u/docs/action_matrix.md).
@@ -28,14 +28,17 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
 Current real-target build note:
 
 - `./tools/build_alink_udos.sh` is green again
+- `make -C ../udos vice-action-alink` is green again on the current working tree
+- `make -C ../udos vice-action-alink-avmrun` is green again on the current
+  working tree
+- `make -C ../udos vice-action-actc-alink-avmrun` is green again on the current
+  working tree
 - current shipped `ALINK` map footprint is:
   - `CODE`: `$204B`
   - `BSS`: `$0B06`
   - total runtime span from `$0900` through `$3450`
-- `make -C ../udos vice-action-alink` now reaches:
-  - `RUN ALINK.PRG`
-  - `ARGS MAIN`
-- the next real-target blocker is no longer launch or ld65 overflow; it is the in-tool `LOAD FAIL` path after launch
+- the previous real-target `LOAD FAIL`/save-return blocker is cleared for the
+  current narrow object/link/runtime slice
 
 ## Proven Linker Behaviors
 
@@ -47,8 +50,8 @@ Current real-target build note:
 ## Current Widening Work
 
 - [ ] broader object graph / external-resolution surface
-- [ ] more robust child-object load path under the current dirty VICE debug line
-- [ ] more robust final save/return path under the current dirty VICE debug line
+- [ ] more robust child-object load diagnostics for future wider object graphs
+- [ ] more robust final save/return diagnostics for future larger outputs
 - [ ] larger body-op surface than the current arithmetic/procedure/branch/`WHILE`/nested-loop-combined slice
 - [ ] broader variable/data surface beyond the current multi-var module-scope integer storage/read/write/control slice
 - [ ] broader procedure/function surface beyond the current local/external integer arg/return slice
@@ -525,10 +528,11 @@ Current real-target build note:
   `MID1`, `END`, `MID2`, `END`, `A` through `P`
 - [x] emits a dense branch-gated early-return nested mixed-loop + shared-transitive slice `BIN/MAIN.AVM` of `251` bytes
 
-## Current Biggest Blockers
+## Current Biggest Risks
 
 - Call-depth / return-context sensitivity around tool ABI file loads and saves.
-  This is still the biggest blocker on the VICE-facing path. The harness now proves the widened linker logic itself on the current additive slice.
+  The current narrow VICE-facing path is green again, but this remains the
+  first risk area when widening child-object loading or final output size.
 - Proof friction from VICE automation.
   This is real, but secondary. It slows narrowing because some dirty lines perturb shell launch, mount timing, or prompt detection before the actual linker boundary is reached.
 - Lack of a small, stable comparator for every dirty line.
