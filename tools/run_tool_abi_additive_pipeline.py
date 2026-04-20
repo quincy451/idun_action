@@ -476,6 +476,46 @@ SCENARIOS = {
         ),
         "expected_console": "5\n",
     },
+    "runtime_library_external": {
+        "out_fs_name": "harness-actc-alink-avmrun-runtime-library-external",
+        "source": (
+            'MODULE MAIN\r'
+            'PROC MAIN()\r'
+            'PrintE("START")\r'
+            'RT_F_ADD()\r'
+            'PrintE("DONE")\r'
+            'RETURN\r'
+        ),
+        "expected_avo": (
+            "AVO1\n"
+            "x main 0 16\n"
+            "b e0u0e1r\n"
+            "u rt_f_add\n"
+            "s START\n"
+            "s DONE\n"
+            "k 2\n"
+            "n main\n"
+        ),
+        "seed_library_objects": {
+            "RT_F_ADD": (
+                "AVO1\n"
+                "x rt_f_add 0 7\n"
+                "b e0r\n"
+                "s FADD\n"
+                "k 2\n"
+                "n rt_f_add\n"
+            ),
+        },
+        "expected_avm": bytes(
+            [
+                65, 86, 77, 49, 2, 41, 0, 0, 0, 1, 25, 0, 97, 25, 0, 73,
+                16, 255, 69, 18, 0, 97, 31, 0, 73, 16, 255, 73, 32, 255,
+                97, 36, 0, 73, 16, 255, 72, 83, 84, 65, 82, 84, 0, 68, 79,
+                78, 69, 0, 70, 65, 68, 68, 0,
+            ]
+        ),
+        "expected_console": "START\nFADD\nDONE\n",
+    },
     "int_vars_multi_while": {
         "out_fs_name": "harness-actc-alink-avmrun-int-vars-multi-while",
         "source": (
@@ -9489,6 +9529,10 @@ def prepare_workspace(base_fs: Path, out_fs: Path, scenario: dict) -> Path:
     for stale in stale_paths:
         if stale.exists():
             stale.unlink()
+    for module, object_text in scenario.get("seed_library_objects", {}).items():
+        library_dir = project_root / "lib"
+        library_dir.mkdir(exist_ok=True)
+        (library_dir / f"{module.upper()}.AVO").write_text(object_text, encoding="ascii")
     return project_root
 
 

@@ -205,6 +205,10 @@ The completed compiler is intended to preserve the current published rules:
   by reachable code
 - a REAL declaration alone does not import REAL arithmetic, comparison,
   conversion, or print runtime code
+- the logical REAL runtime symbols are `rt.f_add`, `rt.f_sub`, `rt.f_mul`,
+  `rt.f_div`, `rt.f_cmp`, `rt.i_to_f`, `rt.f_to_i`, and `rt.print_f`; the
+  current UDOS-native text AVO path may use documented underscore aliases such
+  as `rt_f_add` until dotted symbol parsing is available on target
 - divide by zero is a compile error
 - out-of-range assignment is a compile error
 - use of undeclared identifiers is a compile error

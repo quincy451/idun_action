@@ -25,6 +25,8 @@ ALINK is project-oriented and workspace-oriented.
 - The linker chooses one logical module as the root.
 - The linker expects OBJ/<MODULE>.AVO to exist for the root.
 - Additional dependent objects are loaded from OBJ/ as needed.
+- Runtime/library dependent objects may be loaded from LIB/ when the symbol is
+  not found in OBJ/.
 
 
 Supported Command Line
@@ -139,7 +141,8 @@ The intended ALINK processing model is:
 7. Determine the root entry procedure from the module name.
 8. Build the initial live set from that entry.
 9. For each unresolved external symbol reachable from the live set:
-   - locate the providing object
+   - locate the providing object in OBJ/<symbol>.AVO
+   - if it is not a project object, locate it in LIB/<symbol>.AVO
    - load it
    - validate it
    - parse it
@@ -226,6 +229,17 @@ at least these logical families:
 - overlay runtime
   - rt.ovl_load
   - rt.ovl_call
+
+Current UDOS-native text AVO note:
+
+- The current target-side external-symbol parser accepts identifier-style names
+  made from letters, digits, and `_`.
+- Until dotted symbol parsing is added to the UDOS text AVO path, runtime
+  library objects use underscore aliases such as `rt_f_add` on target.
+- Those aliases correspond to the logical runtime symbols documented above, for
+  example `rt_f_add` maps to `rt.f_add`.
+- Pending externals now search `OBJ/` first and then `LIB/`, which lets runtime
+  helper objects stay out of user object output and link only when imported.
 
 The exact implementation of these symbols may change, but the logical link-time
 names are part of the stable contract between ACTC, ALINK, and AVMRUN.

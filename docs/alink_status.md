@@ -17,6 +17,8 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
 - [x] Uses compiler-emitted export sizes to recover procedure boundaries
 - [x] Builds a live-set from the requested module entry
 - [x] Resolves the current narrow external-object closure by loading child objects
+- [x] Resolves pending dependent objects from `LIB/` when no project object exists
+  in `OBJ/`
 - [x] Carries child-object int/string pools into the linked image
 - [x] Emits direct binary `AVM1` to `BIN/<NAME>.AVM`
 - [x] Narrow exact-byte proof exists for the emitted image
@@ -46,6 +48,9 @@ Current real-target build note:
 - [x] child object loading for the already-proven narrow object shape
 - [x] final binary target path `BIN/<NAME>.AVM`
 - [x] direct binary output instead of text or planning-report output
+- [x] dependent-object lookup falls back from `OBJ/<symbol>.AVO` to
+  `LIB/<symbol>.AVO`, keeping runtime helpers outside compiler output until
+  imported
 
 ## Current Widening Work
 
@@ -86,6 +91,9 @@ Current real-target build note:
   currently proving a 4-byte module-scope `REAL` slot without pulling REAL
   operator code:
   `REAL X`, `PrintIE(7)`
+- [x] also loads a runtime-style library object only from `LIB/` when imported:
+  `MAIN -> rt_f_add`, proving the lookup shape needed for per-operation REAL
+  helper inclusion without making REAL an AVM opcode
 - [x] also loads variable-to-variable arithmetic assignment:
   `X=X+Y`
 - [x] also loads multiple module-scope integer vars under `WHILE` control:

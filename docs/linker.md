@@ -64,6 +64,23 @@ So the current on-target dead-strip behavior is already correct for runtime
 library modules and any user program split into multiple `.avo` units, but not
 yet for unused functions trapped inside one monolithic user object.
 
+## UDOS-Native `ALINK.PRG`
+
+The current UDOS-native linker consumes the bootstrap text AVO form emitted by
+`ACTC.PRG`, not the host JSON line shown above. For reachable pending externals
+it now resolves objects in this order:
+
+- `OBJ/<symbol>.AVO`
+- `LIB/<symbol>.AVO`
+
+The root module still must come from `OBJ/<module>.AVO`. The `LIB/` fallback is
+only for dependent objects, which is the intended path for runtime helpers such
+as REAL operator modules.
+
+Current target-side symbol spelling is identifier-style. Runtime modules use
+underscore aliases such as `rt_f_add` until the UDOS text-object parser accepts
+the dotted logical names (`rt.f_add`) used by the host/reference toolchain.
+
 ## Final `.avm`
 
 The linked output remains:

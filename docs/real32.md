@@ -118,6 +118,11 @@ initializers and rejects using REAL variables in the current 16-bit integer
 expression path. This avoids false success where only the low word of a REAL32
 slot would be read or written.
 
+The linker now has the required runtime-library lookup shape for per-operation
+REAL helpers: pending externals search `OBJ/` first and then `LIB/`. The current
+target-side text AVO spelling uses underscore aliases such as `rt_f_add`, which
+map to the logical runtime symbols such as `rt.f_add`.
+
 Full UDOS-native REAL32 literals, arithmetic, comparisons, conversions, and
 `PrintR` / `PrintRE` lowering remain future work. The host/reference compiler
 still has broader REAL behavior than the UDOS-native ACTC path.

@@ -150,6 +150,9 @@ class TestToolAbiPipeline(unittest.TestCase):
     def test_real_decl_offsets_following_int_pipeline_is_green_under_harness(self) -> None:
         self.run_scenario("real_decl_offsets_following_int", "5\n", 48, 27)
 
+    def test_runtime_library_external_pipeline_is_green_under_harness(self) -> None:
+        self.run_scenario("runtime_library_external", "START\nFADD\nDONE\n", 64, 53)
+
     def test_real_integer_print_is_rejected_until_real_lowering_exists(self) -> None:
         self.run_actc_failure_source(
             'MODULE MAIN\rREAL X\rPROC MAIN()\rPrintIE(X)\rRETURN\r',

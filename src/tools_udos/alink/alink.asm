@@ -181,6 +181,32 @@ load_object_loaded:
     jsr require_avo1_header_or_fail
     rts
 
+load_pending_object_or_library_or_fail:
+    jsr load_source_file
+    bcc load_pending_object_or_library_loaded
+    lda file_params+6
+    cmp #tool_file_status_nofile
+    beq load_pending_object_or_library_try_lib
+    lda #<msg_load_fail
+    ldy #>msg_load_fail
+    jmp fail_with_ptr
+load_pending_object_or_library_try_lib:
+    jsr build_library_object_target_path
+    jsr load_source_file
+    bcc load_pending_object_or_library_loaded
+    lda file_params+6
+    cmp #tool_file_status_nofile
+    beq load_pending_object_or_library_missing
+    lda #<msg_load_fail
+    ldy #>msg_load_fail
+    jmp fail_with_ptr
+load_pending_object_or_library_missing:
+    lda #<msg_no_object
+    ldy #>msg_no_object
+    jmp fail_with_ptr
+load_pending_object_or_library_loaded:
+    rts
+
 require_loaded_source_not_truncated_or_fail:
     lda truncated_flag
     beq require_loaded_source_not_truncated_or_fail_done
@@ -1830,7 +1856,7 @@ load_current_object_link_state_or_fail:
     jsr build_object_target_path
     lda #$71
     sta debug_phase_zp
-    jsr load_object_or_fail
+    jsr load_pending_object_or_library_or_fail
     lda #$72
     sta debug_phase_zp
     jsr require_loaded_source_not_truncated_or_fail
@@ -3663,6 +3689,40 @@ lowercase_ascii_done:
     rts
 
 build_module_stub_content:
+    rts
+
+build_library_object_target_path:
+    lda #'L'
+    sta target_path+0
+    lda #'I'
+    sta target_path+1
+    lda #'B'
+    sta target_path+2
+    lda #'/'
+    sta target_path+3
+    ldy #$00
+build_library_object_target_path_loop:
+    lda module_name,y
+    beq build_library_object_target_path_suffix
+    jsr normalize_module_arg_char
+    sta target_path+4,y
+    iny
+    bne build_library_object_target_path_loop
+build_library_object_target_path_suffix:
+    lda #'.'
+    sta target_path+4,y
+    iny
+    lda #'A'
+    sta target_path+4,y
+    iny
+    lda #'V'
+    sta target_path+4,y
+    iny
+    lda #'O'
+    sta target_path+4,y
+    iny
+    lda #$00
+    sta target_path+4,y
     rts
 
 build_binary_save_target_path:

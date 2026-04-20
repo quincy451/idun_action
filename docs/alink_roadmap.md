@@ -64,6 +64,9 @@ Current working-tree verification:
   16-bit variable slot path.
 - Optional variable-width metadata for compiler-emitted data, currently proving
   4-byte module-scope `REAL` storage.
+- Pending externals now fall back from `OBJ/<symbol>.AVO` to
+  `LIB/<symbol>.AVO`, proving the lookup shape needed for operator-specific
+  runtime modules such as REAL helpers.
 
 ## Remaining Work
 
@@ -80,8 +83,11 @@ Current working-tree verification:
 - Broaden supported object-graph shapes and external-resolution patterns.
 - Broaden body-op coverage as `ACTC` widens.
 - Broaden data/variable support beyond the current integer-centered slice.
-- Add REAL runtime-module resolution as operator-specific link inputs rather
-  than AVM opcode growth or one monolithic REAL blob.
+- Converge UDOS text-object runtime symbol spelling with the logical dotted
+  runtime names, or keep a documented alias map if target constraints require
+  underscore names.
+- Consume ACTC-emitted REAL runtime imports as operator-specific link inputs
+  rather than AVM opcode growth or one monolithic REAL blob.
 - Broaden procedure/function semantics as compiler output becomes richer.
 
 ## Structural Work Still Outstanding
@@ -101,5 +107,6 @@ Current working-tree verification:
 
 1. Keep `make -C ../udos vice-action-alink` green.
 2. Keep `make -C ../udos vice-action-alink-avmrun` and `vice-action-actc-alink-avmrun` green.
-3. Wire REAL runtime lookup so only used REAL operators are pulled into the
-   linked AVM image.
+3. Add ACTC REAL expression lowering that emits only the runtime import aliases
+   used by the source expression, then back those aliases with real `LIB/`
+   runtime objects.
