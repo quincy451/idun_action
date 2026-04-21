@@ -109,14 +109,15 @@ programs must not pay for unused REAL operators.
 
 ## Current UDOS-Native Slice
 
-The current UDOS-native compiler/linker slice only proves REAL declaration
-storage metadata: `REAL X` emits a 4-byte variable slot in the AVO object, and
-ALINK preserves that 4-byte width in the linked AVM data layout.
+The current UDOS-native compiler/linker slice proves REAL declaration storage
+metadata and the first operator-specific runtime import:
 
-Until REAL expression lowering exists, the UDOS-native compiler rejects REAL
-initializers and rejects using REAL variables in the current 16-bit integer
-expression path. This avoids false success where only the low word of a REAL32
-slot would be read or written.
+- `REAL X` emits a 4-byte variable slot in the AVO object
+- ALINK preserves that 4-byte width in the linked AVM data layout
+- `R=A+B`, where all three variables are `REAL`, emits a live import of only
+  `RT_F_ADD` / `rt_f_add`
+- no `-`, `*`, `/`, conversion, comparison, or print helper is imported for
+  that source unless that operator is actually lowered later
 
 The linker now has the required runtime-library lookup shape for per-operation
 REAL helpers: pending externals search `OBJ/` first and then `LIB/`. The current
@@ -128,6 +129,25 @@ object-level `u <symbol>` metadata alone. That is required for REAL operator
 dead-stripping: a helper mentioned only by a dead procedure must not enter the
 final AVM image.
 
-Full UDOS-native REAL32 literals, arithmetic, comparisons, conversions, and
+## Current REAL Helper ABI
+
+The current target-side REAL value ABI is intentionally simple:
+
+- a `REAL32` stack value is two 16-bit cells
+- cells are ordered low word first, then high word
+- `RT_F_ADD` consumes `lhs.low`, `lhs.high`, `rhs.low`, `rhs.high`
+- `RT_F_ADD` pushes `result.low`, `result.high`
+- ACTC emits `L` / `U` body ops to load the low and high words
+- ALINK lowers `U` to the existing AVM `LOAD` opcode at variable offset `+2`
+- ACTC emits `T` / `S` after the helper so the high word is stored first and
+  then the low word is stored
+- ALINK lowers `T` to the existing AVM `STORE` opcode at variable offset `+2`
+
+Until broader REAL expression lowering exists, the UDOS-native compiler still
+rejects REAL initializers and rejects REAL use in the 16-bit integer expression
+path. This avoids false success where only the low word of a REAL32 slot would
+be read or written.
+
+Full UDOS-native REAL32 literals, `-`, `*`, `/`, comparisons, conversions, and
 `PrintR` / `PrintRE` lowering remain future work. The host/reference compiler
 still has broader REAL behavior than the UDOS-native ACTC path.

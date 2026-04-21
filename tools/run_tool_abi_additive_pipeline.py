@@ -546,6 +546,53 @@ SCENARIOS = {
         ),
         "expected_console": "DONE\n",
     },
+    "real_add_assignment_runtime": {
+        "out_fs_name": "harness-actc-alink-avmrun-real-add-assignment-runtime",
+        "source": (
+            'MODULE MAIN\r'
+            'REAL A\r'
+            'REAL B\r'
+            'REAL R\r'
+            'PROC MAIN()\r'
+            'R=A+B\r'
+            'PrintE("DONE")\r'
+            'RETURN\r'
+        ),
+        "expected_avo": (
+            "AVO1\n"
+            "x main 0 28\n"
+            "b L0U0L1U1u0T2S2e0r\n"
+            "u rt_f_add\n"
+            "s DONE\n"
+            "v a 0 4\n"
+            "v b 0 4\n"
+            "v r 0 4\n"
+            "k 2\n"
+            "n main\n"
+        ),
+        "seed_library_objects": {
+            "RT_F_ADD": (
+                "AVO1\n"
+                "x rt_f_add 0 13\n"
+                "b e0p0p1r\n"
+                "s FADD\n"
+                "i 0\n"
+                "i 0\n"
+                "k 2\n"
+                "n rt_f_add\n"
+            ),
+        },
+        "expected_avm": bytes(
+            [
+                65, 86, 77, 49, 2, 65, 0, 0, 0, 1, 43, 0, 19, 43, 0, 19,
+                45, 0, 19, 47, 0, 19, 49, 0, 69, 30, 0, 18, 53, 0, 18,
+                51, 0, 97, 55, 0, 73, 16, 255, 73, 32, 255, 97, 60, 0, 73,
+                16, 255, 17, 0, 0, 17, 0, 0, 72, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 68, 79, 78, 69, 0, 70, 65, 68, 68, 0,
+            ]
+        ),
+        "expected_console": "FADD\nDONE\n",
+    },
     "int_vars_multi_while": {
         "out_fs_name": "harness-actc-alink-avmrun-int-vars-multi-while",
         "source": (

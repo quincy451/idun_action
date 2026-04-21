@@ -46,8 +46,11 @@ Current dirty-tree verification:
   variable slot path.
 - Declaration-only module-scope `REAL` support now records a 4-byte storage
   width in AVO variable metadata.
-- Current safety guards reject REAL initializers and integer-path REAL variable
-  reads/writes until REAL expression lowering exists.
+- First REAL operator lowering exists for `R=A+B` where all operands are
+  module-scope `REAL` variables. ACTC emits low/high word body ops and imports
+  only `RT_F_ADD` for that source shape.
+- Current safety guards still reject REAL initializers and integer-path REAL
+  variable reads/writes outside the explicit REAL add lowering path.
 
 ## Object Emission
 
@@ -67,6 +70,8 @@ Current dirty-tree verification:
 - Current multi-variable integer state slice.
 - Narrow module-scope `BYTE`/`CARD` and proc-local `BYTE` declaration slice.
 - Module-scope `REAL` declaration storage-width slice.
+- First module-scope `REAL` addition assignment slice:
+  `REAL A`, `REAL B`, `REAL R`, `R=A+B`.
 - Current local/external integer arg/return slice.
 - Current larger-object and larger-proc-size coverage proved through the harness.
 
@@ -92,9 +97,9 @@ Current dirty-tree verification:
 - Broaden expression lowering beyond the current proven narrow slice.
 - Broaden statement coverage beyond the current branch/loop/call subset.
 - Broaden stateful variable semantics beyond the current integer-only slice.
-- Add full REAL32 lowering without AVM opcode growth: imports must be
-  operator-specific runtime-library symbols, so `+`, `-`, `*`, `/`, compare,
-  convert, and print support only link when used.
+- Continue REAL32 lowering without AVM opcode growth. `+` now has the first
+  variable-to-variable assignment slice; `-`, `*`, `/`, compare, convert, and
+  print support still need operator-specific runtime imports and proofs.
 - Broaden procedure/function semantics beyond the current local/external integer path.
 
 ## Structural Work Still Outstanding
@@ -107,5 +112,5 @@ Current dirty-tree verification:
 
 1. Keep `make -C ../udos vice-action-actc` green on the current working tree.
 2. Keep `make -C ../udos vice-action-actc-alink-avmrun` green as the chained gate.
-3. Widen REAL from declaration-only storage into typed expressions with
-   per-operation runtime imports.
+3. Widen REAL beyond the current `R=A+B` slice into literals, other operators,
+   conversions, comparisons, and printing with per-operation runtime imports.

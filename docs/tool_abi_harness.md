@@ -858,6 +858,8 @@ That now includes a widening set of stable scenarios:
   `MID1`, `END`, `MID2`, `END`, `DONE`
 - multiple module-scope integer vars driving shared-transitive externals under `WHILE` control:
   `MID1`, `END`, `MID2`, `END`, `DONE`
+- first REAL add-assignment runtime helper slice:
+  `FADD`, `DONE`
 - variable-to-variable arithmetic assignment:
   `3`
 - local zero-arg integer return:

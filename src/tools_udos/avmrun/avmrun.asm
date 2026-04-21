@@ -805,21 +805,22 @@ patch_payload_loop:
 :
     ldy #$00
     lda (scan_ptr),y
+    ; Bootstrap stack/memory opcodes are not byte-compatible with Acheron.
     cmp #OPCODE_PUSH8
     bne :+
-    jmp patch_byte_arg
+    jmp patch_payload_fail
 :
     cmp #OPCODE_PUSH16
     bne :+
-    jmp patch_literal_word_arg
+    jmp patch_payload_fail
 :
     cmp #OPCODE_STORE
     bne :+
-    jmp patch_word_arg
+    jmp patch_payload_fail
 :
     cmp #OPCODE_LOAD
     bne :+
-    jmp patch_word_arg
+    jmp patch_payload_fail
 :
     cmp #OPCODE_NATIVE
     bne :+

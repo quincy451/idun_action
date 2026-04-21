@@ -70,6 +70,8 @@ Current working-tree verification:
 - Pending externals are queued from live `uN` body operations rather than every
   object-level `u <symbol>` line, so dead-stripped procedures do not pull their
   helper objects into the final image.
+- First REAL add-assignment runtime shape links from `LIB/` and uses `U<n>` /
+  `T<n>` body ops for high-word `LOAD` / `STORE` without adding AVM opcodes.
 
 ## Remaining Work
 
@@ -89,8 +91,8 @@ Current working-tree verification:
 - Converge UDOS text-object runtime symbol spelling with the logical dotted
   runtime names, or keep a documented alias map if target constraints require
   underscore names.
-- Consume ACTC-emitted REAL runtime imports as operator-specific link inputs
-  rather than AVM opcode growth or one monolithic REAL blob.
+- Continue consuming ACTC-emitted REAL runtime imports as operator-specific link
+  inputs rather than AVM opcode growth or one monolithic REAL blob.
 - Broaden procedure/function semantics as compiler output becomes richer.
 
 ## Structural Work Still Outstanding
@@ -110,6 +112,5 @@ Current working-tree verification:
 
 1. Keep `make -C ../udos vice-action-alink` green.
 2. Keep `make -C ../udos vice-action-alink-avmrun` and `vice-action-actc-alink-avmrun` green.
-3. Add ACTC REAL expression lowering that emits only the runtime import aliases
-   used by the source expression, then back those aliases with real `LIB/`
-   runtime objects.
+3. Back the current `RT_F_ADD` alias with real floating-point `LIB/` code, then
+   add the remaining REAL operator aliases and proofs one at a time.

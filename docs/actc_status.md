@@ -35,11 +35,13 @@ Current lowering note:
 
 - [x] proc-local `INT` declarations currently lower to proc-scoped static slots plus declaration-site runtime init stores; this is not a stack-frame model yet
 - [x] current harness-proven variable slot ceiling is `16`, aligned with the current VM local-slot count
-- [x] module-scope `REAL` declarations now emit 4-byte storage-width metadata;
-  REAL32 expressions and runtime-library calls are not lowered yet
+- [x] module-scope `REAL` declarations now emit 4-byte storage-width metadata
+- [x] the first REAL expression-lowering slice supports `R=A+B` for module-scope
+  `REAL` variables, emitting low/high word body ops plus only the `RT_F_ADD`
+  runtime import
 - [x] `REAL` variables are guarded from the current 16-bit integer expression
-  path; initializers, integer-path reads, and integer-path writes are rejected
-  until REAL lowering lands
+  path; initializers, integer-path reads, integer-path writes, and unsupported
+  REAL operators are rejected until their typed lowering lands
 
 ## Proven Narrow Source Surface
 
@@ -70,6 +72,8 @@ Current lowering note:
 - [x] `DO ... UNTIL ... OD` containing nested `WHILE ... DO ... OD`
 - [x] `WHILE ... DO ... OD` containing nested `DO ... UNTIL ... OD`
 - [x] mixed local/external and branch content across `DO`/`WHILE` mixed nesting
+- [x] first REAL add-assignment lowering:
+  `REAL A`, `REAL B`, `REAL R`, `R=A+B`
 
 ## Current Widening Work
 

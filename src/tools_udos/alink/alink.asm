@@ -1153,6 +1153,10 @@ build_live_set_body_loop:
     beq build_live_set_skip_pair_branch
     cmp #'S'
     beq build_live_set_skip_pair_branch
+    cmp #'U'
+    beq build_live_set_skip_pair_branch
+    cmp #'T'
+    beq build_live_set_skip_pair_branch
     cmp #'a'
     beq build_live_set_single_branch
     cmp #'m'
@@ -1993,6 +1997,12 @@ emit_live_bytes_for_export_x_loop:
 :   cmp #'S'
     bne :+
     jmp emit_live_bytes_for_export_x_store
+:   cmp #'U'
+    bne :+
+    jmp emit_live_bytes_for_export_x_load_upper
+:   cmp #'T'
+    bne :+
+    jmp emit_live_bytes_for_export_x_store_upper
 :   cmp #'a'
     bne :+
     jmp emit_live_bytes_for_export_x_add
@@ -2153,10 +2163,34 @@ emit_live_bytes_for_export_x_load:
     jsr append_payload_byte
     iny
     jmp emit_live_bytes_for_export_x_loop
+emit_live_bytes_for_export_x_load_upper:
+    iny
+    jsr load_body_digit_index_to_x_or_fail
+    jsr load_var_target_upper_offset_from_x_or_fail
+    lda #OPCODE_LOAD
+    jsr append_payload_byte
+    lda current_bit_lo
+    jsr append_payload_byte
+    lda current_bit_hi
+    jsr append_payload_byte
+    iny
+    jmp emit_live_bytes_for_export_x_loop
 emit_live_bytes_for_export_x_store:
     iny
     jsr load_body_digit_index_to_x_or_fail
     jsr load_var_target_offset_from_x_or_fail
+    lda #OPCODE_STORE
+    jsr append_payload_byte
+    lda current_bit_lo
+    jsr append_payload_byte
+    lda current_bit_hi
+    jsr append_payload_byte
+    iny
+    jmp emit_live_bytes_for_export_x_loop
+emit_live_bytes_for_export_x_store_upper:
+    iny
+    jsr load_body_digit_index_to_x_or_fail
+    jsr load_var_target_upper_offset_from_x_or_fail
     lda #OPCODE_STORE
     jsr append_payload_byte
     lda current_bit_lo
@@ -2342,6 +2376,10 @@ load_next_root_return_target_offset_loop:
 	    beq load_next_root_return_target_offset_add_call
 	    cmp #'S'
 	    beq load_next_root_return_target_offset_add_call
+	    cmp #'U'
+	    beq load_next_root_return_target_offset_add_call
+	    cmp #'T'
+	    beq load_next_root_return_target_offset_add_call
 	    cmp #'s'
 	    beq load_next_root_return_target_offset_add_string
 	    cmp #'e'
@@ -2454,6 +2492,10 @@ load_if_false_target_offset_loop:
 	    cmp #'L'
 	    beq load_if_false_target_offset_add_call
 	    cmp #'S'
+	    beq load_if_false_target_offset_add_call
+	    cmp #'U'
+	    beq load_if_false_target_offset_add_call
+	    cmp #'T'
 	    beq load_if_false_target_offset_add_call
 	    cmp #'s'
 	    beq load_if_false_target_offset_add_string
@@ -2600,6 +2642,10 @@ load_while_false_target_offset_loop:
 	    beq load_while_false_target_offset_add_call
 	    cmp #'S'
 	    beq load_while_false_target_offset_add_call
+	    cmp #'U'
+	    beq load_while_false_target_offset_add_call
+	    cmp #'T'
+	    beq load_while_false_target_offset_add_call
 	    cmp #'s'
 	    beq load_while_false_target_offset_add_string
 	    cmp #'e'
@@ -2722,6 +2768,10 @@ load_while_loop_start_target_offset_loop:
 	    cmp #'L'
 	    beq load_while_loop_start_target_offset_add_call
 	    cmp #'S'
+	    beq load_while_loop_start_target_offset_add_call
+	    cmp #'U'
+	    beq load_while_loop_start_target_offset_add_call
+	    cmp #'T'
 	    beq load_while_loop_start_target_offset_add_call
 	    cmp #'s'
 	    beq load_while_loop_start_target_offset_add_string
@@ -2880,6 +2930,10 @@ load_else_end_target_offset_loop:
 	    beq load_else_end_target_offset_add_call
 	    cmp #'S'
 	    beq load_else_end_target_offset_add_call
+	    cmp #'U'
+	    beq load_else_end_target_offset_add_call
+	    cmp #'T'
+	    beq load_else_end_target_offset_add_call
 	    cmp #'s'
 	    beq load_else_end_target_offset_add_string
 	    cmp #'e'
@@ -3001,6 +3055,10 @@ load_until_loop_start_target_offset_loop:
 	    cmp #'L'
 	    beq load_until_loop_start_target_offset_add_call
 	    cmp #'S'
+	    beq load_until_loop_start_target_offset_add_call
+	    cmp #'U'
+	    beq load_until_loop_start_target_offset_add_call
+	    cmp #'T'
 	    beq load_until_loop_start_target_offset_add_call
 	    cmp #'s'
 	    beq load_until_loop_start_target_offset_add_string
@@ -3207,6 +3265,22 @@ load_var_target_offset_from_x_or_fail:
     lda root_var_offsets_hi,x
     sta current_bit_hi
     rts
+
+load_var_target_upper_offset_from_x_or_fail:
+    lda var_width,x
+    cmp #$04
+    beq :+
+    lda #<msg_bad_avo
+    ldy #>msg_bad_avo
+    jmp fail_with_ptr
+:   jsr load_var_target_offset_from_x_or_fail
+    clc
+    lda current_bit_lo
+    adc #$02
+    sta current_bit_lo
+    bcc :+
+    inc current_bit_hi
+:   rts
 
 load_string_target_offset_from_x_or_fail:
     tya
@@ -3651,6 +3725,10 @@ queue_current_external_symbols_or_fail_body_loop:
     cmp #'L'
     beq queue_current_external_symbols_or_fail_skip_pair
     cmp #'S'
+    beq queue_current_external_symbols_or_fail_skip_pair
+    cmp #'U'
+    beq queue_current_external_symbols_or_fail_skip_pair
+    cmp #'T'
     beq queue_current_external_symbols_or_fail_skip_pair
 queue_current_external_symbols_or_fail_skip_single:
     iny

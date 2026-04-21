@@ -43,6 +43,23 @@ support is expected to come from link-time runtime modules selected per used
 operator, so programs that do not use a REAL operation do not pay for that code
 in the interpreter or in their linked payload.
 
+## REAL Runtime Helper ABI
+
+REAL helpers are normal linked AVO routines, not AVM intrinsics and not
+AVMRUN-resident opcode handlers.
+
+The current REAL32 stack convention is:
+
+- one REAL32 value occupies two 16-bit stack cells
+- the low word is pushed before the high word
+- `RT_F_ADD` consumes `lhs.low`, `lhs.high`, `rhs.low`, `rhs.high`
+- `RT_F_ADD` returns `result.low`, `result.high`
+
+ACTC currently lowers `R=A+B` by loading `A.low`, `A.high`, `B.low`, and
+`B.high`, calling only `RT_F_ADD`, then storing the returned high word and low
+word into `R`. ALINK emits the high-word accesses as ordinary `LOAD` / `STORE`
+against the variable address plus two bytes.
+
 ## Semantics
 
 ### `Print`
@@ -124,3 +141,16 @@ its memory image remains tight:
 
 Direct AVM assembly and host-compiled AVM output can use the wider
 opcode/intrinsic subset.
+
+## AVMRUN Execution Modes
+
+`AVMRUN.PRG` has two execution paths:
+
+- a fast Acheron path for payloads made only of opcodes whose byte values and
+  semantics are compatible with the bundled AcheronVM
+- an internal stack interpreter for the bootstrap AVM opcode set
+
+Bootstrap stack and memory opcodes such as `push16`, `load`, and `store` are
+not Acheron-compatible byte-for-byte. `AVMRUN.PRG` must therefore force the
+internal interpreter when those opcodes appear. This is required for linked REAL
+runtime helpers that use the bootstrap stack ABI.

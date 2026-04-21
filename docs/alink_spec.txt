@@ -244,6 +244,9 @@ Current UDOS-native text AVO note:
   helper objects stay out of user object output and link only when imported.
 - A runtime helper listed in `u <symbol>` metadata is not enough to include it;
   a live body must reference that external by index with `uN`.
+- REAL high-word variable access uses body op aliases rather than new VM
+  opcodes: `U<n>` lowers to `LOAD var+2`, and `T<n>` lowers to `STORE var+2`
+  after ALINK verifies that the variable metadata width is 4 bytes.
 
 The exact implementation of these symbols may change, but the logical link-time
 names are part of the stable contract between ACTC, ALINK, and AVMRUN.
@@ -257,6 +260,10 @@ include REAL operator code at all.
 The REAL routines are normal link-time runtime modules folded into the final
 AVM payload when used. They are not AVMRUN interpreter opcodes, and they are
 not a monolithic always-present REAL blob.
+
+The current proven target-side REAL link case is `R=A+B`, which imports only
+`RT_F_ADD` / `rt_f_add`, pulls that helper from `LIB/`, and does not pull any
+other REAL operator helper.
 
 
 What ALINK Does Not Do
@@ -300,6 +307,7 @@ already proves a narrower but real subset:
   literals, integer literals, and variable metadata
 - parse of optional variable-width metadata, currently proving 4-byte REAL
   storage layout while preserving the older 2-byte default for existing objects
+- REAL high-word load/store body ops for the first add-assignment runtime slice
 - live-set construction from the requested entry
 - current child-object closure
 - deterministic BIN/<MODULE>.AVM emission

@@ -55,6 +55,8 @@ Current real-target build note:
   imported
 - [x] dead-stripped procedures no longer pull their external helper objects into
   the linked image
+- [x] REAL upper-word body ops are lowered without adding VM opcodes: `U<n>`
+  emits `LOAD var+2`, and `T<n>` emits `STORE var+2` for 4-byte variables
 
 ## Current Widening Work
 
@@ -101,6 +103,10 @@ Current real-target build note:
 - [x] also ignores a runtime-style library import listed only by a dead proc:
   `DEAD -> rt_f_add`, `MAIN -> DONE`, proving helper metadata alone does not
   force inclusion
+- [x] also links the first REAL add-assignment runtime shape:
+  `REAL A`, `REAL B`, `REAL R`, `R=A+B`, proving live `RT_F_ADD` lookup from
+  `LIB/`, upper-word variable load/store lowering, and no monolithic REAL VM
+  opcode requirement
 - [x] also loads variable-to-variable arithmetic assignment:
   `X=X+Y`
 - [x] also loads multiple module-scope integer vars under `WHILE` control:
