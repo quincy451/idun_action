@@ -9,6 +9,7 @@ and UDOS object readers converge.
 
 Current status:
 
-- `rt_f_add.avo` is an ABI stub for the REAL add helper. It preserves the
-  current stack contract by returning a zero REAL32 value as low word then high
-  word. It is not the final IEEE-754 addition implementation.
+- `rt_f_add.avo` is a partial REAL add helper. It preserves the current stack
+  contract and implements the exact right-hand zero identity case:
+  `x + +0.0 = x`. Other inputs still return REAL32 zero, so it is not the final
+  IEEE-754 addition implementation.

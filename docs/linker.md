@@ -146,6 +146,6 @@ should include only those runtime objects in the final AVM image.
 
 UDOS-target text AVO runtime modules live separately under
 `src/runtime/udos_modules/` because `ALINK.PRG` does not parse the host JSON AVO
-metadata format. The current `rt_f_add.avo` there is an ABI stub that returns
-REAL32 zero and exists to prove exported `LIB/RT_F_ADD.AVO` lookup and linking;
+metadata format. The current `rt_f_add.avo` there implements the exact
+right-hand `+0.0` identity case and still returns REAL32 zero for other inputs;
 it is not the final floating-point addition implementation.

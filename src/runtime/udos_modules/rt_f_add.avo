@@ -1,7 +1,9 @@
 AVO1
-x rt_f_add 0 7
-b p0p1r
+x rt_f_add 0 38
+b S1S0L1p0qL0p0qap1ghrvKKp0p0r
 i 0
-i 0
+i 1
+v rhs_lo 0
+v rhs_hi 0
 k 2
 n rt_f_add

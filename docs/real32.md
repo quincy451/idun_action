@@ -131,9 +131,11 @@ final AVM image.
 
 The repo now carries the first UDOS-target text runtime object under
 `src/runtime/udos_modules/rt_f_add.avo`, and the workspace exporter overlays it
-into `LIB/RT_F_ADD.AVO`. This file is currently an ABI stub: it returns REAL32
-zero as low word then high word, so it proves library lookup, stack shape, and
-dead-strip behavior without claiming numeric IEEE-754 addition yet.
+into `LIB/RT_F_ADD.AVO`. This file is currently a partial helper: it returns
+the left operand for exact right-hand `+0.0` inputs and returns REAL32 zero for
+other inputs. It proves library lookup, stack shape, dead-strip behavior, and
+the first numeric identity behavior without claiming complete IEEE-754 addition
+yet.
 
 ## Current REAL Helper ABI
 

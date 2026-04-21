@@ -65,7 +65,7 @@ class TestUdosWorkspaceExport(unittest.TestCase):
             self.assertTrue((lib_dir / "RT_PRINT_STR.AVO").is_file())
             self.assertTrue((lib_dir / "RT_F_ADD.AVO").is_file())
             self.assertIn(
-                "x rt_f_add 0 7",
+                "x rt_f_add 0 38",
                 (lib_dir / "RT_F_ADD.AVO").read_text(encoding="ascii"),
             )
             self.assertTrue((lib_dir / "UDOSDIR.TXT").is_file())
