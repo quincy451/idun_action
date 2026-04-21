@@ -247,6 +247,15 @@ Current UDOS-native text AVO note:
 - REAL high-word variable access uses body op aliases rather than new VM
   opcodes: `U<n>` lowers to `LOAD var+2`, and `T<n>` lowers to `STORE var+2`
   after ALINK verifies that the variable metadata width is 4 bytes.
+- Runtime helper bodies can use the bootstrap bitwise and single-bit shift
+  body ops needed by REAL32 algorithms:
+  - `D` lowers to VM `dup`
+  - `K` lowers to VM `drop`
+  - `B` lowers to VM `band`
+  - `O` lowers to VM `bor`
+  - `X` lowers to VM `bxor`
+  - `H` lowers to VM `shl1`
+  - `R` lowers to VM `shr1`
 
 The exact implementation of these symbols may change, but the logical link-time
 names are part of the stable contract between ACTC, ALINK, and AVMRUN.

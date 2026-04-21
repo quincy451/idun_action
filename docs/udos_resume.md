@@ -201,7 +201,8 @@ They are exported into `ACTION.DNP` root and `BIN/`.
 - `AVMRUN.PRG` executes a constrained flagged `AVM1` subset on top of
   AcheronVM. The current proof payloads are `UDOSHELLO.AVM`, `UDOSFLOW.AVM`,
   and focused runtime arithmetic/comparison samples proving the current narrow
-  interpreted subset for `push16`, `add`, `sub`, `eq`, `ne`, `lt`, and `gt`.
+  interpreted subset for `push16`, `add`, `sub`, `eq`, `ne`, `lt`, `gt`,
+  `band`, `bor`, `bxor`, `shl1`, and `shr1`.
   The live `ACTC -> ALINK -> AVMRUN` proof now also covers compiler-lowered
   runtime `<=` / `>=` print expressions built from that subset.
 

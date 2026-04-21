@@ -53,6 +53,11 @@ subset directly:
 - `ne`
 - `lt`
 - `gt`
+- `band`
+- `bor`
+- `bxor`
+- `shl1`
+- `shr1`
 - `dup`
 - `drop`
 - `jz`

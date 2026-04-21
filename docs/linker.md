@@ -82,6 +82,10 @@ defines an external symbol table entry, but ALINK only queues that dependency
 when a live body references it with `uN`. This keeps runtime helpers used only
 by dead-stripped procedures out of the final AVM.
 
+Runtime helper body ops currently include compressed aliases for stack,
+bitwise, and shift opcodes used by REAL32 support: `D`=`dup`, `K`=`drop`,
+`B`=`band`, `O`=`bor`, `X`=`bxor`, `H`=`shl1`, and `R`=`shr1`.
+
 Current target-side symbol spelling is identifier-style. Runtime modules use
 underscore aliases such as `rt_f_add` until the UDOS text-object parser accepts
 the dotted logical names (`rt.f_add`) used by the host/reference toolchain.

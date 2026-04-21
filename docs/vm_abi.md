@@ -60,6 +60,21 @@ ACTC currently lowers `R=A+B` by loading `A.low`, `A.high`, `B.low`, and
 word into `R`. ALINK emits the high-word accesses as ordinary `LOAD` / `STORE`
 against the variable address plus two bytes.
 
+## Runtime Opcode Subset
+
+The bootstrap interpreter operates on 16-bit stack cells. Arithmetic wraps at
+16 bits, comparisons return `0` or `1`, and `lt` / `gt` use signed 16-bit
+comparison.
+
+The bitwise and shift opcodes are unsigned 16-bit primitives intended for
+runtime libraries such as REAL32 helpers:
+
+- `band`: pop two cells, push `lhs & rhs`
+- `bor`: pop two cells, push `lhs | rhs`
+- `bxor`: pop two cells, push `lhs ^ rhs`
+- `shl1`: pop one cell, push `(value << 1) & 0xffff`
+- `shr1`: pop one cell, push logical `value >> 1`
+
 ## Semantics
 
 ### `Print`

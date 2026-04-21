@@ -35,6 +35,11 @@ OPCODE_DUP = $1A
 OPCODE_DROP = $1B
 OPCODE_LT = $1C
 OPCODE_GT = $1D
+OPCODE_BAND = $1E
+OPCODE_BOR = $1F
+OPCODE_BXOR = $20
+OPCODE_SHL1 = $21
+OPCODE_SHR1 = $22
 OPCODE_NATIVE = $2D
 OPCODE_CALL = $45
 OPCODE_JUMP = $46
@@ -1092,6 +1097,21 @@ interpret_payload_loop:
 :   cmp #OPCODE_GT
     bne :+
     jmp interpret_gt
+:   cmp #OPCODE_BAND
+    bne :+
+    jmp interpret_band
+:   cmp #OPCODE_BOR
+    bne :+
+    jmp interpret_bor
+:   cmp #OPCODE_BXOR
+    bne :+
+    jmp interpret_bxor
+:   cmp #OPCODE_SHL1
+    bne :+
+    jmp interpret_shl1
+:   cmp #OPCODE_SHR1
+    bne :+
+    jmp interpret_shr1
 :   cmp #OPCODE_JZ
     bne :+
     jmp interpret_jz
@@ -1268,6 +1288,73 @@ interpret_compare_common:
     bcc :+
     jmp interpret_payload_fail
 :   jsr interp_push_word_tmp
+    bcc :+
+    jmp interpret_payload_fail
+:   lda #$01
+    jsr advance_scan_ptr
+    jmp interpret_payload_loop
+
+interpret_band:
+    jsr interp_pop_to_word_tmp
+    bcc :+
+    jmp interpret_payload_fail
+:   jsr interp_pop_to_svc_retptr
+    bcc :+
+    jmp interpret_payload_fail
+:   lda svc_retptr
+    and word_tmp
+    sta word_tmp
+    lda svc_retptr+1
+    and word_tmp+1
+    sta word_tmp+1
+    jmp interpret_bitwise_push_common
+
+interpret_bor:
+    jsr interp_pop_to_word_tmp
+    bcc :+
+    jmp interpret_payload_fail
+:   jsr interp_pop_to_svc_retptr
+    bcc :+
+    jmp interpret_payload_fail
+:   lda svc_retptr
+    ora word_tmp
+    sta word_tmp
+    lda svc_retptr+1
+    ora word_tmp+1
+    sta word_tmp+1
+    jmp interpret_bitwise_push_common
+
+interpret_bxor:
+    jsr interp_pop_to_word_tmp
+    bcc :+
+    jmp interpret_payload_fail
+:   jsr interp_pop_to_svc_retptr
+    bcc :+
+    jmp interpret_payload_fail
+:   lda svc_retptr
+    eor word_tmp
+    sta word_tmp
+    lda svc_retptr+1
+    eor word_tmp+1
+    sta word_tmp+1
+    jmp interpret_bitwise_push_common
+
+interpret_shl1:
+    jsr interp_pop_to_word_tmp
+    bcc :+
+    jmp interpret_payload_fail
+:   asl word_tmp
+    rol word_tmp+1
+    jmp interpret_bitwise_push_common
+
+interpret_shr1:
+    jsr interp_pop_to_word_tmp
+    bcc :+
+    jmp interpret_payload_fail
+:   lsr word_tmp+1
+    ror word_tmp
+interpret_bitwise_push_common:
+    jsr interp_push_word_tmp
     bcc :+
     jmp interpret_payload_fail
 :   lda #$01

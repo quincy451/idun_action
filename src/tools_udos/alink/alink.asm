@@ -55,8 +55,15 @@ OPCODE_EQ = $16
 OPCODE_NE = $17
 OPCODE_JZ = $18
 OPCODE_JMP = $19
+OPCODE_DUP = $1A
+OPCODE_DROP = $1B
 OPCODE_LT = $1C
 OPCODE_GT = $1D
+OPCODE_BAND = $1E
+OPCODE_BOR = $1F
+OPCODE_BXOR = $20
+OPCODE_SHL1 = $21
+OPCODE_SHR1 = $22
 OPCODE_CALL = $45
 OPCODE_RET = $48
 OPCODE_CALLN = $49
@@ -1136,9 +1143,13 @@ build_live_set_body_loop:
     jmp build_live_set_next_export_restore
 : 
     cmp #'c'
-    beq build_live_set_call_branch
+    bne :+
+    jmp build_live_set_call
+:
     cmp #'u'
-    beq build_live_set_skip_pair_branch
+    bne :+
+    jmp build_live_set_skip_pair
+:
     cmp #'s'
     beq build_live_set_skip_pair_branch
     cmp #'e'
@@ -1157,6 +1168,14 @@ build_live_set_body_loop:
     beq build_live_set_skip_pair_branch
     cmp #'T'
     beq build_live_set_skip_pair_branch
+    jmp build_live_set_check_single_ops
+build_live_set_skip_pair_branch:
+    jmp build_live_set_skip_pair
+build_live_set_check_single_ops:
+    cmp #'D'
+    beq build_live_set_single_branch
+    cmp #'K'
+    beq build_live_set_single_branch
     cmp #'a'
     beq build_live_set_single_branch
     cmp #'m'
@@ -1168,6 +1187,16 @@ build_live_set_body_loop:
     cmp #'l'
     beq build_live_set_single_branch
     cmp #'g'
+    beq build_live_set_single_branch
+    cmp #'B'
+    beq build_live_set_single_branch
+    cmp #'O'
+    beq build_live_set_single_branch
+    cmp #'X'
+    beq build_live_set_single_branch
+    cmp #'H'
+    beq build_live_set_single_branch
+    cmp #'R'
     beq build_live_set_single_branch
 	    cmp #'y'
 	    beq build_live_set_single_branch
@@ -1194,8 +1223,6 @@ build_live_set_body_loop:
     jmp build_live_set_bad
 build_live_set_call_branch:
     jmp build_live_set_call
-build_live_set_skip_pair_branch:
-    jmp build_live_set_skip_pair
 build_live_set_single_branch:
     jmp build_live_set_single
 build_live_set_ret_branch:
@@ -2003,6 +2030,12 @@ emit_live_bytes_for_export_x_loop:
 :   cmp #'T'
     bne :+
     jmp emit_live_bytes_for_export_x_store_upper
+:   cmp #'D'
+    bne :+
+    jmp emit_live_bytes_for_export_x_dup
+:   cmp #'K'
+    bne :+
+    jmp emit_live_bytes_for_export_x_drop
 :   cmp #'a'
     bne :+
     jmp emit_live_bytes_for_export_x_add
@@ -2021,6 +2054,21 @@ emit_live_bytes_for_export_x_loop:
 :   cmp #'g'
     bne :+
     jmp emit_live_bytes_for_export_x_gt
+:   cmp #'B'
+    bne :+
+    jmp emit_live_bytes_for_export_x_band
+:   cmp #'O'
+    bne :+
+    jmp emit_live_bytes_for_export_x_bor
+:   cmp #'X'
+    bne :+
+    jmp emit_live_bytes_for_export_x_bxor
+:   cmp #'H'
+    bne :+
+    jmp emit_live_bytes_for_export_x_shl1
+:   cmp #'R'
+    bne :+
+    jmp emit_live_bytes_for_export_x_shr1
 	:   cmp #'y'
 	    bne :+
 	    jmp emit_live_bytes_for_export_x_printi_top
@@ -2199,6 +2247,16 @@ emit_live_bytes_for_export_x_store_upper:
     jsr append_payload_byte
     iny
     jmp emit_live_bytes_for_export_x_loop
+emit_live_bytes_for_export_x_dup:
+    lda #OPCODE_DUP
+    jsr append_payload_byte
+    iny
+    jmp emit_live_bytes_for_export_x_loop
+emit_live_bytes_for_export_x_drop:
+    lda #OPCODE_DROP
+    jsr append_payload_byte
+    iny
+    jmp emit_live_bytes_for_export_x_loop
 emit_live_bytes_for_export_x_add:
     lda #OPCODE_ADD
     jsr append_payload_byte
@@ -2226,6 +2284,31 @@ emit_live_bytes_for_export_x_lt:
     jmp emit_live_bytes_for_export_x_loop
 emit_live_bytes_for_export_x_gt:
     lda #OPCODE_GT
+    jsr append_payload_byte
+    iny
+    jmp emit_live_bytes_for_export_x_loop
+emit_live_bytes_for_export_x_band:
+    lda #OPCODE_BAND
+    jsr append_payload_byte
+    iny
+    jmp emit_live_bytes_for_export_x_loop
+emit_live_bytes_for_export_x_bor:
+    lda #OPCODE_BOR
+    jsr append_payload_byte
+    iny
+    jmp emit_live_bytes_for_export_x_loop
+emit_live_bytes_for_export_x_bxor:
+    lda #OPCODE_BXOR
+    jsr append_payload_byte
+    iny
+    jmp emit_live_bytes_for_export_x_loop
+emit_live_bytes_for_export_x_shl1:
+    lda #OPCODE_SHL1
+    jsr append_payload_byte
+    iny
+    jmp emit_live_bytes_for_export_x_loop
+emit_live_bytes_for_export_x_shr1:
+    lda #OPCODE_SHR1
     jsr append_payload_byte
     iny
     jmp emit_live_bytes_for_export_x_loop

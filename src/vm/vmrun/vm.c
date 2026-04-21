@@ -24,6 +24,11 @@
 #define OPCODE_DROP 0x1B
 #define OPCODE_LT 0x1C
 #define OPCODE_GT 0x1D
+#define OPCODE_BAND 0x1E
+#define OPCODE_BOR 0x1F
+#define OPCODE_BXOR 0x20
+#define OPCODE_SHL1 0x21
+#define OPCODE_SHR1 0x22
 #define OPCODE_NATIVE 0x2D
 #define OPCODE_CALLN 0x49
 #define OPCODE_SETP16 0x61
@@ -676,6 +681,44 @@ int vm_run_filename(const char* filename)
             rhs = stack_pop();
             lhs = stack_pop();
             stack_push(((int16_t)lhs > (int16_t)rhs) ? 1u : 0u);
+            continue;
+        }
+
+        if (opcode == OPCODE_BAND)
+        {
+            rhs = stack_pop();
+            lhs = stack_pop();
+            stack_push((uint16_t)(lhs & rhs));
+            continue;
+        }
+
+        if (opcode == OPCODE_BOR)
+        {
+            rhs = stack_pop();
+            lhs = stack_pop();
+            stack_push((uint16_t)(lhs | rhs));
+            continue;
+        }
+
+        if (opcode == OPCODE_BXOR)
+        {
+            rhs = stack_pop();
+            lhs = stack_pop();
+            stack_push((uint16_t)(lhs ^ rhs));
+            continue;
+        }
+
+        if (opcode == OPCODE_SHL1)
+        {
+            lhs = stack_pop();
+            stack_push((uint16_t)(lhs << 1));
+            continue;
+        }
+
+        if (opcode == OPCODE_SHR1)
+        {
+            lhs = stack_pop();
+            stack_push((uint16_t)(lhs >> 1));
             continue;
         }
 

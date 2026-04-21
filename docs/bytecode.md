@@ -43,6 +43,11 @@ All jump/string offsets are payload-relative absolute offsets.
 | `0x1b` | `drop` | none | Discard top of stack |
 | `0x1c` | `lt` | none | Signed `<`, returns `0/1` |
 | `0x1d` | `gt` | none | Signed `>`, returns `0/1` |
+| `0x1e` | `band` | none | Pop two, push `lhs & rhs` |
+| `0x1f` | `bor` | none | Pop two, push `lhs | rhs` |
+| `0x20` | `bxor` | none | Pop two, push `lhs ^ rhs` |
+| `0x21` | `shl1` | none | Pop one, push `(value << 1) & 0xffff` |
+| `0x22` | `shr1` | none | Pop one, push logical `value >> 1` |
 | `0x2d` | `native` | none | Terminate and return to native caller |
 | `0x49` | `calln` | `u16 target` | Invoke a VM intrinsic pseudo-target |
 | `0x61` | `setp16` | `u16` | Set the current string pointer |
