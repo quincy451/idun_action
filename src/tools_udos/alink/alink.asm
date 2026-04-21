@@ -3617,21 +3617,68 @@ copy_export_ptr_to_symbol_buffer_done:
 
 queue_current_external_symbols_or_fail:
     ldx #$00
-queue_current_external_symbols_or_fail_loop:
-    cpx external_count
+queue_current_external_symbols_or_fail_export_loop:
+    cpx export_count
     beq queue_current_external_symbols_or_fail_done
-    txa
+    lda live_flags,x
+    bne queue_current_external_symbols_or_fail_scan_export
+queue_current_external_symbols_or_fail_next_export:
+    inx
+    bne queue_current_external_symbols_or_fail_export_loop
+queue_current_external_symbols_or_fail_done:
+    rts
+queue_current_external_symbols_or_fail_scan_export:
+    stx export_index
+    jsr set_body_ptr_from_x
+    ldy #$00
+queue_current_external_symbols_or_fail_body_loop:
+    lda (body_ptr),y
+    beq queue_current_external_symbols_or_fail_restore_next_export
+    cmp #'u'
+    beq queue_current_external_symbols_or_fail_external
+    cmp #'c'
+    beq queue_current_external_symbols_or_fail_skip_pair
+    cmp #'s'
+    beq queue_current_external_symbols_or_fail_skip_pair
+    cmp #'e'
+    beq queue_current_external_symbols_or_fail_skip_pair
+    cmp #'i'
+    beq queue_current_external_symbols_or_fail_skip_pair
+    cmp #'j'
+    beq queue_current_external_symbols_or_fail_skip_pair
+    cmp #'p'
+    beq queue_current_external_symbols_or_fail_skip_pair
+    cmp #'L'
+    beq queue_current_external_symbols_or_fail_skip_pair
+    cmp #'S'
+    beq queue_current_external_symbols_or_fail_skip_pair
+queue_current_external_symbols_or_fail_skip_single:
+    iny
+    jmp queue_current_external_symbols_or_fail_body_loop
+queue_current_external_symbols_or_fail_skip_pair:
+    iny
+    iny
+    jmp queue_current_external_symbols_or_fail_body_loop
+queue_current_external_symbols_or_fail_external:
+    iny
+    jsr load_body_digit_index_to_x_or_fail
+    cpx external_count
+    bcc :+
+    lda #<msg_bad_avo
+    ldy #>msg_bad_avo
+    jmp fail_with_ptr
+:   tya
     pha
     jsr set_external_ptr_from_x
     jsr copy_export_ptr_to_symbol_buffer
     jsr enqueue_symbol_buffer_if_new_or_fail
-queue_current_external_symbols_or_fail_next:
     pla
-    tax
-    inx
-    bne queue_current_external_symbols_or_fail_loop
-queue_current_external_symbols_or_fail_done:
-    rts
+    tay
+    iny
+    jmp queue_current_external_symbols_or_fail_body_loop
+queue_current_external_symbols_or_fail_restore_next_export:
+    ldx export_index
+    jmp queue_current_external_symbols_or_fail_next_export
 
 enqueue_symbol_buffer_if_new_or_fail:
     ldx #$00

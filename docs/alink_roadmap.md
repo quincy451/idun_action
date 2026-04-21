@@ -67,6 +67,9 @@ Current working-tree verification:
 - Pending externals now fall back from `OBJ/<symbol>.AVO` to
   `LIB/<symbol>.AVO`, proving the lookup shape needed for operator-specific
   runtime modules such as REAL helpers.
+- Pending externals are queued from live `uN` body operations rather than every
+  object-level `u <symbol>` line, so dead-stripped procedures do not pull their
+  helper objects into the final image.
 
 ## Remaining Work
 

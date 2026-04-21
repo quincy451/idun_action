@@ -516,6 +516,36 @@ SCENARIOS = {
         ),
         "expected_console": "START\nFADD\nDONE\n",
     },
+    "dead_runtime_library_external": {
+        "out_fs_name": "harness-actc-alink-avmrun-dead-runtime-library-external",
+        "source": (
+            'MODULE MAIN\r'
+            'PROC DEAD()\r'
+            'RT_F_ADD()\r'
+            'RETURN\r'
+            'PROC MAIN()\r'
+            'PrintE("DONE")\r'
+            'RETURN\r'
+        ),
+        "expected_avo": (
+            "AVO1\n"
+            "x dead 0 4\n"
+            "x main 4 7\n"
+            "b u0r\n"
+            "b e0r\n"
+            "u rt_f_add\n"
+            "s DONE\n"
+            "k 2\n"
+            "n main\n"
+        ),
+        "expected_avm": bytes(
+            [
+                65, 86, 77, 49, 2, 14, 0, 0, 0, 1, 9, 0, 97, 9, 0, 73,
+                16, 255, 73, 32, 255, 68, 79, 78, 69, 0,
+            ]
+        ),
+        "expected_console": "DONE\n",
+    },
     "int_vars_multi_while": {
         "out_fs_name": "harness-actc-alink-avmrun-int-vars-multi-while",
         "source": (

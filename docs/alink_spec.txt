@@ -190,6 +190,8 @@ That means:
 - the root entry procedure is always kept
 - only procedures reachable from the entry remain
 - only objects required to satisfy reachable references are included
+- external objects are queued from live `uN` body operations, not merely from
+  the presence of a `u <symbol>` line in the object symbol table
 - only overlays reachable from the live program remain
 - unused exports in loaded objects are allowed to drop out of the final image
 
@@ -240,6 +242,8 @@ Current UDOS-native text AVO note:
   example `rt_f_add` maps to `rt.f_add`.
 - Pending externals now search `OBJ/` first and then `LIB/`, which lets runtime
   helper objects stay out of user object output and link only when imported.
+- A runtime helper listed in `u <symbol>` metadata is not enough to include it;
+  a live body must reference that external by index with `uN`.
 
 The exact implementation of these symbols may change, but the logical link-time
 names are part of the stable contract between ACTC, ALINK, and AVMRUN.

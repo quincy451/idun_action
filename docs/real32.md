@@ -123,6 +123,11 @@ REAL helpers: pending externals search `OBJ/` first and then `LIB/`. The current
 target-side text AVO spelling uses underscore aliases such as `rt_f_add`, which
 map to the logical runtime symbols such as `rt.f_add`.
 
+ALINK now queues helper objects from live `uN` body operations, not from
+object-level `u <symbol>` metadata alone. That is required for REAL operator
+dead-stripping: a helper mentioned only by a dead procedure must not enter the
+final AVM image.
+
 Full UDOS-native REAL32 literals, arithmetic, comparisons, conversions, and
 `PrintR` / `PrintRE` lowering remain future work. The host/reference compiler
 still has broader REAL behavior than the UDOS-native ACTC path.

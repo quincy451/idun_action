@@ -77,6 +77,11 @@ The root module still must come from `OBJ/<module>.AVO`. The `LIB/` fallback is
 only for dependent objects, which is the intended path for runtime helpers such
 as REAL operator modules.
 
+Dependency inclusion is driven by live body operations. A `u <symbol>` line
+defines an external symbol table entry, but ALINK only queues that dependency
+when a live body references it with `uN`. This keeps runtime helpers used only
+by dead-stripped procedures out of the final AVM.
+
 Current target-side symbol spelling is identifier-style. Runtime modules use
 underscore aliases such as `rt_f_add` until the UDOS text-object parser accepts
 the dotted logical names (`rt.f_add`) used by the host/reference toolchain.

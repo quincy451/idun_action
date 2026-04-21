@@ -19,6 +19,8 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
 - [x] Resolves the current narrow external-object closure by loading child objects
 - [x] Resolves pending dependent objects from `LIB/` when no project object exists
   in `OBJ/`
+- [x] Queues external dependencies from live `uN` body operations instead of
+  every object-level `u <symbol>` line
 - [x] Carries child-object int/string pools into the linked image
 - [x] Emits direct binary `AVM1` to `BIN/<NAME>.AVM`
 - [x] Narrow exact-byte proof exists for the emitted image
@@ -51,6 +53,8 @@ Current real-target build note:
 - [x] dependent-object lookup falls back from `OBJ/<symbol>.AVO` to
   `LIB/<symbol>.AVO`, keeping runtime helpers outside compiler output until
   imported
+- [x] dead-stripped procedures no longer pull their external helper objects into
+  the linked image
 
 ## Current Widening Work
 
@@ -94,6 +98,9 @@ Current real-target build note:
 - [x] also loads a runtime-style library object only from `LIB/` when imported:
   `MAIN -> rt_f_add`, proving the lookup shape needed for per-operation REAL
   helper inclusion without making REAL an AVM opcode
+- [x] also ignores a runtime-style library import listed only by a dead proc:
+  `DEAD -> rt_f_add`, `MAIN -> DONE`, proving helper metadata alone does not
+  force inclusion
 - [x] also loads variable-to-variable arithmetic assignment:
   `X=X+Y`
 - [x] also loads multiple module-scope integer vars under `WHILE` control:

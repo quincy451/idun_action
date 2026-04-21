@@ -153,6 +153,9 @@ class TestToolAbiPipeline(unittest.TestCase):
     def test_runtime_library_external_pipeline_is_green_under_harness(self) -> None:
         self.run_scenario("runtime_library_external", "START\nFADD\nDONE\n", 64, 53)
 
+    def test_dead_runtime_library_external_pipeline_is_green_under_harness(self) -> None:
+        self.run_scenario("dead_runtime_library_external", "DONE\n", 68, 26)
+
     def test_real_integer_print_is_rejected_until_real_lowering_exists(self) -> None:
         self.run_actc_failure_source(
             'MODULE MAIN\rREAL X\rPROC MAIN()\rPrintIE(X)\rRETURN\r',
