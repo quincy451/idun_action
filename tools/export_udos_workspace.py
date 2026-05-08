@@ -115,6 +115,13 @@ def export_udos_tools(root: Path, image_root: Path, bin_dir: Path) -> None:
         ("build_actadd_udos.sh", "ACTADD.PRG"),
         ("build_act2save_udos.sh", "ACT2SAVE.PRG"),
         ("build_actc_udos.sh", "ACTC.PRG"),
+        ("build_actc_overlay_noop.sh", "ACTC_OVL0.BIN"),
+        ("build_actc_overlay_source_header.sh", "ACTC_OVL1.BIN"),
+        ("build_actc_overlay_decl_counts.sh", "ACTC_OVL2.BIN"),
+        ("build_actc_overlay_payload_layout.sh", "ACTC_OVL3.BIN"),
+        ("build_actc_overlay_runtime_imports.sh", "ACTC_OVL4.BIN"),
+        ("build_actc_overlay_emit_object.sh", "ACTC_OVL5.BIN"),
+        ("build_actc_overlay_body_collect.sh", "ACTC_OVL6.BIN"),
         ("build_alink_udos.sh", "ALINK.PRG"),
         ("build_actchk_udos.sh", "ACTCHK.PRG"),
         ("build_actdir_udos.sh", "ACTDIR.PRG"),
@@ -126,12 +133,26 @@ def export_udos_tools(root: Path, image_root: Path, bin_dir: Path) -> None:
         ("build_actwork_udos.sh", "ACTWORK.PRG"),
         ("build_actcopy_udos.sh", "ACTCOPY.PRG"),
         ("build_actdel_udos.sh", "ACTDEL.PRG"),
+        ("build_actdbg_udos.sh", "ACTDBG.PRG"),
+        ("build_actdbg_overlay_optional_ui.sh", "ACTDBG_OVL1.BIN"),
+        ("build_actdbg_overlay_exec.sh", "ACTDBG_OVL2.BIN"),
+        ("build_actedit_udos.sh", "ACTEDIT.PRG"),
         ("build_actmkdir_udos.sh", "ACTMKDIR.PRG"),
         ("build_actren_udos.sh", "ACTMOVE.PRG"),
         ("build_actrmdir_udos.sh", "ACTRMDIR.PRG"),
         ("build_actwrite_udos.sh", "ACTWRITE.PRG"),
         ("build_avminfo_udos.sh", "AVMINFO.PRG"),
         ("build_avmrun_udos.sh", "AVMRUN.PRG"),
+        ("build_avmrunc_udos.sh", "AVMRUNC.PRG"),
+        ("build_avmrun_native_helper_printstd.sh", "RT_PRINT_STD_HELPER.BIN"),
+        ("build_avmrun_native_helper_printreal.sh", "RT_PRINT_F_HELPER.BIN"),
+        ("build_avmrun_native_helper_gfx.sh", "RT_GFX1_HELPER.BIN"),
+        ("build_avmrun_native_helper_sidspr.sh", "RT_SIDSPR1_HELPER.BIN"),
+        ("build_avmrun_native_helper_dbf.sh", "RT_DBF1_HELPER.BIN"),
+        ("build_avmrun_native_helper_math.sh", "RT_MATH1_HELPER.BIN"),
+        ("build_avmrun_overlay_printreal.sh", "AVMRUN_OVL1.BIN"),
+        ("build_avmrun_overlay_realops.sh", "AVMRUN_OVL2.BIN"),
+        ("build_avmrun_overlay_interp.sh", "AVMRUN_OVL3.BIN"),
     ]
     for script_name, out_name in tool_specs:
         build_tool = root / "tools" / script_name
@@ -143,10 +164,8 @@ def export_udos_tools(root: Path, image_root: Path, bin_dir: Path) -> None:
             text=True,
         )
         built = Path(result.stdout.strip().splitlines()[-1])
-        shutil.copy2(built, bin_dir / out_name)
         shutil.copy2(built, image_root / out_name)
         if out_name == "ACTWRITE.PRG":
-            shutil.copy2(built, bin_dir / "W.PRG")
             shutil.copy2(built, image_root / "W.PRG")
 
     (image_root / "ACTFLOW.BAT").write_text(

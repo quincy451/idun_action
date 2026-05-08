@@ -1,0 +1,12 @@
+AVO1
+x rt_s_to_f 0 69
+b S0p1L0RRRRRRRRRRRRRRRmS1L0L1XL1mu0S3S2L3L1p0BOS3L2L3r
+u rt_i_to_f
+i 32768
+i 0
+v n 0
+v mask 0
+v lo 0
+v hi 0
+k 0
+n rt_s_to_f

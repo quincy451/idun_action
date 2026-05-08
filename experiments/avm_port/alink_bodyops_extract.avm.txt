@@ -1,0 +1,213 @@
+entry start
+
+start:
+  push16 in_name
+  calln fopenr
+  jz exit_now
+
+  push16 out_name
+  calln fopenw
+  jz close_read_and_exit
+
+  push16 0
+  store 0
+
+scan_loop:
+  calln fread8
+  dup
+  push16 $ffff
+  eq
+  jz got_byte
+
+  drop
+  load 0
+  push8 2
+  eq
+  jz close_both_and_exit
+  push8 10
+  calln fwrite8
+  jmp close_both_and_exit
+
+got_byte:
+  store 1
+
+  load 0
+  push8 0
+  eq
+  jz state_not_line_start
+
+  load 1
+  push8 13
+  eq
+  jz s0_not_cr
+  jmp scan_loop
+s0_not_cr:
+  load 1
+  push8 10
+  eq
+  jz s0_not_lf
+  jmp scan_loop
+s0_not_lf:
+  load 1
+  push8 98
+  eq
+  jz s0_not_b
+  push8 1
+  store 0
+  jmp scan_loop
+s0_not_b:
+  push8 3
+  store 0
+  jmp scan_loop
+
+state_not_line_start:
+  load 0
+  push8 1
+  eq
+  jz state_not_after_b
+
+  load 1
+  push8 32
+  eq
+  jz s1_not_space
+  push8 2
+  store 0
+  jmp scan_loop
+s1_not_space:
+  load 1
+  push8 13
+  eq
+  jz s1_not_cr
+  push8 0
+  store 0
+  jmp scan_loop
+s1_not_cr:
+  load 1
+  push8 10
+  eq
+  jz s1_not_lf
+  push8 0
+  store 0
+  jmp scan_loop
+s1_not_lf:
+  push8 3
+  store 0
+  jmp scan_loop
+
+state_not_after_b:
+  load 0
+  push8 2
+  eq
+  jz state_skip_line
+
+  load 1
+  push8 13
+  eq
+  jz s2_not_cr
+  push8 10
+  calln fwrite8
+  push8 0
+  store 0
+  jmp scan_loop
+s2_not_cr:
+  load 1
+  push8 10
+  eq
+  jz s2_validate
+  push8 10
+  calln fwrite8
+  push8 0
+  store 0
+  jmp scan_loop
+
+s2_validate:
+  load 1
+  push8 48
+  lt
+  jz s2_digit_hi
+  jmp s2_upper_lo
+s2_digit_hi:
+  load 1
+  push8 57
+  gt
+  jz s2_valid
+  jmp s2_upper_lo
+
+s2_upper_lo:
+  load 1
+  push8 65
+  lt
+  jz s2_upper_hi
+  jmp s2_lower_lo
+s2_upper_hi:
+  load 1
+  push8 90
+  gt
+  jz s2_valid
+  jmp s2_lower_lo
+
+s2_lower_lo:
+  load 1
+  push8 97
+  lt
+  jz invalid_char
+  load 1
+  push8 122
+  gt
+  jz s2_lower_exclusions
+  jmp invalid_char
+s2_lower_exclusions:
+  load 1
+  push8 98
+  eq
+  jz s2_check_k
+  jmp invalid_char
+s2_check_k:
+  load 1
+  push8 107
+  eq
+  jz s2_valid
+  jmp invalid_char
+
+s2_valid:
+  load 1
+  calln fwrite8
+  jmp scan_loop
+
+state_skip_line:
+  load 1
+  push8 13
+  eq
+  jz s3_not_cr
+  push8 0
+  store 0
+  jmp scan_loop
+s3_not_cr:
+  load 1
+  push8 10
+  eq
+  jz s3_not_lf
+  push8 0
+  store 0
+  jmp scan_loop
+s3_not_lf:
+  jmp scan_loop
+
+invalid_char:
+close_both_and_exit:
+  calln fcloser
+  drop
+  calln fclosew
+  drop
+  calln exit
+
+close_read_and_exit:
+  calln fcloser
+  drop
+exit_now:
+  calln exit
+
+in_name:
+  stringz "MAIN.AVO"
+out_name:
+  stringz "BODY.TXT"

@@ -1,0 +1,22 @@
+; MATH1 binding draft
+; This is a design sketch for the next Action-facing helper-family binding.
+; It is not yet claimed as accepted compiler syntax or a shipped include file.
+;
+; Intent:
+; - thin Action-facing declarations
+; - semantic numeric functions, not new AVM core opcodes
+; - operator-specific REAL runtime modules remain the implementation for
+;   A+B, A-B, A*B, A/B, REAL(x), and INT(x)
+; - raw 6502 implementation lives in RT_MATH1_HELPER.BIN
+; - ALINK selects it only when used
+
+MODULE MATH1
+
+REAL FUNC FAbs(REAL x)
+REAL FUNC FSqrt(REAL x)
+REAL FUNC FSin(REAL radians)
+REAL FUNC FCos(REAL radians)
+REAL FUNC FExp(REAL x)
+REAL FUNC FLog(REAL x)
+REAL FUNC FMin(REAL a,b)
+REAL FUNC FMax(REAL a,b)

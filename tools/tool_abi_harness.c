@@ -29,7 +29,8 @@
 #define KERNAL_CLRCHN 0xFFCC
 #define KERNAL_CHRIN 0xFFCF
 #define KERNAL_CHROUT 0xFFD2
-#define MAX_OPS 256
+#define MAX_OPS 1024
+#define MAX_REU_TRACE_OPS 400
 #define MAX_PATH_LEN 1024
 #define TRACE_HEAD_LEN 16
 #define STACK_WINDOW_LEN 16
@@ -42,6 +43,7 @@
 #define MAX_CHANNELS 16
 #define MAX_KERNAL_OPS 256
 #define MAX_PC_TRACE 2048
+#define SIM_REU_SIZE (16u * 1024u * 1024u)
 
 typedef struct {
     uint16_t svc_console_write_sc0;
@@ -49,8 +51,15 @@ typedef struct {
     uint16_t svc_program_get_cmdline_ptr;
     uint16_t svc_program_get_cmdline_len;
     uint16_t svc_program_exit;
+    uint16_t svc_vm_acheron_enter;
     uint16_t svc_file_load_sc0;
     uint16_t svc_file_save_sc0;
+    uint16_t svc_file_write_begin_sc0;
+    uint16_t svc_file_write_chunk_sc0;
+    uint16_t svc_file_write_close_sc0;
+    uint16_t svc_file_stage_reu_sc0;
+    uint16_t svc_reu_read_sc0;
+    uint16_t svc_reu_write_sc0;
     uint8_t tool_file_status_fail;
     uint8_t tool_file_status_ok;
     uint8_t tool_file_status_too_large;
@@ -72,14 +81,14 @@ typedef struct {
     char full_path[MAX_PATH_LEN];
     uint16_t ptr;
     uint16_t limit;
-    uint16_t actual_len;
+    uint32_t actual_len;
     uint8_t status;
     uint8_t x_reg;
     uint8_t sp;
     uint16_t stack_rts_raw;
     uint16_t stack_rts_next;
     uint16_t approx_jsr_site;
-    uint8_t params[9];
+    uint8_t params[16];
     uint8_t head[TRACE_HEAD_LEN];
     uint8_t head_len;
     uint8_t stack_window[STACK_WINDOW_LEN];
@@ -163,6 +172,7 @@ typedef struct {
     M6502_Callbacks callbacks;
     ServiceAbi abi;
     char workspace[MAX_PATH_LEN];
+    char program_dir[MAX_PATH_LEN];
     char cmdline[256];
     uint8_t exit_status;
     bool exited;
@@ -174,6 +184,7 @@ typedef struct {
     size_t console_cap;
     FileOp ops[MAX_OPS];
     size_t op_count;
+    size_t reu_trace_op_count;
     LabelEntry labels[MAX_LABELS];
     size_t label_count;
     DumpRequest dumps[MAX_DUMPS];
@@ -209,6 +220,10 @@ typedef struct {
     uint8_t current_output_lfn;
     uint8_t kernal_status;
     HostChannel channels[MAX_CHANNELS];
+    FILE* stream_write_fp;
+    char stream_write_path[MAX_PATH_LEN];
+    uint8_t* reu;
+    size_t reu_size;
     KernalOp kernal_ops[MAX_KERNAL_OPS];
     size_t kernal_op_count;
     bool trace_pc_enabled;
@@ -372,10 +387,24 @@ static void load_services_inc(ServiceAbi* abi, const char* path)
             parse_u16_value(value, &abi->svc_program_get_cmdline_len);
         } else if (strcmp(name, "svc_program_exit") == 0) {
             parse_u16_value(value, &abi->svc_program_exit);
+        } else if (strcmp(name, "svc_vm_acheron_enter") == 0) {
+            parse_u16_value(value, &abi->svc_vm_acheron_enter);
         } else if (strcmp(name, "svc_file_load_sc0") == 0) {
             parse_u16_value(value, &abi->svc_file_load_sc0);
         } else if (strcmp(name, "svc_file_save_sc0") == 0) {
             parse_u16_value(value, &abi->svc_file_save_sc0);
+        } else if (strcmp(name, "svc_file_write_begin_sc0") == 0) {
+            parse_u16_value(value, &abi->svc_file_write_begin_sc0);
+        } else if (strcmp(name, "svc_file_write_chunk_sc0") == 0) {
+            parse_u16_value(value, &abi->svc_file_write_chunk_sc0);
+        } else if (strcmp(name, "svc_file_write_close_sc0") == 0) {
+            parse_u16_value(value, &abi->svc_file_write_close_sc0);
+        } else if (strcmp(name, "svc_file_stage_reu_sc0") == 0) {
+            parse_u16_value(value, &abi->svc_file_stage_reu_sc0);
+        } else if (strcmp(name, "svc_reu_read_sc0") == 0) {
+            parse_u16_value(value, &abi->svc_reu_read_sc0);
+        } else if (strcmp(name, "svc_reu_write_sc0") == 0) {
+            parse_u16_value(value, &abi->svc_reu_write_sc0);
         } else if (strcmp(name, "tool_file_status_fail") == 0) {
             parse_u8_value(value, &abi->tool_file_status_fail);
         } else if (strcmp(name, "tool_file_status_ok") == 0) {
@@ -433,6 +462,13 @@ static bool find_label_addr(Harness* h, const char* name, uint16_t* out)
 static uint16_t read_u16(Harness* h, uint16_t addr)
 {
     return (uint16_t)h->mem[addr] | ((uint16_t)h->mem[(uint16_t)(addr + 1)] << 8);
+}
+
+static uint32_t read_u24(Harness* h, uint16_t addr)
+{
+    return (uint32_t)h->mem[addr] |
+           ((uint32_t)h->mem[(uint16_t)(addr + 1)] << 8) |
+           ((uint32_t)h->mem[(uint16_t)(addr + 2)] << 16);
 }
 
 static void write_result_ptr(Harness* h, uint8_t x, uint16_t value)
@@ -568,6 +604,46 @@ static bool resolve_image_absolute_path(Harness* h, const char* rel, bool create
     return ok;
 }
 
+static bool resolve_program_path(Harness* h, const char* rel, bool create_parents, char* out, size_t out_size)
+{
+    char saved_workspace[MAX_PATH_LEN];
+    snprintf(saved_workspace, sizeof(saved_workspace), "%s", h->workspace);
+    snprintf(h->workspace, sizeof(h->workspace), "%s", h->program_dir);
+    bool ok = resolve_workspace_path(h, rel, create_parents, out, out_size);
+    snprintf(h->workspace, sizeof(h->workspace), "%s", saved_workspace);
+    return ok;
+}
+
+static bool resolve_tool_path(Harness* h, const char* rel, bool create_parents, char* out, size_t out_size)
+{
+    if (rel[0] == '!') {
+        return resolve_program_path(h, rel + 1, create_parents, out, out_size);
+    }
+    return resolve_workspace_path(h, rel, create_parents, out, out_size);
+}
+
+static void copy_parent_dir(const char* path, char* out, size_t out_size)
+{
+    const char* slash = strrchr(path, '/');
+    const char* backslash = strrchr(path, '\\');
+    if (!slash || (backslash && backslash > slash)) {
+        slash = backslash;
+    }
+    if (!slash) {
+        snprintf(out, out_size, ".");
+        return;
+    }
+    size_t len = (size_t)(slash - path);
+    if (len == 0) {
+        len = 1;
+    }
+    if (len >= out_size) {
+        len = out_size - 1;
+    }
+    memcpy(out, path, len);
+    out[len] = 0;
+}
+
 static HostChannel* find_channel(Harness* h, uint8_t lfn, bool create)
 {
     HostChannel* free_slot = NULL;
@@ -648,13 +724,72 @@ static void write_file_bytes(const char* path, const uint8_t* data, size_t len)
 
 static FileOp* record_op(Harness* h, const char* kind)
 {
+    if ((strcmp(kind, "rrd") == 0 || strcmp(kind, "rwr") == 0) &&
+        h->reu_trace_op_count >= MAX_REU_TRACE_OPS) {
+        return NULL;
+    }
     if (h->op_count >= MAX_OPS) {
         return NULL;
     }
     FileOp* op = &h->ops[h->op_count++];
     memset(op, 0, sizeof(*op));
     snprintf(op->kind, sizeof(op->kind), "%s", kind);
+    if (strcmp(kind, "rrd") == 0 || strcmp(kind, "rwr") == 0) {
+        h->reu_trace_op_count++;
+    }
     return op;
+}
+
+static bool has_logged_reu_op(Harness* h, const char* kind, uint8_t x)
+{
+    for (size_t i = 0; i < h->op_count; i++) {
+        FileOp* op = &h->ops[i];
+        if (strcmp(op->kind, kind) != 0) {
+            continue;
+        }
+        bool match = true;
+        for (size_t j = 0; j < 8; j++) {
+            if (op->params[j] != h->mem[(uint8_t)(x + (uint8_t)j)]) {
+                match = false;
+                break;
+            }
+        }
+        if (match) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool has_logged_reu_write_op(Harness* h, uint8_t x, uint16_t src_ptr, uint16_t len)
+{
+    uint16_t head_len = len < TRACE_HEAD_LEN ? len : TRACE_HEAD_LEN;
+    for (size_t i = 0; i < h->op_count; i++) {
+        FileOp* op = &h->ops[i];
+        if (strcmp(op->kind, "rwr") != 0) {
+            continue;
+        }
+        bool match = true;
+        for (size_t j = 0; j < 8; j++) {
+            if (op->params[j] != h->mem[(uint8_t)(x + (uint8_t)j)]) {
+                match = false;
+                break;
+            }
+        }
+        if (!match || op->head_len != head_len) {
+            continue;
+        }
+        for (uint16_t j = 0; j < head_len; j++) {
+            if (op->head[j] != h->mem[(uint16_t)(src_ptr + j)]) {
+                match = false;
+                break;
+            }
+        }
+        if (match) {
+            return true;
+        }
+    }
+    return false;
 }
 
 static void fill_op_common(Harness* h, FileOp* op, M6502* cpu, uint8_t x, const char* rel, const char* full, uint16_t ptr, uint16_t limit)
@@ -1047,6 +1182,17 @@ static int service_program_exit(M6502* cpu, uint16_t address, uint8_t data)
     longjmp(G->escape, 1);
 }
 
+static int service_vm_acheron_enter(M6502* cpu, uint16_t address, uint8_t data)
+{
+    (void)cpu;
+    (void)address;
+    (void)data;
+    append_console(G, "HARNESS NO ACHERON\n");
+    G->exit_status = 1;
+    G->exited = true;
+    longjmp(G->escape, 1);
+}
+
 static int service_file_load(M6502* cpu, uint16_t address, uint8_t data)
 {
     (void)address;
@@ -1062,7 +1208,7 @@ static int service_file_load(M6502* cpu, uint16_t address, uint8_t data)
     char rel[MAX_PATH_LEN];
     char full[MAX_PATH_LEN];
     read_cstr_mem(h, name_ptr, rel, sizeof(rel));
-    resolve_workspace_path(h, rel, false, full, sizeof(full));
+    resolve_tool_path(h, rel, false, full, sizeof(full));
     FileOp* op = record_op(h, "load");
     if (op) {
         fill_op_common(h, op, cpu, x, rel, full, dest_ptr, limit);
@@ -1140,6 +1286,172 @@ static int service_file_load(M6502* cpu, uint16_t address, uint8_t data)
     return RTS_STUB_ADDR;
 }
 
+static void ensure_reu(Harness* h)
+{
+    if (h->reu) {
+        return;
+    }
+    h->reu = calloc(1, SIM_REU_SIZE);
+    if (!h->reu) {
+        die("calloc failed for simulated REU");
+    }
+    h->reu_size = SIM_REU_SIZE;
+}
+
+static int service_file_stage_reu(M6502* cpu, uint16_t address, uint8_t data)
+{
+    (void)address;
+    (void)data;
+    Harness* h = G;
+    uint8_t x = cpu->registers->x;
+    uint16_t name_ptr = read_u16(h, x + 0);
+    uint32_t reu_base = read_u24(h, x + 2);
+    char rel[MAX_PATH_LEN];
+    char full[MAX_PATH_LEN];
+    read_cstr_mem(h, name_ptr, rel, sizeof(rel));
+    resolve_tool_path(h, rel, false, full, sizeof(full));
+
+    FileOp* op = record_op(h, "rsta");
+    if (op) {
+        fill_op_common(h, op, cpu, x, rel, full, (uint16_t)(reu_base & 0xFFFFu), (uint16_t)(reu_base >> 16));
+        fill_op_symbol_dumps(h, op);
+    }
+
+    FILE* fp = fopen(full, "rb");
+    if (!fp) {
+        h->mem[x + 5] = h->abi.tool_file_status_nofile;
+        h->mem[x + 6] = 0;
+        h->mem[x + 7] = 0;
+        h->mem[x + 8] = 0;
+        if (op) {
+            op->status = h->abi.tool_file_status_nofile;
+        }
+        return RTS_STUB_ADDR;
+    }
+    if (fseek(fp, 0, SEEK_END) != 0) {
+        fclose(fp);
+        die_errno("fseek REU stage failed");
+    }
+    long end = ftell(fp);
+    if (end < 0) {
+        fclose(fp);
+        die_errno("ftell REU stage failed");
+    }
+    size_t size = (size_t)end;
+    if (fseek(fp, 0, SEEK_SET) != 0) {
+        fclose(fp);
+        die_errno("fseek REU stage rewind failed");
+    }
+
+    ensure_reu(h);
+    size_t copy_len = size;
+    uint8_t status = h->abi.tool_file_status_ok;
+    if (reu_base >= h->reu_size) {
+        copy_len = 0;
+        status = h->abi.tool_file_status_too_large;
+    } else if (copy_len > h->reu_size - reu_base) {
+        copy_len = h->reu_size - reu_base;
+        status = h->abi.tool_file_status_too_large;
+    }
+
+    if (copy_len && fread(h->reu + reu_base, 1, copy_len, fp) != copy_len) {
+        fclose(fp);
+        die_errno("fread REU stage failed");
+    }
+    fclose(fp);
+
+    h->mem[x + 5] = status;
+    h->mem[x + 6] = (uint8_t)(copy_len & 0xFFu);
+    h->mem[x + 7] = (uint8_t)((copy_len >> 8) & 0xFFu);
+    h->mem[x + 8] = (uint8_t)((copy_len >> 16) & 0xFFu);
+    if (op) {
+        op->actual_len = (uint32_t)copy_len;
+        op->status = status;
+        if (copy_len) {
+            fill_op_head_from_buf(op, h->reu + reu_base, (uint16_t)(copy_len > TRACE_HEAD_LEN ? TRACE_HEAD_LEN : copy_len));
+        }
+    }
+    return RTS_STUB_ADDR;
+}
+
+static int service_reu_read(M6502* cpu, uint16_t address, uint8_t data)
+{
+    (void)address;
+    (void)data;
+    Harness* h = G;
+    uint8_t x = cpu->registers->x;
+    uint32_t reu_addr = read_u24(h, x + 0);
+    uint16_t dest_ptr = read_u16(h, x + 3);
+    uint16_t len = read_u16(h, x + 5);
+
+    FileOp* op = NULL;
+    if (!has_logged_reu_op(h, "rrd", x)) {
+        op = record_op(h, "rrd");
+    }
+    if (op) {
+        fill_op_common(h, op, cpu, x, "", "", dest_ptr, len);
+        fill_op_symbol_dumps(h, op);
+    }
+
+    ensure_reu(h);
+    if (reu_addr >= h->reu_size || (size_t)len > h->reu_size - reu_addr) {
+        h->mem[x + 7] = h->abi.tool_file_status_too_large;
+        if (op) {
+            op->status = h->abi.tool_file_status_too_large;
+        }
+        return RTS_STUB_ADDR;
+    }
+    for (uint16_t i = 0; i < len; i++) {
+        h->mem[(uint16_t)(dest_ptr + i)] = h->reu[reu_addr + i];
+    }
+    h->mem[x + 7] = h->abi.tool_file_status_ok;
+    if (op) {
+        op->actual_len = len;
+        op->status = h->abi.tool_file_status_ok;
+        fill_op_head_from_mem(h, op, dest_ptr, len);
+    }
+    return RTS_STUB_ADDR;
+}
+
+static int service_reu_write(M6502* cpu, uint16_t address, uint8_t data)
+{
+    (void)address;
+    (void)data;
+    Harness* h = G;
+    uint8_t x = cpu->registers->x;
+    uint32_t reu_addr = read_u24(h, x + 0);
+    uint16_t src_ptr = read_u16(h, x + 3);
+    uint16_t len = read_u16(h, x + 5);
+
+    FileOp* op = NULL;
+    if (!has_logged_reu_write_op(h, x, src_ptr, len)) {
+        op = record_op(h, "rwr");
+    }
+    if (op) {
+        fill_op_common(h, op, cpu, x, "", "", src_ptr, len);
+        fill_op_symbol_dumps(h, op);
+        fill_op_head_from_mem(h, op, src_ptr, len);
+    }
+
+    ensure_reu(h);
+    if (reu_addr >= h->reu_size || (size_t)len > h->reu_size - reu_addr) {
+        h->mem[x + 7] = h->abi.tool_file_status_too_large;
+        if (op) {
+            op->status = h->abi.tool_file_status_too_large;
+        }
+        return RTS_STUB_ADDR;
+    }
+    for (uint16_t i = 0; i < len; i++) {
+        h->reu[reu_addr + i] = h->mem[(uint16_t)(src_ptr + i)];
+    }
+    h->mem[x + 7] = h->abi.tool_file_status_ok;
+    if (op) {
+        op->actual_len = len;
+        op->status = h->abi.tool_file_status_ok;
+    }
+    return RTS_STUB_ADDR;
+}
+
 static int service_file_save(M6502* cpu, uint16_t address, uint8_t data)
 {
     (void)address;
@@ -1156,7 +1468,7 @@ static int service_file_save(M6502* cpu, uint16_t address, uint8_t data)
     char rel[MAX_PATH_LEN];
     char full[MAX_PATH_LEN];
     read_cstr_mem(h, name_ptr, rel, sizeof(rel));
-    resolve_workspace_path(h, rel, true, full, sizeof(full));
+    resolve_tool_path(h, rel, true, full, sizeof(full));
     if (save_len == 0) {
         while ((uint32_t)src_ptr + (uint32_t)save_len < 0x10000u &&
                h->mem[(uint16_t)(src_ptr + save_len)] != 0) {
@@ -1208,6 +1520,130 @@ static int service_file_save(M6502* cpu, uint16_t address, uint8_t data)
     return RTS_STUB_ADDR;
 }
 
+static int service_file_write_begin(M6502* cpu, uint16_t address, uint8_t data)
+{
+    (void)address;
+    (void)data;
+    Harness* h = G;
+    uint8_t x = cpu->registers->x;
+    uint16_t name_ptr = read_u16(h, x + 0);
+    char rel[MAX_PATH_LEN];
+    char full[MAX_PATH_LEN];
+    read_cstr_mem(h, name_ptr, rel, sizeof(rel));
+    resolve_tool_path(h, rel, true, full, sizeof(full));
+
+    FileOp* op = record_op(h, "wopn");
+    if (op) {
+        fill_op_common(h, op, cpu, x, rel, full, 0, 0);
+        fill_op_symbol_dumps(h, op);
+    }
+
+    if (h->stream_write_fp) {
+        fclose(h->stream_write_fp);
+        h->stream_write_fp = NULL;
+    }
+
+    char parent[MAX_PATH_LEN];
+    snprintf(parent, sizeof(parent), "%s", full);
+    char* slash = strrchr(parent, '/');
+    if (slash) {
+        *slash = 0;
+        ensure_dir_exists(parent);
+    }
+
+    h->stream_write_fp = fopen(full, "wb");
+    if (!h->stream_write_fp) {
+        h->mem[x + 2] = h->abi.tool_file_status_fail;
+        if (op) {
+            op->status = h->abi.tool_file_status_fail;
+        }
+        return RTS_STUB_ADDR;
+    }
+    snprintf(h->stream_write_path, sizeof(h->stream_write_path), "%s", full);
+    h->mem[x + 2] = h->abi.tool_file_status_ok;
+    if (op) {
+        op->status = h->abi.tool_file_status_ok;
+    }
+    return RTS_STUB_ADDR;
+}
+
+static int service_file_write_chunk(M6502* cpu, uint16_t address, uint8_t data)
+{
+    (void)address;
+    (void)data;
+    Harness* h = G;
+    uint8_t x = cpu->registers->x;
+    uint16_t src_ptr = read_u16(h, x + 0);
+    uint16_t len = read_u16(h, x + 2);
+
+    FileOp* op = record_op(h, "wrte");
+    if (op) {
+        fill_op_common(h, op, cpu, x, "", h->stream_write_path, src_ptr, len);
+        fill_op_symbol_dumps(h, op);
+        fill_op_head_from_mem(h, op, src_ptr, len);
+    }
+
+    if (!h->stream_write_fp) {
+        h->mem[x + 4] = h->abi.tool_file_status_fail;
+        if (op) {
+            op->status = h->abi.tool_file_status_fail;
+        }
+        return RTS_STUB_ADDR;
+    }
+    for (uint16_t i = 0; i < len; i++) {
+        if (fputc(h->mem[(uint16_t)(src_ptr + i)], h->stream_write_fp) == EOF) {
+            h->mem[x + 4] = h->abi.tool_file_status_fail;
+            if (op) {
+                op->actual_len = i;
+                op->status = h->abi.tool_file_status_fail;
+            }
+            return RTS_STUB_ADDR;
+        }
+    }
+    h->mem[x + 4] = h->abi.tool_file_status_ok;
+    if (op) {
+        op->actual_len = len;
+        op->status = h->abi.tool_file_status_ok;
+    }
+    return RTS_STUB_ADDR;
+}
+
+static int service_file_write_close(M6502* cpu, uint16_t address, uint8_t data)
+{
+    (void)address;
+    (void)data;
+    Harness* h = G;
+    uint8_t x = cpu->registers->x;
+
+    FileOp* op = record_op(h, "wcls");
+    if (op) {
+        fill_op_common(h, op, cpu, x, "", h->stream_write_path, 0, 0);
+        fill_op_symbol_dumps(h, op);
+    }
+
+    if (!h->stream_write_fp) {
+        h->mem[x + 0] = h->abi.tool_file_status_fail;
+        if (op) {
+            op->status = h->abi.tool_file_status_fail;
+        }
+        return RTS_STUB_ADDR;
+    }
+    if (fclose(h->stream_write_fp) != 0) {
+        h->stream_write_fp = NULL;
+        h->mem[x + 0] = h->abi.tool_file_status_fail;
+        if (op) {
+            op->status = h->abi.tool_file_status_fail;
+        }
+        return RTS_STUB_ADDR;
+    }
+    h->stream_write_fp = NULL;
+    h->mem[x + 0] = h->abi.tool_file_status_ok;
+    if (op) {
+        op->status = h->abi.tool_file_status_ok;
+    }
+    return RTS_STUB_ADDR;
+}
+
 static void install_callbacks(Harness* h)
 {
     memset(&h->callbacks, 0, sizeof(h->callbacks));
@@ -1226,8 +1662,23 @@ static void install_callbacks(Harness* h)
     M6502_setCallback(h->cpu, call, h->abi.svc_program_get_cmdline_ptr, service_program_get_cmdline_ptr);
     M6502_setCallback(h->cpu, call, h->abi.svc_program_get_cmdline_len, service_program_get_cmdline_len);
     M6502_setCallback(h->cpu, call, h->abi.svc_program_exit, service_program_exit);
+    if (h->abi.svc_vm_acheron_enter) {
+        M6502_setCallback(h->cpu, call, h->abi.svc_vm_acheron_enter, service_vm_acheron_enter);
+    }
     M6502_setCallback(h->cpu, call, h->abi.svc_file_load_sc0, service_file_load);
     M6502_setCallback(h->cpu, call, h->abi.svc_file_save_sc0, service_file_save);
+    M6502_setCallback(h->cpu, call, h->abi.svc_file_write_begin_sc0, service_file_write_begin);
+    M6502_setCallback(h->cpu, call, h->abi.svc_file_write_chunk_sc0, service_file_write_chunk);
+    M6502_setCallback(h->cpu, call, h->abi.svc_file_write_close_sc0, service_file_write_close);
+    if (h->abi.svc_file_stage_reu_sc0) {
+        M6502_setCallback(h->cpu, call, h->abi.svc_file_stage_reu_sc0, service_file_stage_reu);
+    }
+    if (h->abi.svc_reu_read_sc0) {
+        M6502_setCallback(h->cpu, call, h->abi.svc_reu_read_sc0, service_reu_read);
+    }
+    if (h->abi.svc_reu_write_sc0) {
+        M6502_setCallback(h->cpu, call, h->abi.svc_reu_write_sc0, service_reu_write);
+    }
 }
 
 static void load_prg(Harness* h, const char* path, uint16_t* entry_out)
@@ -1418,7 +1869,8 @@ static void print_summary(Harness* h)
         json_escape(stdout, op->path);
         printf(", \"full_path\": ");
         json_escape(stdout, op->full_path);
-        printf(", \"ptr\": %u, \"limit\": %u, \"actual_len\": %u, \"status\": %u", op->ptr, op->limit, op->actual_len, op->status);
+        printf(", \"ptr\": %u, \"limit\": %u, \"actual_len\": %u, \"status\": %u",
+               op->ptr, op->limit, (unsigned)op->actual_len, op->status);
         printf(", \"x\": %u, \"sp\": %u, \"stack_rts_raw\": %u, \"stack_rts_next\": %u, \"approx_jsr_site\": %u", op->x_reg, op->sp, op->stack_rts_raw, op->stack_rts_next, op->approx_jsr_site);
         printf(", \"params\": [");
         for (size_t j = 0; j < sizeof(op->params); j++) {
@@ -1638,6 +2090,7 @@ int main(int argc, char** argv)
     }
 
     snprintf(h.workspace, sizeof(h.workspace), "%s", workspace);
+    copy_parent_dir(prg_path, h.program_dir, sizeof(h.program_dir));
     snprintf(h.cmdline, sizeof(h.cmdline), "%s", cmdline);
     load_services_inc(&h.abi, services_inc);
     if (labels_path) {
@@ -1717,6 +2170,9 @@ int main(int argc, char** argv)
     }
 
     print_summary(&h);
+    if (h.stream_write_fp) {
+        fclose(h.stream_write_fp);
+    }
     M6502_delete(h.cpu);
     free(h.console);
     return h.exit_status ? 1 : 0;

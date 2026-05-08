@@ -1,0 +1,58 @@
+; SIDSPR1 binding draft
+; This is a design sketch for the first Action-facing helper-family binding.
+; It is not yet claimed as accepted compiler syntax or a shipped include file.
+;
+; Intent:
+; - thin Action-facing declarations
+; - semantic sprite/SID operations
+; - raw 6502 implementation lives in RT_SIDSPR1_HELPER.BIN
+; - ALINK selects it only when used
+
+MODULE SIDSPR1
+
+BYTE CONST SID_TRI=$10
+BYTE CONST SID_SAW=$20
+BYTE CONST SID_PULSE=$40
+BYTE CONST SID_NOISE=$80
+
+BYTE CONST SID_LOW=$10
+BYTE CONST SID_BAND=$20
+BYTE CONST SID_HIGH=$40
+
+BYTE CONST SPR_FRONT=0
+BYTE CONST SPR_BACK=1
+
+BYTE FUNC SpriteHit()
+BYTE FUNC SpriteHitBg()
+BYTE FUNC SidOsc3()
+BYTE FUNC SidEnv3()
+
+PROC SpriteOn(BYTE n)
+PROC SpriteOff(BYTE n)
+PROC SpritePos(BYTE n,CARD x,BYTE y)
+PROC SpritePtr(BYTE n,BYTE ptr)
+PROC SpriteData(BYTE n,CARD addr)
+PROC SpriteColor(BYTE n,BYTE col)
+PROC SpriteMC(BYTE n,BYTE on)
+PROC SpriteXExp(BYTE n,BYTE on)
+PROC SpriteYExp(BYTE n,BYTE on)
+PROC SpritePrio(BYTE n,BYTE behind)
+PROC SetSpriteMC(BYTE c0,BYTE c1)
+
+PROC SidFreq(BYTE v,CARD freq)
+PROC SidPulse(BYTE v,CARD width)
+PROC SidWave(BYTE v,BYTE wave)
+PROC SidAD(BYTE v,BYTE ad)
+PROC SidSR(BYTE v,BYTE sr)
+PROC SidOn(BYTE v)
+PROC SidOff(BYTE v)
+PROC SidVol(BYTE vol)
+PROC SidCutoff(CARD cutoff)
+PROC SidRes(BYTE res)
+PROC SidMode(BYTE mode)
+PROC SidRoute(BYTE mask)
+PROC SidRst()
+
+; Optional compatibility sugar only if later needed.
+PROC Sound(BYTE voice,pitch,distortion,volume)
+PROC SndRst()

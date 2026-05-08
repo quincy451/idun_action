@@ -52,7 +52,7 @@ class TestCompileFileIo(unittest.TestCase):
             )
             self.assertEqual(compile_result.returncode, 0, msg=compile_result.stdout + compile_result.stderr)
             self.assertTrue(avm.is_file())
-            self.assertTrue(avm.with_suffix(".avo").is_file())
+            self.assertTrue(avm.with_suffix(".obj").is_file())
 
             run_result = subprocess.run(
                 [

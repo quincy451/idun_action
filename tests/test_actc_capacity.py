@@ -1,0 +1,317 @@
+from pathlib import Path
+import json
+import re
+import shutil
+import subprocess
+import tempfile
+import unittest
+
+
+def count_body_ops(body: str) -> int:
+    match = re.search(r"^b ([^\n]*)$", body, re.MULTILINE)
+    if match is None:
+        return 0
+    stream = match.group(1)
+    count = 0
+    index = 0
+    while index < len(stream):
+        count += 1
+        index += 1
+        if index < len(stream) and stream[index] in "0123456789ABCDEF":
+            index += 1
+    return count
+
+
+def assert_single_proc_avo(test: unittest.TestCase, text: str, body: str, min_line: int = 2) -> None:
+    match = re.match(r"^AVO1\nf 0 src/main\.act\nq 0 0 (\d+) (\d+)\n((?:l 0 \d+ 0 \d+ \d+\n)*)", text)
+    test.assertIsNotNone(match, msg=text)
+    assert match is not None
+    test.assertGreaterEqual(int(match.group(1)), min_line, msg=text)
+    test.assertEqual(int(match.group(2)), 6, msg=text)
+    debug_lines = [line for line in match.group(3).splitlines() if line]
+    test.assertEqual(len(debug_lines), count_body_ops(body), msg=text)
+    for index, line in enumerate(debug_lines):
+        test.assertRegex(line, rf"^l 0 {index} 0 \d+ \d+$", msg=text)
+    remainder = text[match.end() :]
+    var_debug_prefix = re.match(
+        r"^((?:V g [ibcr] \d+ 0 \d+ \d+\n|V [pl] [ibcr] \d+ \d+ 0 \d+ \d+\n)*)",
+        remainder,
+    )
+    assert var_debug_prefix is not None
+    test.assertEqual(remainder[var_debug_prefix.end() :], body, msg=text)
+
+
+class TestActcCapacity(unittest.TestCase):
+    def setUp(self) -> None:
+        self.root = Path(__file__).resolve().parents[1]
+        self.build_dir = self.root / "build" / "udos_tools"
+
+    def require_toolchain(self) -> None:
+        for tool in ("cc", "ca65", "ld65", "make"):
+            if shutil.which(tool) is None:
+                self.skipTest(f"{tool} not found")
+
+    def run_checked(self, args: list[str], timeout: int = 120) -> subprocess.CompletedProcess[str]:
+        result = subprocess.run(
+            args,
+            cwd=self.root,
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=timeout,
+        )
+        self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+        return result
+
+    def assert_actc_stays_inside_tool_window(self) -> None:
+        map_text = (self.build_dir / "actc.current.map").read_text(encoding="ascii")
+        match = re.search(r"^BSS\s+([0-9A-Fa-f]{6})\s+([0-9A-Fa-f]{6})\s+", map_text, re.MULTILINE)
+        self.assertIsNotNone(match, msg=map_text)
+        bss_end = int(match.group(2), 16)
+        self.assertLessEqual(bss_end, 0x9FFF, msg=map_text)
+        resident_floor = self.find_resident_floor()
+        self.assertLess(
+            bss_end,
+            resident_floor,
+            msg=f"ACTC BSS end ${bss_end:04X} overlaps UDOS resident floor ${resident_floor:04X}\n{map_text}",
+        )
+
+    def find_resident_floor(self) -> int:
+        udos_dir = self.root.parent / "udos"
+        candidates = [
+            udos_dir / "build" / "release" / "udos-resident.labels",
+            udos_dir / "build" / "udos-resident.labels",
+        ]
+        for path in candidates:
+            if not path.is_file():
+                continue
+            for line in path.read_text(encoding="ascii", errors="ignore").splitlines():
+                parts = line.split()
+                if len(parts) >= 3 and parts[2].lstrip(".") == "reu_transfer_chunk_loop":
+                    return int(parts[1], 16)
+        return 0x4AFE
+
+    def test_production_actc_loads_and_compiles_48k_reu_source(self) -> None:
+        self.require_toolchain()
+        self.run_checked([str(self.root / "tools" / "build_tool_abi_harness.sh")])
+        self.run_checked([str(self.root / "tools" / "build_actc_udos.sh")])
+        self.assert_actc_stays_inside_tool_window()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            workspace = Path(tmpdir) / "actc-capacity"
+            project_root = workspace / "IMAGES" / "ACTION.DNP" / "PROJ3"
+            source_dir = project_root / "src"
+            object_dir = project_root / "obj"
+            source_dir.mkdir(parents=True)
+            object_dir.mkdir()
+            (project_root / "ACTION.PROJ").write_text("ACTION PROJECT\rMAIN.ACT\r", encoding="ascii")
+
+            header = "MODULE MAIN\r"
+            body = 'PROC MAIN()\rPrintE("OK")\rRETURN\r'
+            source_len = 48 * 1024
+            filler_len = source_len - len(header) - len(body)
+            self.assertGreaterEqual(filler_len, 0)
+            source = header + ("\r" * filler_len) + body
+            self.assertGreaterEqual(source.index("PROC MAIN"), 40960)
+            source_path = source_dir / "main.act"
+            source_path.write_text(source, encoding="ascii")
+
+            result = self.run_checked(
+                [
+                    str(self.build_dir / "tool_abi_harness"),
+                    "--prg",
+                    str(self.build_dir / "ACTC.PRG"),
+                    "--workspace",
+                    str(project_root),
+                    "--cmdline",
+                    "MAIN",
+                    "--services-inc",
+                    str(self.build_dir / "udos_services.inc"),
+                    "--labels",
+                    str(self.build_dir / "actc.current.labels"),
+                    "--max-steps",
+                    "40000000",
+                ]
+            )
+
+            summary = json.loads(result.stdout)
+            self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
+            self.assertFalse(summary["hit_limit"], msg=result.stdout)
+            output_path = object_dir / "MAIN.OBJ"
+            self.assertTrue(output_path.is_file(), msg=result.stdout)
+            assert_single_proc_avo(
+                self,
+                output_path.read_text(encoding="ascii"),
+                "x main 0 7\nb e0r\ns OK\nk 2\nn main\n",
+                min_line=40962,
+            )
+            reu_stage = next(op for op in summary["ops"] if op["kind"] == "rsta")
+            reu_reads = [op for op in summary["ops"] if op["kind"] == "rrd"]
+            reu_writes = [op for op in summary["ops"] if op["kind"] == "rwr"]
+            self.assertEqual(reu_stage["path"], "SRC/MAIN.ACT")
+            self.assertEqual(reu_stage["actual_len"], source_len)
+            self.assertEqual(reu_stage["status"], 1)
+            self.assertTrue(reu_reads, msg=result.stdout)
+            self.assertTrue(all(op["status"] == 1 for op in reu_reads), msg=result.stdout)
+            self.assertTrue(
+                any(
+                    op["params"][2] == 1
+                    and ((op["params"][1] << 8) | op["params"][0]) >= 0x9000
+                    for op in reu_reads
+                ),
+                msg=result.stdout,
+            )
+            self.assertTrue(
+                any(op["params"][0:3] == [0, 0xD0, 0] and op["actual_len"] == 255 for op in reu_writes),
+                msg=result.stdout,
+            )
+            self.assertTrue(
+                any(op["params"][0:3] == [0, 0xD0, 0] and op["actual_len"] == 255 for op in reu_reads),
+                msg=result.stdout,
+            )
+            self.assertTrue(
+                any(op["params"][0:3] == [0, 0xE0, 0] and op["actual_len"] == 24 for op in reu_writes),
+                msg=result.stdout,
+            )
+            self.assertTrue(
+                any(op["params"][0:3] == [0, 0xE0, 0] and op["actual_len"] == 24 for op in reu_reads),
+                msg=result.stdout,
+            )
+            self.assertTrue(
+                any(op["params"][0:3] == [0, 0xE6, 0] and op["actual_len"] == 25 for op in reu_writes),
+                msg=result.stdout,
+            )
+            self.assertTrue(
+                any(op["params"][0:3] == [0, 0xE6, 0] and op["actual_len"] == 25 for op in reu_reads),
+                msg=result.stdout,
+            )
+            self.assertTrue(
+                any(op["params"][0:3] == [0, 0xEB, 0] and op["actual_len"] == 4 for op in reu_writes),
+                msg=result.stdout,
+            )
+            self.assertTrue(
+                any(op["params"][0:3] == [0, 0xED, 0] and op["actual_len"] == 3 for op in reu_writes),
+                msg=result.stdout,
+            )
+            self.assertTrue(
+                any(op["params"][0:3] == [0, 0xED, 0] and op["actual_len"] == 3 for op in reu_reads),
+                msg=result.stdout,
+            )
+            self.assertTrue(
+                any(op["params"][0:3] == [0, 0xEE, 0] and op["actual_len"] == 3 for op in reu_writes),
+                msg=result.stdout,
+            )
+            self.assertTrue(
+                any(op["params"][0:3] == [0, 0xEC, 0] and op["actual_len"] == 1 for op in reu_writes),
+                msg=result.stdout,
+            )
+
+    def test_production_actc_streams_object_larger_than_legacy_content_buffer(self) -> None:
+        self.require_toolchain()
+        self.run_checked([str(self.root / "tools" / "build_tool_abi_harness.sh")])
+        self.run_checked([str(self.root / "tools" / "build_actc_udos.sh")])
+        self.assert_actc_stays_inside_tool_window()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            workspace = Path(tmpdir) / "actc-output-stream"
+            project_root = workspace / "IMAGES" / "ACTION.DNP" / "PROJ3"
+            source_dir = project_root / "src"
+            object_dir = project_root / "obj"
+            source_dir.mkdir(parents=True)
+            object_dir.mkdir()
+            (project_root / "ACTION.PROJ").write_text("ACTION PROJECT\rMAIN.ACT\r", encoding="ascii")
+
+            calls = "T()\r" * 100
+            source = (
+                "MODULE MAIN\r"
+                "INT X=[1]\r"
+                "PROC T()\r"
+                "RETURN\r"
+                "PROC F()\r"
+                f"{calls}"
+                "RETURN\r"
+                "PROC G()\r"
+                f"{calls}"
+                "RETURN\r"
+                "PROC MAIN()\r"
+                f"{calls}"
+                "PrintIE(7)\r"
+                "RETURN\r"
+            )
+            (source_dir / "main.act").write_text(source, encoding="ascii")
+
+            result = self.run_checked(
+                [
+                    str(self.build_dir / "tool_abi_harness"),
+                    "--prg",
+                    str(self.build_dir / "ACTC.PRG"),
+                    "--workspace",
+                    str(project_root),
+                    "--cmdline",
+                    "MAIN",
+                    "--services-inc",
+                    str(self.build_dir / "udos_services.inc"),
+                    "--labels",
+                    str(self.build_dir / "actc.current.labels"),
+                    "--max-steps",
+                    "12000000",
+                ]
+            )
+
+            summary = json.loads(result.stdout)
+            self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
+            self.assertFalse(summary["hit_limit"], msg=result.stdout)
+            output_path = object_dir / "MAIN.OBJ"
+            output_text = output_path.read_text(encoding="ascii")
+            self.assertGreater(len(output_text), 640)
+            self.assertTrue(
+                output_text.startswith(
+                    "AVO1\n"
+                    "f 0 src/main.act\n"
+                    "q 0 0 3 6\n"
+                    "q 1 0 5 6\n"
+                    "q 2 0 107 6\n"
+                    "q 3 0 209 6\n"
+                ),
+                msg=output_text,
+            )
+            self.assertIn("l 0 0 0 4 1\n", output_text)
+            self.assertIn("x t 0 1\nx f 1 301\n", output_text)
+            self.assertIn("\ni 7\n", output_text)
+            self.assertTrue(output_text.endswith("v x 1\nk 6\nn main\n"), msg=output_text)
+
+            open_ops = [op for op in summary["ops"] if op["kind"] == "wopn"]
+            write_ops = [op for op in summary["ops"] if op["kind"] == "wrte"]
+            close_ops = [op for op in summary["ops"] if op["kind"] == "wcls"]
+            save_ops = [op for op in summary["ops"] if op["kind"] == "save"]
+            self.assertEqual(len(open_ops), 1, msg=result.stdout)
+            self.assertEqual(open_ops[0]["path"], "OBJ/MAIN.OBJ")
+            self.assertGreaterEqual(len(write_ops), 2, msg=result.stdout)
+            self.assertEqual(sum(op["actual_len"] for op in write_ops), len(output_text))
+            self.assertTrue(all(op["status"] == 1 for op in write_ops), msg=result.stdout)
+            self.assertEqual(len(close_ops), 1, msg=result.stdout)
+            self.assertEqual(close_ops[0]["status"], 1, msg=result.stdout)
+            self.assertFalse(save_ops, msg=result.stdout)
+            reu_reads = [op for op in summary["ops"] if op["kind"] == "rrd"]
+            reu_writes = [op for op in summary["ops"] if op["kind"] == "rwr"]
+            self.assertTrue(reu_reads, msg=result.stdout)
+            self.assertTrue(
+                any(op["params"][0:3] == [0, 0xE4, 0] and op["actual_len"] == 25 for op in reu_writes),
+                msg=result.stdout,
+            )
+            self.assertTrue(
+                any(op["params"][0:3] == [0, 0xE9, 0] and op["actual_len"] == 4 for op in reu_writes),
+                msg=result.stdout,
+            )
+            self.assertTrue(
+                any(op["params"][0:3] == [0, 0xEA, 0] and op["actual_len"] == 4 for op in reu_writes),
+                msg=result.stdout,
+            )
+            self.assertTrue(
+                any(op["params"][0:3] == [0, 0xE8, 0] and op["actual_len"] == 2 for op in reu_writes),
+                msg=result.stdout,
+            )
+
+
+if __name__ == "__main__":
+    unittest.main()

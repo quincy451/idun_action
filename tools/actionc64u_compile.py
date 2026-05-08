@@ -1055,12 +1055,12 @@ def emit_payload(actions: Iterable[EmitAction]) -> bytes:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Compile a minimal Action-like source file into ActionC64U .avo or .avm"
+        description="Compile a minimal Action-like source file into ActionC64U .obj or .avm"
     )
     parser.add_argument("input", help="input .act file")
-    parser.add_argument("-o", "--output", help="output .avo or .avm file")
-    parser.add_argument("--object-output", help="explicit .avo output path when --emit-avm is used")
-    parser.add_argument("--emit-avm", action="store_true", help="run the linker after emitting the main .avo")
+    parser.add_argument("-o", "--output", help="output .obj or .avm file")
+    parser.add_argument("--object-output", help="explicit .obj output path when --emit-avm is used")
+    parser.add_argument("--emit-avm", action="store_true", help="run the linker after emitting the main .obj")
     parser.add_argument(
         "--runtime-dir",
         action="append",
@@ -1080,7 +1080,7 @@ def default_runtime_dirs() -> list[Path]:
 
 
 def default_output_path(input_path: Path, emit_avm: bool) -> Path:
-    suffix = ".avm" if emit_avm else ".avo"
+    suffix = ".avm" if emit_avm else ".obj"
     return repo_root() / "build" / f"{input_path.stem}{suffix}"
 
 
@@ -1140,7 +1140,7 @@ def main(argv: list[str] | None = None) -> int:
 
     runtime_dirs = [Path(path) for path in args.runtime_dir] if args.runtime_dir else default_runtime_dirs()
     object_path = Path(args.object_output) if args.object_output else (
-        output_path.with_suffix(".avo") if emit_avm else output_path
+        output_path.with_suffix(".obj") if emit_avm else output_path
     )
     avm_output = output_path if emit_avm else None
 

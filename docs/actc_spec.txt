@@ -4,13 +4,15 @@ Purpose
 
 ACTC is the ActionC64U compiler front end. Its completed job is to take one
 tracked Action source module from a project workspace, parse and validate it,
-lower it into the ActionC64U object model, and emit one deterministic object
-file in AVO format for ALINK to consume.
+lower it into the ActionC64U object model, and emit one deterministic `AVO1`
+text object file for ALINK to consume. The primary project-object filename is
+now `OBJ/<MODULE>.OBJ`; legacy `.AVO` remains a compatibility input for
+downstream tools.
 
 ACTC is not the final-image builder. In the completed toolchain:
 
-- ACTC compiles source to OBJ/<MODULE>.AVO
-- ALINK links OBJ/<MODULE>.AVO plus dependent objects to BIN/<MODULE>.AVM
+- ACTC compiles source to OBJ/<MODULE>.OBJ
+- ALINK links OBJ/<MODULE>.OBJ plus dependent objects to BIN/<MODULE>.AVM
 - AVMRUN loads and executes BIN/<MODULE>.AVM
 
 
@@ -41,7 +43,8 @@ Rules:
 - <module> is a logical module name, not a full path.
 - ACTC resolves the source path from the current project as
   SRC/<module>.ACT.
-- ACTC writes the object path as OBJ/<module>.AVO.
+- ACTC writes the object path as OBJ/<module>.OBJ.
+- The object text format itself remains `AVO1`.
 
 
 Completed Language Surface
@@ -206,9 +209,10 @@ The completed compiler is intended to preserve the current published rules:
 - a REAL declaration alone does not import REAL arithmetic, comparison,
   conversion, or print runtime code
 - the logical REAL runtime symbols are `rt.f_add`, `rt.f_sub`, `rt.f_mul`,
-  `rt.f_div`, `rt.f_cmp`, `rt.i_to_f`, `rt.f_to_i`, and `rt.print_f`; the
-  current UDOS-native text AVO path may use documented underscore aliases such
-  as `rt_f_add` until dotted symbol parsing is available on target
+  `rt.f_div`, `rt.f_cmp`, `rt.i_to_f`, `rt.s_to_f`, `rt.f_to_i`, and
+  `rt.print_f`; the current UDOS-native text AVO path may use documented
+  underscore aliases such as `rt_f_add` until dotted symbol parsing is
+  available on target
 - divide by zero is a compile error
 - out-of-range assignment is a compile error
 - use of undeclared identifiers is a compile error
@@ -240,7 +244,7 @@ The completed ACTC processing model is:
     - integer literals
     - variable metadata
 12. Record runtime imports needed by the lowered code.
-13. Emit a deterministic AVO object to OBJ/<MODULE>.AVO.
+13. Emit a deterministic AVO object to OBJ/<MODULE>.OBJ.
 
 
 Object Output
@@ -262,11 +266,14 @@ At minimum, each emitted object carries:
   live-set reachability
 
 For REAL, variable metadata must identify 4-byte REAL32 storage. Runtime imports
-must be operator-specific: `+` imports add only, `*` imports multiply only,
-comparisons import compare only, and unused REAL operators are not emitted.
-The current target-side slice has the first concrete case: `R=A+B` for
-module-scope REAL variables emits low/high word body ops and only the
-`RT_F_ADD` / `rt_f_add` runtime import.
+must be operator-specific: `+` imports add only, `-` imports subtract only, `*`
+imports multiply only, `/` imports divide only, comparisons import compare only,
+and unused REAL operators are not emitted. The current target-side slice has the
+first concrete cases: `R=A` for module-scope REAL variables emits low/high word
+load/store body ops with no runtime import, while `R=A+B`, `R=A-B`, `R=A*B`,
+and `R=A/B` emit low/high word body ops and only the matching `RT_F_ADD` /
+`rt_f_add`, `RT_F_SUB` / `rt_f_sub`, `RT_F_MUL` / `rt_f_mul`, or `RT_F_DIV` /
+`rt_f_div` runtime import.
 
 ACTC is responsible for object correctness and determinism. ALINK is
 responsible for whole-program symbol resolution, dead-strip, final layout, and
@@ -314,7 +321,7 @@ already proves a narrower but real subset:
 
 - project-aware module selection
 - MODULE header validation
-- deterministic OBJ/<MODULE>.AVO output
+- deterministic OBJ/<MODULE>.OBJ output
 - top-level export extraction
 - current arithmetic and comparison lowering
 - IF / ELSE / FI
@@ -323,13 +330,49 @@ already proves a narrower but real subset:
 - current local and external integer argument and return handling
 - current integer variable handling for module scope and procedure scope
 - current REAL declaration proof allocates 4-byte variable storage metadata
-- current first REAL operation proof lowers `R=A+B` for module-scope REAL
-  variables through the operator-specific `RT_F_ADD` runtime import
+- current first REAL operation proofs lower `R=A+B`, `R=A-B`, `R=A*B`, and
+  `R=A/B` for module-scope REAL variables through the operator-specific
+  `RT_F_ADD`, `RT_F_SUB`, `RT_F_MUL`, and `RT_F_DIV` runtime imports
 - current UDOS-native REAL guards reject REAL initializers, integer-path use of
   REAL variables, and unsupported REAL operators until typed lowering is
   implemented for those cases
 - current body_ops and payload emission
+- production `ACTC.PRG` now builds in the widened `$0900-$9FFF` tool window with
+  `ACTC_REU_SOURCE_CACHE=1`, `STREAM_OUTPUT=1`, `CONTENT_BUFFER_SIZE=16`,
+  `OUTPUT_CHUNK_SIZE=128`, `SOURCE_LIMIT=20480`,
+  `SOURCE_LOOKAHEAD=255`, `BODY_OPS_STRIDE=255`, `INT_LITERAL_MAX=36`,
+  `STRING_LITERAL_MAX=36`, `EXPORT_MAX=16`, `EXTERNAL_MAX=36`, and
+  `LOOP_MAX=16`
+- production `ACTC.PRG` has a harness proof for staging and compiling a `49152`
+  byte source module through the REU source-cache path with `PROC MAIN()`
+  discovered near offset `49120` in the third source window
+- production `ACTC.PRG` has a harness proof for streaming an `OBJ/MAIN.OBJ`
+  larger than the legacy `640` byte output buffer through the resident
+  write-begin/write-chunk/write-close services
 - committed ACTC -> ALINK -> AVMRUN proof on the validated baseline
 
-The remaining gap is language-surface widening, better diagnostics, and
-continued object-model growth, not a redesign of the compiler's role.
+The remaining gap is language-surface widening, better diagnostics, continued
+object-model growth, and replacing raw pointer lookahead with a streaming source
+reader. The large-source design is tracked in
+`docs/actc_source_streaming_plan.md`: ACTC needs chunked file-read services,
+one-time REU source staging, tokenization over a refillable source window, and
+REU-backed compiler lookup/storage tables before DNP-sized source files are
+realistic. The
+`ACTC_REU_SOURCE_CACHE=1` path now proves staging source beyond the first
+`20480` bytes into simulated REU through the resident-compatible service ABI,
+paging later windows plus 255 bytes of bounded lookahead back into RAM, and
+compiling a `PROC MAIN` name or a `PrintE` string literal that crosses the first
+window boundary. It also proves long inline spaces before a `PrintIE` literal
+can commit an 8-bit `Y` lookahead wrap across the first window boundary, and a
+long `PrintIE(...)` expression with a boundary-spanning symbol token can
+preserve parser registers across that commit/read path. The boolean pre-scan
+also routes an 8-bit wrap into boolean parsing instead of silently rescanning
+from `Y=0` in the same window. Speculative expression pre-scans and failed
+keyword probes that cross into a later REU source window reload the original
+window before returning. Assignment parsing also preserves the `=` operator
+position across variable lookup and advances correctly when that operator sits
+at an 8-bit `Y` wrap, and procedure parameter parsing now has the same first
+proof for an opening `(` at `Y=$FF`. Runtime and constant group-speculation
+paths also restore the original REU source window before reinterpreting `(expr)`
+as a comparison left-hand side. The production parser still needs a
+token-boundary-safe source reader before this is a general large-source solution.

@@ -75,8 +75,35 @@ skip_line_breaks_done:
     rts
 
 advance_scan_ptr:
+.ifdef ACTC_REU_SOURCE_CACHE
+.if ACTC_REU_SOURCE_CACHE
+    inc scan_ptr
+    bne :+
+    inc scan_ptr+1
+:
+    pha
+    txa
+    pha
+    tya
+    pha
+    jsr source_reader_refill_if_at_window_end
+    pla
+    tay
+    pla
+    tax
+    pla
+    rts
+.else
     inc scan_ptr
     bne :+
     inc scan_ptr+1
 :
     rts
+.endif
+.else
+    inc scan_ptr
+    bne :+
+    inc scan_ptr+1
+:
+    rts
+.endif

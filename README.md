@@ -13,9 +13,9 @@ not drive feature work. See [docs/active_direction.md](./docs/active_direction.m
 
 The current UDOS-facing alpha ships:
 
-- `ALINK.PRG`: UDOS-native linker for `.AVO` objects
+- `ALINK.PRG`: UDOS-native linker; the default live gate now emits direct `.PRG` output
 - `ACTC.PRG`: UDOS-native compiler front end
-- `AVMRUN.PRG`: UDOS-native VM runner for `.AVM` payloads
+- `AVMRUN.PRG`: legacy/compat VM runner for `.AVM` payloads
 - `ACTMON.PRG`: monitor-style front end
 - workspace/project helper tools under `src/tools_udos/`
 - dead-strip linkable runtime modules
@@ -66,16 +66,30 @@ Use the sibling UDOS repo as the source of truth for current development:
 ```sh
 make -C ../udos PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-actc
 make -C ../udos PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-alink
-make -C ../udos PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-alink-avmrun
-make -C ../udos PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-actc-alink-avmrun
+make -C ../udos PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-actc-alink-launch
+make -C ../udos PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-alink-compat
+make -C ../udos PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-actc-alink-launch-printmath
 ```
 
 These gates build the UDOS release image, install the Action `.PRG` tools, boot
-UDOS under VICE, and validate the real tool path:
+UDOS under VICE, and validate the real tool path. The helper-free higher-level
+default is:
+
+```text
+ACTC.PRG -> ALINK.PRG -> MAIN.PRG
+```
+
+The AVM-bearing path remains separate:
 
 ```text
 ACTC.PRG -> ALINK.PRG -> AVMRUN.PRG
 ```
+
+The lower-level default linker gate is `make -C ../udos vice-action-alink`,
+which now verifies `ALINK.PRG -> BIN/MAIN.PRG`. The separate
+`vice-action-alink-compat` target is the legacy AVM-specific replay gate.
+The older `vice-action-alink-avmrun` name remains only as a compatibility
+alias.
 
 ## Build UDOS Tools
 

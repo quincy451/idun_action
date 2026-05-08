@@ -66,6 +66,11 @@ The first UDOS-native external Action-side tool proofs now exist:
 
 They are exported into `ACTION.DNP` root and `BIN/`.
 
+External command lookup is intentionally compact: UDOS first tries the current
+directory, then the root directory of the same drive. Tool support files can use
+the executable-relative `!NAME` tool ABI path prefix so overlays live beside the
+PRG that was actually launched.
+
 - `ACTDIR.PRG` enumerates the current mounted directory through the preserved
   UDOS directory ABI and returns to the prompt.
 - `ACTADD.PRG` validates `ACTION.PROJ` in the current directory, writes
@@ -85,7 +90,7 @@ They are exported into `ACTION.DNP` root and `BIN/`.
   parenthesized grouping, and simple `=` / `<` / `>` / `<=` / `>=` / `<>`
   comparisons before
   object emission, and emits a
-  deterministic `OBJ/<NAME>.AVO` text object stub with `AVO1`,
+  deterministic `OBJ/<NAME>.OBJ` text object stub with `AVO1`,
   module/export/call/import metadata where each export carries compiled offset
   and size, plus compiler-emitted `body_ops` and a minimal local control-flow
   `payload_hex` skeleton (`CALL` local proc, `RET`) plus explicit
@@ -96,24 +101,37 @@ They are exported into `ACTION.DNP` root and `BIN/`.
   generated object file because `OBJ/UDOSDIR.TXT` is not yet refreshed
   reliably enough for a stable shell-side `TYPE OBJ/...` proof. The current
   import list is inferred from simple source-pattern scanning, not a full
-  parser or code generator.
+  parser or code generator. `.AVO` is now the legacy compatibility name for
+  these project objects, not the primary emitted extension.
 - `ALINK.PRG` is now the first UDOS-native linker slice. The current proof
-  loads deterministic `OBJ/<NAME>.AVO` object stubs, parses export, body,
+  loads deterministic `OBJ/<NAME>.OBJ` object stubs, parses export, body,
   payload, and unresolved external symbol metadata, uses compiler-emitted
   export offset/size triplets instead of inferring procedure spans from the
   payload shape, seeds the local live set from the module entry proc instead
   of assuming export slot `0`, propagates the local body-op call graph,
-  resolves the current widened small-object closure, and emits
-  `BIN/<NAME>.AVM` on the host fs tree as direct binary `AVM1`. The focused
-  headless VICE proof is green through `make vice-action-alink`, with
-  host-side verification of the exact emitted `AVM1` bytes and proof that an
-  unused local export is stripped from the final image. The direct typed
-  `make vice-action-alink-avmrun` proof is now also green and executes the
-  emitted artifact through `AVMRUN.PRG`, printing `HELLOWORLD`, `TOOL7`, and
-  `12342` before returning to the UDOS prompt. The integrated typed
-  `make vice-action-actc-alink-avmrun` proof is also green and runs a real
-  compiled `MAIN.ACT` object through `ALINK` and `AVMRUN`, printing `HELLO`,
-  `TOOL7`, and `10`. The current `ALINK.PRG` slice is still a narrow
+  resolves the current widened small-object closure, and now emits
+  `BIN/<NAME>.PRG` as the default live output path for `make vice-action-alink`.
+  That focused headless VICE proof is green again and returns to the UDOS
+  prompt after producing the direct PRG artifact. The separate AVM-specific
+  linker/runner proof `make vice-action-alink-compat` remains the legacy
+  compat gate and executes the emitted `BIN/<NAME>.AVM` artifact through
+  `AVMRUN.PRG`, printing `HELLOWORLD`, `TOOL7`, and `12342` before returning
+  to the UDOS prompt.
+  The named imported `printmath` higher-level proof is now the direct
+  launch target `make vice-action-actc-alink-launch-printmath`, which is green
+  end to end and proves the live screen reaches `hello`, `tool7`, and `5459`.
+  The separate helper-bearing `make vice-action-actc-alink-compat-printmath`
+  path remains a compat replay target rather than the primary proof surface.
+  The first real live compat failure still sits lower in the shell-launched
+  `AVMRUNC -> AVM` path at `SHELLADD.AVM` (`push16/push16/add/exit`), where
+  the replay falls to `READY.` under VICE instead of returning to the UDOS
+  prompt.
+  returning far enough to reach `svc_program_exit`. The helper-free
+  higher-level default is now the separate launch path:
+  `make vice-action-actc-alink-launch` proves `ACTC.PRG`, `ALINK.PRG`, and
+  direct `BIN/MAIN.PRG` launch under VICE without routing through
+  `MAIN.AVM`/`AVMRUN`; the named `if_else` and nested-else local-call chain
+  shapes are green there. The current `ALINK.PRG` slice is still a narrow
   object/link pipeline rather than a full historical Action code generator.
 - `ACTFLOW.BAT` is the first composite workspace flow proof. It exercises the
   preserved UDOS file write/copy/move/delete services through the existing

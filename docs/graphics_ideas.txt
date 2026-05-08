@@ -1,0 +1,475 @@
+You’re describing exactly the kind of place where the language type system can protect the programmer from VIC-II weirdness. I’d separate “art asset type” from “runtime display object,” because sprites, sprite definitions, bitmap data, and screen/color metadata are related but not the same thing.
+Thought for 24s
+Yes — I would define separate asset types for the C64 display modes. Your instinct is right:
+SPRITE   = high-res spriteMSPRITE  = multicolor spriteBITMAP   = high-res bitmapMBITMAP  = multicolor bitmap
+I would avoid using one generic BITMAP type for everything unless the type carries a mode field internally. The C64 storage and color rules are different enough that the compiler/editor should know the mode up front.
+Sprite asset types
+SPRITE
+A high-res sprite is:
+24 × 21 pixels1 visible color + transparent63 bytes of bitmap data64 bytes of memory space on the C64
+So a file like:
+Spr1.SPR
+could contain:
+asset name: Spr1mode: high-res spritewidth: 24height: 21sprite color: 0-15data: 63 bytes
+Runtime operations could look like:
+SPRITE Player = "Player.SPR"Player.x = 100Player.y = 80Player.color = REDPlayer.show()
+MSPRITE
+A multicolor sprite is still physically:
+24 × 21 screen pixels
+But logically it is:
+12 × 21 fat pixels
+Each pixel is 2 bits:
+00 = transparent01 = shared sprite multicolor 110 = individual sprite color11 = shared sprite multicolor 2
+So:
+Enemy.MPR
+or:
+Enemy.MSP
+would contain:
+asset name: Enemymode: multicolor spritelogical width: 12height: 21data: 63 bytesindividual sprite color: 0-15
+Important detail: multicolor sprite data is not bigger than high-res sprite data. It is still 63 bytes. The difference is how the VIC-II interprets the bits.
+
+Bitmap asset types
+BITMAP / high-res screen
+A full high-res C64 bitmap is:
+320 × 200 pixels
+But every 8×8 cell can only use:
+2 colors
+A full high-res bitmap asset needs more than just the bitmap bits. It needs:
+8000 bytes bitmap data1000 bytes screen/color attribute data
+The bitmap data says whether each pixel is color slot 0 or color slot 1.
+The screen attribute data says what those two colors are for each 8×8 cell.
+So a file like:
+Image.HRS
+could contain:
+asset name: Imagemode: high-res bitmapwidth: 320height: 200bitmap data: 8000 bytescell color data: 1000 bytes
+MBITMAP / multicolor screen
+A full multicolor bitmap is logically:
+160 × 200 pixels
+but displayed as:
+320 × 200 screen pixels
+Each logical pixel is double-wide and uses 2 bits.
+Each 8×8 screen cell, or 4×8 logical cell, can use:
+4 color slots
+A full multicolor bitmap asset needs:
+8000 bytes bitmap data1000 bytes screen RAM color data1000 bytes color RAM data1 global background color
+So:
+Image2.MCS
+could contain:
+asset name: Image2mode: multicolor bitmaplogical width: 160height: 200bitmap data: 8000 bytesscreen color data: 1000 bytescolor RAM data: 1000 bytesbackground color: 0-15
+
+About your “2×2 to 320×200 BITMAP” idea
+This is where I would be careful.
+On a modern PC, a 2×2 bitmap is simple.
+On a C64, a 2×2 high-res bitmap piece is not really independent, because the colors belong to the surrounding 8×8 cell, not to the individual pixels.
+So if you allow:
+BITMAP ExplosionPiece size 16,16
+you have two choices.
+Option 1: Make small bitmaps cell-aligned
+This is the easiest and cleanest.
+For high-res bitmap fragments:
+width must be multiple of 8height should be multiple of 8
+For multicolor bitmap fragments:
+logical width must be multiple of 4height should be multiple of 8
+Then the asset can carry its own cell color data cleanly.
+Example:
+BITMAP Logo 64,32MBITMAP Face 40,32
+These are easy to store, load, blit, and validate.
+Option 2: Allow arbitrary sizes but treat them as raw pixel masks
+This gives you:
+BITMAP Spark 2,2
+But then the color rules are not self-contained. When you draw that 2×2 image into the screen, its colors have to merge with the destination 8×8 cell’s existing colors.
+That can cause problems:
+Destination cell already uses red and black.Your 2×2 image wants yellow.
+In high-res mode there is no third color slot. So the compiler/runtime must either reject it, remap it, or replace one of the existing cell colors.
+For that reason, I would probably use different names:
+BITMAP      full-screen or cell-aligned high-res bitmapMBITMAP     full-screen or cell-aligned multicolor bitmapBMASK       arbitrary-size 1-bit maskMCMASK      arbitrary-size multicolor maskCHAR        8×8 character/tileMCHAR       4×8 multicolor character/tile
+That keeps the language honest.
+
+What happens if the user picks an illegal color?
+The important thing is this:
+The C64 does not store “illegal colors” in the bitmap data.
+The VIC-II only sees bit patterns and color slots.
+For high-res bitmap mode, every pixel is just:
+0 or 1
+The current 8×8 cell says:
+0 = this color1 = that color
+So if the user paints a third color into the same 8×8 cell, the hardware cannot represent that intention.
+The editor/compiler has to decide what to do.
+Example: high-res bitmap cell
+Suppose one 8×8 cell currently uses:
+slot 0 = blackslot 1 = white
+The pixel data only stores:
+0 = black1 = white
+Now the user selects red and paints inside that same 8×8 cell.
+The C64 cannot store:
+0 = black1 = white2 = red
+There is no 2.
+So your editor has four possible behaviors.
+Behavior 1: Reject the color
+This is the safest for a C64-native editor.
+Beep / flash border / show message:"Cell already uses black and white. Replace a color?"
+This prevents accidental corruption.
+Behavior 2: Replace one of the cell colors
+The editor could ask:
+This cell already uses:0 = black1 = whiteReplace which color with red?
+If the user replaces white with red, then every white pixel in that 8×8 cell becomes red.
+That is exactly how the C64 would behave, because all pixels using slot 1 now point to red.
+Behavior 3: Auto-map to nearest existing color
+If the user picks red but the cell only has black and white, the editor could choose the closest existing color.
+That means red might become black or white.
+This is useful for importing PC images, but annoying for hand drawing.
+Behavior 4: Allow invalid art internally, then fail on export
+This is the worst choice for your C64 editor/language.
+The user draws something beautiful, then the compiler/exporter says:
+Cannot export: cell 12,8 has 5 colors.
+That is fine for a PC conversion tool, but bad for a C64-native art editor.
+
+Best behavior for your C64 editor
+For hand editing on the C64, I would use this rule:
+Never allow the user to unknowingly create an invalid cell.
+When the selected color would violate the cell rule, show a small cell-color panel on the right:
+Current cell colors:High-res bitmap:  Slot 0: black  Slot 1: whiteSelected color:  redOptions:  A = replace slot 0  B = replace slot 1  C = cancel
+For multicolor bitmap:
+Current cell colors:Slot 0: global backgroundSlot 1: cell color ASlot 2: cell color BSlot 3: cell color CSelected color:  yellowOptions:  replace slot 1  replace slot 2  replace slot 3  cancel
+Slot 0 in multicolor bitmap is special because it is usually the global background color. If you change that, it affects the whole screen, not just the current cell.
+So I would protect it:
+Changing background color affects entire image. Continue?
+
+What the C64 actually displays
+If the asset is forced into C64 format, it will always display “correctly” from the VIC-II’s point of view.
+But it may not display as the artist intended.
+For example, if a PC image has this in one 8×8 high-res cell:
+blackwhiteredblue
+When converted to C64 high-res bitmap, the exporter must reduce it to:
+only 2 colors
+Maybe it chooses black and white. Then red and blue pixels get mapped to black or white.
+The VIC-II does not glitch or crash. It simply displays whatever the bits and color attributes say.
+So the rule is:
+The hardware does not handle illegal colors.The editor/compiler must handle them before the data reaches hardware.
+
+Recommended file/type design
+I would use something like this:
+Player.SPR   high-res spriteEnemy.MSP    multicolor spriteTitle.HBM    high-res bitmapTitle.MBM    multicolor bitmapFont.CHR     high-res character setFont.MCR     multicolor character setLogo.HTL     high-res tile/block imageLogo.MTL     multicolor tile/block image
+Or with your names:
+Spr1.SPRSpr2.MPRImage.HRSImage2.MCS
+That is perfectly reasonable.
+I might slightly rename:
+.SPR = high-res sprite.MSP = multicolor sprite.HBM = high-res bitmap.MBM = multicolor bitmap
+because MPR might look like “map” or “music pattern,” but your idea is fine.
+
+Compiler-side idea
+The compiler could treat these as named binary resources:
+SPRITE PlayerSprite = resource "Player.SPR"MSPRITE EnemySprite = resource "Enemy.MSP"BITMAP TitleScreen = resource "Title.HBM"MBITMAP GameScreen = resource "Game.MBM"
+Then operations are type-specific:
+PlayerSprite.setColor(RED)PlayerSprite.showAt(100, 80)TitleScreen.loadBitmap($2000)TitleScreen.loadScreenColors($0400)TitleScreen.display()
+For multicolor sprites:
+setSpriteMulticolor1(ORANGE)setSpriteMulticolor2 BROWNEnemySprite.color = GREENEnemySprite.showAt(120, 90)
+For multicolor bitmap:
+GameScreen.loadBitmap($2000)GameScreen.loadScreenRam($0400)GameScreen.loadColorRam($D800)GameScreen.background = BLACKGameScreen.display()
+
+The biggest design rule
+For sprites:
+The color limits belong to the sprite.
+For bitmap graphics:
+The color limits belong to each 8×8 cell.
+So your editor should think in terms of current cell color slots, not just selected palette color.
+For a C64-native editor, the right-side panel should probably show:
+Global C64 palette: 16 colorsCurrent object colors:  sprite color  multicolor 1  multicolor 2orCurrent bitmap cell colors:  slot 0  slot 1  slot 2  slot 3
+Then when the user paints, they are really painting with a slot, and the slot has a C64 color assigned to it.
+That avoids most confusion.
+So instead of the user thinking:
+I am painting red.
+They think:
+I am painting with cell color slot 1, which is currently red.
+That maps much more cleanly to the C64 hardware.
+given the defination of either sprite and the c64 hardware support for sprites...what operations make sence in a high level language as an operation involving a variable of a sprite type?
+I’ll frame this as language/API design rather than raw VIC-II register trivia: what should be natural on a SPRITE/MSPRITE variable, and what should stay global because the hardware makes it shared.
+Thought for 39s
+For your language, I would split this into two concepts:
+SPRITEDATA / MSPRITEDATA = the 63-byte picture definitionSPRITE / MSPRITE         = a live hardware sprite object using one of the 8 VIC-II sprite slots
+That keeps the language clean. The C64 sprite image is a 24×21 object stored as 63 bytes, and the live sprite is controlled through VIC-II registers for position, enable/disable, color, expansion, priority, multicolor mode, and collision flags. The visible hardware slots are limited to 8 sprites. 
+Core operations that make sense
+1. Attach sprite art to a hardware sprite
+You need a way to say:
+Player.image = PlayerStandingEnemy.image  = EnemyFrame1
+or:
+Player.setImage("Player.SPR")
+Under the hood, this sets the sprite data pointer for the hardware slot. On the C64, the sprite pointers live in the last 8 bytes of the current screen memory block, normally $07F8 to $07FF if screen RAM is at $0400. 
+Good operations:
+sprite.setImage(spriteData)sprite.setFrame(frameNumber)sprite.nextFrame()sprite.animate(firstFrame, lastFrame, speed)
+Animation is a very natural high-level operation because the hardware already expects a sprite slot to point at a 64-byte sprite block.
+
+2. Show / hide
+This maps directly to the sprite enable register.
+Player.show()Player.hide()Player.visible = truePlayer.visible = false
+The VIC-II has an enable bit for each sprite, so this is a perfect high-level operation. 
+
+3. Position and movement
+The obvious operations are:
+Player.x = 100Player.y = 80Player.setPosition(100, 80)Player.move(2, 0)Player.moveTo(x, y)
+C64 sprite X position is effectively 9-bit, because the low 8 bits are in the sprite X register and the 9th X bit for all sprites is collected in $D010. The Y position is an 8-bit register. 
+I would hide that from the programmer. Let them write:
+Player.x = 270
+and have the compiler/runtime automatically handle the high X bit.
+I would also allow off-screen positions:
+Player.x = -24Player.x = 340
+Even if the hardware register cannot directly hold negative values, the language can keep a logical signed X/Y and only display the sprite when it is in range. That makes scrolling and enemy spawning cleaner.
+
+4. Color
+For a high-res sprite:
+Player.color = RED
+That is simple: one visible color plus transparency.
+For a multicolor sprite:
+Enemy.color = GREEN
+But be careful: this should mean the individual sprite color, not all three colors.
+The two extra multicolor sprite colors are shared globally by all multicolor sprites:
+SpriteSystem.multiColor1 = ORANGESpriteSystem.multiColor2 = BROWN
+or:
+setSpriteMultiColors(ORANGE, BROWN)
+So for MSPRITE, I would support:
+Enemy.color = GREENEnemy.show()
+But I would not support this as if it were fully per-sprite:
+Enemy.color1 = ORANGEEnemy.color2 = GREENEnemy.color3 = BROWN
+because that lies about the hardware. Multicolor sprites have three visible colors plus transparency, but two of those visible colors are shared among all multicolor sprites. 
+
+5. Size / expansion
+The C64 can double a sprite horizontally, vertically, or both. It cannot arbitrary-scale a sprite.
+So I would support:
+Player.expandX = truePlayer.expandY = truePlayer.normalSize()Player.doubleWidth()Player.doubleHeight()Player.doubleSize()
+Do not make this look like modern scaling:
+Player.scale = 1.5Player.scaleX = 3
+Better:
+Player.widthMode  = NORMAL | DOUBLEPlayer.heightMode = NORMAL | DOUBLE
+A high-res sprite is normally 24×21 screen pixels. With expansion it can display as 48×21, 24×42, or 48×42. The VIC-II doubles the pixels; it does not add resolution. 
+
+6. Priority: in front of or behind background
+The C64 supports sprite-to-background priority. So this makes sense:
+Player.priority = FRONTPlayer.priority = BEHIND_BACKGROUND
+or:
+Player.inFront()Player.behindBackground()
+But be careful with sprite-to-sprite priority. When sprites overlap each other, lower-numbered sprite slots appear in front of higher-numbered ones. So this:
+Player.z = 100Enemy.z = 50
+is only possible if your runtime changes hardware slot assignments.
+Simpler version:
+Player.slot = 0   ; appears in front of slot 1, 2, 3...Enemy.slot = 1
+Advanced version:
+Player.zOrder = 1Enemy.zOrder = 2SpriteSystem.sortByZ()
+But that requires a manager that assigns hardware sprite slots.
+
+7. Collision operations
+The C64 has hardware collision registers for sprite-to-sprite and sprite-to-background collisions. Reading those registers clears them, so a high-level language should probably buffer collision state once per frame. 
+Good high-level operations:
+if Player.hitSprite() then ...if Player.hitBackground() then ...if Player.hit(Enemy) then ...
+But there are two levels here.
+Hardware-level:
+Player.hitSprite()Player.hitBackground()
+This tells you whether the sprite was involved in a collision.
+Software-level:
+Player.overlaps(Enemy)Player.boxOverlaps(Enemy)Player.pixelOverlaps(Enemy)
+This is more exact and more predictable.
+I would provide both:
+Player.hardwareCollision()Player.backgroundCollision()Player.boxCollision(Enemy)Player.pixelCollision(Enemy)
+The hardware collision registers tell you which sprite numbers were involved, but they are not a perfect game-logic system. They are useful, but many games still use software bounding-box collision for control and reliability.
+
+What I would make first
+For a first version of the language, I would support this set:
+Player.setImage(PlayerStanding)Player.setFrame(0)Player.show()Player.hide()Player.x = 100Player.y = 80Player.setPosition(100, 80)Player.move(dx, dy)Player.color = WHITEPlayer.expandX = truePlayer.expandY = falsePlayer.priority = FRONTPlayer.priority = BEHIND_BACKGROUNDPlayer.hitSprite()Player.hitBackground()Player.overlaps(Enemy)
+For multicolor sprites:
+Enemy.color = GREEN                  ; individual sprite colorSpriteSystem.multiColor1 = ORANGE    ; sharedSpriteSystem.multiColor2 = BROWN     ; shared
+That gives you almost everything the hardware naturally supports without pretending the C64 is a modern GPU.
+
+Suggested syntax
+Something like this would feel clean:
+SPRITEDATA PlayerStand = LOAD "PlayerStand.SPR"SPRITEDATA PlayerRun1  = LOAD "PlayerRun1.SPR"SPRITEDATA PlayerRun2  = LOAD "PlayerRun2.SPR"SPRITE PlayerPlayer.slot = 0Player.image = PlayerStandPlayer.color = LIGHTBLUEPlayer.x = 120Player.y = 100Player.show()
+Animation:
+Player.image = PlayerRun1WAIT 4Player.image = PlayerRun2WAIT 4
+or higher level:
+Player.animate(PlayerRun1, PlayerRun2, 4)
+Multicolor:
+MSPRITEDATA EnemyArt = LOAD "Enemy.MSP"MSPRITE EnemySpriteSystem.multiColor1 = ORANGESpriteSystem.multiColor2 = BROWNEnemy.slot = 1Enemy.image = EnemyArtEnemy.color = GREENEnemy.setPosition(200, 90)Enemy.show()
+Collision:
+IF Player.overlaps(Enemy) THEN    Player.hide()ENDIFIF Player.hitBackground() THEN    Player.move(0, -1)ENDIF
+
+Operations I would avoid or mark as advanced
+These do not map cleanly to C64 hardware:
+Player.rotate(90)Player.scale(1.5)Player.alpha = 128Player.color1 = REDPlayer.color2 = BLUEPlayer.color3 = GREENPlayer.z = 500
+They either cannot be done by the VIC-II, or they require software preprocessing, generated alternate sprite frames, or a sprite manager.
+Better alternatives:
+Player.image = PlayerRotated90      ; prebuilt rotated framePlayer.doubleWidth()                ; real hardware featurePlayer.doubleHeight()               ; real hardware featurePlayer.priority = FRONT             ; real hardware feature
+
+The design I would use
+I would define the language model like this:
+SPRITEDATA    63-byte high-res sprite imageMSPRITEDATA    63-byte multicolor sprite imageSPRITE    live hardware sprite using SPRITEDATAMSPRITE    live hardware sprite using MSPRITEDATA
+Then the SPRITE variable is not just the bitmap. It is the live object:
+SPRITE Player
+means:
+hardware slotx positiony positionvisible flagcolorsprite data pointerx expansiony expansionprioritycollision state
+That is a very natural high-level abstraction over the C64 hardware.
+what operations would you propose for the other graphic resource datatypes you recommand
+I’ll cover the non-sprite types as language-visible resources: bitmap screens, multicolor bitmap screens, character sets, tiles/blocks, masks, and maybe screen maps. The key is to separate “data you edit/store” from “operations that copy it into VIC-II memory or draw/blit it.”
+Thought for 13s
+For the non-sprite graphics types, I would design the operations around what the C64 can really change cheaply:
+1. Whole resource operations2. Cell/color-slot operations3. Pixel/bit operations4. Draw/blit operations5. Display/load operations
+The important C64 reality is that bitmap graphics are still organized around character-style blocks. The VIC-II has 320×200 high-res or 160×200 multicolor bitmap resolution, but bitmap data is organized through 8×8 / 4×8 tile-like areas, with color information coming from screen RAM and sometimes color RAM. 
+1. BITMAP / high-res bitmap
+I would use this for high-res bitmap graphics, either full-screen or cell-aligned rectangular pieces.
+BITMAP TitleBITMAP LogoBITMAP Panel
+A high-res C64 bitmap should expose operations based on 1-bit pixels plus 2 colors per 8×8 cell. High-res bitmap mode uses screen RAM to hold foreground/background colors for each 8×8 tile. 
+Useful operations
+Title.clear(color0, color1)Title.setPixel(x, y, slot)Title.getPixel(x, y)Title.setCellColors(cellX, cellY, color0, color1)Title.getCellColors(cellX, cellY)Title.drawLine(x1, y1, x2, y2, slot)Title.drawRect(x, y, w, h, slot)Title.fillRect(x, y, w, h, slot)Title.copyFrom(sourceBitmap, srcX, srcY, w, h, dstX, dstY)Title.blit(sourceBitmap, dstX, dstY, colorPolicy)Title.loadTo(bitmapAddress, screenAddress)Title.display()Title.save("Title.HBM")
+For setPixel, I would not have the programmer set an arbitrary color directly. I would have them set a slot:
+slot 0 = cell color 0slot 1 = cell color 1
+So this is good:
+Title.setPixel(10, 20, 1)
+This is dangerous:
+Title.setPixelColor(10, 20, RED)
+because that might force a cell-color change and accidentally recolor other pixels in the same 8×8 cell.
+If you do allow setPixelColor, it should need a policy:
+Title.setPixelColor(x, y, RED, FAIL_IF_ILLEGAL)Title.setPixelColor(x, y, RED, REPLACE_CELL_COLOR)Title.setPixelColor(x, y, RED, NEAREST_COLOR)
+My default would be:
+FAIL_IF_ILLEGAL
+because that keeps the program honest.
+
+2. MBITMAP / multicolor bitmap
+This is for 160×200 logical-pixel graphics, displayed as 320×200 because each pixel is double-wide. Multicolor bitmap mode allows 4 colors per 8×8 screen cell: one global background color, two colors from screen RAM, and one from color RAM. 
+MBITMAP GamePictureMBITMAP TitlePicture
+Useful operations
+GamePicture.clear(slot)GamePicture.setPixel(x, y, slot)GamePicture.getPixel(x, y)GamePicture.setBackgroundColor(color)GamePicture.setCellColors(cellX, cellY, slot1Color, slot2Color, slot3Color)GamePicture.getCellColors(cellX, cellY)GamePicture.drawLine(x1, y1, x2, y2, slot)GamePicture.drawRect(x, y, w, h, slot)GamePicture.fillRect(x, y, w, h, slot)GamePicture.blit(source, dstX, dstY, colorPolicy)GamePicture.loadTo(bitmapAddress, screenAddress, colorRamAddress)GamePicture.display()GamePicture.save("GamePicture.MBM")
+Here setPixel should use slots:
+0 = global background1 = screen RAM upper nibble color2 = screen RAM lower nibble color3 = color RAM color
+So this is clean:
+GamePicture.setPixel(20, 40, 3)
+This means:
+Use this cell's color-slot 3.
+For multicolor bitmap, I would make the coordinate system logical:
+x = 0 to 159y = 0 to 199
+Then the display preview can show it stretched to 320×200.
+
+3. CHARSET / high-res character set
+This is one of the most useful C64 graphics resource types.
+A full high-res character set is usually:
+256 characters × 8 bytes = 2048 bytes
+Each character is:
+8 × 8 pixels
+The VIC-II can read custom character data from memory, and each character is 8 bytes. 
+CHARSET GameFontCHARSET Tiles
+Useful operations
+GameFont.clearChar(index)GameFont.copyChar(srcIndex, dstIndex)GameFont.flipCharX(index)GameFont.flipCharY(index)GameFont.rotateChar90(index)      ; compile/editor helper, not hardwareGameFont.invertChar(index)GameFont.setPixel(charIndex, x, y, bit)GameFont.getPixel(charIndex, x, y)GameFont.loadTo(address)GameFont.use()GameFont.save("GameFont.CHR")
+For character graphics, operations like flip, copy, invert, and rotate are very natural because they only affect 8 bytes per character.
+I would also expose character construction:
+Tiles.defineChar(32, "Blank")Tiles.defineChar(64, "Brick")Tiles.defineChar(65, "Grass")
+For game programming, this matters more than bitmap operations because C64 games often use character/tile graphics heavily.
+
+4. MCHARSET / multicolor character set
+This is for multicolor characters. Each character is still 8 bytes, but visually it is:
+4 logical pixels wide × 8 pixels tall
+because each pixel is double-wide.
+MCHARSET GameTiles
+Useful operations
+GameTiles.clearChar(index)GameTiles.copyChar(srcIndex, dstIndex)GameTiles.flipCharX(index)GameTiles.flipCharY(index)GameTiles.setPixel(charIndex, x, y, slot)GameTiles.getPixel(charIndex, x, y)GameTiles.setGlobalBackground(color)GameTiles.setMultiColor1(color)GameTiles.setMultiColor2(color)GameTiles.loadTo(address)GameTiles.use()GameTiles.save("GameTiles.MCR")
+For multicolor character mode, I would again use slots:
+0 = background color1 = shared multicolor 12 = shared multicolor 23 = per-cell color
+One important language rule: in multicolor character mode, some colors are global, and one color comes from color RAM per screen cell. The VIC-II character mode also has the useful behavior that the high bit of color RAM can control whether a given character cell is high-res or multicolor, so mixing high-res and multicolor characters on one screen can be possible. 
+So I would allow:
+Screen.setCharMode(x, y, HIRES)Screen.setCharMode(x, y, MULTICOLOR)
+or hide that inside the color value.
+
+5. SCREEN / character screen map
+This is separate from a charset.
+The charset defines what character shapes look like.
+The screen map defines what character code is placed at each location.
+SCREEN Map
+A normal C64 text/character screen is:
+40 × 25 character cells = 1000 bytes screen RAM
+The VIC-II also has 1000 bytes of screen memory for 40×25 character codes. 
+Useful operations
+Map.clear(charCode, color)Map.putChar(x, y, charCode)Map.getChar(x, y)Map.setColor(x, y, color)Map.getColor(x, y)Map.printAt(x, y, "HELLO")Map.fillRect(x, y, w, h, charCode, color)Map.drawBox(x, y, w, h, borderTile, fillTile)Map.scrollLeft(x, y, w, h)Map.scrollRight(x, y, w, h)Map.scrollUp(x, y, w, h)Map.scrollDown(x, y, w, h)Map.loadTo(screenAddress, colorRamAddress)Map.display()Map.save("Level1.SCR")
+This is probably one of the most important types for your language because a lot of C64 games are tile-map games.
+I would make this very natural:
+Screen.put(10, 5, Brick)Screen.color(10, 5) = REDScreen.print(0, 24, "SCORE 000100")
+
+6. TILE / high-res tile block
+A TILE should be a reusable rectangular block made from characters.
+Example:
+TILE Tree 2, 3TILE Door 2, 4TILE Platform 4, 1
+This means:
+Tree = 2 chars wide × 3 chars tall
+Not pixels. Character-cell units.
+Useful operations
+Tree.drawTo(screen, x, y)Tree.copyFrom(screen, x, y)Tree.flipX()Tree.flipY()Tree.setCell(localX, localY, charCode, color)Tree.getCell(localX, localY)Tree.save("Tree.TIL")
+For a C64 language, I would strongly prefer tile sizes in character cells over arbitrary pixels:
+2 × 3 cells = 16 × 24 pixels
+This maps directly to C64 screen memory and is much faster than bitmap drawing.
+
+7. MTILE / multicolor tile block
+Same idea, but for multicolor character graphics.
+MTILE Rock 2, 2MTILE MonsterHead 3, 2
+Useful operations
+Rock.drawTo(screen, x, y)Rock.setCell(localX, localY, charCode, color)Rock.getCell(localX, localY)Rock.flipX()Rock.flipY()Rock.save("Rock.MTL")
+For multicolor tiles, the tile should probably remember:
+character codeper-cell coloroptional mode bit: hires or multicolor
+This lets your tile system handle mixed-resolution screens cleanly.
+
+8. BMASK / high-res mask
+This is not a display object by itself. It is a 1-bit shape used for drawing, collision, or clipping.
+BMASK ExplosionMaskBMASK HitShape
+Useful operations
+HitShape.setBit(x, y, value)HitShape.getBit(x, y)HitShape.clear()HitShape.invert()HitShape.flipX()HitShape.flipY()HitShape.overlaps(otherMask, x, y)HitShape.applyTo(bitmap, x, y, slot)HitShape.eraseFrom(bitmap, x, y)
+This is useful because it avoids pretending every arbitrary small image is a valid C64 bitmap with its own colors.
+A BMASK can be any size:
+BMASK BulletShape 5, 3BMASK ExplosionShape 17, 13
+Then when applying it to a bitmap, you provide the color slot:
+ExplosionShape.applyTo(ScreenBitmap, 100, 50, 1)
+That means:
+Where the mask has 1 bits, write slot 1.
+This is much cleaner than arbitrary tiny BITMAP objects.
+
+9. MCMASK / multicolor mask
+Same idea, but 2-bit multicolor logical pixels.
+MCMASK PaintBlob
+Useful operations
+PaintBlob.setPixel(x, y, slot)PaintBlob.getPixel(x, y)PaintBlob.clear()PaintBlob.flipX()PaintBlob.flipY()PaintBlob.applyTo(mbitmap, x, y, colorPolicy)
+This can be arbitrary-sized, but when applied to an MBITMAP, it still has to respect the destination cell color slots.
+
+10. PALETTE or COLORSET
+The C64 has a fixed 16-color palette, so this is not a modern RGB palette. But a named color group is still useful.
+COLORSET CaveColorsCOLORSET PlayerColors
+Useful operations
+CaveColors.set(0, BLACK)CaveColors.set(1, DARKGRAY)CaveColors.set(2, BROWN)CaveColors.set(3, LIGHTGRAY)CaveColors.applyTo(bitmapCell)CaveColors.applyToSpriteSystem()
+For multicolor sprites:
+SpriteColors.setSpriteMulticolor1(ORANGE)SpriteColors.setSpriteMulticolor2(BROWN)
+For multicolor bitmap or character mode:
+ScreenColors.background = BLACKScreenColors.multicolor1 = DARKGRAYScreenColors.multicolor2 = BROWN
+I would not make this an RGB palette. I would make it a list of C64 color indexes.
+
+The resource operations I would expose first
+For your language, I would start with this core set.
+BITMAP
+clear(color0, color1)setPixel(x, y, slot)getPixel(x, y)setCellColors(cellX, cellY, color0, color1)drawLine(x1, y1, x2, y2, slot)drawRect(x, y, w, h, slot)fillRect(x, y, w, h, slot)blit(source, x, y, policy)loadTo(bitmapAddr, screenAddr)display()
+MBITMAP
+clear(slot)setPixel(x, y, slot)getPixel(x, y)setBackgroundColor(color)setCellColors(cellX, cellY, color1, color2, color3)drawLine(x1, y1, x2, y2, slot)drawRect(x, y, w, h, slot)fillRect(x, y, w, h, slot)blit(source, x, y, policy)loadTo(bitmapAddr, screenAddr, colorRamAddr)display()
+CHARSET
+setPixel(charIndex, x, y, bit)getPixel(charIndex, x, y)clearChar(index)copyChar(src, dst)flipCharX(index)flipCharY(index)invertChar(index)loadTo(address)use()
+MCHARSET
+setPixel(charIndex, x, y, slot)getPixel(charIndex, x, y)clearChar(index)copyChar(src, dst)flipCharX(index)flipCharY(index)setGlobalBackground(color)setMultiColor1(color)setMultiColor2(color)loadTo(address)use()
+SCREEN
+clear(charCode, color)putChar(x, y, charCode)getChar(x, y)setColor(x, y, color)printAt(x, y, text)fillRect(x, y, w, h, charCode, color)drawTile(tile, x, y)scrollLeft(x, y, w, h)scrollRight(x, y, w, h)scrollUp(x, y, w, h)scrollDown(x, y, w, h)loadTo(screenAddr, colorRamAddr)display()
+TILE / MTILE
+drawTo(screen, x, y)setCell(localX, localY, charCode, color)getCell(localX, localY)flipX()flipY()copyFrom(screen, x, y)
+BMASK / MCMASK
+setPixel(x, y, valueOrSlot)getPixel(x, y)clear()invert()flipX()flipY()applyTo(bitmap, x, y, slotOrPolicy)overlaps(otherMask, x, y)
+
+The design rule I would use
+For anything bitmap-like, expose slot-based drawing as the normal method:
+bitmap.setPixel(x, y, slot)
+Only expose direct color drawing with an explicit policy:
+bitmap.setPixelColor(x, y, color, FAIL_IF_ILLEGAL)bitmap.setPixelColor(x, y, color, REPLACE_CELL_COLOR)bitmap.setPixelColor(x, y, color, MAP_TO_EXISTING)
+For anything screen/tile-like, expose character-cell operations:
+screen.putChar(x, y, charCode)screen.setColor(x, y, color)tile.drawTo(screen, x, y)
+For the C64, this gives you a nice split:
+Sprites      = moving objectsBitmaps      = full-screen/title/art panelsCharsets     = reusable pixel definitionsScreens      = 40×25 map of charactersTiles        = reusable screen-cell blocksMasks        = drawing/collision helpers
+That maps well to both the editor and the compiler.
+Top of Form
+
+
+Bottom of Form

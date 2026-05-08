@@ -10,7 +10,8 @@ The short answer is:
 
 - ACTC builds objects
 - ALINK builds AVM programs
-- AVMRUN runs AVM programs
+- AVMRUN runs native-fast-path AVM programs
+- AVMRUNC runs compat/interpreter AVM programs
 
 If the final build product is BIN/<MODULE>.AVM, then AVMRUN.PRG is the runtime
 program required to execute it.
@@ -23,15 +24,22 @@ stages.
 
 Build-time:
 
-- ACTC.PRG compiles SRC/<MODULE>.ACT to OBJ/<MODULE>.AVO
-- ALINK.PRG links OBJ/<MODULE>.AVO and its dependencies to BIN/<MODULE>.AVM
+- ACTC.PRG compiles SRC/<MODULE>.ACT to OBJ/<MODULE>.OBJ
+- ALINK.PRG links OBJ/<MODULE>.OBJ and its dependencies to BIN/<MODULE>.AVM
+
+Project objects remain `AVO1` text objects internally.
+The primary filename extension is now `.OBJ`; legacy `.AVO` remains accepted
+by linker-side compatibility paths.
 
 Run-time:
 
-- AVMRUN.PRG loads BIN/<MODULE>.AVM
-- AVMRUN validates the image
-- AVMRUN initializes the VM/runtime state
-- AVMRUN transfers control to the program entry point
+- AVMRUN.PRG loads BIN/<MODULE>.AVM when the payload stays on the shipped
+  native fast path
+- AVMRUNC.PRG loads BIN/<MODULE>.AVM when the payload needs the compat
+  interpreter/overlay path
+- the selected runner validates the image
+- the selected runner initializes the VM/runtime state
+- the selected runner transfers control to the program entry point
 
 So if the linker does not emit a directly bootable or directly SYS-able PRG,
 the missing piece is not another linker pass. The missing piece is the runtime
@@ -43,6 +51,11 @@ Required Runtime Program
 1. AVMRUN.PRG
 
 AVMRUN.PRG is the required launcher and runtime host for linked AVM output.
+
+2. AVMRUNC.PRG
+
+AVMRUNC.PRG is the compatibility runner. It keeps the interpreter/overlay path
+that production `AVMRUN.PRG` no longer carries resident.
 
 Its job is to:
 
@@ -57,6 +70,27 @@ Its job is to:
 - prepare the VM state
 - dispatch execution to the supported VM engine
 - return control to UDOS when the program exits
+
+Current binary AVM capacity:
+
+- AVMRUN.PRG loads binary AVM files into a runtime window at $3000 rather than
+  into its own BSS
+- the shipped production build is now binary-`AVM1` only; legacy text AVM
+  decode is no longer part of the normal runtime path
+- the shipped production build no longer links its own `Acheron` copy; the
+  normal fast path enters the resident UDOS engine through
+  `svc_vm_acheron_enter`
+- AVMRUN uses `$0001 = $36` during file load so BASIC ROM is hidden and the
+  runtime window can span `$3000-$EFFF`
+- after header validation it switches to `$0001 = $34` while patching and
+  executing, so RAM under both I/O and KERNAL is visible as well
+- the current configured binary file limit is $C000 bytes, or 49152 bytes
+- tests/test_avmrun_capacity.py proves a 49152-byte AVM patches and exits from
+  near the top of that widened runtime window through the tool ABI harness
+- AVMRUN restores the original memory configuration before returning to UDOS
+- the compat runner keeps the same `$3000-$EFFF` payload window while still
+  staging `AVMRUN_OVL1.BIN`, `AVMRUN_OVL2.BIN`, and `AVMRUN_OVL3.BIN` on
+  demand
 
 In practice, the run command is:
 
@@ -77,9 +111,13 @@ Its responsibilities include:
 - AVM header parsing
 - payload preparation
 - entry-point dispatch
-- Acheron-backed execution for the supported format/flag set
+- resident-Acheron-backed execution for the supported format/flag set
 - interpreted support for the currently implemented opcode subset
 - runtime intrinsic handling
+
+It is no longer responsible for accepting legacy text-AVM source in the
+production build. That compatibility path is treated as debug-only baggage, not
+part of the shipped launcher contract.
 
 The currently documented intrinsic families include:
 
@@ -88,6 +126,7 @@ The currently documented intrinsic families include:
   - PrintE
   - PrintI
   - PrintIE
+  - PrintR / PrintRE
 - process exit
   - Exit
 - REU services
@@ -99,6 +138,49 @@ The currently documented intrinsic families include:
   - ReuPoke16
 - console services
   - ConIn
+
+The current shipped runner no longer keeps the print helper family in its
+always-resident body. `Print`, `PrintE`, `PrintI`, `PrintIE`, `PrintR`, and
+`PrintRE` now stage `AVMRUN_OVL1.BIN` from the program directory on first use
+and execute that helper from a dedicated overlay window at `$F000`. This is
+the first production proof that optional runtime helper code can be paid for on
+demand rather than permanently in `AVMRUN.PRG`.
+- the first linked native-helper proof now also exists: when linked
+  `rt_print_f` is live, `ALINK` appends a native-helper trailer to the final
+  `AVM1` file and emits a reserved `CALLN` pseudo-target instead of the old
+  runner-global `PRINTREAL` intrinsic; `ALINK` stages
+  `!RT_PRINT_F_HELPER.BIN` from the packaged tool set and streams it into that
+  trailer only when needed; `AVMRUN` loads the helper into a dedicated low-RAM
+  window at `$2400`, validates the helper's self-describing `AVNH` header, and
+  patches the pseudo-target to the embedded native entry on the normal fast
+  path
+- the stronger linked `PrintRE` proof is now real on an actual `ALINK`
+  program: `A=REAL(1)`, `B=REAL(8)`, `X=A/B`, `PrintRE(X)` still prints
+  `0.125` after removing `RT_PRINT_F_HELPER.BIN`, `RT_PRINT_STD_HELPER.BIN`,
+  `AVMRUN_OVL1.BIN`, `AVMRUN_OVL2.BIN`, and `AVMRUN_OVL3.BIN` from the
+  mounted workspace, which proves that shipped linked REAL print no longer
+  depends on loose helper sidecars or AVMRUN overlays for that case
+- the same `AVNH` convention now also has a second packaged helper artifact,
+  `!RT_PRINT_STD_HELPER.BIN`, for native standard print support (`Print`,
+  `PrintE`, `PrintI`, `PrintIE`) on the normal fast path
+- `ALINK` now emits the linked standard-print pseudo-targets
+  (`$FE00` / `$FE10` / `$FE30` / `$FE31`) for those sites instead of the old
+  runner-global `$FFxx` print targets
+- `ALINK` now also appends that standard print helper as a native-helper
+  trailer entry when those linked print sites are live, so standard print now
+  uses the same program-owned helper-trailer model as `rt_print_f`
+- the current harness proof for standard print still exercises the interpreter
+  fallback path through `AVMRUN_OVL1.BIN` and `AVMRUN_OVL3.BIN`; what is gone
+  is the runtime dependency on a loose `RT_PRINT_STD_HELPER.BIN` sidecar
+- production `AVMRUN.PRG` no longer contains the standard-print sidecar loader
+  compatibility path at all; linked standard print now requires the helper
+  trailer carried in the `AVM1` image
+- interpreted `REAL` arithmetic/conversion is also no longer resident in the
+  main runner body; `FADD` / `FSUB` / `FMUL` / `FDIV` / `FTOI` / `ITOF` now
+  stage `AVMRUN_OVL2.BIN` on first use through the same overlay window
+- the fallback interpreter shell is no longer resident either; it now stages
+  `AVMRUN_OVL3.BIN` and resumes through that overlay when the normal fast path
+  cannot execute the payload directly
   - ConOut
 - file services
   - FileOpenRead
@@ -161,8 +243,33 @@ In other words:
 - runtime modules are link-time inputs
 - REAL arithmetic/conversion/print routines are link-time inputs selected per
   used operator, not AVMRUN opcodes and not an always-present REAL blob
-- the current UDOS `RT_F_ADD.AVO` file implements the exact right-hand `+0.0`
-  identity case but is still not complete IEEE-754 addition
+- the current UDOS `RT_F_ADD.AVO` file implements exact `+0.0` identity for
+  either operand, same-sign equal-power-of-two sums such as
+  `1.0 + 1.0 = 2.0`, `2.0 + 2.0 = 4.0`, `4.0 + 4.0 = 8.0`, and
+  `-2.0 + -2.0 = -4.0`, adjacent-exponent sums such as
+  `2.0 + 1.0 = 3.0`, adjacent-exponent mixed-sign differences such as
+  `2.0 + -1.0 = 1.0`, gap-two sums such as `4.0 + 1.0 = 5.0`,
+  gap-two mixed-sign differences such as `4.0 + -1.0 = 3.0` and
+  `1.0 + -4.0 = -3.0`, plus exact
+  `1.5 + 1.5 = 3.0`, but is still not complete IEEE-754 addition
+- the current UDOS `RT_F_SUB.AVO` file implements exact `x - +0.0`,
+  sign-flipped `+0.0 - x`, equal signed power-of-two subtraction as zero,
+  adjacent-exponent differences such as `4.0 - 2.0 = 2.0`,
+  adjacent-exponent mixed-sign sums such as `2.0 - -1.0 = 3.0`, gap-two
+  differences such as `4.0 - 1.0 = 3.0`, gap-two mixed-sign sums such as
+  `4.0 - -1.0 = 5.0` and `-4.0 - 1.0 = -5.0`, and exact
+  `2.0 - 1.0 = 1.0`, but is still not complete IEEE-754 subtraction
+- the current UDOS `RT_F_MUL.AVO` file implements zero identity, one identity,
+  and low-word-zero values scaled by exact power-of-two operands, including
+  `2.0 * 2.0 = 4.0`, `4.0 * 2.0 = 8.0`,
+  `-2.0 * 2.0 = -4.0`, `-2.0 * -2.0 = 4.0`, and
+  `1.5 * 2.0 = 3.0`, but is still not complete IEEE-754 multiplication
+- the current UDOS `RT_F_DIV.AVO` file implements zero numerator,
+  divide-by-zero as zero, `x / 1.0 = x`, and low-word-zero values divided by
+  exact power-of-two denominators, including `4.0 / 2.0 = 2.0`,
+  `8.0 / 2.0 = 4.0`, `2.0 / 4.0 = 0.5`,
+  `-4.0 / 2.0 = -2.0`, `2.0 / -4.0 = -0.5`, and
+  `3.0 / 2.0 = 1.5`, but is still not complete IEEE-754 division
 - AVMRUN is the run-time launcher
 - the linked AVM is the run-time payload
 
@@ -221,7 +328,7 @@ Current Proven Status
 On the committed baseline, the real end-to-end proof already matches this
 architecture:
 
-- ACTC produces OBJ/<MODULE>.AVO
+- ACTC produces OBJ/<MODULE>.OBJ
 - ALINK produces BIN/<MODULE>.AVM
 - AVMRUN executes BIN/<MODULE>.AVM and returns to UDOS
 

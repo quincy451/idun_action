@@ -10,6 +10,165 @@ and UDOS object readers converge.
 Current status:
 
 - `rt_f_add.avo` is a partial REAL add helper. It preserves the current stack
-  contract and implements the exact right-hand zero identity case:
-  `x + +0.0 = x`. Other inputs still return REAL32 zero, so it is not the final
-  IEEE-754 addition implementation.
+  contract, implements exact zero identity for either side
+  (`x + +0.0 = x`, `+0.0 + x = x`), handles same-sign equal-power-of-two sums
+  by exponent increment, including `1.0 + 1.0 = 2.0`,
+  `2.0 + 2.0 = 4.0`, `4.0 + 4.0 = 8.0`, and
+  `-2.0 + -2.0 = -4.0`, and still handles exact `1.5 + 1.5 = 3.0`.
+  It also handles adjacent-exponent power-of-two sums such as
+  `2.0 + 1.0 = 3.0`, `1.0 + 2.0 = 3.0`, and
+  `-2.0 + -1.0 = -3.0`, adjacent-exponent mixed-sign differences
+  such as `2.0 + -1.0 = 1.0`, `1.0 + -2.0 = -1.0`,
+  `-2.0 + 1.0 = -1.0`, and `-1.0 + 2.0 = 1.0`, gap-two
+  power-of-two sums such as `4.0 + 1.0 = 5.0`, and gap-two mixed-sign
+  differences such as `4.0 + -1.0 = 3.0`, `1.0 + -4.0 = -3.0`,
+  `-4.0 + 1.0 = -3.0`, and `-1.0 + 4.0 = 3.0`. Equal-and-opposite
+  cancellation is proven for the current direct `2.0 + -2.0` harness case,
+  but broader mixed-sign addition remains incomplete. Other non-zero inputs still return REAL32 zero, so it is
+  not the final IEEE-754 addition implementation.
+- `rt_f_sub.avo` is a partial REAL subtract helper. It preserves the same stack
+  contract, implements `x - +0.0 = x`, `+0.0 - x` by flipping the sign bit, and
+  handles equal signed power-of-two subtraction as zero, including
+  `2.0 - 2.0 = 0.0` and `-2.0 - -2.0 = 0.0`, plus exact
+  `2.0 - 1.0 = 1.0`. It also handles adjacent-exponent power-of-two
+  differences such as `4.0 - 2.0 = 2.0`, `2.0 - 4.0 = -2.0`, and
+  `-4.0 - -2.0 = -2.0`, plus gap-two differences such as
+  `4.0 - 1.0 = 3.0` and `1.0 - 4.0 = -3.0`, plus
+  adjacent-exponent mixed-sign sums such as `2.0 - -1.0 = 3.0`,
+  `1.0 - -2.0 = 3.0`, `-2.0 - 1.0 = -3.0`, and
+  `-1.0 - 2.0 = -3.0`, and gap-two mixed-sign sums such as
+  `4.0 - -1.0 = 5.0`, `1.0 - -4.0 = 5.0`,
+  `-4.0 - 1.0 = -5.0`, and `-1.0 - 4.0 = -5.0`. Other non-zero pairs still return REAL32 zero,
+  so it is not the final IEEE-754 subtraction
+  implementation.
+- `rt_f_mul.avo` is a partial REAL multiply helper. It preserves the same stack
+  contract, implements zero identity, implements `x * 1.0 = x` and
+  `1.0 * x = x`, and handles low-word-zero values scaled by an exact
+  power-of-two operand using exponent addition plus sign-bit xor, including
+  `2.0 * 2.0 = 4.0`, `4.0 * 2.0 = 8.0`,
+  `-2.0 * 2.0 = -4.0`, `-2.0 * -2.0 = 4.0`,
+  `1.5 * 2.0 = 3.0`, `2.0 * 1.5 = 3.0`, `-1.5 * 2.0 = -3.0`,
+  `1.5 * -2.0 = -3.0`, `-1.5 * -2.0 = 3.0`, `1.5 * 1.5 = 2.25`, and
+  `0.75 * 0.75 = 0.5625`. Other non-zero pairs still return REAL32 zero, so
+  it is not the final IEEE-754 multiplication implementation.
+- `rt_f_div.avo` is a partial REAL divide helper. It preserves the same stack
+  contract, implements zero numerator and divide-by-zero as REAL32 zero,
+  implements `x / 1.0 = x`, and handles low-word-zero numerators divided by
+  an exact power-of-two denominator using exponent subtraction plus
+  sign-bit xor, including `4.0 / 2.0 = 2.0`,
+  `8.0 / 2.0 = 4.0`, `2.0 / 4.0 = 0.5`,
+  `-4.0 / 2.0 = -2.0`, `2.0 / -4.0 = -0.5`,
+  `3.0 / 2.0 = 1.5`, `1.5 / 2.0 = 0.75`, `-3.0 / 2.0 = -1.5`,
+  `3.0 / -2.0 = -1.5`, `-3.0 / -2.0 = 1.5`, `1.5 / 1.5 = 1.0`, and
+  `1.5 / 0.75 = 2.0`, `1.0 / 3.0 = 0.3333333432674407958984375`, and
+  `1.0 / 10.0 = 0.100000001490116119384765625`. Other non-zero pairs still
+  return REAL32 zero, so it is not the final IEEE-754 division
+  implementation.
+- `rt_i_to_f.avo` is the first target-side integer-to-REAL helper. It converts
+  one non-negative 16-bit stack cell to exact REAL32, including values such as
+  `1`, `7`, `255`, `256`, and `65535`. The current UDOS-native compiler uses
+  it only for the narrow `BYTE`/`CARD` to REAL bridge. Signed `INT` conversion
+  is still intentionally not routed through it, because the current helper
+  treats the incoming cell as an unsigned magnitude.
+- `rt_s_to_f.avo` is the first target-side signed-`INT` to REAL helper. It
+  converts one 16-bit two's-complement stack cell to exact REAL32 by deriving a
+  branchless sign mask, converting the resulting magnitude through
+  `rt_i_to_f`, and then applying the REAL sign bit. The current UDOS-native
+  compiler uses it only for the narrow `INT` variable-to-REAL bridge.
+- `rt_print_f.avo` is the first target-side REAL print wrapper. It preserves
+  the current stack contract and routes the current narrow `PrintR` / `PrintRE`
+  lowering through the runtime-side REAL print intrinsic. The current proven
+  UDOS-native slice is intentionally narrow but no longer limited to
+  low-word-zero values: `REAL X`, `X=REAL(7)`, `PrintRE(X)`, fractional
+  dyadic cases such as `A=REAL(3)`, `B=REAL(2)`, `X=A/B`, `PrintRE(X)`
+  producing `1.5`, `X=X/B`, `PrintRE(X)` producing `0.75`,
+  `A=REAL(1)`, `B=REAL(8)`, `X=A/B`, `PrintRE(X)` producing `0.125`,
+  `A=REAL(1)`, `B=REAL(32)`, `X=A/B`, `PrintRE(X)` producing `0.03125`,
+  `A=REAL(1)`, `B=REAL(64)`, `X=A/B`, `PrintRE(X)` producing `0.015625`,
+  `A=REAL(1)`, `B=REAL(256)`, `X=A/B`, `PrintRE(X)` producing `0.00390625`,
+  and `A=REAL(1)`, `B=REAL(32768)`, `X=A/B`, `PrintRE(X)` producing
+  `0.000030517578125`,
+  signed dyadic cases such as `INT N=[0]`, `N=0-1`, `A=REAL(N)`,
+  `B=REAL(2)`, `X=A/B`, `PrintRE(X)` producing `-0.5`, and
+  low-word-nonzero dyadic cases such as `A=REAL(129)`, `B=REAL(256)`,
+  `X=A/B`, `PrintRE(X)` producing `0.50390625`, plus first end-to-end
+  arithmetic print cases such as `X=X+A` after `X=1.5`, `A=1.5`,
+  `PrintRE(X)` producing `3`, `X=A+B` with `A=4.0`, `B=-1.0`
+  producing `3`, `X=A+B` with `A=1.0`, `B=-4.0` producing `-3`,
+  `X=A+B` with `A=-1.0`, `B=4.0` producing `3`,
+  `X=A-B` with `A=4.0`, `B=1.0` producing `3`,
+  `X=A-B` with `A=4.0`, `B=-1.0` producing `5`,
+  `X=A-B` with `A=-1.0`, `B=4.0` producing `-5`, and
+  `X=A*B` with `A=1.5`, `B=2.0` producing `3`,
+  `X=A*B` with `A=-1.5`, `B=2.0` producing `-3`,
+  `X=A*B` with `A=1.5`, `B=-2.0` producing `-3`,
+  `X=A*B` with `A=-1.5`, `B=-2.0` producing `3`,
+  `X=A*B` with `A=1.5`, `B=1.5` producing `2.25`,
+  `X=A*B` with `A=0.75`, `B=0.75` producing `0.5625`,
+  `X=A/B` with `A=-3.0`, `B=2.0` producing `-1.5`,
+  `X=A/B` with `A=3.0`, `B=-2.0` producing `-1.5`, and
+  `X=A/B` with `A=-3.0`, `B=-2.0` producing `1.5`,
+  and the linked helper-trailer model itself is now proven on a real
+  `ALINK`-produced program: `A=REAL(1)`, `B=REAL(8)`, `X=A/B`, `PrintRE(X)`
+  still produces `0.125` after removing `RT_PRINT_F_HELPER.BIN`,
+  `RT_PRINT_STD_HELPER.BIN`, `AVMRUN_OVL1.BIN`, `AVMRUN_OVL2.BIN`, and
+  `AVMRUN_OVL3.BIN` from the mounted workspace, so the shipped linked REAL
+  print path no longer depends on loose helper sidecars or runner overlays for
+  that proven case,
+  and the broader compat/interpreter payload surface now belongs to
+  `AVMRUNC.PRG`, while production `AVMRUN.PRG` is the native fast-path runner,
+  and production `AVMRUN.PRG` no longer falls back to loading a loose
+  `RT_PRINT_STD_HELPER.BIN` at runtime for standard print either; newly linked
+  programs must carry the standard-print helper trailer that `ALINK` emits,
+  `X=A/B` with `A=1.5`, `B=1.5` producing `1`, and
+  `X=A/B` with `A=1.5`, `B=0.75` producing `2`,
+  `X=A/B` with `A=1.0`, `B=3.0` producing `0.3333333432674407958984375`,
+  `X=A/B` with `A=1.0`, `B=9.0` producing `0.111111111938953399658203125`,
+  `X=A/B` with `A=2.0`, `B=9.0` producing `0.22222222387790679931640625`,
+  `X=A/B` with `A=1.0`, `B=11.0` producing `0.0909090936183929443359375`,
+  `X=A/B` with `A=2.0`, `B=11.0` producing `0.181818187236785888671875`,
+  `X=A/B` with `A=1.0`, `B=13.0` producing `0.076923079788684844970703125`,
+  `X=A/B` with `A=2.0`, `B=13.0` producing `0.15384615957736968994140625`,
+  `X=A/B` with `A=2.0`, `B=3.0` producing `0.666666686534881591796875`,
+  `X=A/B` with `A=1.0`, `B=7.0` producing `0.14285714924335479736328125`,
+  `X=A/B` with `A=1.0`, `B=10.0` producing `0.100000001490116119384765625`,
+  `X=A+B` with `A=(1.0/10.0)`, `B=(1.0/5.0)` producing
+  `0.300000011920928955078125`,
+  `X=A+B` with `X=(1.0/10.0)+(1.0/5.0)` and `B=(1.0/5.0)` producing `0.5`,
+  `X=A-B` with `A=(1.0/2.0)`, `B=(1.0/10.0)` producing
+  `0.4000000059604644775390625`,
+  `X=X-C` after `X=(1.0/10.0)+(1.0/10.0)` and `C=(1.0/5.0)` producing `0`,
+  `X=(A+B+A)*10` after `A=(1.0/10.0)` and `B=(1.0/10.0)` producing `3`,
+  `X=A+B` with `A=(2.0/13.0)` and `B=(1.0/13.0)` producing
+  `0.2307692468166351318359375`,
+  `X=A+B` with `A=(2.0/17.0)` and `B=(1.0/17.0)` producing
+  `0.17647059261798858642578125`,
+  `X=A+B` with `A=(2.0/19.0)` and `B=(1.0/19.0)` producing
+  `0.15789473056793212890625`,
+  `X=A+B` with `A=(2.0/23.0)` and `B=(1.0/23.0)` producing
+  `0.1304347813129425048828125`,
+  `X=A*B` with `A=(1.0/7.0)`, `B=7.0` producing `1`,
+  `X=A*B` with `A=(1.0/9.0)`, `B=9.0` producing `1`,
+  `X=A*B` with `A=(1.0/11.0)`, `B=11.0` producing `1`,
+  `X=A*B` with `A=(1.0/13.0)`, `B=13.0` producing `1`,
+  `X=A*B` with `A=(1.0/17.0)`, `B=17.0` producing `1`,
+  `X=A*B` with `A=(1.0/19.0)`, `B=19.0` producing `1`,
+  `X=A*B` with `A=(1.0/23.0)`, `B=23.0` producing `1`,
+  `X=A*B` with `A=(1.0/5.0)`, `B=(1.0/5.0)` producing
+  `0.0400000028312206268310546875`,
+  `X=A/B` with `A=(1.0/10.0)`, `B=(1.0/5.0)` producing `0.5`,
+  `X=A/B` with `A=(1.0/17.0)`, `B=(2.0/17.0)` producing `0.5`,
+  `X=A/B` with `A=(1.0/19.0)`, `B=(2.0/19.0)` producing `0.5`,
+  `X=A/B` with `A=(1.0/23.0)`, `B=(2.0/23.0)` producing `0.5`,
+  `X=A/B` with `A=(6.0/5.0)`, `B=(3.0/10.0)` producing `4`, and
+  `X=A*B` with `A=(1.0/3.0)`, `B=3.0` producing `1`,
+  `X=A*B` with `A=(1.0/10.0)`, `B=10.0` producing `1`,
+  `X=A/B` with `A=1.0`, `B=17.0` producing `0.0588235296308994293212890625`,
+  `X=A/B` with `A=2.0`, `B=17.0` producing
+  `0.117647059261798858642578125`,
+  `X=A/B` with `A=1.0`, `B=19.0` producing `0.052631579339504241943359375`,
+  `X=A/B` with `A=2.0`, `B=19.0` producing
+  `0.10526315867900848388671875`,
+  `X=A/B` with `A=1.0`, `B=23.0` producing `0.0434782616794109344482421875`,
+  and `X=A/B` with `A=2.0`, `B=23.0` producing
+  `0.086956523358821868896484375`.

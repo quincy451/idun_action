@@ -1,6 +1,6 @@
 # `ACTC` Status
 
-Current as of `2026-04-20`.
+Current as of `2026-04-25`.
 
 This file is a focused ledger for the UDOS-native `ACTC.PRG` tool.
 It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/test/action/actionc64u/docs/action_matrix.md).
@@ -11,7 +11,16 @@ It is narrower and easier to update than the broad [action_matrix.md](/mnt/c/tes
 - [x] Requires a loaded project and a tracked manifest entry
 - [x] Reads `SRC/<NAME>.ACT` for the requested module
 - [x] Validates the source `MODULE` header against the requested module name
-- [x] Emits deterministic `AVO1` object text into `OBJ/<NAME>.AVO`
+- [x] Emits deterministic `AVO1` object text into `OBJ/<NAME>.OBJ`
+- [x] Treats `.OBJ` as the primary project-object name while preserving legacy
+  `.AVO` compatibility for downstream tools
+- [x] Emits object-level source debug records:
+  - `f 0 src/<module>.act`
+  - `q <export_index> 0 <line> <col>`
+  - `l <export_index> <body_op_index> 0 <line> <col>`
+  - `V g <type> <var_index> <file_id> <line> <col>`
+  - `V p <type> <export_index> <var_index> <file_id> <line> <col>`
+  - `V l <type> <export_index> <var_index> <file_id> <line> <col>`
 - [x] Emits compiler-owned export names plus offset/size metadata
 - [x] Emits `body_ops`
 - [x] Emits a minimal payload skeleton plus `payload_bytes`
@@ -24,24 +33,376 @@ Current real-target build note:
 
 - `./tools/build_actc_udos.sh` is green again
 - `make -C ../udos vice-action-actc` is green again on the current working tree
-- `make -C ../udos vice-action-actc-alink-avmrun` is green again on the
-  current working tree
+- `make -C ../udos vice-action-actc-alink-launch` is green again as the
+  helper-free higher-level default launch path on the current working tree
+- `make -C ../udos vice-action-actc-alink-launch-printmath` is green again
+  as the named imported `printmath` direct-launch proof on the current working
+  tree
+- `make -C ../udos vice-action-actc-alink-compat-printmath` remains the
+  helper-bearing compat replay target for the same shape
 - current shipped `ACTC` map footprint is:
-  - `CODE`: `$24B9`
-  - `BSS`: `$06F9`
-  - total runtime span from `$0900` through `$34B1`
+  - `CODE`: `$3838`
+  - `BSS`: `$0318`
+  - total runtime span from `$0900` through `$444F`
+  - free bytes below the current resident floor `$4AFE`: `1707`
+- current shipped `ACTC` file footprint is:
+  - `ACTC.PRG`: `14394` bytes
+  - `ACTC_REU.PRG`: `31485` bytes
+  - `ACTC_OVL0.BIN`: `48` bytes
+  - `ACTC_OVL1.BIN`: `357` bytes
+  - `ACTC_OVL2.BIN`: `4663` bytes
+  - `ACTC_OVL3.BIN`: `605` bytes
+  - `ACTC_OVL4.BIN`: `235` bytes
+  - `ACTC_OVL5.BIN`: `1930` bytes
+  - `ACTC_OVL6.BIN`: `5056` bytes
+  - total current overlay payload: `12894` bytes
+- current shipped `ACTC` link window is `$0900-$9FFF`
+- current shipped `ACTC` build now uses:
+  - `ACTC_REU_SOURCE_CACHE=1`
+  - `ACTC_REU_TABLES=1`
+  - `ACTC_REU_BODY_OPS=1`
+  - `ACTC_REU_STRING_LITERALS=1`
+  - `ACTC_REU_VAR_NAMES=1`
+  - `ACTC_REU_EXPORT_NAMES=1`
+  - `ACTC_REU_INT_LITERALS=1`
+  - `ACTC_KEEP_BODY_RESIDENT_FALLBACK=0`
+  - `ACTC_REU_VAR_META=1`
+  - `ACTC_REU_PROC_META=1`
+  - `ACTC_REU_VAR_DEBUG=1`
+  - `ACTC_REU_LAYOUT_META=1`
+  - `ACTC_REU_STRING_OFFSETS=1`
+  - `ACTC_USE_BODY_OVERLAY=1`
+  - `STREAM_OUTPUT=1`
+  - `CONTENT_BUFFER_SIZE=16`
+  - `OUTPUT_CHUNK_SIZE=128`
+  - `SOURCE_LIMIT=3328`
+  - `SOURCE_LOOKAHEAD=255`
+  - `BODY_OPS_STRIDE=255`
+  - `INT_LITERAL_MAX=36`
+  - `STRING_LITERAL_MAX=36`
+  - `EXPORT_MAX=16`
+  - `EXTERNAL_MAX=36`
+  - `LOOP_MAX=16`
+- current shipped REAL-to-INT proof surface includes:
+  - `A=REAL(3)`, `B=REAL(2)`, `A=A/B`, `X=INT(A)` -> `1`
+  - `N=0-3`, `A=REAL(N)`, `B=REAL(2)`, `A=A/B`, `X=INT(A)` -> `-1`
+  - `A=REAL(1)`, `B=REAL(3)`, `A=A/B`, `X=INT(A)` -> `0`
+  - `N=0-1`, `A=REAL(N)`, `B=REAL(3)`, `A=A/B`, `X=INT(A)` -> `0`
+  - `A=REAL(1)`, `B=REAL(10)`, `A=A/B`, `B=REAL(10)`, `A=A*B`,
+    `X=INT(A)` -> `1`
+  - `A=REAL(32767)`, `X=INT(A)` -> `32767`
+  - `A=REAL(0-32768)`, `X=INT(A)`, `B=REAL(X)`, `A=B` -> `1`
+  - `A=REAL(32768)`, `X=INT(A)` -> runtime `REAL->INT RANGE`
+  - `A=REAL(0-32768)`, `B=REAL(1)`, `A=A-B`, `X=INT(A)` -> runtime
+    `REAL->INT RANGE`
+- current shipped `ACTC` stores the unresolved external-name table in REU
+  through `svc_reu_read_sc0` / `svc_reu_write_sc0`; only the 25-byte active
+  external-name window remains resident
+- current shipped `ACTC` stores procedure `body_ops` streams in REU at
+  `$00D000`, keeping only one `BODY_OPS_STRIDE` active body window resident and
+  flushing dirty procedure bodies through `svc_reu_write_sc0`
+- current shipped `ACTC` also stores string literals at `$00E000`, variable
+  names at `$00E400`, and export names at `$00E600`, each behind one small
+  resident active window
+- current shipped `ACTC` also stores integer literals at `$00E800`, variable
+  metadata at `$00E900`, procedure parameter/local metadata at `$00EA00`,
+  procedure layout metadata at `$00EB00`, and string offsets at `$00EC00`,
+  each behind a small resident active window or fixed-record staging slot
+- current shipped `ACTC` also stores procedure declaration debug offsets at
+  `$00ED00`, body-op debug offsets at `$00EE00`, and variable declaration
+  debug offsets at `$00EF00`, so object emission can format `q`, `l`,
+  typed `V g`, `V p`, and `V l` source debug records without keeping those
+  tables resident
+- `tests/test_actc_capacity.py` proves production `ACTC.PRG` stages and
+  compiles a `49152` byte source module through the REU source-cache path under
+  the tool ABI harness, with `PROC MAIN()` discovered near offset `49120` in the
+  third REU-backed source window, and also proves the production REU table
+  writes/reads for `body_ops`, string literals, export names, layout metadata,
+  and string offsets
+- `tests/test_actc_capacity.py` also proves production `ACTC.PRG` streams an
+  `OBJ/MAIN.OBJ` larger than the legacy `640` byte object buffer through
+  `svc_file_write_begin_sc0`, `svc_file_write_chunk_sc0`, and
+  `svc_file_write_close_sc0`, while exercising REU-backed variable names,
+  variable metadata, procedure metadata, and integer literals
+- `tests/test_actc_capacity.py`, `tests/test_actc_overlay.py`, and
+  `tests/test_actc_reu_source_cache.py` now also prove the emitted `f`, `q`,
+  `l`, typed `V g`, `V p`, and `V l` object debug records and the REU writes
+  that back the procedure/body/variable source mapping tables
+- current end-to-end REAL print/runtime proof surface also includes signed
+  arithmetic cases:
+  - `-1.5 * 2.0 = -3.0`
+  - `1.5 * -2.0 = -3.0`
+  - `-1.5 * -2.0 = 3.0`
+  - `-3.0 / 2.0 = -1.5`
+  - `3.0 / -2.0 = -1.5`
+  - `-3.0 / -2.0 = 1.5`
+  - `1.5 * 1.5 = 2.25`
+  - `0.75 * 0.75 = 0.5625`
+  - `1.5 / 1.5 = 1.0`
+  - `1.5 / 0.75 = 2.0`
+  - `1.0 / 3.0 = 0.3333333432674407958984375`
+  - `1.0 / 9.0 = 0.111111111938953399658203125`
+  - `2.0 / 9.0 = 0.22222222387790679931640625`
+  - `1.0 / 11.0 = 0.0909090936183929443359375`
+  - `2.0 / 11.0 = 0.181818187236785888671875`
+  - `1.0 / 13.0 = 0.076923079788684844970703125`
+  - `2.0 / 13.0 = 0.15384615957736968994140625`
+  - `1.0 / 17.0 = 0.0588235296308994293212890625`
+  - `2.0 / 17.0 = 0.117647059261798858642578125`
+  - `1.0 / 19.0 = 0.052631579339504241943359375`
+  - `2.0 / 19.0 = 0.10526315867900848388671875`
+  - `1.0 / 23.0 = 0.0434782616794109344482421875`
+  - `2.0 / 23.0 = 0.086956523358821868896484375`
+  - `2.0 / 3.0 = 0.666666686534881591796875`
+  - `1.0 / 7.0 = 0.14285714924335479736328125`
+  - `1.0 / 10.0 = 0.100000001490116119384765625`
+  - `(1.0 / 10.0) + (1.0 / 5.0) = 0.300000011920928955078125`
+  - `((1.0 / 10.0) + (1.0 / 5.0)) + (1.0 / 5.0) = 0.5`
+  - `(1.0 / 2.0) - (1.0 / 10.0) = 0.4000000059604644775390625`
+  - `((1.0 / 10.0) + (1.0 / 10.0)) - (1.0 / 5.0) = 0.0`
+  - `((1.0 / 10.0) + (1.0 / 10.0) + (1.0 / 10.0)) * 10.0 = 3.0`
+  - `(2.0 / 13.0) + (1.0 / 13.0) = 0.2307692468166351318359375`
+  - `(2.0 / 17.0) + (1.0 / 17.0) = 0.17647059261798858642578125`
+  - `(2.0 / 19.0) + (1.0 / 19.0) = 0.15789473056793212890625`
+  - `(2.0 / 23.0) + (1.0 / 23.0) = 0.1304347813129425048828125`
+  - `(1.0 / 7.0) * 7.0 = 1.0`
+  - `(1.0 / 9.0) * 9.0 = 1.0`
+  - `(1.0 / 11.0) * 11.0 = 1.0`
+  - `(1.0 / 13.0) * 13.0 = 1.0`
+  - `(1.0 / 17.0) * 17.0 = 1.0`
+  - `(1.0 / 19.0) * 19.0 = 1.0`
+  - `(1.0 / 23.0) * 23.0 = 1.0`
+  - `(1.0 / 5.0) * (1.0 / 5.0) = 0.0400000028312206268310546875`
+  - `(1.0 / 10.0) / (1.0 / 5.0) = 0.5`
+  - `(1.0 / 17.0) / (2.0 / 17.0) = 0.5`
+  - `(1.0 / 19.0) / (2.0 / 19.0) = 0.5`
+  - `(1.0 / 23.0) / (2.0 / 23.0) = 0.5`
+  - `(6.0 / 5.0) / (3.0 / 10.0) = 4.0`
+  - `(1.0 / 3.0) * 3.0 = 1.0`
+  - `(1.0 / 10.0) * 10.0 = 1.0`
+- `tests/test_actc_overlay.py` proves the first ACTC pass-overlay artifact:
+  `tools/build_actc_overlay_noop.sh` builds raw `ACTC_OVL0.BIN` with `ACOV`
+  magic, overlay ABI version `1`, pass id `0`, execution base `$A000`, and a
+  no-op entry that returns status `0`
+- `tests/test_actc_overlay.py` also proves the first useful ACTC pass overlay:
+  `tools/build_actc_overlay_source_header.sh` builds `ACTC_OVL1.BIN`, pass id
+  `1`, which receives the source-window context plus a pointer to the requested
+  module name, validates the `MODULE <name>` header against that requested
+  name, reports the consumed source offset through the context source mark
+  fields, and returns a diagnostic pointer when the module header is invalid
+- `tests/test_actc_overlay.py` also proves a declaration-count overlay:
+  `tools/build_actc_overlay_decl_counts.sh` builds `ACTC_OVL2.BIN`, pass id
+  `2`, which receives the source-window context, scans top-level declarations
+  in the current source window, reports module scalar declaration and procedure
+  declaration counts, writes those counts back into resident `ACTC` count
+  fields through context pointers, writes module variable names into the
+  REU-backed var-name table, writes initial var metadata, including
+  module-scope decimal arithmetic and comparison/boolean initializer values,
+  into the REU-backed
+  var-meta table, writes procedure export names into the REU-backed export-name
+  table, parses procedure parameter lists and procedure-local scalar
+  declarations, appends parameter/local names and metadata to the REU-backed
+  variable tables, writes procedure param/local count/base metadata into the
+  REU-backed proc-meta table, rejects duplicate module vars, duplicate procedure
+  exports, duplicate params, param/module collisions, local/param collisions,
+  duplicate locals, malformed declaration names/tails, empty or unterminated
+  initializer tails, trailing initializer operators, and REAL initializers, and
+  leaves the final source offset in the source mark fields
+- `tests/test_actc_overlay.py` also proves the first resident ACTC overlay
+  scheduler: `actc_overlay_run_pass` accepts a pass id in `A`, finds the pass
+  descriptor, stages `ACTC_OVL0.BIN`, `ACTC_OVL1.BIN`, or `ACTC_OVL2.BIN` into
+  REU bank `$02`, copies it into
+  `$A000`, clears LORAM so `$0001` changes from `$37` to `$36` for the call,
+  passes an ACTC context block to the overlay in `X/Y`, executes the overlay,
+  receives context status `0` plus return status `0`, and restores `$0001` to
+  `$37`
+- `tests/test_actc_overlay.py` also proves the first real compile-path overlay
+  chain: building `ACTC.PRG` with `ACTC_USE_SOURCE_HEADER_OVERLAY=1` and
+  `ACTC_USE_DECL_OVERLAY=1` runs `ACTC_OVL1.BIN` for module-header validation,
+  then `ACTC_OVL2.BIN` for declaration scanning, and the overlay-generated var
+  metadata is used by the later object emitter. Overlay staging uses the
+  executable-relative tool ABI path prefix: `!ACTC_OVL1.BIN` and
+  `!ACTC_OVL2.BIN` resolve beside the launched `ACTC.PRG`.
+- `tests/test_actc_overlay.py` now also proves the later production overlay
+  passes: `ACTC_OVL3.BIN`, pass id `3`, computes REU-backed proc layout and
+  string offsets; `ACTC_OVL4.BIN`, pass id `4`, detects runtime import flags by
+  calling the resident source-pattern finder through the overlay ABI;
+  `ACTC_OVL5.BIN`, pass id `5`, streams `AVO1` object emission by using resident
+  pointer-setter, REU-window-loader, and append-byte callbacks; and
+  `ACTC_OVL6.BIN`, pass id `6`, now owns the default proc-body lowering path.
+  The full compile path now stages `ACTC_OVL1.BIN`, `ACTC_OVL2.BIN`,
+  `ACTC_OVL6.BIN`, `ACTC_OVL4.BIN`, `ACTC_OVL3.BIN`, and `ACTC_OVL5.BIN`
+  during a normal compile.
+- `ACTC_OVL6.BIN` now also owns its loop stack locally. The default build no
+  longer keeps the resident loop push/pop helpers or the resident loop-stack
+  BSS just to support overlayed proc-body lowering.
+- `ACTC_OVL6.BIN` now also emits current-proc parameter bind ops directly after
+  loading proc metadata through the overlay ABI. The default build no longer
+  keeps the resident proc-param bind helper only to support overlayed body
+  lowering.
+- `ACTC_OVL6.BIN` now also lowers the current module-scope REAL assignment
+  slice directly. The default build no longer keeps the resident REAL
+  assignment helper or its resident scratch bytes only to support overlayed
+  proc-body lowering.
+- `ACTC_OVL6.BIN` now also owns the direct grouped/widened REAL integer bridge
+  assignment path, so the default build no longer keeps the resident
+  direct-REAL-assignment helper block only to support overlayed body lowering.
+- `ACTC_OVL6.BIN` now also passes the condition/print body op marker in `A`
+  to two generic resident callbacks. The default build no longer keeps the five
+  resident body wrapper helpers for `IF`, `UNTIL`, `DO WHILE`, `PRINTI`, and
+  `PRINTIE` just to support the overlay path.
+- `ACTC_OVL2.BIN` now has source-window paging support through the overlay ABI.
+  The resident compiler passes a `load next source window` callback in the
+  context block, and the overlay maintains a 24-bit source mark plus a current
+  window remaining counter so declarations after the first `20480` byte source
+  window can be scanned. The executable-relative overlay load path is now
+  covered by release/VICE proofs, so the normal `tools/build_actc_udos.sh`
+  build defaults `ACTC_USE_DECL_OVERLAY` to `1`.
+- The normal production build now treats the source-header and declaration
+  overlays as required: when `ACTC_USE_SOURCE_HEADER_OVERLAY=1` and
+  `ACTC_USE_DECL_OVERLAY=1` with the REU source cache enabled, resident module
+  header parsing and declaration collection are compiled out,
+  `tools/build_actc_udos.sh` builds `ACTC_OVL1.BIN` and `ACTC_OVL2.BIN`
+  automatically, and both overlays must be present beside `ACTC.PRG`.
+- `tests/test_actc_overlay.py` also proves unknown pass ids fail before any
+  file/REU operations, leaving context status as failed
+- `tools/export_udos_workspace.py` and `../udos/Makefile` now package
+  `ACTC_OVL0.BIN` through `ACTC_OVL6.BIN` beside `ACTC.PRG`, so exported
+  workspaces and release disks carry every overlay file currently built for the
+  ACTC scheduler and body-overlay bring-up work
+- `tests/test_actc_reu_source_cache.py` proves the same source-cache ABI stages
+  source beyond `20480` bytes into simulated REU, pages later windows back into
+  `source_buffer`, and emits `OBJ/MAIN.OBJ` when the `PROC MAIN` name crosses
+  the first compile-window boundary or a `PrintE` string literal crosses that
+  boundary, and when long inline spaces before a `PrintIE` literal cross that
+  boundary
+- `tests/test_actc_reu_source_cache.py` also proves a long `PrintIE(...)`
+  expression with a symbol token crossing the boundary can commit an 8-bit `Y`
+  lookahead wrap, preserve parser registers across the REU read service, and
+  continue parsing from the next window
+- `tests/test_actc_reu_source_cache.py` also proves the boolean pre-scan no
+  longer silently wraps inside the same window: a `PrintIE(1 ... AND 1)` line
+  with `AND` beyond an 8-bit `Y` wrap is routed to the boolean parser and
+  compiled across the REU boundary
+- `tests/test_actc_reu_source_cache.py` also proves failed boolean keyword
+  probes restore the original REU source window before falling back to normal
+  expression parsing, so a long-space `PrintIE(...)` expression can continue on
+  a variable symbol after the probe crosses the first window boundary
+- `tests/test_actc_reu_source_cache.py` also proves assignment parsing can
+  preserve the `=` operator position after variable lookup and advance past an
+  operator sitting at an 8-bit `Y` wrap before parsing the right-hand side
+- `tests/test_actc_reu_source_cache.py` also proves procedure parameter parsing
+  can advance past an opening `(` sitting at an 8-bit `Y` wrap and continue
+  reading parameters from the next REU-backed reader position
+- `tests/test_actc_reu_source_cache.py` also proves runtime and constant
+  parenthesized comparison left-hand-side speculation can cross an 8-bit `Y`
+  wrap, restore the original REU source window, and reinterpret `(expr)` as the
+  left side of `=`
+- `tests/test_actc_reu_source_cache.py` now stays green with the declaration
+  overlay enabled in the focused REU source-cache harness. The former wrap-edge
+  failures are covered: procedure parameter parsing now tolerates the `(` after
+  a long cross-window space run, and the simple initializer evaluator now
+  preserves grouped constant comparisons across a `Y` wrap.
 
 Current lowering note:
 
 - [x] proc-local `INT` declarations currently lower to proc-scoped static slots plus declaration-site runtime init stores; this is not a stack-frame model yet
 - [x] current harness-proven variable slot ceiling is `16`, aligned with the current VM local-slot count
 - [x] module-scope `REAL` declarations now emit 4-byte storage-width metadata
-- [x] the first REAL expression-lowering slice supports `R=A+B` for module-scope
-  `REAL` variables, emitting low/high word body ops plus only the `RT_F_ADD`
-  runtime import
+- [x] exact-zero module-scope `REAL` initialization now lowers through the
+  integer zero literal path:
+  `REAL X=[0]`
+- [x] direct REAL copy assignment now supports `R=A` for module-scope
+  `REAL` variables, emitting low/high word load/store ops with no runtime import
+- [x] exact-zero module-scope `REAL` assignment now lowers without a runtime
+  helper:
+  `REAL X`, `X=0`
+- [x] first narrow non-zero integer-to-REAL body assignment bridge now lowers
+  small non-negative integer expressions such as `X=7` and `X=(1+2*3)` to two
+  integer literals plus `T`/`S`, with no REAL runtime import
+- [x] wider non-negative integer-to-REAL body assignment now lowers larger
+  literals and grouped `+`/`-` expressions such as `X=256` and `X=(255+1)`
+  through only `RT_I_TO_F` / `rt_i_to_f`
+- [x] narrow signed direct integer-to-REAL body assignment now lowers
+  `0-<positive word expr>` such as `X=0-256` through only `RT_S_TO_F` /
+  `rt_s_to_f`
+- [x] narrow `BYTE`/`CARD` variable-to-REAL body assignment now lowers through
+  only `RT_I_TO_F` / `rt_i_to_f`, for example
+  `CARD A=[255]`, `A=A+1`, `REAL X`, `X=A`
+- [x] narrow signed `INT` variable-to-REAL body assignment now lowers through
+  only `RT_S_TO_F` / `rt_s_to_f`, for example
+  `INT A=[0]`, `A=0-7`, `REAL X`, `X=A`
+- [x] narrow explicit `REAL(<integer var>)` body conversion now lowers through
+  the same helper selected by source var type, for example
+  `CARD A=[255]`, `A=A+1`, `REAL X`, `X=REAL(A)` and
+  `INT A=[0]`, `A=0-7`, `REAL X`, `X=REAL(A)`
+- [x] narrow explicit `REAL(<integer expression>)` body conversion now lowers
+  through the same bridge helpers for the first proven constant-expression
+  cases, for example `REAL X`, `X=REAL(255+1)` and
+  `REAL X`, `X=REAL(32767)`, and `REAL X`, `X=REAL(0-256)`; the first wide
+  `*` / `/` bridge cases now lower too, for example `REAL X`, `X=REAL(512/2)`
+- [x] narrow REAL condition lowering now imports only `RT_F_CMP` /
+  `rt_f_cmp` for the current proven module-scope compare cases:
+  `REAL A`, `REAL B`, `REAL C`, then `IF A<B THEN`, `IF B=C THEN`,
+  `IF C>=B THEN`, `IF A<>C THEN`, `IF B>A THEN`, and `IF A<=B THEN`
+- [x] narrow `PrintR` / `PrintRE` body lowering now imports only
+  `RT_PRINT_F` / `rt_print_f` for the current proven REAL print cases,
+  including integral, fractional, signed, and first low-word-nonzero dyadic
+  values such as
+  `REAL X`, `X=REAL(7)`, `PrintRE(X)`,
+  `REAL A`, `REAL B`, `REAL X`, `A=REAL(3)`, `B=REAL(2)`, `X=A/B`,
+  `PrintRE(X)`, `X=X/B`, `PrintRE(X)`, `REAL A`, `REAL B`, `REAL X`,
+  `A=REAL(1)`, `B=REAL(8)`, `X=A/B`, `PrintRE(X)`, `INT N=[0]`, `N=0-1`,
+  `REAL A`, `REAL B`, `REAL X`, `A=REAL(N)`, `B=REAL(2)`, `X=A/B`,
+  `PrintRE(X)`, `REAL A`, `REAL B`, `REAL X`, `A=REAL(1)`,
+  `B=REAL(32)`, `X=A/B`, `PrintRE(X)`, `REAL A`, `REAL B`, `REAL X`,
+  `A=REAL(1)`, `B=REAL(64)`, `X=A/B`, `PrintRE(X)`, `REAL A`,
+  `REAL B`, `REAL X`, `A=REAL(1)`, `B=REAL(256)`, `X=A/B`,
+  `PrintRE(X)`, `REAL A`, `REAL B`, `REAL X`, `A=REAL(1)`,
+  `B=REAL(32768)`, `X=A/B`, `PrintRE(X)`, `REAL A`, `REAL B`,
+  `REAL X`, `A=REAL(129)`, `B=REAL(256)`, `X=A/B`,
+  `PrintRE(X)`, and first arithmetic print cases such as
+  `REAL A`, `REAL B`, `REAL X`, `A=REAL(3)`, `B=REAL(2)`, `X=A/B`,
+  `A=A/B`, `X=X+A`, `PrintRE(X)`, `INT N=[0]`, `N=0-1`, `REAL A`,
+  `REAL B`, `REAL X`, `A=REAL(4)`, `B=REAL(N)`, `X=A+B`,
+  `PrintRE(X)`, `INT N=[0]`, `N=0-4`, `REAL A`, `REAL B`,
+  `REAL X`, `A=REAL(1)`, `B=REAL(N)`, `X=A+B`, `PrintRE(X)`,
+  `INT N=[0]`, `N=0-1`, `REAL A`, `REAL B`, `REAL X`,
+  `A=REAL(N)`, `B=REAL(4)`, `X=A+B`, `PrintRE(X)`, `REAL A`,
+  `REAL B`, `REAL X`, `A=REAL(4)`, `B=REAL(1)`, `X=A-B`,
+  `PrintRE(X)`, `INT N=[0]`, `N=0-1`, `REAL A`, `REAL B`,
+  `REAL X`, `A=REAL(4)`, `B=REAL(N)`, `X=A-B`, `PrintRE(X)`,
+  `INT N=[0]`, `N=0-1`, `REAL A`, `REAL B`, `REAL X`,
+  `A=REAL(N)`, `B=REAL(4)`, `X=A-B`, `PrintRE(X)`, and
+  `REAL A`, `REAL B`, `REAL X`, `A=REAL(3)`, `B=REAL(2)`,
+  `A=A/B`, `X=A*B`, `PrintRE(X)`, `INT N=[0]`, `N=0-3`, `REAL A`,
+  `REAL B`, `REAL X`, `A=REAL(N)`, `B=REAL(2)`, `A=A/B`, `X=A*B`,
+  `PrintRE(X)`, `REAL A`, `REAL B`, `REAL X`, `A=REAL(3)`, `B=REAL(2)`,
+  `A=A/B`, `N=0-2`, `B=REAL(N)`, `X=A*B`, `PrintRE(X)`,
+  `INT N=[0]`, `N=0-3`, `REAL A`, `REAL B`, `REAL X`, `A=REAL(N)`,
+  `B=REAL(2)`, `A=A/B`, `N=0-2`, `B=REAL(N)`, `X=A*B`, `PrintRE(X)`,
+  `INT N=[0]`, `N=0-3`, `REAL A`, `REAL B`, `REAL X`, `A=REAL(N)`,
+  `B=REAL(2)`, `X=A/B`, `PrintRE(X)`, `REAL A`, `REAL B`, `REAL X`,
+  `A=REAL(3)`, `N=0-2`, `B=REAL(N)`, `X=A/B`, `PrintRE(X)`, and
+  `INT N=[0]`, `N=0-3`, `REAL A`, `REAL B`, `REAL X`, `A=REAL(N)`,
+  `N=0-2`, `B=REAL(N)`, `X=A/B`, `PrintRE(X)`
+- [x] the positive 16-bit bridge parser now carries the first proven `*` / `/`
+  precedence cases for REAL lowering, for example `REAL X`, `X=(128*2)`, and
+  `REAL X`, `X=REAL(512/2)`
+- [x] the first REAL expression-lowering slices support `R=A+B`, `R=A-B`,
+  `R=A*B`, and `R=A/B` for module-scope `REAL` variables, emitting low/high
+  word body ops plus only the matching `RT_F_ADD`, `RT_F_SUB`, `RT_F_MUL`, or
+  `RT_F_DIV` runtime import
 - [x] `REAL` variables are guarded from the current 16-bit integer expression
-  path; initializers, integer-path reads, integer-path writes, and unsupported
-  REAL operators are rejected until their typed lowering lands
+  path; non-zero initializers, integer-path reads, integer-path writes, and
+  unsupported REAL operators are rejected until their typed lowering lands
+- [x] wide `REAL` integer bridge support is still intentionally bounded:
+  the current proven surface now covers direct and explicit grouped 16-bit
+  `+`, `-`, `*`, and `/` bridge cases such as `X=(128*2)`,
+  `X=0-(128*2)`, `X=REAL(128*2)`, `X=REAL(32767)`, and
+  `X=REAL(0-(512/2))`; the positive 16-bit boundary direct-assignment case
+  `X=32767` is also proven; broader `REAL(<literal-or-expression>)` lowering
+  beyond that slice still depends on wider typed lowering
 
 ## Proven Narrow Source Surface
 
@@ -72,8 +433,8 @@ Current lowering note:
 - [x] `DO ... UNTIL ... OD` containing nested `WHILE ... DO ... OD`
 - [x] `WHILE ... DO ... OD` containing nested `DO ... UNTIL ... OD`
 - [x] mixed local/external and branch content across `DO`/`WHILE` mixed nesting
-- [x] first REAL add-assignment lowering:
-  `REAL A`, `REAL B`, `REAL R`, `R=A+B`
+- [x] first REAL add/subtract/multiply/divide assignment lowering:
+  `REAL A`, `REAL B`, `REAL R`, `R=A+B`, `R=A-B`, `R=A*B`, and `R=A/B`
 
 ## Current Widening Work
 
@@ -156,8 +517,20 @@ Current lowering note:
 - [x] module-scope `REAL` declarations emit a 4-byte variable slot without
   importing unused REAL runtime operators:
   `REAL X`, `PrintIE(7)`
+- [x] exact-zero module-scope `REAL` initialization lowers through the existing
+  zero literal path without importing a REAL helper:
+  `REAL X=[0]`
+- [x] module-scope `REAL` copy assignment imports no runtime helper:
+  `R=A` emits `L`, `U`, `T`, and `S` body ops only
+- [x] exact-zero module-scope `REAL` assignment imports no runtime helper:
+  `X=0` emits `p`, `p`, `T`, and `S` body ops only
+- [x] module-scope `REAL` add/subtract/multiply/divide assignment imports only the
+  operator used:
+  `R=A+B` imports `RT_F_ADD`; `R=A-B` imports `RT_F_SUB`; `R=A*B` imports
+  `RT_F_MUL`; `R=A/B` imports `RT_F_DIV`
 - [x] unsafe current-stage REAL use is rejected:
-  `REAL X=[0]`, `PrintIE(X)`, and `X=0` where `X` is REAL
+  non-zero REAL initializers, `PrintIE(X)`, and non-zero integer-path writes
+  where `X` is REAL
 - [x] variable-to-variable arithmetic assignment:
   `X=X+Y`
 - [x] multiple module-scope integer variables driving `WHILE ... DO ... OD`:
@@ -331,6 +704,66 @@ Current lowering note:
   `EXTERNAL_MAX = 16`
 - [x] harness `ACTC` loop-kind stack widened beyond the old `8`-deep nesting ceiling:
   `LOOP_MAX = 16`
+- [x] production `ACTC` source staging widened beyond one page:
+  `ACTC_REU_SOURCE_CACHE = 1`, `SOURCE_LIMIT = 20480`, and
+  `SOURCE_LOOKAHEAD = 255`, with a `49152` byte source compile proof that finds
+  `PROC MAIN()` near offset `49120` through the REU source-cache path
+- [x] production `ACTC` now uses the same widened literal/export/loop family as
+  the harness line, with `BODY_OPS_STRIDE = 255`, `INT_LITERAL_MAX = 36`,
+  `STRING_LITERAL_MAX = 36`, `EXPORT_MAX = 16`, `EXTERNAL_MAX = 36`, and
+  `LOOP_MAX = 16`
+- [ ] token-safe large-source parsing:
+  current ACTC stages source into REU and refills `source_buffer` as raw scans
+  advance, with 255 bytes of bounded lookahead for direct `(scan_ptr),y` reads,
+  commits 256-byte inline-space skips and long expression scans back into the
+  reader, marks/restores the active source window around speculative expression
+  pre-scans, routes boolean pre-scan wrap cases into the boolean parser, restores
+  failed keyword probes that crossed into another REU source window, preserves
+  assignment operator positions across variable lookup, advances assignment
+  punctuation and procedure parameter punctuation through the reader, restores
+  runtime and constant group speculation before reinterpretation as a comparison
+  left-hand side, and now streams object output; it still needs
+  token-boundary-safe source reading before DNP-sized sources are realistic
+- [x] REU source-cache service-shape proof:
+  `ACTC_REU_SOURCE_CACHE=1` stages source bytes beyond the first `20480` window
+  into simulated REU at `$010000` through resident-compatible REU service
+  entries and pages later windows back into `source_buffer`
+- [x] first scanner-refill proof:
+  ACTC compiles sources where the `PROC MAIN` name or a `PrintE` string literal
+  crosses the first `SOURCE_LIMIT` window boundary
+- [x] first reader commit proof:
+  ACTC compiles a source where long inline spaces before a `PrintIE` literal
+  force 8-bit `Y` lookahead to wrap across the first source window boundary
+- [x] first expression reader commit proof:
+  ACTC compiles a source where a long `PrintIE(...)` expression crosses the
+  first source window boundary and a long variable symbol itself spans the
+  commit point
+- [x] first boolean pre-scan wrap proof:
+  ACTC compiles a source where `AND` appears after a 320-space run crossing the
+  first source window boundary, proving pre-scan wrap routes to boolean parsing
+  instead of silently rescanning from the start of the same window
+- [x] first failed-keyword restore proof:
+  ACTC compiles a source where a boolean keyword probe skips spaces across the
+  first source window boundary, fails on a variable symbol, reloads the original
+  REU source window, and lets normal value parsing continue from the original
+  expression position
+- [x] first assignment punctuation wrap proof:
+  ACTC compiles a source where an assignment `=` sits at an 8-bit `Y` wrap after
+  long inline spaces, preserving the operator position across variable lookup
+  and parsing the right-hand side from the next reader position
+- [x] first procedure parameter punctuation wrap proof:
+  ACTC compiles a source where `PROC MAIN` has 251 inline spaces before `(`, so
+  the opening parameter-list delimiter sits at `Y=$FF` and parameters continue
+  from the next REU-backed reader position
+- [x] first group-speculation restore proofs:
+  ACTC compiles runtime `PrintIE((1 ... )=1)` and constant `INT X=[(1 ... )=1]`
+  cases where closing the parenthesized left-hand side crosses an 8-bit `Y` wrap,
+  then reloads the original REU source window before reparsing the group as the
+  left side of a comparison
+- [ ] production large-source parser:
+  direct `(scan_ptr),y` lookahead remains; ACTC still needs a source-reader
+  refactor so long identifiers, strings, expressions, and line endings can
+  safely cross bounded-lookahead windows
 - [x] current widened control-flow object emission:
   `b p0p1qhe0vp2p3qhe1ve2r`
 - [x] current widened `ELSE` object emission:

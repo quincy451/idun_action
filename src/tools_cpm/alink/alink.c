@@ -561,7 +561,7 @@ static bool load_provider_for_symbol(const char* symbol, const char* main_filena
     bool found = false;
     AvoObject candidate;
 
-    parse_filename(&search, "*.avo");
+    parse_filename(&search, "*.obj");
     search.ex = '?';
     cpm_set_dma(cpm_default_dma);
 
@@ -781,7 +781,7 @@ int main(void)
     char avm_filename[13];
     char map_filename[13];
 
-    primary_fcb_to_name(main_filename, "main.avo");
+    primary_fcb_to_name(main_filename, "main.obj");
     replace_extension(main_filename, ".avm", avm_filename);
     replace_extension(main_filename, ".map", map_filename);
     link_objects(main_filename, avm_filename, map_filename);

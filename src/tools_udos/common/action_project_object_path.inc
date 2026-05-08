@@ -19,6 +19,40 @@ build_object_target_path_suffix:
     lda #'.'
     sta target_path+4,y
     iny
+    lda #'O'
+    sta target_path+4,y
+    iny
+    lda #'B'
+    sta target_path+4,y
+    iny
+    lda #'J'
+    sta target_path+4,y
+    iny
+    lda #$00
+    sta target_path+4,y
+    rts
+
+build_legacy_object_target_path:
+    lda #'O'
+    sta target_path+0
+    lda #'B'
+    sta target_path+1
+    lda #'J'
+    sta target_path+2
+    lda #'/'
+    sta target_path+3
+    ldy #$00
+build_legacy_object_target_path_loop:
+    lda module_name,y
+    beq build_legacy_object_target_path_suffix
+    jsr normalize_module_arg_char
+    sta target_path+4,y
+    iny
+    bne build_legacy_object_target_path_loop
+build_legacy_object_target_path_suffix:
+    lda #'.'
+    sta target_path+4,y
+    iny
     lda #'A'
     sta target_path+4,y
     iny

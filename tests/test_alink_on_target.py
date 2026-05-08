@@ -14,11 +14,11 @@ class TestAlinkOnTarget(unittest.TestCase):
         self.build_vm = self.root / "tools" / "build_vmrun.sh"
         self.runner = self.root / "tools" / "cpmemu_runner.py"
         self.runtime_aliases = [
-            ("rt_print_str.avo", "pstr.avo"),
-            ("rt_print_line.avo", "plin.avo"),
-            ("rt_format_int.avo", "fint.avo"),
-            ("rt_ovl_call.avo", "ovlc.avo"),
-            ("rt_ovl_load.avo", "ovll.avo"),
+            ("rt_print_str.obj", "pstr.obj"),
+            ("rt_print_line.obj", "plin.obj"),
+            ("rt_format_int.obj", "fint.obj"),
+            ("rt_ovl_call.obj", "ovlc.obj"),
+            ("rt_ovl_load.obj", "ovll.obj"),
         ]
 
     def build_tool(self, script: Path) -> None:
@@ -72,7 +72,7 @@ class TestAlinkOnTarget(unittest.TestCase):
     def stage_drive(self, drive: Path, main_object: Path) -> None:
         shutil.copy2(self.root / "build" / "alink.com", drive / "alink.com")
         shutil.copy2(self.root / "build" / "vm.com", drive / "vm.com")
-        shutil.copy2(main_object, drive / "main.avo")
+        shutil.copy2(main_object, drive / "main.obj")
         for source_name, alias_name in self.runtime_aliases:
             shutil.copy2(self.root / "src" / "runtime" / "modules" / source_name, drive / alias_name)
 
@@ -82,7 +82,7 @@ class TestAlinkOnTarget(unittest.TestCase):
     def test_hello_links_and_deadstrips_integer_module(self) -> None:
         self.build_tool(self.build_alink)
         self.build_tool(self.build_vm)
-        main_object = self.compile_object("hello.act", "alink-hello.avo")
+        main_object = self.compile_object("hello.act", "alink-hello.obj")
 
         with tempfile.TemporaryDirectory() as tmpdir:
             drive = Path(tmpdir)
@@ -105,7 +105,7 @@ class TestAlinkOnTarget(unittest.TestCase):
     def test_math_links_and_pulls_integer_module(self) -> None:
         self.build_tool(self.build_alink)
         self.build_tool(self.build_vm)
-        main_object = self.compile_object("math.act", "alink-math.avo")
+        main_object = self.compile_object("math.act", "alink-math.obj")
 
         with tempfile.TemporaryDirectory() as tmpdir:
             drive = Path(tmpdir)
@@ -119,7 +119,7 @@ class TestAlinkOnTarget(unittest.TestCase):
     def test_overlay_object_links_overlay_segment(self) -> None:
         self.build_tool(self.build_alink)
         self.build_tool(self.build_vm)
-        main_object = self.compile_object("ovl_demo.act", "alink-ovl.avo")
+        main_object = self.compile_object("ovl_demo.act", "alink-ovl.obj")
 
         with tempfile.TemporaryDirectory() as tmpdir:
             drive = Path(tmpdir)

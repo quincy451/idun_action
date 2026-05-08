@@ -38,11 +38,55 @@ class ViceProtocolError(RuntimeError):
     pass
 
 
+_VICE_VERSION_CACHE: dict[str, str] = {}
+
+
+def vice_version(path: Path) -> str:
+    cache_key = str(path)
+    cached = _VICE_VERSION_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+    try:
+        result = subprocess.run(
+            [str(path), "--version"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            timeout=5.0,
+            check=False,
+        )
+        line = result.stdout.splitlines()[0].strip() if result.stdout else ""
+    except Exception:
+        line = ""
+    _VICE_VERSION_CACHE[cache_key] = line
+    return line
+
+
+def prefer_known_good_linux_vice(candidate: Path) -> Path:
+    if os.name == "nt":
+        return candidate
+    distro_candidate = Path("/usr/bin/x64sc")
+    if candidate == distro_candidate or not distro_candidate.is_file():
+        return candidate
+    if vice_version(candidate).startswith("x64sc (VICE 3.10)") and vice_version(distro_candidate).startswith(
+        "x64sc (VICE 3.7.1)"
+    ):
+        return distro_candidate.resolve()
+    return candidate
+
+
 def locate_x64sc() -> Path:
+    windows_candidates = (
+        Path(r"C:\c64\vice\GTK3VICE-3.10-win64\bin\x64sc.exe"),
+        Path("/mnt/c/c64/vice/GTK3VICE-3.10-win64/bin/x64sc.exe"),
+    )
     candidate = shutil.which("x64sc")
     if not candidate:
+        for candidate_path in windows_candidates:
+            if candidate_path.is_file():
+                return candidate_path.resolve()
         raise ViceUnavailable("x64sc not found on PATH")
-    return Path(candidate).resolve()
+    return prefer_known_good_linux_vice(Path(candidate).resolve())
 
 
 def default_cpm_images_dir() -> Path:
@@ -69,18 +113,31 @@ def petscii_bytes(text: str) -> bytes:
     return text.replace("\n", "\r").encode("ascii", errors="strict")
 
 
-def screen_code_to_ascii(code: int) -> str:
-    if code in {0x00, 0x20, 0xA0}:
+def petscii_to_ascii(code: int) -> str:
+    if code == 0x0D:
+        return "\n"
+    if code == 0x0A:
+        return "\r"
+    if code <= 0x1F:
+        return "."
+    if code in {0xA0, 0xE0}:
         return " "
-    if 1 <= code <= 26:
-        return chr(ord("A") + code - 1)
-    if 0x30 <= code <= 0x39:
+    if 0xC1 <= code <= 0xDA:
+        return chr(ord("A") + code - 0xC1)
+    if 0x41 <= code <= 0x5A:
+        return chr(ord("a") + code - 0x41)
+    if 0x20 <= code <= 0x7E:
         return chr(code)
-    if 0x21 <= code <= 0x2F or 0x3A <= code <= 0x3F:
-        return chr(code)
-    if 0x40 <= code <= 0x5A:
-        return chr(code)
-    return "?"
+    return "."
+
+
+def screen_code_to_ascii(code: int) -> str:
+    code &= 0x7F
+    if code <= 0x1F:
+        code += 0x40
+    elif 0x40 <= code <= 0x5F:
+        code += 0x20
+    return petscii_to_ascii(code)
 
 
 def screen_ram_to_text(data: bytes) -> str:

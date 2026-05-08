@@ -27,7 +27,7 @@ start:
     jsr build_object_target_path
     lda #<target_path
     ldy #>target_path
-    jsr load_seeded_file_or_fail
+    jsr load_seeded_file_or_legacy_fail
     bcc :+
     lda #<msg_load_fail
     ldy #>msg_load_fail
@@ -40,7 +40,7 @@ start:
 :   lda #<load_name_work
     ldy #>load_name_work
     jsr copy_ptr_to_target_path
-    jsr load_source_file
+    jsr load_named_source_or_legacy_fail
     bcc :+
     lda #<msg_load_fail
     ldy #>msg_load_fail
@@ -161,7 +161,7 @@ build_test_binary_payload_loop:
 build_test_binary_payload_done:
     rts
 
-load_seeded_file_or_fail:
+try_load_seeded_file:
     sta src_ptr
     sty src_ptr+1
     lda #$00
@@ -186,21 +186,55 @@ load_seeded_file_or_fail:
     jsr svc_file_load_sc0
     lda file_params+6
     cmp #tool_file_status_ok
-    beq load_seeded_file_or_fail_done
+    beq try_load_seeded_file_done
     cmp #tool_file_status_too_large
-    bne load_seeded_file_or_fail_fail
+    bne try_load_seeded_file_fail
     lda #$01
     sta truncated_flag
-load_seeded_file_or_fail_done:
+try_load_seeded_file_done:
     ldy file_params+7
     lda #$00
     sta source_buffer,y
     clc
     rts
-load_seeded_file_or_fail_fail:
+try_load_seeded_file_fail:
+    sec
+    rts
+
+load_seeded_file_or_fail:
+    jsr try_load_seeded_file
+    bcc load_seeded_file_or_fail_done
     lda #<msg_load_fail
     ldy #>msg_load_fail
     jmp fail_with_ptr
+load_seeded_file_or_fail_done:
+    rts
+
+load_seeded_file_or_legacy_fail:
+    jsr try_load_seeded_file
+    bcc load_seeded_file_or_legacy_fail_done
+    lda file_params+6
+    cmp #tool_file_status_nofile
+    bne load_seeded_file_or_legacy_fail_done
+    jsr build_legacy_object_target_path
+    lda #<target_path
+    ldy #>target_path
+    jsr try_load_seeded_file
+load_seeded_file_or_legacy_fail_done:
+    rts
+
+load_named_source_or_legacy_fail:
+    jsr load_source_file
+    bcc load_named_source_or_legacy_fail_done
+    lda file_params+6
+    cmp #tool_file_status_nofile
+    bne load_named_source_or_legacy_fail_done
+    lda #<load_name_work_legacy
+    ldy #>load_name_work_legacy
+    jsr copy_ptr_to_target_path
+    jsr load_source_file
+load_named_source_or_legacy_fail_done:
+    rts
 
 save_fail:
     lda #<msg_save_fail
@@ -249,8 +283,10 @@ default_module_name:
 project_marker:
     .asciiz "ACTION.PROJ"
 load_name_main:
-    .asciiz "OBJ/MAIN.AVO"
+    .asciiz "OBJ/MAIN.OBJ"
 load_name_work:
+    .asciiz "OBJ/W.OBJ"
+load_name_work_legacy:
     .asciiz "OBJ/W.AVO"
 fixed_object_name:
 fixed_binary_name:

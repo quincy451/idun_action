@@ -19,6 +19,13 @@ FIXED_SERVICES = {
     "svc_file_delete_sc0": 0xCF24,
     "svc_file_rename_sc0": 0xCF27,
     "svc_file_copy_sc0": 0xCF2A,
+    "svc_file_write_begin_sc0": 0xCF2D,
+    "svc_file_write_chunk_sc0": 0xCF30,
+    "svc_file_write_close_sc0": 0xCF33,
+    "svc_file_stage_reu_sc0": 0xCF36,
+    "svc_reu_read_sc0": 0xCF39,
+    "svc_reu_write_sc0": 0xCF3C,
+    "svc_vm_acheron_enter": 0xCF3F,
 }
 
 FIXED_DATA = {

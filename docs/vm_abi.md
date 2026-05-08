@@ -52,13 +52,15 @@ The current REAL32 stack convention is:
 
 - one REAL32 value occupies two 16-bit stack cells
 - the low word is pushed before the high word
-- `RT_F_ADD` consumes `lhs.low`, `lhs.high`, `rhs.low`, `rhs.high`
-- `RT_F_ADD` returns `result.low`, `result.high`
+- `RT_F_ADD`, `RT_F_SUB`, `RT_F_MUL`, and `RT_F_DIV` consume `lhs.low`,
+  `lhs.high`, `rhs.low`, `rhs.high`
+- REAL operator helpers return `result.low`, `result.high`
 
-ACTC currently lowers `R=A+B` by loading `A.low`, `A.high`, `B.low`, and
-`B.high`, calling only `RT_F_ADD`, then storing the returned high word and low
-word into `R`. ALINK emits the high-word accesses as ordinary `LOAD` / `STORE`
-against the variable address plus two bytes.
+ACTC currently lowers `R=A+B`, `R=A-B`, `R=A*B`, and `R=A/B` by loading
+`A.low`, `A.high`, `B.low`, and `B.high`, calling only the matching helper, then
+storing the returned high word and low word into `R`. ALINK emits the high-word
+accesses as ordinary `LOAD` / `STORE` against the variable address plus two
+bytes.
 
 ## Runtime Opcode Subset
 

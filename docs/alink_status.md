@@ -1,6 +1,6 @@
 # `ALINK` Status
 
-Current as of `2026-04-20`.
+Current as of `2026-04-24`.
 
 This file is a focused ledger for the UDOS-native `ALINK.PRG` tool.
 It tracks the real linker slice separately from the broader [action_matrix.md](/mnt/c/test/action/actionc64u/docs/action_matrix.md).
@@ -9,6 +9,8 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
 
 - [x] Launches from a UDOS Action workspace as `ALINK.PRG <module>`
 - [x] Loads deterministic `AVO1` object stubs from `OBJ/`
+- [x] Prefers `.OBJ` project/library objects and falls back to legacy `.AVO`
+  compatibility paths
 - [x] Parses export metadata
 - [x] Parses `body_ops`
 - [x] Parses unresolved external symbol lines
@@ -22,27 +24,103 @@ It tracks the real linker slice separately from the broader [action_matrix.md](/
 - [x] Queues external dependencies from live `uN` body operations instead of
   every object-level `u <symbol>` line
 - [x] Carries child-object int/string pools into the linked image
-- [x] Emits direct binary `AVM1` to `BIN/<NAME>.AVM`
+- [x] Emits direct native `PRG` output to `BIN/<NAME>.PRG` on the default live gate
+- [x] Retains binary `AVM1` emission to `BIN/<NAME>.AVM` on the AVM-specific compat gate
+- [x] Emits the first text `DBG1` sidecar to `BIN/<NAME>.DBG`
 - [x] Narrow exact-byte proof exists for the emitted image
 - [x] Narrow integrated proof exists through `ALINK -> AVMRUN`
-- [x] Narrow integrated proof also exists through `ACTC -> ALINK -> AVMRUN`
+- [ ] Live helper-bearing higher-level proof through `ACTC -> ALINK -> AVMRUNC`
 - [x] Current shipped UDOS build links again under the real target after widening the tool load window from `$2000` to `$4000`
 - [x] Current workspace exporter is green again with `--build-udos-tools`
 
 Current real-target build note:
 
 - `./tools/build_alink_udos.sh` is green again
-- `make -C ../udos vice-action-alink` is green again on the current working tree
-- `make -C ../udos vice-action-alink-avmrun` is green again on the current
-  working tree
-- `make -C ../udos vice-action-actc-alink-avmrun` is green again on the current
-  working tree
+- `make -C ../udos vice-action-alink` is green again on the current working
+  tree as the default direct-native PRG gate
+- `make -C ../udos vice-action-alink-compat` is green again as the
+  AVM-specific linker/runner proof on the current working tree
+- `make -C ../udos vice-action-actc-alink-launch-printmath` is green again
+  as the named imported `printmath` direct-launch proof on the current working
+  tree, reaching `hello`, `tool7`, and `5459` before returning to the UDOS
+  prompt. The separate helper-bearing
+  `make -C ../udos vice-action-actc-alink-compat-printmath` path remains the
+  compat replay target for the same source shape.
+  returning to the UDOS prompt
+- `make -C ../udos vice-action-actc-alink-launch` is green again as the
+  helper-free higher-level default launch path on the current working tree
 - current shipped `ALINK` map footprint is:
-  - `CODE`: `$204B`
-  - `BSS`: `$0B06`
-  - total runtime span from `$0900` through `$3450`
+  - `CODE`: `$28BD`
+  - `BSS`: `$0793`
+  - total runtime span from `$0900` through `$394F`
+- current shipped `ALINK` file footprint is:
+  - `ALINK.PRG`: `10431` bytes
+- current shipped `ALINK` link window is `$0900-$9FFF`
+- current shipped `ALINK` build now uses:
+  - `ACTC_REU_SOURCE_CACHE=1` through the shared project-source loader
+  - `STREAM_OUTPUT=1`
+  - `ALINK_DEBUG_SIDECAR=1`
+  - `SOURCE_LIMIT=512` resident source window
+  - `SOURCE_LOOKAHEAD=255` read-ahead margin for cross-window line scans
+  - `BODY_OPS_STRIDE=255`
+  - `OUTPUT_CHUNK_SIZE=128`
+  - `EXPORT_MAX=16`
+  - `EXTERNAL_MAX=36`
+  - `PENDING_SYMBOL_MAX=36`
+  - `CONTENT_BUFFER_SIZE=16` for the legacy non-stream path only
+  - streamed output payload guard: `$C000` bytes (`49152`) before the
+    12-byte AVM header
 - the previous real-target `LOAD FAIL`/save-return blocker is cleared for the
   current narrow object/link/runtime slice
+- `external_names`, `pending_names`, `export_names`, `var_names`,
+  `string_literals`, `saved_string_literals`, `body_ops_data`, loaded AVO
+  source windows, per-pending layout records, and export/proc layout tables are
+  now REU-backed in production `ALINK`; the export/proc layout record now also
+  carries the root/current export target offsets, so the resident linker no
+  longer keeps separate root/current export target arrays. Root/current var
+  target mirrors are now also REU-backed, so resident RAM no longer keeps those
+  arrays either. Resident RAM keeps only the active `25`-byte name windows, one
+  `24`-byte string window, one `255`-byte body-op window, one `8`-byte
+  export/proc layout window, and a `768`-byte source/read-ahead window
+- compared to the pre-REU-table linker baseline, resident `BSS` is down by
+  `10080` bytes and the total runtime span is down by `8839` bytes, even though
+  code grew by `1241` bytes to pay for the REU helpers
+- compared to the immediately previous shipped linker build, the root/current
+  var target mirror REU move shrinks `ALINK.PRG` by `136` bytes and code by
+  `136` bytes, but grows resident `BSS` by `155` bytes and grows total runtime
+  span by `19` bytes; that makes it a functional REU move, but not yet a clean
+  resident-memory win
+- UDOS tool ABI version 2 adds chunked file output services used by production
+  `ALINK.PRG`: begin write, write chunk, and close write
+- production `ALINK.PRG` now emits a first text `DBG1` sidecar. The current
+  bootstrap records are:
+  - `m <module_id> <module_name>`
+  - `f <module_id> <file_id> <path>`
+  - `q <module_id> <export_index> <entry_pc> <file_id> <line> <col> <proc_name>`
+  - `l <module_id> <export_index> <pc> <file_id> <line> <col>`
+  - `v g <type> <module_id> <var_index> <addr> <width> <file_id> <line> <col> <name>`
+  - `v p <type> <module_id> <export_index> <var_index> <addr> <width> <file_id> <line> <col> <name>`
+  - `v l <type> <module_id> <export_index> <var_index> <addr> <width> <file_id> <line> <col> <name>`
+- `tests/test_alink_capacity.py` now proves that production `ALINK.PRG`
+  preserves compiler-emitted `f/q/l/V g/V p/V l` records into `BIN/MAIN.DBG`
+  while still emitting the expected large streamed `BIN/MAIN.AVM`
+- the host `tool_abi_harness` now dedupes identical REU read/write traces so
+  large REU-backed compiler/linker runs still retain the final streamed
+  `wopn`/`wrte`/`wcls` records in test output
+- `AVMRUN.PRG` no longer keeps the binary AVM file image in its BSS. Binary
+  AVM loads now use the fixed runtime window at `$2E00` with a current limit of
+  `$C000` bytes (`49152`), and `tests/test_avmrun_capacity.py` proves a
+  high-entry `49152` byte AVM through the tool ABI harness. AVMRUN uses
+  `$0001 = $36` during file load, then switches to `$34` for patch/execute so
+  RAM through `$EBFF` is visible as well, and finally restores the
+  original memory configuration before returning to UDOS.
+- This clears the immediate runtime choke point for the earlier `15311` byte
+  production `ALINK` capacity proof. Production `ALINK` can now emit a `48079`
+  byte streamed AVM under the harness, but AVMRUN is still not at the final
+  `48K` runtime target:
+  true near-`48K` runtime execution needs either a REU/banked payload executor or
+  a loader/interpreter split that does not require the whole AVM to coexist with
+  AVMRUN code in plain low RAM.
 
 ## Proven Linker Behaviors
 
@@ -50,16 +128,54 @@ Current real-target build note:
 - [x] child object loading for the already-proven narrow object shape
 - [x] final binary target path `BIN/<NAME>.AVM`
 - [x] direct binary output instead of text or planning-report output
-- [x] dependent-object lookup falls back from `OBJ/<symbol>.AVO` to
-  `LIB/<symbol>.AVO`, keeping runtime helpers outside compiler output until
+- [x] dependent-object lookup falls back from `OBJ/<symbol>.OBJ` to
+  `LIB/<symbol>.OBJ`, keeping runtime helpers outside compiler output until
   imported
 - [x] dead-stripped procedures no longer pull their external helper objects into
   the linked image
 - [x] REAL upper-word body ops are lowered without adding VM opcodes: `U<n>`
   emits `LOAD var+2`, and `T<n>` emits `STORE var+2` for 4-byte variables
+- [x] production `ALINK.PRG` no longer uses one contiguous final-image buffer:
+  it streams `BIN/<NAME>.AVM` through 128-byte UDOS write chunks
+- [x] production `ALINK.PRG` now has a near-`48K` streamed-image proof beyond
+  the old `575` byte ceiling and the interim `3072` byte buffer ceiling: seeded
+  AVO objects link to a `48079` byte `BIN/MAIN.AVM` under the tool ABI harness
+- [x] `AVMRUN.PRG` now has a binary AVM load/run proof beyond the old `2048`
+  byte runtime file buffer: a `49152` byte AVM loads at `$2E00`, patches near
+  the top of the widened window, and exits cleanly
+  under the tool ABI harness
 
 ## Current Widening Work
 
+- [x] prove production `ALINK` streamed output past `16K` and close to the
+  intended `48K` target
+- [x] remove AVMRUN's immediate plain-low-RAM payload ceiling so the runtime can
+  execute the current `49152` byte binary AVM window
+- [ ] continue widening source/object table limits now that final-image output
+  no longer requires a contiguous linker-owned buffer
+- [x] move the first large linker lookup payloads to REU-backed storage:
+  `body_ops_data` (`4080` bytes), `external_names` (`900` bytes), and
+  `pending_names` (`900` bytes) no longer sit resident in normal C64 RAM
+- [x] move loaded object source windows into REU-backed staging instead of a
+  resident `4097`-byte source buffer
+- [x] move current and saved string literal pools into REU-backed staging
+- [x] move per-pending layout mirrors into REU-backed staging
+- [x] move export/proc offset tables into REU-backed staging
+- [x] move root/current export target mirrors into the REU-backed export layout
+  record
+- [x] move root/current var target mirrors into REU-backed staging
+- [ ] continue that REU move for the remaining heavy linker payloads:
+  map/debug records should not all consume normal C64 RAM
+- [ ] next measured resident-pressure targets for that REU move are now the
+  remaining always-live metadata tables: final map/debug data and the small
+  integer literal tables that still sit resident
+- [x] start the source-debug sidecar line described in
+  [source_debugger_roadmap.md](/mnt/c/test/action/actionc64u/docs/source_debugger_roadmap.md):
+  preserve compiler-emitted file/proc/body-line debug records and write the
+  first linked `BIN/<NAME>.DBG` output
+- [ ] grow that source-debug sidecar with any richer procedure/frame records
+  the debugger will need beyond the current linked global/parameter/local
+  variable metadata
 - [ ] broader object graph / external-resolution surface
 - [ ] more robust child-object load diagnostics for future wider object graphs
 - [ ] more robust final save/return diagnostics for future larger outputs
@@ -97,18 +213,56 @@ Current real-target build note:
   currently proving a 4-byte module-scope `REAL` slot without pulling REAL
   operator code:
   `REAL X`, `PrintIE(7)`
+- [x] also links direct REAL copy assignment without importing helper code:
+  `REAL A`, `REAL R`, `R=A`, `PrintE("DONE")`, proving `U<n>`/`T<n>`
+  high-word lowering can support REAL storage movement without runtime bloat
 - [x] also loads a runtime-style library object only from `LIB/` when imported:
   `MAIN -> rt_f_add`, proving the lookup shape needed for per-operation REAL
   helper inclusion without making REAL an AVM opcode
 - [x] also ignores a runtime-style library import listed only by a dead proc:
   `DEAD -> rt_f_add`, `MAIN -> DONE`, proving helper metadata alone does not
   force inclusion
-- [x] also links the first REAL add-assignment runtime shape:
-  `REAL A`, `REAL B`, `REAL R`, `R=A+B`, proving live `RT_F_ADD` lookup from
+- [x] also links the first REAL add/subtract/multiply/divide assignment runtime
+  shapes:
+  `REAL A`, `REAL B`, `REAL R`, `R=A+B`, `R=A-B`, `R=A*B`, and `R=A/B`,
+  proving live `RT_F_ADD`, `RT_F_SUB`, `RT_F_MUL`, or `RT_F_DIV` lookup from
   `LIB/`, upper-word variable load/store lowering, and no monolithic REAL VM
   opcode requirement
 - [x] repo-exported UDOS `LIB/RT_F_ADD.AVO` now exists as a target text-object
-  helper with exact right-hand `+0.0` identity behavior; full IEEE-754 addition
+- [x] harness-sized `ALINK.PRG` now also uses streamed output, so REAL compare
+  cases that pull `RT_I_TO_F` and `RT_F_CMP` from `LIB/` no longer trip the old
+  resident payload ceiling; the current harness proof links and runs
+  `A<B`, `B=C`, `C>=B`, and `A<>C` through `ALINK -> AVMRUN`
+  helper with exact `+0.0` identity behavior for either operand, same-sign
+  equal-power-of-two sums such as `1.0 + 1.0 = 2.0`, `2.0 + 2.0 = 4.0`,
+  `4.0 + 4.0 = 8.0`, and `-2.0 + -2.0 = -4.0`, plus exact
+  `1.5 + 1.5 = 3.0`, adjacent-exponent same-sign sums such as
+  `2.0 + 1.0 = 3.0`, adjacent-exponent mixed-sign differences such as
+  `2.0 + -1.0 = 1.0`, plus gap-two sums such as `4.0 + 1.0 = 5.0`
+  and gap-two mixed-sign differences such as `4.0 + -1.0 = 3.0` and
+  `1.0 + -4.0 = -3.0`; full
+  IEEE-754 addition inside that helper remains future work
+- [x] repo-exported UDOS `LIB/RT_F_SUB.AVO` now exists as a target text-object
+  helper with exact `x - +0.0`, sign-flipped `+0.0 - x`, equal signed
+  power-of-two subtraction as zero, adjacent-exponent differences such as
+  `4.0 - 2.0 = 2.0`, adjacent-exponent mixed-sign sums such as
+  `2.0 - -1.0 = 3.0`, gap-two differences such as
+  `4.0 - 1.0 = 3.0`, and gap-two mixed-sign sums such as
+  `4.0 - -1.0 = 5.0` and `-4.0 - 1.0 = -5.0`, and exact
+  `2.0 - 1.0 = 1.0`; full IEEE-754
+  subtraction inside that helper
+  remains future work
+- [x] repo-exported UDOS `LIB/RT_F_MUL.AVO` now exists as a target text-object
+  helper with zero identity, one identity, and low-word-zero values scaled by
+  exact power-of-two operands, including `2.0 * 2.0 = 4.0`,
+  `4.0 * 2.0 = 8.0`, `-2.0 * 2.0 = -4.0`, and
+  `1.5 * 2.0 = 3.0`; full IEEE-754 multiplication inside that helper
+  remains future work
+- [x] repo-exported UDOS `LIB/RT_F_DIV.AVO` now exists as a target text-object
+  helper with zero numerator, divide-by-zero as zero, `x / 1.0 = x`, and
+  low-word-zero values divided by exact power-of-two denominators, including
+  `4.0 / 2.0 = 2.0`, `8.0 / 2.0 = 4.0`, `2.0 / 4.0 = 0.5`,
+  `2.0 / -4.0 = -0.5`, and `3.0 / 2.0 = 1.5`; full IEEE-754 division
   inside that helper remains future work
 - [x] also loads variable-to-variable arithmetic assignment:
   `X=X+Y`
@@ -177,8 +331,8 @@ Current real-target build note:
   `v v0 1`, `v n1 0`, `v x2 0`, and `x add1 ...`
 - [x] also resolves digit-bearing external module/proc names:
   `MAIN -> W1`
-- [x] harness linker object loading now accepts compiler-emitted `.AVO` objects beyond the old `255`-byte ceiling:
-  `large_object_proc_local_inits` proves a `291`-byte `MAIN.AVO`
+- [x] harness linker object loading now accepts compiler-emitted `AVO1` project objects beyond the old `255`-byte ceiling:
+  `large_object_proc_local_inits` proves a `291`-byte `MAIN.OBJ`
 - [x] also loads dense local-call compiler output beyond the old `96`-char harness body ceiling:
   `PROC MAIN() T() ... T() PrintIE(X) RETURN` with `74` local calls, proving a `152`-char root body line
 - [x] harness linker payload buffer now emits binaries beyond the old `256`-byte image ceiling:
@@ -313,12 +467,12 @@ Current real-target build note:
 - [x] also loads `WHILE ... DO ... OD` containing nested `DO ... UNTIL ... OD`
 - [x] also loads mixed local/external and branch content across `DO`/`WHILE` mixed nesting
 - [x] also loads shared transitive unresolved-external reuse across `WHILE` containing nested `DO ... UNTIL ... OD`
-- [x] resolves the current widened child-object closure including `OBJ/W.AVO`
-- [x] resolves the current widened transitive child-object closure including `OBJ/W.AVO` and `OBJ/Z.AVO`
+- [x] resolves the current widened child-object closure including `OBJ/W.OBJ`
+- [x] resolves the current widened transitive child-object closure including `OBJ/W.OBJ` and `OBJ/Z.OBJ`
 - [x] resolves sibling child objects from the root:
-  `OBJ/W.AVO` and `OBJ/Z.AVO`
+  `OBJ/W.OBJ` and `OBJ/Z.OBJ`
 - [x] resolves sibling child objects from a child module:
-  `OBJ/Z.AVO` and `OBJ/Q.AVO`
+  `OBJ/Z.OBJ` and `OBJ/Q.OBJ`
 - [x] reuses the same root child object across repeated call sites
 - [x] reuses the same transitive child object across multiple parents
 - [x] emits a widened `BIN/MAIN.AVM` of `76` bytes on that slice
@@ -405,8 +559,8 @@ Current real-target build note:
 - [x] emits a `WHILE` + nested `DO` + call/external slice `BIN/MAIN.AVM` of `86` bytes
 - [x] emits a mixed `DO`/`WHILE` + branch local/external slice `BIN/MAIN.AVM` of `138` bytes
 - [x] emits a `WHILE` + nested `DO` + shared-transitive slice `BIN/MAIN.AVM` of `96` bytes
-- [x] harness proof exists through:
-  `ACTC -> ALINK -> AVMRUN`
+- [x] helper-bearing harness proof exists through:
+  `ACTC -> ALINK -> AVMRUNC`
 - [x] current harness runtime output for that widened slice:
   `HELLO`, `TOOL7`, `5459`
 - [x] current harness runtime output for the precedence slice:

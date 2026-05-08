@@ -29,7 +29,7 @@ class TestRealFeatures(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
         self.assertTrue(output.is_file())
-        self.assertTrue(output.with_suffix(".avo").is_file())
+        self.assertTrue(output.with_suffix(".obj").is_file())
         map_output = output.with_suffix(".map.txt")
         self.assertTrue(map_output.is_file())
         blob = output.read_bytes()

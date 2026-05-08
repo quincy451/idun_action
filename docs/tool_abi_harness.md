@@ -8,6 +8,13 @@ Current local harness for UDOS-native tools:
   - [build_actc_harness_udos.sh](/mnt/c/test/action/actionc64u/tools/build_actc_harness_udos.sh)
   - [build_alink_harness_udos.sh](/mnt/c/test/action/actionc64u/tools/build_alink_harness_udos.sh)
 
+Current harness artifact split:
+
+- production overlay/compiler proofs use `build/udos_tools/ACTC.PRG` with
+  `build/udos_tools/actc.current.labels`
+- resident pipeline harness proofs use `build/udos_tools/ACTC_HARNESS.PRG` with
+  `build/udos_tools/actc_harness.current.labels`
+
 ## Purpose
 
 This harness runs a tool `.PRG` under a deterministic host-side 6502 CPU core and
@@ -23,7 +30,29 @@ Current intercepted services:
 - `svc_console_newline`
 - `svc_file_load_sc0`
 - `svc_file_save_sc0`
+- `svc_file_write_begin_sc0`
+- `svc_file_write_chunk_sc0`
+- `svc_file_write_close_sc0`
+- `svc_file_stage_reu_sc0`
+- `svc_reu_read_sc0`
+- `svc_reu_write_sc0`
 - `svc_program_exit`
+- `svc_vm_acheron_enter`
+
+The REU stage/read/write entries are now exported by the production UDOS
+resident ABI; the harness simulates their file-to-REU, REU-to-RAM, and RAM-to-REU
+behavior for deterministic compiler tests.
+
+Current hard limit:
+
+- the harness does not execute the resident UDOS `Acheron` engine
+- `svc_vm_acheron_enter` is trapped only to fail fast with `HARNESS NO ACHERON`
+- native `AVMRUN` fast-path proofs therefore still require the real resident
+  UDOS + VICE path, not the tool ABI harness
+
+Tool paths beginning with `!` are executable-relative support-file paths. For
+example, `!ACTC_OVL2.BIN` resolves beside the launched `ACTC.PRG`, not inside
+the current project workspace. Normal paths remain workspace-relative.
 
 That makes it useful for separating:
 
@@ -71,15 +100,66 @@ Current harness build widening knobs:
 - `ACTC`: `EXPORT_MAX=16`
 - `ACTC`: `EXTERNAL_MAX=16`
 - `ACTC`: `LOOP_MAX=16`
-- `ALINK`: `SOURCE_LIMIT=511`
-- `ALINK`: `BODY_OPS_STRIDE=160`
-- `ALINK`: `CONTENT_BUFFER_SIZE=280`
+- `ALINK`: `STREAM_OUTPUT=1`
+- `ALINK`: `SOURCE_LIMIT=320`
+- `ALINK`: `SOURCE_LOOKAHEAD=255`
+- `ALINK`: `BODY_OPS_STRIDE=255`
+- `ALINK`: `CONTENT_BUFFER_SIZE=16` for the legacy non-stream path only
+- `ALINK`: `OUTPUT_CHUNK_SIZE=128`
 - `ALINK`: `INT_LITERAL_MAX=36`
 - `ALINK`: `STRING_LITERAL_MAX=36`
-- `ALINK`: `EXPORT_MAX=16`
+- `ALINK`: `EXPORT_MAX=12`
 - `ALINK`: `EXTERNAL_MAX=16`
 - `ALINK`: `PENDING_SYMBOL_MAX=16`
 - `ALINK`: `LOOP_MAX=16`
+
+Current production `ALINK` capacity knobs differ from the harness-sized linker
+build. `./tools/build_alink_udos.sh` now builds production `ALINK.PRG` with
+`STREAM_OUTPUT=1`, `SOURCE_LIMIT=20480`, `BODY_OPS_STRIDE=255`,
+`OUTPUT_CHUNK_SIZE=128`, `EXPORT_MAX=16`, `EXTERNAL_MAX=36`, and
+`PENDING_SYMBOL_MAX=36`. The focused capacity test proves a `48079` byte
+streamed `BIN/MAIN.AVM` under this harness.
+
+Current production `ACTC` capacity is also widened. `./tools/build_actc_udos.sh`
+now builds production `ACTC.PRG` with `ACTC_REU_SOURCE_CACHE=1`,
+`STREAM_OUTPUT=1`, `CONTENT_BUFFER_SIZE=16`, `OUTPUT_CHUNK_SIZE=128`,
+`SOURCE_LIMIT=20480`, `SOURCE_LOOKAHEAD=255`, `BODY_OPS_STRIDE=255`,
+`INT_LITERAL_MAX=36`, `STRING_LITERAL_MAX=36`, `EXPORT_MAX=16`,
+`EXTERNAL_MAX=36`, and `LOOP_MAX=16`. The focused `tests/test_actc_capacity.py`
+proof stages and compiles a `49152` byte source module through the REU
+source-cache path under the harness, with `PROC MAIN()` discovered near offset
+`49120` in the third source window, and separately proves a streamed
+`OBJ/MAIN.OBJ` larger than the legacy `640` byte object buffer.
+
+The focused REU source-cache proof builds `ACTC_REU.PRG` with
+`ACTC_REU_SOURCE_CACHE=1` using
+`./tools/build_actc_reu_cache_harness_udos.sh`. The focused
+`tests/test_actc_reu_source_cache.py` proof stages `SRC/MAIN.ACT` beyond the
+first `20480` bytes into simulated REU at `$010000`, pages later windows plus
+255 bytes of bounded lookahead back into `source_buffer`, and emits the expected
+`OBJ/MAIN.OBJ` when the `PROC MAIN` name or a `PrintE` string literal crosses
+the first window boundary. It also proves long inline spaces before a `PrintIE`
+literal can commit an 8-bit `Y` lookahead wrap across the first window boundary,
+and that a long `PrintIE(...)` expression with a boundary-spanning symbol token
+can preserve parser registers across that REU read/commit path. It also proves
+the boolean pre-scan routes an 8-bit wrap to boolean parsing instead of silently
+rescanning from the start of the same window, proves speculative expression
+pre-scans and failed keyword probes can restore the original REU source window
+before ordinary expression parsing continues, proves assignment parsing preserves
+the `=` operator position across variable lookup and advances correctly when
+that operator sits at an 8-bit `Y` wrap, and proves procedure parameter parsing
+can advance past an opening `(` at `Y=$FF`. It also proves runtime and constant
+group-speculation paths can restore the original REU source window before
+reinterpreting `(expr)` as a comparison left-hand side.
+This is an ABI/parser-infrastructure proof, not full large-source parsing yet.
+
+Current production `AVMRUN` capacity also differs from the historical small
+runtime buffer. `./tools/build_avmrun_udos.sh` now emits current labels/maps and
+loads binary AVM files at `$3000` with a `$C000` byte limit. The focused
+`tests/test_avmrun_capacity.py` proof executes a `49152` byte binary AVM under
+the harness, proves BASIC ROM is disabled via `$0001 = $36` during the load,
+proves AVMRUN switches to `$0001 = $34` for high-memory patch/execute, and
+proves the original memory configuration is restored before exit.
 
 Recent harness-proven widening additions now covered by named scenarios:
 
@@ -105,13 +185,14 @@ Recent harness-proven widening additions now covered by named scenarios:
 - `var16_proc_slots`: one proc parameter plus 15 proc-local vars allocated through slot `F`, like `PROC SHOW(Z) INT A ... INT O` with `O=Z+2`
 - `digit_symbol_names`: digit-bearing var/proc/param/local names like `INT V0=[1]`, `PROC ADD1(N1)`, `INT X2=[N1+1]`
 - `digit_external_module_names`: digit-bearing external module/proc names like `MAIN -> W1`
-- `large_object_proc_local_inits`: dense proc-local initializer objects beyond the old `255`-byte linker load ceiling, proving a `291`-byte `MAIN.AVO`
+- `large_object_proc_local_inits`: dense proc-local initializer objects beyond the old `255`-byte linker load ceiling, proving a `291`-byte `MAIN.OBJ`
 - `export16_local_calls`: local-proc export tables widened past `7`, proving compiler/linker handling of `c8`, `c9`, and `cA` in one module
 - `external10_child_queue`: root external fanout widened past the old `8` external / `7` pending-child ceiling, proving `MAIN -> W0 .. W9`
 - `loop9_do_until`: nested `DO ... UNTIL ... OD` widened past the old `8`-deep loop ceiling, proving `9` nested loops print `DEEP`
 - `loop9_while`: nested `WHILE ... DO ... OD` widened past the old `8`-deep loop ceiling, proving `9` nested loops fall through to `DONE`
 - `string36_high_index`: string literal pools widened through base-36 slot `Z`, proving dead-stripped locals can still reserve `0..Y` while `MAIN` emits `eZ`
 - `int36_high_index`: integer literal pools widened through base-36 slot `Z`, proving dead-stripped locals can still reserve `0..34` while `MAIN` emits `pZz`
+- `many_int_indices`: repeated `PrintIE` calls prove AVMRUN pops integer print operands instead of leaking stack cells across native calls
 - `body152_local_calls`: dense local-call proc bodies widened past the old `96`-char harness ceiling, proving `74` local calls plus `PrintIE(X)` in one `MAIN` body
 - `payload265_local_calls`: linker payload emission widened past the old `256`-byte image ceiling, proving `77` local calls plus `PrintIE(X)` link into a `265`-byte `MAIN.AVM`
 - `payload269_local_calls`: linker payload emission widened past the old `255`-byte payload ceiling, proving `77` local calls plus three module vars link into a `269`-byte `MAIN.AVM`
@@ -689,9 +770,13 @@ That script:
 - writes the selected scenario source set and `ACTION.PROJ` manifest
 - runs `ACTC`, `ALINK`, and `AVMRUN` under the harness
 - verifies:
-  - exact `OBJ/<NAME>.AVO` text for every compiled module in the scenario
+  - exact `OBJ/<NAME>.OBJ` text for every compiled module in the scenario
   - exact `BIN/MAIN.AVM` bytes
   - exact runtime console output
+
+Project object files in these scenarios are `AVO1` text objects stored as
+`.OBJ`. Legacy `.AVO` names remain compatibility inputs where older paths are
+still under test.
 
 Run a tool:
 
@@ -736,7 +821,7 @@ actionc64u/build/udos_tools/tool_abi_harness \
   --services-inc actionc64u/build/udos_tools/udos_services.inc \
   --labels udos/build/release/udos-resident.labels \
   --entry-label vice_open_read_from_ptr \
-  --poke-cstr '50450=/IMAGES/ACTION.DNP/PROJ3/OBJ/MAIN.AVO,S,R' \
+  --poke-cstr '50450=/IMAGES/ACTION.DNP/PROJ3/OBJ/MAIN.OBJ,S,R' \
   --poke-word '251=50450' \
   --poke-byte '38334=1' \
   --poke-byte '38486=5' \
@@ -816,14 +901,16 @@ On the real widened manual-pipeline object workspace, the harness proves:
 
 - `ACTC` loads `ACTION.PROJ`
 - loads `SRC/MAIN.ACT`
-- saves `OBJ/MAIN.AVO`
+- saves `OBJ/MAIN.OBJ`
 - `ALINK` loads `ACTION.PROJ`
-- loads `OBJ/MAIN.AVO`
-- loads `OBJ/W.AVO`
+- loads `OBJ/MAIN.OBJ`
+- loads `OBJ/W.OBJ`
 - saves `BIN/MAIN.AVM`
 - `AVMRUN` loads `BIN/MAIN.AVM`
 - runtime output is `HELLO`, `TOOL7`, `5459`
 - exits cleanly
+- the separate AVMRUN capacity proof loads a `49152` byte binary AVM at `$3000`,
+  patches/exits near the top of the widened window, and exits cleanly
 
 So the current widened `ACTC -> ALINK -> AVMRUN` slice is working under the
 harness when the resident/VICE service path is removed from the equation.
@@ -858,8 +945,24 @@ That now includes a widening set of stable scenarios:
   `MID1`, `END`, `MID2`, `END`, `DONE`
 - multiple module-scope integer vars driving shared-transitive externals under `WHILE` control:
   `MID1`, `END`, `MID2`, `END`, `DONE`
-- first REAL add-assignment runtime helper slice:
+- direct REAL copy assignment without runtime helper import:
   `DONE`
+- first REAL add/subtract/multiply/divide assignment runtime helper slices:
+  `DONE`
+- direct REAL add helper numeric probes:
+  `123`, `16512`, `16384`, `16640`, `49280`, `0`, `16448`,
+  `16448`, `16448`, `49216`, `16256`, `49024`, `49024`, `16256`,
+  `16544`, `16544`, `49312`, `16448`, `49216`, `49216`, `16448`
+- direct REAL subtract helper numeric probes:
+  `16256`, `0`, `49024`, `0`, `16256`, `16384`, `49152`, `49152`,
+  `16448`, `49216`, `49216`, `16448`, `16448`, `49216`, `49216`,
+  `16544`, `16544`, `49312`, `49312`
+- direct REAL multiply helper numeric probes:
+  `16512`, `16640`, `16384`, `0`, `49280`, `16512`, `16448`,
+  `16448`, `49216`
+- direct REAL divide helper numeric probes:
+  `16384`, `16512`, `16128`, `0`, `49152`, `48896`, `16320`,
+  `16192`, `49088`
 - variable-to-variable arithmetic assignment:
   `3`
 - local zero-arg integer return:

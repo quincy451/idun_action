@@ -7,10 +7,15 @@
 - Support dead-strip inclusion of only the runtime modules the program imports.
 - Provide an on-target dead-strip path via `alink.com`.
 
-## `.avo` Object Format
+## `.obj` Project Object Format
 
-Current object files use a small text container so they are easy to diff and
-inspect during bootstrap work.
+Current project object files use a small text container so they are easy to
+diff and inspect during bootstrap work.
+
+The text format itself is still `AVO1`.
+The primary project-object filename extension is now `.obj` / `.OBJ`.
+Legacy `.avo` / `.AVO` filenames are still accepted by the current linker
+compatibility path.
 
 Structure:
 
@@ -37,7 +42,7 @@ resulting symbol map.
 ## Symbol Resolution
 
 - the main object is always included first
-- imported symbols are resolved against `.avo` files found in the supplied
+- imported symbols are resolved against object files found in the supplied
   runtime module directories
 - when a module is included, its imports are added to the worklist
 - duplicate exports are link errors
@@ -46,6 +51,9 @@ resulting symbol map.
   order, with the main object fixed at the front
 
 ## `alink.com`
+
+This section describes the legacy CP/M/bootstrap path.
+It still uses the older `.avo` naming.
 
 The repo now ships a first on-target linker:
 
@@ -66,14 +74,17 @@ yet for unused functions trapped inside one monolithic user object.
 
 ## UDOS-Native `ALINK.PRG`
 
-The current UDOS-native linker consumes the bootstrap text AVO form emitted by
-`ACTC.PRG`, not the host JSON line shown above. For reachable pending externals
-it now resolves objects in this order:
+The current UDOS-native linker consumes the bootstrap text `AVO1` form emitted
+by `ACTC.PRG`, not the host JSON line shown above. For reachable pending
+externals it now resolves objects in this order:
 
-- `OBJ/<symbol>.AVO`
-- `LIB/<symbol>.AVO`
+- `OBJ/<symbol>.OBJ`
+- `LIB/<symbol>.OBJ`
 
-The root module still must come from `OBJ/<module>.AVO`. The `LIB/` fallback is
+If those are absent, the current compatibility path still accepts legacy
+`OBJ/<symbol>.AVO` and `LIB/<symbol>.AVO`.
+
+The root module still must come from `OBJ/<module>.OBJ`. The `LIB/` fallback is
 only for dependent objects, which is the intended path for runtime helpers such
 as REAL operator modules.
 
@@ -85,6 +96,10 @@ by dead-stripped procedures out of the final AVM.
 Runtime helper body ops currently include compressed aliases for stack,
 bitwise, and shift opcodes used by REAL32 support: `D`=`dup`, `K`=`drop`,
 `B`=`band`, `O`=`bor`, `X`=`bxor`, `H`=`shl1`, and `R`=`shr1`.
+
+UDOS text AVO integer literals are parsed as 16-bit unsigned values, so REAL
+helpers can push word constants such as `16256` (`$3F80`) and `16384`
+(`$4000`) directly.
 
 Current target-side symbol spelling is identifier-style. Runtime modules use
 underscore aliases such as `rt_f_add` until the UDOS text-object parser accepts
@@ -106,6 +121,40 @@ The linker also emits a sidecar map file:
 - lists final export addresses
 - lists resolved imports
 
+## Planned Debug Sidecar
+
+Source-level debugging should not force permanent debug payload into every
+normal `.AVM`.
+
+Planned direction:
+
+- `ACTC` emits object-level debug records keyed to source files, procedure
+  indices, body-op indices, and variable slots
+- `ALINK` resolves those object-level records to final linked addresses
+- `ALINK` writes a sidecar debug file, planned as `BIN/<NAME>.DBG`
+- a future `ACTDBG.PRG` consumes:
+  - `BIN/<NAME>.AVM`
+  - `BIN/<NAME>.DBG`
+
+That is the intended way source-level debugging grows the linker without
+bloating normal release images.
+
+Bootstrap that has landed:
+
+- production `ALINK.PRG` now emits a first text `DBG1` sidecar
+- current records are:
+  - `m <module_id> <module_name>`
+  - `f <module_id> <file_id> <path>`
+  - `q <module_id> <export_index> <entry_pc> <file_id> <line> <col> <proc_name>`
+  - `l <module_id> <export_index> <pc> <file_id> <line> <col>`
+  - `v g <type> <module_id> <var_index> <addr> <width> <file_id> <line> <col> <name>`
+  - `v p <type> <module_id> <export_index> <var_index> <addr> <width> <file_id> <line> <col> <name>`
+  - `v l <type> <module_id> <export_index> <var_index> <addr> <width> <file_id> <line> <col> <name>`
+- procedure entry PCs are now linked addresses
+- line records are now keyed by final linked PCs, not body-op indices
+- the current linked variable debug records now cover globals, parameters, and
+  locals, keyed by final linked variable addresses and widths
+
 ## Current Runtime Modules
 
 Host/reference bootstrap runtime modules live under `src/runtime/modules/`:
@@ -119,6 +168,7 @@ Host/reference bootstrap runtime modules live under `src/runtime/modules/`:
 - `rt.f_div`
 - `rt.f_cmp`
 - `rt.i_to_f`
+- `rt.s_to_f`
 - `rt.f_to_i`
 - `rt.print_f`
 - `rt.reu_alloc`
@@ -146,6 +196,31 @@ should include only those runtime objects in the final AVM image.
 
 UDOS-target text AVO runtime modules live separately under
 `src/runtime/udos_modules/` because `ALINK.PRG` does not parse the host JSON AVO
-metadata format. The current `rt_f_add.avo` there implements the exact
-right-hand `+0.0` identity case and still returns REAL32 zero for other inputs;
-it is not the final floating-point addition implementation.
+metadata format. The current `rt_f_add.avo` implements exact `+0.0` identity
+for either operand, same-sign equal-power-of-two sums such as
+`1.0 + 1.0 = 2.0`, `2.0 + 2.0 = 4.0`, `4.0 + 4.0 = 8.0`, and
+`-2.0 + -2.0 = -4.0`, adjacent-exponent sums such as
+`2.0 + 1.0 = 3.0`, adjacent-exponent mixed-sign differences such as
+`2.0 + -1.0 = 1.0` and `1.0 + -2.0 = -1.0`, gap-two sums such as
+`4.0 + 1.0 = 5.0`, gap-two mixed-sign differences such as
+`4.0 + -1.0 = 3.0` and `1.0 + -4.0 = -3.0`, plus exact
+`1.5 + 1.5 = 3.0`; the current harness also
+proves `2.0 + -2.0 = 0.0` without claiming general mixed-sign addition.
+The current `rt_f_sub.avo` implements exact
+`x - +0.0`, sign-flipped `+0.0 - x`, equal signed power-of-two subtraction
+as zero, adjacent-exponent differences such as `4.0 - 2.0 = 2.0`, gap-two
+differences such as `4.0 - 1.0 = 3.0`, adjacent-exponent mixed-sign
+sums such as `2.0 - -1.0 = 3.0` and `-2.0 - 1.0 = -3.0`,
+gap-two mixed-sign sums such as `4.0 - -1.0 = 5.0` and
+`-4.0 - 1.0 = -5.0`, and exact
+`2.0 - 1.0 = 1.0`. The current `rt_f_mul.avo` implements
+zero identity, one identity, and low-word-zero values scaled by exact
+power-of-two operands, including `2.0 * 2.0 = 4.0`,
+`4.0 * 2.0 = 8.0`, `-2.0 * 2.0 = -4.0`, and
+`1.5 * 2.0 = 3.0`. The current `rt_f_div.avo` implements zero numerator,
+divide-by-zero as zero, `x / 1.0 = x`, and low-word-zero values divided by
+exact power-of-two denominators, including `4.0 / 2.0 = 2.0`,
+`8.0 / 2.0 = 4.0`, `2.0 / 4.0 = 0.5`, `2.0 / -4.0 = -0.5`,
+and `3.0 / 2.0 = 1.5`.
+These are not the final floating-point arithmetic
+implementations.

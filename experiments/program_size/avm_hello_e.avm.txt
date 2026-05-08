@@ -1,0 +1,11 @@
+entry start
+code 9
+
+start:
+  ; current string pointer -> "HELLO"
+  setp16 msg
+  calln printe
+  calln exit
+
+msg:
+  stringz "HELLO"

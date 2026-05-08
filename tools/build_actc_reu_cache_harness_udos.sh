@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+UDOS_DIR="$ROOT_DIR/../udos"
+BUILD_DIR="$ROOT_DIR/build/udos_tools"
+SRC="$ROOT_DIR/src/tools_udos/actc/actc.asm"
+CFG="$ROOT_DIR/src/tools_udos/actc/actc.cfg"
+LABELS="$UDOS_DIR/build/udos-resident.labels"
+RELEASE_LABELS="$UDOS_DIR/build/release/udos-resident.labels"
+INC="$BUILD_DIR/udos_services.inc"
+OBJ="$BUILD_DIR/actc.reu.o"
+BIN="$BUILD_DIR/actc.reu.bin"
+PRG="$BUILD_DIR/ACTC_REU.PRG"
+CURRENT_LABELS="$BUILD_DIR/actc.reu.current.labels"
+CURRENT_MAP="$BUILD_DIR/actc.reu.current.map"
+ACTC_USE_DECL_OVERLAY="${ACTC_USE_DECL_OVERLAY:-1}"
+ACTC_USE_SOURCE_HEADER_OVERLAY="${ACTC_USE_SOURCE_HEADER_OVERLAY:-1}"
+ACTC_USE_LAYOUT_OVERLAY="${ACTC_USE_LAYOUT_OVERLAY:-1}"
+ACTC_USE_IMPORT_OVERLAY="${ACTC_USE_IMPORT_OVERLAY:-1}"
+ACTC_USE_EMIT_OVERLAY="${ACTC_USE_EMIT_OVERLAY:-1}"
+ACTC_USE_BODY_OVERLAY="${ACTC_USE_BODY_OVERLAY:-1}"
+ACTC_KEEP_BODY_RESIDENT_FALLBACK="${ACTC_KEEP_BODY_RESIDENT_FALLBACK:-0}"
+ACTC_SOURCE_HEADER_OVERLAY_BUILD="$ROOT_DIR/tools/build_actc_overlay_source_header.sh"
+ACTC_DECL_OVERLAY_BUILD="$ROOT_DIR/tools/build_actc_overlay_decl_counts.sh"
+ACTC_LAYOUT_OVERLAY_BUILD="$ROOT_DIR/tools/build_actc_overlay_payload_layout.sh"
+ACTC_IMPORT_OVERLAY_BUILD="$ROOT_DIR/tools/build_actc_overlay_runtime_imports.sh"
+ACTC_EMIT_OVERLAY_BUILD="$ROOT_DIR/tools/build_actc_overlay_emit_object.sh"
+ACTC_BODY_OVERLAY_BUILD="$ROOT_DIR/tools/build_actc_overlay_body_collect.sh"
+
+mkdir -p "$BUILD_DIR"
+
+if [[ -n "${UDOS_LABELS:-}" ]]; then
+  LABELS="$UDOS_LABELS"
+elif [[ -f "$RELEASE_LABELS" ]]; then
+  LABELS="$RELEASE_LABELS"
+elif [[ ! -f "$LABELS" ]]; then
+  make -C "$UDOS_DIR" resident >/dev/null
+fi
+
+python3 "$ROOT_DIR/tools/generate_udos_service_inc.py" --labels "$LABELS" --output "$INC"
+
+ca65 -g \
+  -D ACTC_REU_SOURCE_CACHE=1 \
+  -D "ACTC_USE_DECL_OVERLAY=$ACTC_USE_DECL_OVERLAY" \
+  -D "ACTC_USE_SOURCE_HEADER_OVERLAY=$ACTC_USE_SOURCE_HEADER_OVERLAY" \
+  -D "ACTC_USE_LAYOUT_OVERLAY=$ACTC_USE_LAYOUT_OVERLAY" \
+  -D "ACTC_USE_IMPORT_OVERLAY=$ACTC_USE_IMPORT_OVERLAY" \
+  -D "ACTC_USE_EMIT_OVERLAY=$ACTC_USE_EMIT_OVERLAY" \
+  -D "ACTC_USE_BODY_OVERLAY=$ACTC_USE_BODY_OVERLAY" \
+  -D "ACTC_KEEP_BODY_RESIDENT_FALLBACK=$ACTC_KEEP_BODY_RESIDENT_FALLBACK" \
+  -D STREAM_OUTPUT=1 \
+  -D CONTENT_BUFFER_SIZE=16 \
+  -D OUTPUT_CHUNK_SIZE=128 \
+  -D SOURCE_LIMIT=20480 \
+  -D SOURCE_LOOKAHEAD=255 \
+  -D BODY_OPS_STRIDE=255 \
+  -D INT_LITERAL_MAX=36 \
+  -D STRING_LITERAL_MAX=36 \
+  -D EXPORT_MAX=16 \
+  -D EXTERNAL_MAX=36 \
+  -D LOOP_MAX=16 \
+  -o "$OBJ" "$SRC" -I "$BUILD_DIR"
+ld65 -C "$CFG" -o "$BIN" "$OBJ" -Ln "$CURRENT_LABELS" -m "$CURRENT_MAP"
+printf '\x00\x09' > "$PRG"
+cat "$BIN" >> "$PRG"
+if [[ "$ACTC_USE_SOURCE_HEADER_OVERLAY" != "0" ]]; then
+  bash "$ACTC_SOURCE_HEADER_OVERLAY_BUILD" >/dev/null
+fi
+if [[ "$ACTC_USE_DECL_OVERLAY" != "0" ]]; then
+  bash "$ACTC_DECL_OVERLAY_BUILD" >/dev/null
+fi
+if [[ "$ACTC_USE_LAYOUT_OVERLAY" != "0" ]]; then
+  bash "$ACTC_LAYOUT_OVERLAY_BUILD" >/dev/null
+fi
+if [[ "$ACTC_USE_IMPORT_OVERLAY" != "0" ]]; then
+  bash "$ACTC_IMPORT_OVERLAY_BUILD" >/dev/null
+fi
+if [[ "$ACTC_USE_EMIT_OVERLAY" != "0" ]]; then
+  bash "$ACTC_EMIT_OVERLAY_BUILD" >/dev/null
+fi
+if [[ "$ACTC_USE_BODY_OVERLAY" != "0" ]]; then
+  ACTC_KEEP_BODY_RESIDENT_FALLBACK="$ACTC_KEEP_BODY_RESIDENT_FALLBACK" bash "$ACTC_BODY_OVERLAY_BUILD" >/dev/null
+fi
+printf '%s\n' "$PRG"

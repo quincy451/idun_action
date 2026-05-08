@@ -1,0 +1,5 @@
+AVO1
+x rt_gfx_bitmap_copy 0 4
+b ZCr
+k 0
+n rt_gfx_bitmap_copy

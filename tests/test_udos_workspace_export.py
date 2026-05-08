@@ -64,9 +64,59 @@ class TestUdosWorkspaceExport(unittest.TestCase):
             self.assertTrue((lib_dir / "LIBPSTR.MOD").is_file())
             self.assertTrue((lib_dir / "RT_PRINT_STR.AVO").is_file())
             self.assertTrue((lib_dir / "RT_F_ADD.AVO").is_file())
+            self.assertTrue((lib_dir / "RT_F_SUB.AVO").is_file())
+            self.assertTrue((lib_dir / "RT_F_MUL.AVO").is_file())
+            self.assertTrue((lib_dir / "RT_F_DIV.AVO").is_file())
+            self.assertTrue((lib_dir / "RT_I_TO_F.AVO").is_file())
+            self.assertTrue((lib_dir / "RT_SID_FREQ.AVO").is_file())
+            self.assertTrue((lib_dir / "RT_SPRITE_ON.AVO").is_file())
             self.assertIn(
-                "x rt_f_add 0 38",
+                "x rt_f_add 0 2",
                 (lib_dir / "RT_F_ADD.AVO").read_text(encoding="ascii"),
+            )
+            self.assertIn(
+                "b Ar",
+                (lib_dir / "RT_F_ADD.AVO").read_text(encoding="ascii"),
+            )
+            self.assertIn(
+                "n rt_f_add",
+                (lib_dir / "RT_F_ADD.AVO").read_text(encoding="ascii"),
+            )
+            self.assertIn(
+                "x rt_f_sub 0 2",
+                (lib_dir / "RT_F_SUB.AVO").read_text(encoding="ascii"),
+            )
+            self.assertIn(
+                "b Jr",
+                (lib_dir / "RT_F_SUB.AVO").read_text(encoding="ascii"),
+            )
+            self.assertIn(
+                "x rt_f_mul 0 2",
+                (lib_dir / "RT_F_MUL.AVO").read_text(encoding="ascii"),
+            )
+            self.assertIn(
+                "b Mr",
+                (lib_dir / "RT_F_MUL.AVO").read_text(encoding="ascii"),
+            )
+            self.assertIn(
+                "x rt_f_div 0 2",
+                (lib_dir / "RT_F_DIV.AVO").read_text(encoding="ascii"),
+            )
+            self.assertIn(
+                "b Vr",
+                (lib_dir / "RT_F_DIV.AVO").read_text(encoding="ascii"),
+            )
+            self.assertIn(
+                "x rt_i_to_f 0 2",
+                (lib_dir / "RT_I_TO_F.AVO").read_text(encoding="ascii"),
+            )
+            self.assertIn(
+                "b Wr",
+                (lib_dir / "RT_I_TO_F.AVO").read_text(encoding="ascii"),
+            )
+            self.assertIn(
+                "x rt_s_to_f 0 69",
+                (lib_dir / "RT_S_TO_F.AVO").read_text(encoding="ascii"),
             )
             self.assertTrue((lib_dir / "UDOSDIR.TXT").is_file())
 
@@ -90,52 +140,53 @@ class TestUdosWorkspaceExport(unittest.TestCase):
 
             image_root = output / "IMAGES" / "ACTION.DNP"
             self.assertTrue((image_root / "ACTDIR.PRG").is_file())
-            self.assertTrue((image_root / "BIN" / "ACTDIR.PRG").is_file())
             self.assertTrue((image_root / "ACTADD.PRG").is_file())
-            self.assertTrue((image_root / "BIN" / "ACTADD.PRG").is_file())
             self.assertTrue((image_root / "ACT2SAVE.PRG").is_file())
-            self.assertTrue((image_root / "BIN" / "ACT2SAVE.PRG").is_file())
             self.assertTrue((image_root / "ACTC.PRG").is_file())
-            self.assertTrue((image_root / "BIN" / "ACTC.PRG").is_file())
+            self.assertEqual((image_root / "ACTC_OVL0.BIN").read_bytes()[:4], b"ACOV")
+            self.assertEqual((image_root / "ACTC_OVL1.BIN").read_bytes()[:4], b"ACOV")
+            self.assertEqual((image_root / "ACTC_OVL2.BIN").read_bytes()[:4], b"ACOV")
+            self.assertEqual((image_root / "ACTC_OVL3.BIN").read_bytes()[:4], b"ACOV")
+            self.assertEqual((image_root / "ACTC_OVL4.BIN").read_bytes()[:4], b"ACOV")
+            self.assertEqual((image_root / "ACTC_OVL5.BIN").read_bytes()[:4], b"ACOV")
+            self.assertEqual((image_root / "ACTC_OVL6.BIN").read_bytes()[:4], b"ACOV")
             self.assertTrue((image_root / "ALINK.PRG").is_file())
-            self.assertTrue((image_root / "BIN" / "ALINK.PRG").is_file())
             self.assertTrue((image_root / "ACTCHK.PRG").is_file())
-            self.assertTrue((image_root / "BIN" / "ACTCHK.PRG").is_file())
             self.assertTrue((image_root / "ACTMON.PRG").is_file())
-            self.assertTrue((image_root / "BIN" / "ACTMON.PRG").is_file())
             self.assertTrue((image_root / "ACTFILE.PRG").is_file())
-            self.assertTrue((image_root / "BIN" / "ACTFILE.PRG").is_file())
             self.assertTrue((image_root / "ACTWORK.PRG").is_file())
-            self.assertTrue((image_root / "BIN" / "ACTWORK.PRG").is_file())
             self.assertTrue((image_root / "ACTFLOW.BAT").is_file())
             self.assertTrue((image_root / "ACTNEW.BAT").is_file())
             self.assertTrue((image_root / "ACTNEW.PRG").is_file())
-            self.assertTrue((image_root / "BIN" / "ACTNEW.PRG").is_file())
             self.assertTrue((image_root / "ACTSRC.PRG").is_file())
-            self.assertTrue((image_root / "BIN" / "ACTSRC.PRG").is_file())
             self.assertTrue((image_root / "PROJECT.TXT").is_file())
             self.assertTrue((image_root / "MAIN.ACT").is_file())
             actnew_lines = (image_root / "ACTNEW.BAT").read_text(encoding="ascii").splitlines()
             self.assertTrue(actnew_lines)
             self.assertTrue(all(len(line) <= 31 for line in actnew_lines if line))
             self.assertTrue((image_root / "ACTINFO.PRG").is_file())
-            self.assertTrue((image_root / "BIN" / "ACTINFO.PRG").is_file())
             self.assertTrue((image_root / "ACTCOPY.PRG").is_file())
-            self.assertTrue((image_root / "BIN" / "ACTCOPY.PRG").is_file())
             self.assertTrue((image_root / "ACTDEL.PRG").is_file())
-            self.assertTrue((image_root / "BIN" / "ACTDEL.PRG").is_file())
             self.assertTrue((image_root / "ACTMKDIR.PRG").is_file())
-            self.assertTrue((image_root / "BIN" / "ACTMKDIR.PRG").is_file())
             self.assertTrue((image_root / "ACTMOVE.PRG").is_file())
-            self.assertTrue((image_root / "BIN" / "ACTMOVE.PRG").is_file())
             self.assertTrue((image_root / "ACTRMDIR.PRG").is_file())
-            self.assertTrue((image_root / "BIN" / "ACTRMDIR.PRG").is_file())
             self.assertTrue((image_root / "ACTWRITE.PRG").is_file())
-            self.assertTrue((image_root / "BIN" / "ACTWRITE.PRG").is_file())
+            self.assertTrue((image_root / "ACTDBG.PRG").is_file())
+            self.assertEqual((image_root / "ACTDBG_OVL1.BIN").read_bytes()[:4], b"DGOV")
+            self.assertEqual((image_root / "ACTDBG_OVL2.BIN").read_bytes()[:4], b"DGOV")
+            self.assertTrue((image_root / "ACTEDIT.PRG").is_file())
             self.assertTrue((image_root / "AVMINFO.PRG").is_file())
-            self.assertTrue((image_root / "BIN" / "AVMINFO.PRG").is_file())
             self.assertTrue((image_root / "AVMRUN.PRG").is_file())
-            self.assertTrue((image_root / "BIN" / "AVMRUN.PRG").is_file())
+            self.assertTrue((image_root / "AVMRUNC.PRG").is_file())
+            self.assertEqual((image_root / "RT_PRINT_STD_HELPER.BIN").read_bytes()[:4], b"AVNH")
+            self.assertEqual((image_root / "RT_PRINT_F_HELPER.BIN").read_bytes()[:4], b"AVNH")
+            self.assertEqual((image_root / "RT_GFX1_HELPER.BIN").read_bytes()[:4], b"AVNH")
+            self.assertEqual((image_root / "RT_SIDSPR1_HELPER.BIN").read_bytes()[:4], b"AVNH")
+            self.assertEqual((image_root / "RT_DBF1_HELPER.BIN").read_bytes()[:4], b"AVNH")
+            self.assertEqual((image_root / "RT_MATH1_HELPER.BIN").read_bytes()[:4], b"AVNH")
+            self.assertEqual((image_root / "AVMRUN_OVL1.BIN").read_bytes()[:4], b"AVOV")
+            self.assertEqual((image_root / "AVMRUN_OVL2.BIN").read_bytes()[:4], b"AVOV")
+            self.assertEqual((image_root / "AVMRUN_OVL3.BIN").read_bytes()[:4], b"AVOV")
 
 
 if __name__ == "__main__":

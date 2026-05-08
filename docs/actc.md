@@ -27,7 +27,8 @@ The current shipped subset matches the bootstrap on-target evaluator:
 - `RETURN`
 
 `actc.com` still emits a runnable `.avm` file directly. There is no on-target
-`.avo` linker yet, so this remains a monolithic compiler for now.
+`.obj` / `.avo` linker on that legacy CP/M path yet, so this remains a
+monolithic compiler for now.
 
 ## File Behavior
 

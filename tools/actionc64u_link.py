@@ -156,8 +156,8 @@ def link(main_path: Path, runtime_dirs: list[Path], avm_output: Path, map_output
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Link ActionC64U .avo objects into a final .avm")
-    parser.add_argument("main_object", help="main .avo file")
+    parser = argparse.ArgumentParser(description="Link ActionC64U .obj objects into a final .avm")
+    parser.add_argument("main_object", help="main .obj file")
     parser.add_argument("-o", "--output", help="output .avm file")
     parser.add_argument("--map-output", help="output link map path")
     parser.add_argument(
