@@ -193,7 +193,7 @@ final body emission.
 
 ## Object Output
 
-Production ACTC no longer builds the complete AVO text in `content_buffer`.
+Production ACTC no longer builds the complete object text in `content_buffer`.
 With `STREAM_OUTPUT=1`, object emission mirrors production ALINK's streamed
 output path:
 
@@ -230,7 +230,7 @@ ALINK.
 7. Convert module-header and declaration collection to REU-backed pass 1.
 8. Convert body operation collection and runtime-import detection to REU-backed
    pass 2.
-9. Convert AVO emission from `content_buffer` to chunked write services.
+9. Convert object emission from `content_buffer` to chunked write services.
    Current production `ACTC.PRG` has this path with `STREAM_OUTPUT=1`,
    `CONTENT_BUFFER_SIZE=16`, and `OUTPUT_CHUNK_SIZE=128`.
 10. Move large ACTC and ALINK lookup payloads into REU-backed tables. Most ACTC

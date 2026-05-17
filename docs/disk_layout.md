@@ -1,66 +1,11 @@
-# CP/M Disk Layout
+# Disk Layout
 
-ActionC64U currently uses flat CP/M filenames instead of subdirectories. The
-same layout works on CP/M-65 and under `cpmemu`, which only exposes lowercase
-8.3 host filenames.
+Current UDOS Action workspace layout:
 
-## Tool Files
+- `SRC/`: source files
+- `OBJ/`: compiler object files
+- `BIN/`: linked direct PRG output
+- `LIB/`: library objects and helper modules
+- `UDOSDIR.TXT`: directory catalog metadata used by UDOS tools and probes
 
-- `alink.com`
-- `actmon.com`
-- `actc.com`
-- `vm.com`
-
-Under `cpmemu`, `actmon.com` uses embedded compile/run entry points for
-`COMPILE`, `RUN`, and `BUILD` because direct COM launches do not provide a CCP
-handoff path for running additional tools. On a fuller CP/M-65 system, `EDIT`
-can still chain to an external editor such as `bedit.com` when `CCP`-style
-handoff support is present.
-
-## Library Manifests
-
-CP/M-65 does not give us a portable `LIB/` directory in this workflow, so the
-bootstrap toolchain uses filename prefixes instead:
-
-- `libpstr.mod` -> `rt.print_str`
-- `libplin.mod` -> `rt.print_line`
-- `libfint.mod` -> `rt.format_int`
-
-Each manifest lives on disk and is read by `actc.com` during compile time. The
-compiler starts from the main program's logical imports, follows manifest
-imports recursively, emits a single runnable `.avm`, and writes a sidecar
-`.map` describing exactly which modules were included. The constrained D64
-release image packs those same manifests into a single `libmods.dat` bundle to
-save directory entries and allocation blocks.
-
-## Runtime `.avo` Objects For `alink.com`
-
-`alink.com` links `.avo` objects from the current CP/M directory and dead-strips
-unused runtime modules at module granularity. Because CP/M filenames must stay
-within lower-case 8.3, the staged runtime objects use short aliases such as:
-
-- `pstr.avo` -> `rt.print_str`
-- `plin.avo` -> `rt.print_line`
-- `fint.avo` -> `rt.format_int`
-
-The release staging path currently copies the bootstrap `alink.com` subset
-needed by the shipped print/int examples, alongside the older `.mod` manifests.
-
-## Example Working Set
-
-A minimal staged drive for current development contains:
-
-- `alink.com`
-- `actmon.com`
-- `actc.com`
-- `vm.com`
-- `libpstr.mod`
-- `libplin.mod`
-- `libfint.mod`
-- `hello.act`
-- `math.act`
-- `if.act`
-- `realdemo.act` (`examples/real_demo.act` staged under an 8.3 alias)
-- `real_cmp.act`
-- `reu_demo.act`
-- `ovl_demo.act`
+The maintained runnable artifact is `BIN/<MODULE>.PRG`.

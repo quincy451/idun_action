@@ -44,6 +44,9 @@ class TestActcDeadStrip(unittest.TestCase):
         )
 
     def stage_drive(self, drive: Path) -> None:
+        for artifact in (self.root / "build" / "actc.com", self.root / "build" / "vm.com"):
+            if not artifact.is_file():
+                self.skipTest(f"required CP/M tool artifact unavailable: {artifact}")
         shutil.copy2(self.root / "build" / "actc.com", drive / "actc.com")
         shutil.copy2(self.root / "build" / "vm.com", drive / "vm.com")
         for manifest in self.libmods:

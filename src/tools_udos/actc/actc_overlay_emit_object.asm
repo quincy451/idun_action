@@ -22,7 +22,7 @@ actc_overlay_entry:
     lda #ACTC_OVERLAY_PASS_EMIT_OBJECT
     sta (ACTC_OVERLAY_CONTEXT_ZP),y
 
-    jsr build_avo_content_overlay
+    jsr build_object_content_overlay
     bcs actc_overlay_fail
 
     ldy #ACTC_OVERLAY_CTX_STATUS
@@ -40,28 +40,30 @@ actc_overlay_fail:
     lda #ACTC_OVERLAY_STATUS_FAILED
     rts
 
-build_avo_content_overlay:
-    jsr emit_avo_header
+build_object_content_overlay:
+    jsr emit_object_header
     jsr emit_debug_file_list
-    bcs build_avo_content_overlay_fail
+    bcs build_object_content_overlay_fail
     jsr emit_debug_proc_decl_list
-    bcs build_avo_content_overlay_fail
+    bcs build_object_content_overlay_fail
     jsr emit_debug_body_op_list
-    bcs build_avo_content_overlay_fail
+    bcs build_object_content_overlay_fail
     jsr emit_debug_var_list
-    bcs build_avo_content_overlay_fail
+    bcs build_object_content_overlay_fail
     jsr emit_export_list
-    bcs build_avo_content_overlay_fail
+    bcs build_object_content_overlay_fail
     jsr emit_body_ops_list
-    bcs build_avo_content_overlay_fail
+    bcs build_object_content_overlay_fail
+    jsr emit_machine_code_list
+    bcs build_object_content_overlay_fail
     jsr emit_external_list
-    bcs build_avo_content_overlay_fail
+    bcs build_object_content_overlay_fail
     jsr emit_string_list
-    bcs build_avo_content_overlay_fail
+    bcs build_object_content_overlay_fail
     jsr emit_int_list
-    bcs build_avo_content_overlay_fail
+    bcs build_object_content_overlay_fail
     jsr emit_var_list
-    bcs build_avo_content_overlay_fail
+    bcs build_object_content_overlay_fail
 
     lda #'k'
     jsr emit_char_overlay
@@ -83,16 +85,16 @@ build_avo_content_overlay:
     clc
     rts
 
-build_avo_content_overlay_fail:
+build_object_content_overlay_fail:
     sec
     rts
 
-emit_avo_header:
-    lda #'A'
-    jsr emit_char_overlay
-    lda #'V'
-    jsr emit_char_overlay
+emit_object_header:
     lda #'O'
+    jsr emit_char_overlay
+    lda #'B'
+    jsr emit_char_overlay
+    lda #'J'
     jsr emit_char_overlay
     lda #'1'
     jsr emit_char_overlay
@@ -445,6 +447,14 @@ emit_debug_var_type_for_x:
     rts
 
 emit_export_list:
+    jsr is_main_fanout_machine_object
+    bcc emit_export_list_not_fanout
+    jmp emit_machine_fanout_export_list
+emit_export_list_not_fanout:
+    jsr is_main_single_local_call_machine_object
+    bcc emit_export_list_standard
+    jmp emit_machine_local_call_export_list
+emit_export_list_standard:
     lda #$00
     sta entry_index_data
 emit_export_list_loop:
@@ -481,6 +491,18 @@ emit_export_list_loop:
     lda #ACTC_OVERLAY_CTX_LAYOUT_WINDOW_PTR_LO
     jsr load_context_ptr_to_work_zp
     ldy #$02
+    lda entry_index_data
+    bne emit_export_list_layout_size
+    jsr is_empty_main_machine_object
+    bcc emit_export_list_layout_size
+    lda #16
+    ldy #$00
+    jsr emit_word_decimal
+    jmp emit_export_list_newline
+emit_export_list_layout_size:
+    lda #ACTC_OVERLAY_CTX_LAYOUT_WINDOW_PTR_LO
+    jsr load_context_ptr_to_work_zp
+    ldy #$02
     lda (ACTC_OVERLAY_WORK_ZP),y
     pha
     iny
@@ -488,6 +510,7 @@ emit_export_list_loop:
     tay
     pla
     jsr emit_word_decimal
+emit_export_list_newline:
     jsr emit_newline
     inc entry_index_data
     jmp emit_export_list_loop
@@ -495,7 +518,89 @@ emit_export_list_done:
     clc
     rts
 
+emit_machine_local_call_export_list:
+    ldx #$01
+    lda #$00
+    tay
+    sta word_value_lo
+    sta word_value_hi
+    lda #20
+    jsr emit_machine_export_line
+    ldx #$00
+    lda #19
+    ldy #$00
+    sta word_value_lo
+    sty word_value_hi
+    lda #$01
+    jsr emit_machine_export_line
+    clc
+    rts
+
+emit_machine_fanout_export_list:
+    ldx #$02
+    lda #$00
+    tay
+    sta word_value_lo
+    sta word_value_hi
+    lda #27
+    jsr emit_machine_export_line
+    ldx #$01
+    lda #22
+    ldy #$00
+    sta word_value_lo
+    sty word_value_hi
+    lda #$04
+    jsr emit_machine_export_line
+    ldx #$00
+    lda #26
+    ldy #$00
+    sta word_value_lo
+    sty word_value_hi
+    lda #$01
+    jsr emit_machine_export_line
+    clc
+    rts
+
+emit_machine_export_line:
+    sta compare_char_local
+    stx saved_x_local
+    lda #'x'
+    jsr emit_char_overlay
+    lda #' '
+    jsr emit_char_overlay
+    ldx saved_x_local
+    lda #ACTC_OVERLAY_CTX_SET_EXPORT_PTR_FN_LO
+    jsr call_indexed_context_function
+    jsr load_resident_export_ptr_to_scan_zp
+    jsr emit_lower_scan_zp_string
+    lda #' '
+    jsr emit_char_overlay
+    lda word_value_lo
+    ldy word_value_hi
+    jsr emit_word_decimal
+    lda #' '
+    jsr emit_char_overlay
+    lda compare_char_local
+    ldy #$00
+    jsr emit_word_decimal
+    jmp emit_newline
+
 emit_body_ops_list:
+    jsr is_main_fanout_machine_object
+    bcc emit_body_ops_list_not_fanout
+    jsr emit_machine_body_marker_line
+    jsr emit_machine_body_marker_line
+    jsr emit_machine_body_marker_line
+    clc
+    rts
+emit_body_ops_list_not_fanout:
+    jsr is_main_single_local_call_machine_object
+    bcc emit_body_ops_list_standard
+    jsr emit_machine_body_marker_line
+    jsr emit_machine_body_marker_line
+    clc
+    rts
+emit_body_ops_list_standard:
     lda #$00
     sta entry_index_data
 emit_body_ops_list_loop:
@@ -507,6 +612,16 @@ emit_body_ops_list_loop:
     jsr emit_char_overlay
     lda #' '
     jsr emit_char_overlay
+    lda entry_index_data
+    bne emit_body_ops_list_portable
+    jsr is_empty_main_machine_object
+    bcc emit_body_ops_list_portable
+    lda #'M'
+    jsr emit_char_overlay
+    jsr emit_newline
+    inc entry_index_data
+    jmp emit_body_ops_list_loop
+emit_body_ops_list_portable:
     ldx entry_index_data
     lda #ACTC_OVERLAY_CTX_SET_BODY_PTR_FN_LO
     jsr call_indexed_context_function
@@ -533,6 +648,39 @@ emit_body_ops_list_newline:
     inc entry_index_data
     jmp emit_body_ops_list_loop
 emit_body_ops_list_done:
+    clc
+    rts
+
+emit_machine_code_list:
+    jsr is_empty_main_machine_object
+    bcc emit_machine_code_list_check_local_call
+    lda #<empty_main_machine_record
+    sta ACTC_OVERLAY_SCAN_ZP
+    lda #>empty_main_machine_record
+    sta ACTC_OVERLAY_SCAN_ZP+1
+    jsr emit_scan_zp_string
+    jsr emit_newline
+    jmp emit_machine_code_list_done
+emit_machine_code_list_check_local_call:
+    jsr is_main_single_local_call_machine_object
+    bcc emit_machine_code_list_check_fanout
+    lda #<single_local_call_machine_record
+    sta ACTC_OVERLAY_SCAN_ZP
+    lda #>single_local_call_machine_record
+    sta ACTC_OVERLAY_SCAN_ZP+1
+    jsr emit_scan_zp_string
+    jsr emit_newline
+    jmp emit_machine_code_list_done
+emit_machine_code_list_check_fanout:
+    jsr is_main_fanout_machine_object
+    bcc emit_machine_code_list_done
+    lda #<fanout_machine_record
+    sta ACTC_OVERLAY_SCAN_ZP
+    lda #>fanout_machine_record
+    sta ACTC_OVERLAY_SCAN_ZP+1
+    jsr emit_scan_zp_string
+    jsr emit_newline
+emit_machine_code_list_done:
     clc
     rts
 
@@ -701,6 +849,264 @@ emit_lower_scan_zp_string_loop:
     bne emit_lower_scan_zp_string_loop
 emit_lower_scan_zp_string_done:
     rts
+
+is_empty_main_machine_object:
+    lda #ACTC_OVERLAY_CTX_EXPORT_COUNT_PTR_LO
+    jsr load_count_from_context
+    cmp #$01
+    bne is_empty_main_machine_object_no
+    lda #ACTC_OVERLAY_CTX_EXTERN_COUNT_PTR_LO
+    jsr load_count_from_context
+    bne is_empty_main_machine_object_no
+    lda #ACTC_OVERLAY_CTX_STRING_COUNT_PTR_LO
+    jsr load_count_from_context
+    bne is_empty_main_machine_object_no
+    lda #ACTC_OVERLAY_CTX_INT_COUNT_PTR_LO
+    jsr load_count_from_context
+    bne is_empty_main_machine_object_no
+    lda #ACTC_OVERLAY_CTX_VAR_COUNT_PTR_LO
+    jsr load_count_from_context
+    bne is_empty_main_machine_object_no
+    lda #ACTC_OVERLAY_CTX_MODULE_VAR_COUNT_PTR_LO
+    jsr load_count_from_context
+    bne is_empty_main_machine_object_no
+    lda #ACTC_OVERLAY_CTX_MODULE_NAME_PTR_LO
+    jsr load_context_ptr_to_scan_zp
+    jsr scan_zp_is_main_symbol
+    bcc is_empty_main_machine_object_no
+    ldx #$00
+    lda #ACTC_OVERLAY_CTX_SET_EXPORT_PTR_FN_LO
+    jsr call_indexed_context_function
+    jsr load_resident_export_ptr_to_scan_zp
+    jsr scan_zp_is_main_symbol
+    bcc is_empty_main_machine_object_no
+    ldx #$00
+    lda #ACTC_OVERLAY_CTX_SET_BODY_PTR_FN_LO
+    jsr call_indexed_context_function
+    jsr load_resident_body_ptr_to_scan_zp
+    ldy #$00
+    lda (ACTC_OVERLAY_SCAN_ZP),y
+    beq is_empty_main_machine_object_yes
+    cmp #'r'
+    bne is_empty_main_machine_object_no
+    iny
+    lda (ACTC_OVERLAY_SCAN_ZP),y
+    bne is_empty_main_machine_object_no
+is_empty_main_machine_object_yes:
+    sec
+    rts
+is_empty_main_machine_object_no:
+    clc
+    rts
+
+scan_zp_is_main_symbol:
+    ldy #$00
+    lda (ACTC_OVERLAY_SCAN_ZP),y
+    jsr lowercase_ascii_overlay
+    cmp #'m'
+    bne scan_zp_is_main_symbol_no
+    iny
+    lda (ACTC_OVERLAY_SCAN_ZP),y
+    jsr lowercase_ascii_overlay
+    cmp #'a'
+    bne scan_zp_is_main_symbol_no
+    iny
+    lda (ACTC_OVERLAY_SCAN_ZP),y
+    jsr lowercase_ascii_overlay
+    cmp #'i'
+    bne scan_zp_is_main_symbol_no
+    iny
+    lda (ACTC_OVERLAY_SCAN_ZP),y
+    jsr lowercase_ascii_overlay
+    cmp #'n'
+    bne scan_zp_is_main_symbol_no
+    iny
+    lda (ACTC_OVERLAY_SCAN_ZP),y
+    bne scan_zp_is_main_symbol_no
+    sec
+    rts
+scan_zp_is_main_symbol_no:
+    clc
+    rts
+
+is_main_single_local_call_machine_object:
+    lda #ACTC_OVERLAY_CTX_EXPORT_COUNT_PTR_LO
+    jsr load_count_from_context
+    cmp #$02
+    bne is_main_single_local_call_machine_object_no
+    lda #ACTC_OVERLAY_CTX_EXTERN_COUNT_PTR_LO
+    jsr load_count_from_context
+    bne is_main_single_local_call_machine_object_no
+    lda #ACTC_OVERLAY_CTX_STRING_COUNT_PTR_LO
+    jsr load_count_from_context
+    bne is_main_single_local_call_machine_object_no
+    lda #ACTC_OVERLAY_CTX_INT_COUNT_PTR_LO
+    jsr load_count_from_context
+    bne is_main_single_local_call_machine_object_no
+    lda #ACTC_OVERLAY_CTX_VAR_COUNT_PTR_LO
+    jsr load_count_from_context
+    bne is_main_single_local_call_machine_object_no
+    lda #ACTC_OVERLAY_CTX_MODULE_VAR_COUNT_PTR_LO
+    jsr load_count_from_context
+    bne is_main_single_local_call_machine_object_no
+    lda #ACTC_OVERLAY_CTX_MODULE_NAME_PTR_LO
+    jsr load_context_ptr_to_scan_zp
+    jsr scan_zp_is_main_symbol
+    bcc is_main_single_local_call_machine_object_no
+    ldx #$01
+    lda #ACTC_OVERLAY_CTX_SET_EXPORT_PTR_FN_LO
+    jsr call_indexed_context_function
+    jsr load_resident_export_ptr_to_scan_zp
+    jsr scan_zp_is_main_symbol
+    bcc is_main_single_local_call_machine_object_no
+    ldx #$00
+    lda #ACTC_OVERLAY_CTX_SET_BODY_PTR_FN_LO
+    jsr call_indexed_context_function
+    jsr load_resident_body_ptr_to_scan_zp
+    jsr scan_zp_is_return_body
+    bcc is_main_single_local_call_machine_object_no
+    ldx #$01
+    lda #ACTC_OVERLAY_CTX_SET_BODY_PTR_FN_LO
+    jsr call_indexed_context_function
+    jsr load_resident_body_ptr_to_scan_zp
+    jsr scan_zp_is_call_zero_return_body
+    bcc is_main_single_local_call_machine_object_no
+    sec
+    rts
+is_main_single_local_call_machine_object_no:
+    clc
+    rts
+
+scan_zp_is_return_body:
+    ldy #$00
+    lda (ACTC_OVERLAY_SCAN_ZP),y
+    beq scan_zp_is_return_body_yes
+    cmp #'r'
+    bne scan_zp_is_return_body_no
+    iny
+    lda (ACTC_OVERLAY_SCAN_ZP),y
+    bne scan_zp_is_return_body_no
+scan_zp_is_return_body_yes:
+    sec
+    rts
+scan_zp_is_return_body_no:
+    clc
+    rts
+
+scan_zp_is_call_zero_return_body:
+    ldy #$00
+    lda (ACTC_OVERLAY_SCAN_ZP),y
+    cmp #'c'
+    bne scan_zp_is_call_zero_return_body_no
+    iny
+    lda (ACTC_OVERLAY_SCAN_ZP),y
+    cmp #'0'
+    bne scan_zp_is_call_zero_return_body_no
+    iny
+    lda (ACTC_OVERLAY_SCAN_ZP),y
+    cmp #'r'
+    bne scan_zp_is_call_zero_return_body_no
+    iny
+    lda (ACTC_OVERLAY_SCAN_ZP),y
+    bne scan_zp_is_call_zero_return_body_no
+    sec
+    rts
+scan_zp_is_call_zero_return_body_no:
+    clc
+    rts
+
+is_main_fanout_machine_object:
+    lda #ACTC_OVERLAY_CTX_EXPORT_COUNT_PTR_LO
+    jsr load_count_from_context
+    cmp #$03
+    bne is_main_fanout_machine_object_no
+    lda #ACTC_OVERLAY_CTX_EXTERN_COUNT_PTR_LO
+    jsr load_count_from_context
+    bne is_main_fanout_machine_object_no
+    lda #ACTC_OVERLAY_CTX_STRING_COUNT_PTR_LO
+    jsr load_count_from_context
+    bne is_main_fanout_machine_object_no
+    lda #ACTC_OVERLAY_CTX_INT_COUNT_PTR_LO
+    jsr load_count_from_context
+    bne is_main_fanout_machine_object_no
+    lda #ACTC_OVERLAY_CTX_VAR_COUNT_PTR_LO
+    jsr load_count_from_context
+    bne is_main_fanout_machine_object_no
+    lda #ACTC_OVERLAY_CTX_MODULE_VAR_COUNT_PTR_LO
+    jsr load_count_from_context
+    bne is_main_fanout_machine_object_no
+    lda #ACTC_OVERLAY_CTX_MODULE_NAME_PTR_LO
+    jsr load_context_ptr_to_scan_zp
+    jsr scan_zp_is_main_symbol
+    bcc is_main_fanout_machine_object_no
+    ldx #$02
+    lda #ACTC_OVERLAY_CTX_SET_EXPORT_PTR_FN_LO
+    jsr call_indexed_context_function
+    jsr load_resident_export_ptr_to_scan_zp
+    jsr scan_zp_is_main_symbol
+    bcc is_main_fanout_machine_object_no
+    ldx #$00
+    lda #ACTC_OVERLAY_CTX_SET_BODY_PTR_FN_LO
+    jsr call_indexed_context_function
+    jsr load_resident_body_ptr_to_scan_zp
+    jsr scan_zp_is_return_body
+    bcc is_main_fanout_machine_object_no
+    ldx #$01
+    lda #ACTC_OVERLAY_CTX_SET_BODY_PTR_FN_LO
+    jsr call_indexed_context_function
+    jsr load_resident_body_ptr_to_scan_zp
+    jsr scan_zp_is_call_zero_return_body
+    bcc is_main_fanout_machine_object_no
+    ldx #$02
+    lda #ACTC_OVERLAY_CTX_SET_BODY_PTR_FN_LO
+    jsr call_indexed_context_function
+    jsr load_resident_body_ptr_to_scan_zp
+    jsr scan_zp_is_call_zero_call_one_return_body
+    bcc is_main_fanout_machine_object_no
+    sec
+    rts
+is_main_fanout_machine_object_no:
+    clc
+    rts
+
+scan_zp_is_call_zero_call_one_return_body:
+    ldy #$00
+    lda (ACTC_OVERLAY_SCAN_ZP),y
+    cmp #'c'
+    bne scan_zp_is_call_zero_call_one_return_body_no
+    iny
+    lda (ACTC_OVERLAY_SCAN_ZP),y
+    cmp #'0'
+    bne scan_zp_is_call_zero_call_one_return_body_no
+    iny
+    lda (ACTC_OVERLAY_SCAN_ZP),y
+    cmp #'c'
+    bne scan_zp_is_call_zero_call_one_return_body_no
+    iny
+    lda (ACTC_OVERLAY_SCAN_ZP),y
+    cmp #'1'
+    bne scan_zp_is_call_zero_call_one_return_body_no
+    iny
+    lda (ACTC_OVERLAY_SCAN_ZP),y
+    cmp #'r'
+    bne scan_zp_is_call_zero_call_one_return_body_no
+    iny
+    lda (ACTC_OVERLAY_SCAN_ZP),y
+    bne scan_zp_is_call_zero_call_one_return_body_no
+    sec
+    rts
+scan_zp_is_call_zero_call_one_return_body_no:
+    clc
+    rts
+
+emit_machine_body_marker_line:
+    lda #'b'
+    jsr emit_char_overlay
+    lda #' '
+    jsr emit_char_overlay
+    lda #'M'
+    jsr emit_char_overlay
+    jmp emit_newline
 
 emit_newline:
     lda #10
@@ -994,6 +1400,12 @@ msg_bad_literal:
     .asciiz "BAD LITERAL"
 msg_bad_var:
     .asciiz "BAD VAR"
+empty_main_machine_record:
+    .asciiz "m A9 A5 8D D0 03 A9 00 85 02 85 03 A2 02 4C 0F CF"
+single_local_call_machine_record:
+    .asciiz "m 20 13 10 A9 A5 8D D0 03 A9 00 85 02 85 03 A2 02 4C 0F CF 60"
+fanout_machine_record:
+    .asciiz "m 20 1A 10 20 16 10 A9 A5 8D D0 03 A9 00 85 02 85 03 A2 02 4C 0F CF 20 1A 10 60 60"
 call_target_minus_one:
     .byte $00
 call_target_ptr:

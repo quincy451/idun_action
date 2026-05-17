@@ -7,8 +7,7 @@ The active product path is:
 - UDOS as the standalone Commodore 64 Ultimate shell/runtime
 - Action tooling as UDOS-aware `.PRG` programs
 - C64 Ultimate ROM/Ultimate DOS services through the UDOS resident service layer
-- direct linked `.PRG` output as the default runtime artifact, with
-  `AVMRUN.PRG`/`AVMRUNC.PRG` kept only as compat replay surfaces
+- direct linked `.PRG` output as the only maintained runtime artifact
 
 The active code paths are:
 
@@ -18,19 +17,10 @@ The active code paths are:
 - `tools/build_*_udos.sh`
 - `tools/export_udos_workspace.py`
 
-The CP/M-65 code remains in the repository only as legacy bootstrap/reference
-material. It is not the primary implementation target and should not drive
-feature decisions.
-
-Legacy/reference code includes:
-
-- `src/tools_cpm/`
-- `tools/build_actc.sh`
-- `tools/build_alink.sh`
-- `tools/build_vmrun.sh`
-- `tools/build_actmon.sh`
-- `tools/cpmemu_runner.py`
-- tests that launch `.COM` programs through `cpmemu`
+The CP/M-65 compiler/linker/bootstrap code and the old VM toolchain have been
+removed. Repository code should not add new runtime-runner flows. Action-linked
+programs now target direct 6502 `.PRG` output, and the UDOS resident shell is
+native 6502 rather than a VM bytecode host.
 
 ## Active Verification Gates
 
@@ -40,23 +30,13 @@ Use UDOS gates as the source of truth:
 make -C ../udos PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-actc
 make -C ../udos PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-alink
 make -C ../udos PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-actc-alink-launch
-make -C ../udos PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-alink-compat
-make -C ../udos PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-compat-shellmin
-make -C ../udos PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-compat-shelladd
-make -C ../udos PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-compat-shelladd-trace
 ```
 
 Treat `vice-action-alink` as the default direct-native linker gate that emits
 `BIN/MAIN.PRG`.
 Treat `vice-action-actc-alink-launch` as the helper-free higher-level default.
-Treat `vice-action-alink-compat` as the AVM-specific linker/runner gate.
 Treat `vice-action-actc-alink-launch-printmath` as a green named direct
-launch gate for the imported `printmath` shape. Keep
-`vice-action-actc-alink-compat-printmath` only as the helper-bearing compat
-replay target for the same source shape. The narrow shell-launched compat
-sanity gates `vice-action-compat-shellmin` and `vice-action-compat-shelladd`
-are green; treat the helper-bearing `printmath` replay as the remaining compat
-surface, not the default path.
+launch gate for the imported `printmath` shape.
 
 Use narrower UDOS gates when working on a specific tool:
 
@@ -64,23 +44,20 @@ Use narrower UDOS gates when working on a specific tool:
 make -C ../udos PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-actadd
 make -C ../udos PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-act2save
 make -C ../udos PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-actcopy
-make -C ../udos PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-runtime-compat
 ```
 
 ## Development Rules
 
-- Prefer `src/tools_udos` over `src/tools_cpm` for compiler/linker/runtime work.
-- Prefer `tools/build_*_udos.sh` over CP/M `.COM` build scripts.
+- Prefer `src/tools_udos` over deleted CP/M-era compiler/linker paths.
+- Prefer `tools/build_*_udos.sh`; do not reintroduce CP/M `.COM` build scripts.
 - Do not treat `cpmemu` success as proof that the active target works.
-- Do not add new CP/M features unless explicitly maintaining historical
-  bootstrap/reference behavior.
-- If a CP/M-era implementation and a UDOS implementation disagree, the UDOS
-  behavior is authoritative for current development.
+- Do not add new CP/M or runtime-runner features.
 
 ## Current Design Inputs
 
-Optional runtime/library work should follow the link-selected helper direction
-described in `docs/avmrun_diet_plan.md`.
+Optional runtime/library work should follow the link-selected helper direction:
+helpers are selected by the linker and carried by the final `.PRG`, not by a
+separate runtime program.
 
 Current concrete API inputs:
 
@@ -98,7 +75,7 @@ Current concrete API inputs:
   - `docs/sidspr1_bindings_draft.act`
 
 These are design inputs for optional helper families. They should not be
-implemented as permanent `AVMRUN` core features.
+implemented as permanent runner-global features.
 
 ## Current Next Work
 
@@ -109,12 +86,9 @@ The current practical path is:
    failures.
 3. Continue widening `ACTC.PRG` object emission.
 4. Continue widening `ALINK.PRG` object resolution and final direct-PRG
-   generation, keeping AVM emission only for explicit compat gates.
-5. Keep the native `ALINK -> MAIN.PRG` path green while shrinking the public
-   AVM-specific proof surface to legacy replay targets.
-6. Treat `AVMRUN.PRG` as a compat runner, not the canonical default runtime,
-   and keep moving optional feature helpers toward link-only runtime modules as
-   outlined in `docs/avmrun_diet_plan.md`.
+   generation.
+5. Keep the native `ALINK -> MAIN.PRG` path green.
+6. Keep moving optional feature helpers toward link-only runtime modules.
 7. Build on the resident REU stage/read services and convert ACTC toward the
    REU-backed source-streaming plan in `docs/actc_source_streaming_plan.md` so
    source size is no longer tied to one contiguous buffer.

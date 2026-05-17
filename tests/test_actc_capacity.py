@@ -22,8 +22,8 @@ def count_body_ops(body: str) -> int:
     return count
 
 
-def assert_single_proc_avo(test: unittest.TestCase, text: str, body: str, min_line: int = 2) -> None:
-    match = re.match(r"^AVO1\nf 0 src/main\.act\nq 0 0 (\d+) (\d+)\n((?:l 0 \d+ 0 \d+ \d+\n)*)", text)
+def assert_single_proc_object(test: unittest.TestCase, text: str, body: str, min_line: int = 2) -> None:
+    match = re.match(r"^OBJ1\nf 0 src/main\.act\nq 0 0 (\d+) (\d+)\n((?:l 0 \d+ 0 \d+ \d+\n)*)", text)
     test.assertIsNotNone(match, msg=text)
     assert match is not None
     test.assertGreaterEqual(int(match.group(1)), min_line, msg=text)
@@ -139,7 +139,7 @@ class TestActcCapacity(unittest.TestCase):
             self.assertFalse(summary["hit_limit"], msg=result.stdout)
             output_path = object_dir / "MAIN.OBJ"
             self.assertTrue(output_path.is_file(), msg=result.stdout)
-            assert_single_proc_avo(
+            assert_single_proc_object(
                 self,
                 output_path.read_text(encoding="ascii"),
                 "x main 0 7\nb e0r\ns OK\nk 2\nn main\n",
@@ -266,7 +266,7 @@ class TestActcCapacity(unittest.TestCase):
             self.assertGreater(len(output_text), 640)
             self.assertTrue(
                 output_text.startswith(
-                    "AVO1\n"
+                    "OBJ1\n"
                     "f 0 src/main.act\n"
                     "q 0 0 3 6\n"
                     "q 1 0 5 6\n"

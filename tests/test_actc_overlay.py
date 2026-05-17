@@ -433,7 +433,7 @@ class TestActcOverlay(unittest.TestCase):
             if not object_path.is_file():
                 object_path = object_dir / "main.obj"
             obj = object_path.read_text(encoding="ascii")
-            self.assertIn("b e0e1p0yp1ze2e3p2yp3zr\n", obj)
+            self.assertIn("b e0e1j0i1e2e3j2i3r\n", obj)
             self.assertIn("s LT\n", obj)
             self.assertIn("s EQ\n", obj)
             self.assertIn("s GE\n", obj)

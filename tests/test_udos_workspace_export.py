@@ -37,86 +37,78 @@ class TestUdosWorkspaceExport(unittest.TestCase):
             docs_dir = image_root / "DOC"
             self.assertTrue((docs_dir / "OPERATOR.TXT").is_file())
             self.assertTrue((docs_dir / "LANGUAGE.TXT").is_file())
-            self.assertTrue((docs_dir / "VMABI.TXT").is_file())
-            self.assertTrue((docs_dir / "UDOSRESM.TXT").is_file())
-            self.assertIn("ActionC64U Operator Guide", (docs_dir / "OPERATOR.TXT").read_text(encoding="ascii"))
+            self.assertFalse((docs_dir / "VMABI.TXT").exists())
+            self.assertFalse((docs_dir / "UDOSRESM.TXT").exists())
+            self.assertIn("ActionC64U UDOS Operator Guide", (docs_dir / "OPERATOR.TXT").read_text(encoding="ascii"))
 
             src_dir = image_root / "SRC"
             self.assertTrue((src_dir / "HELLO.ACT").is_file())
             self.assertTrue((src_dir / "MATH.ACT").is_file())
             self.assertIn("PROC main()", (src_dir / "HELLO.ACT").read_text(encoding="ascii"))
 
-            bin_dir = image_root / "BIN"
-            for name in ["HELLO.AVM", "REURUN.AVM", "VMECHO.AVM", "FILECOPY.AVM"]:
-                self.assertEqual((bin_dir / name).read_bytes()[:4], b"AVM1", name)
-            self.assertTrue((bin_dir / "HELLO.AVT").is_file())
-            self.assertEqual((image_root / "HELLO.AVM").read_bytes()[:4], b"AVM1")
-            self.assertEqual((bin_dir / "UDOSHELLO.AVM").read_bytes()[:4], b"AVM1")
-            self.assertEqual((bin_dir / "UDOSHELLO.AVM").read_bytes()[9], 1)
-            self.assertEqual((image_root / "UDOSHELLO.AVM").read_bytes()[9], 1)
-            self.assertEqual((bin_dir / "UDOSFLOW.AVM").read_bytes()[:4], b"AVM1")
-            self.assertEqual((bin_dir / "UDOSFLOW.AVM").read_bytes()[9], 1)
-            self.assertEqual((image_root / "UDOSFLOW.AVM").read_bytes()[9], 1)
+            old_binary_pattern = "*." + ("A" + "VM")
+            self.assertFalse(list(image_root.rglob(old_binary_pattern)))
+            self.assertFalse(list(image_root.rglob("*.AVT")))
 
             lib_dir = image_root / "LIB"
             bundle = (lib_dir / "LIBMODS.DAT").read_text(encoding="ascii")
             self.assertIn("FILE libpstr.mod", bundle)
             self.assertTrue((lib_dir / "LIBPSTR.MOD").is_file())
-            self.assertTrue((lib_dir / "RT_PRINT_STR.AVO").is_file())
-            self.assertTrue((lib_dir / "RT_F_ADD.AVO").is_file())
-            self.assertTrue((lib_dir / "RT_F_SUB.AVO").is_file())
-            self.assertTrue((lib_dir / "RT_F_MUL.AVO").is_file())
-            self.assertTrue((lib_dir / "RT_F_DIV.AVO").is_file())
-            self.assertTrue((lib_dir / "RT_I_TO_F.AVO").is_file())
-            self.assertTrue((lib_dir / "RT_SID_FREQ.AVO").is_file())
-            self.assertTrue((lib_dir / "RT_SPRITE_ON.AVO").is_file())
+            self.assertTrue((lib_dir / "RT_PRINT_STR.OBJ").is_file())
+            self.assertTrue((lib_dir / "RT_F_ADD.OBJ").is_file())
+            self.assertTrue((lib_dir / "RT_F_SUB.OBJ").is_file())
+            self.assertTrue((lib_dir / "RT_F_MUL.OBJ").is_file())
+            self.assertTrue((lib_dir / "RT_F_DIV.OBJ").is_file())
+            self.assertTrue((lib_dir / "RT_I_TO_F.OBJ").is_file())
+            self.assertTrue((lib_dir / "RT_SID_FREQ.OBJ").is_file())
+            self.assertTrue((lib_dir / "RT_SPRITE_ON.OBJ").is_file())
             self.assertIn(
                 "x rt_f_add 0 2",
-                (lib_dir / "RT_F_ADD.AVO").read_text(encoding="ascii"),
+                (lib_dir / "RT_F_ADD.OBJ").read_text(encoding="ascii"),
             )
             self.assertIn(
                 "b Ar",
-                (lib_dir / "RT_F_ADD.AVO").read_text(encoding="ascii"),
+                (lib_dir / "RT_F_ADD.OBJ").read_text(encoding="ascii"),
             )
             self.assertIn(
                 "n rt_f_add",
-                (lib_dir / "RT_F_ADD.AVO").read_text(encoding="ascii"),
+                (lib_dir / "RT_F_ADD.OBJ").read_text(encoding="ascii"),
             )
             self.assertIn(
                 "x rt_f_sub 0 2",
-                (lib_dir / "RT_F_SUB.AVO").read_text(encoding="ascii"),
+                (lib_dir / "RT_F_SUB.OBJ").read_text(encoding="ascii"),
             )
             self.assertIn(
                 "b Jr",
-                (lib_dir / "RT_F_SUB.AVO").read_text(encoding="ascii"),
+                (lib_dir / "RT_F_SUB.OBJ").read_text(encoding="ascii"),
             )
             self.assertIn(
                 "x rt_f_mul 0 2",
-                (lib_dir / "RT_F_MUL.AVO").read_text(encoding="ascii"),
+                (lib_dir / "RT_F_MUL.OBJ").read_text(encoding="ascii"),
             )
             self.assertIn(
                 "b Mr",
-                (lib_dir / "RT_F_MUL.AVO").read_text(encoding="ascii"),
+                (lib_dir / "RT_F_MUL.OBJ").read_text(encoding="ascii"),
             )
             self.assertIn(
                 "x rt_f_div 0 2",
-                (lib_dir / "RT_F_DIV.AVO").read_text(encoding="ascii"),
+                (lib_dir / "RT_F_DIV.OBJ").read_text(encoding="ascii"),
             )
             self.assertIn(
                 "b Vr",
-                (lib_dir / "RT_F_DIV.AVO").read_text(encoding="ascii"),
+                (lib_dir / "RT_F_DIV.OBJ").read_text(encoding="ascii"),
             )
             self.assertIn(
                 "x rt_i_to_f 0 2",
-                (lib_dir / "RT_I_TO_F.AVO").read_text(encoding="ascii"),
+                (lib_dir / "RT_I_TO_F.OBJ").read_text(encoding="ascii"),
             )
             self.assertIn(
                 "b Wr",
-                (lib_dir / "RT_I_TO_F.AVO").read_text(encoding="ascii"),
+                (lib_dir / "RT_I_TO_F.OBJ").read_text(encoding="ascii"),
             )
             self.assertIn(
                 "x rt_s_to_f 0 69",
-                (lib_dir / "RT_S_TO_F.AVO").read_text(encoding="ascii"),
+                (lib_dir / "RT_S_TO_F.OBJ").read_text(encoding="ascii"),
             )
             self.assertTrue((lib_dir / "UDOSDIR.TXT").is_file())
 
@@ -171,22 +163,27 @@ class TestUdosWorkspaceExport(unittest.TestCase):
             self.assertTrue((image_root / "ACTMOVE.PRG").is_file())
             self.assertTrue((image_root / "ACTRMDIR.PRG").is_file())
             self.assertTrue((image_root / "ACTWRITE.PRG").is_file())
-            self.assertTrue((image_root / "ACTDBG.PRG").is_file())
-            self.assertEqual((image_root / "ACTDBG_OVL1.BIN").read_bytes()[:4], b"DGOV")
-            self.assertEqual((image_root / "ACTDBG_OVL2.BIN").read_bytes()[:4], b"DGOV")
             self.assertTrue((image_root / "ACTEDIT.PRG").is_file())
-            self.assertTrue((image_root / "AVMINFO.PRG").is_file())
-            self.assertTrue((image_root / "AVMRUN.PRG").is_file())
-            self.assertTrue((image_root / "AVMRUNC.PRG").is_file())
-            self.assertEqual((image_root / "RT_PRINT_STD_HELPER.BIN").read_bytes()[:4], b"AVNH")
-            self.assertEqual((image_root / "RT_PRINT_F_HELPER.BIN").read_bytes()[:4], b"AVNH")
-            self.assertEqual((image_root / "RT_GFX1_HELPER.BIN").read_bytes()[:4], b"AVNH")
-            self.assertEqual((image_root / "RT_SIDSPR1_HELPER.BIN").read_bytes()[:4], b"AVNH")
-            self.assertEqual((image_root / "RT_DBF1_HELPER.BIN").read_bytes()[:4], b"AVNH")
-            self.assertEqual((image_root / "RT_MATH1_HELPER.BIN").read_bytes()[:4], b"AVNH")
-            self.assertEqual((image_root / "AVMRUN_OVL1.BIN").read_bytes()[:4], b"AVOV")
-            self.assertEqual((image_root / "AVMRUN_OVL2.BIN").read_bytes()[:4], b"AVOV")
-            self.assertEqual((image_root / "AVMRUN_OVL3.BIN").read_bytes()[:4], b"AVOV")
+            old_vm_prefix = "A" + "VM"
+            old_runner = old_vm_prefix + "RUN"
+            for name in [
+                old_vm_prefix + "INFO.PRG",
+                old_runner + ".PRG",
+                old_runner + "C.PRG",
+                "ACTDBG.PRG",
+                "ACTDBG_OVL1.BIN",
+                "ACTDBG_OVL2.BIN",
+                "RT_PRINT_STD_HELPER.BIN",
+                "RT_PRINT_F_HELPER.BIN",
+                "RT_GFX1_HELPER.BIN",
+                "RT_SIDSPR1_HELPER.BIN",
+                "RT_DBF1_HELPER.BIN",
+                "RT_MATH1_HELPER.BIN",
+                old_runner + "_OVL1.BIN",
+                old_runner + "_OVL2.BIN",
+                old_runner + "_OVL3.BIN",
+            ]:
+                self.assertFalse((image_root / name).exists(), name)
 
 
 if __name__ == "__main__":

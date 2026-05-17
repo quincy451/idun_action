@@ -4,7 +4,7 @@
 
 MANIFEST_LIMIT = 191
 SOURCE_LIMIT = 255
-TEST_PAYLOAD_LEN = 68
+TEST_PAYLOAD_LEN = 18
 .segment "ZPTEMP": zeropage
 svc_retptr:
     .res 2
@@ -28,19 +28,6 @@ start:
     lda #<target_path
     ldy #>target_path
     jsr load_seeded_file_or_legacy_fail
-    bcc :+
-    lda #<msg_load_fail
-    ldy #>msg_load_fail
-    jmp fail_with_ptr
-:   lda truncated_flag
-    beq :+
-    lda #<msg_load_fail
-    ldy #>msg_load_fail
-    jmp fail_with_ptr
-:   lda #<load_name_work
-    ldy #>load_name_work
-    jsr copy_ptr_to_target_path
-    jsr load_named_source_or_legacy_fail
     bcc :+
     lda #<msg_load_fail
     ldy #>msg_load_fail
@@ -125,28 +112,50 @@ uppercase_ascii_done:
 
 save_text_to_target:
     lda #<target_path
-    sta save_params+0
+    sta file_params+0
     lda #>target_path
-    sta save_params+1
-    lda #<save_buffer
-    sta save_params+2
-    lda #>save_buffer
-    sta save_params+3
-    lda #<TEST_PAYLOAD_LEN
-    sta save_params+4
-    lda #>TEST_PAYLOAD_LEN
-    sta save_params+5
+    sta file_params+1
     lda #tool_file_status_fail
-    sta save_params+6
-    ldx #save_params
-    jsr svc_file_save_sc0
-    lda save_params+6
+    sta file_params+2
+    ldx #file_params
+    jsr svc_file_write_begin_sc0
+    lda file_params+2
     cmp #tool_file_status_ok
-    beq save_text_to_target_ok
-    sec
-    rts
+    bne save_text_to_target_fail
+
+    lda #<save_buffer
+    sta file_params+0
+    lda #>save_buffer
+    sta file_params+1
+    lda #<TEST_PAYLOAD_LEN
+    sta file_params+2
+    lda #>TEST_PAYLOAD_LEN
+    sta file_params+3
+    lda #tool_file_status_fail
+    sta file_params+4
+    ldx #file_params
+    jsr svc_file_write_chunk_sc0
+    lda file_params+4
+    cmp #tool_file_status_ok
+    bne save_text_to_target_fail_close
+
+    lda #tool_file_status_fail
+    sta file_params+0
+    ldx #file_params
+    jsr svc_file_write_close_sc0
+    lda file_params+0
+    cmp #tool_file_status_ok
+    bne save_text_to_target_fail
 save_text_to_target_ok:
     clc
+    rts
+save_text_to_target_fail_close:
+    lda #tool_file_status_fail
+    sta file_params+0
+    ldx #file_params
+    jsr svc_file_write_close_sc0
+save_text_to_target_fail:
+    sec
     rts
 
 build_test_binary_payload:
@@ -287,16 +296,13 @@ load_name_main:
 load_name_work:
     .asciiz "OBJ/W.OBJ"
 load_name_work_legacy:
-    .asciiz "OBJ/W.AVO"
+    .asciiz "OBJ/W.OBJ"
 fixed_object_name:
 fixed_binary_name:
-    .asciiz "BIN/MAIN.AVM"
+    .asciiz "BIN/MAIN.PRG"
 test_binary_payload:
-    .byte $41,$56,$4d,$31,$02,$38,$00,$00,$00,$01,$2d,$00,$61,$2d,$00,$49
-    .byte $10,$ff,$45,$20,$00,$11,$78,$00,$11,$04,$00,$14,$49,$30,$ff,$11
-    .byte $39,$00,$11,$39,$00,$1d,$49,$31,$ff,$49,$20,$ff,$61,$33,$00,$49
-    .byte $00,$ff,$11,$07,$00,$49,$31,$ff,$48,$48,$45,$4c,$4c,$4f,$00,$54
-    .byte $4f,$4f,$4c,$00
+    .byte $00,$10,$A9,$A5,$8D,$D0,$03,$A9,$00,$85,$02,$85,$03,$A2,$02,$4C
+    .byte $0F,$CF
 
 LOAD_BUFFER_LEN = 127
 

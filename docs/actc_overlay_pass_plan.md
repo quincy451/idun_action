@@ -114,7 +114,7 @@ under BASIC ROM.
    external discovery still happens during resident body lowering.
 5. `actc_p4_layout`: compute proc sizes, offsets, and literal offsets. Current
    production state: implemented in `ACTC_OVL3.BIN`.
-6. `actc_p5_emit`: stream `AVO1` object output. Current production state:
+6. `actc_p5_emit`: stream `OBJ1` object output. Current production state:
    implemented in `ACTC_OVL5.BIN`.
 
 ## Why This Matters
@@ -133,4 +133,4 @@ tool image.
    from `ACTC_OVL6.BIN` so later language growth does not refill the resident
    tool image.
 3. Keep release packaging for every overlay binary next to `ACTC.PRG`.
-4. Keep `ACTC -> ALINK -> AVMRUN` as the regression gate while each pass moves.
+4. Keep `ACTC -> ALINK -> BIN/MAIN.PRG` as the regression gate while each pass moves.

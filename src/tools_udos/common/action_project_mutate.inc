@@ -92,6 +92,7 @@ remove_manifest_done:
     rts
 
 save_manifest_buffer:
+    jsr normalize_manifest_header
     lda #<project_marker
     sta save_params+0
     lda #>project_marker
@@ -108,6 +109,7 @@ save_manifest_buffer_len_loop:
     bne save_manifest_buffer_len_loop
 save_manifest_buffer_len_done:
     sty save_params+4
+    lda #$00
     sta save_params+5
     lda #tool_file_status_fail
     sta save_params+6
@@ -120,4 +122,35 @@ save_manifest_buffer_len_done:
     rts
 save_manifest_buffer_ok:
     clc
+    rts
+
+normalize_manifest_header:
+    lda #'A'
+    sta manifest_buffer+0
+    lda #'C'
+    sta manifest_buffer+1
+    lda #'T'
+    sta manifest_buffer+2
+    lda #'I'
+    sta manifest_buffer+3
+    lda #'O'
+    sta manifest_buffer+4
+    lda #'N'
+    sta manifest_buffer+5
+    lda #' '
+    sta manifest_buffer+6
+    lda #'P'
+    sta manifest_buffer+7
+    lda #'R'
+    sta manifest_buffer+8
+    lda #'O'
+    sta manifest_buffer+9
+    lda #'J'
+    sta manifest_buffer+10
+    lda #'E'
+    sta manifest_buffer+11
+    lda #'C'
+    sta manifest_buffer+12
+    lda #'T'
+    sta manifest_buffer+13
     rts

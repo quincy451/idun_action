@@ -53,13 +53,13 @@ build_legacy_object_target_path_suffix:
     lda #'.'
     sta target_path+4,y
     iny
-    lda #'A'
-    sta target_path+4,y
-    iny
-    lda #'V'
-    sta target_path+4,y
-    iny
     lda #'O'
+    sta target_path+4,y
+    iny
+    lda #'B'
+    sta target_path+4,y
+    iny
+    lda #'J'
     sta target_path+4,y
     iny
     lda #$00

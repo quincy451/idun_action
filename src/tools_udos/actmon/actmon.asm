@@ -2,6 +2,7 @@
 
 .export start
 
+ACTION_PROJECT_SAVE_TREE_ONLY = 1
 MANIFEST_LIMIT = 191
 SOURCE_LIMIT = 191
 
@@ -35,8 +36,8 @@ src_ptr:
     .res 2
 line_len:
     .res 1
-
-save_params = file_params
+save_params:
+    .res 7
 
 .code
 

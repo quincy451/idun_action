@@ -1,7 +1,5 @@
 # Build artifacts
 build/
-examples/reurun.avm
-examples/vmecho.avm
 
 # Python test cache
 __pycache__/

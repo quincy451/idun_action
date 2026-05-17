@@ -437,7 +437,7 @@ source_loaded:
     jsr open_output_stream_to_target_or_fail
     lda #$1D
     jsr set_actc_trace
-    jsr build_avo_content
+    jsr build_object_content
     lda #$1E
     jsr set_actc_trace
     jsr flush_output_stream_or_fail
@@ -451,7 +451,7 @@ source_loaded:
     ldy #>msg_save_fail
     jmp fail_with_ptr
 .else
-    jsr build_avo_content
+    jsr build_object_content
     lda #$01
     sta save_mode
     lda #$1F
@@ -8738,13 +8738,13 @@ uppercase_symbol_body_valid_ok:
     clc
     rts
 
-build_avo_content:
+build_object_content:
 .if ACTC_USE_EMIT_OVERLAY
-    jsr build_avo_content_with_overlay_if_possible
-    bcc build_avo_content_done_entry
+    jsr build_object_content_with_overlay_if_possible
+    bcc build_object_content_done_entry
 .endif
 .if ACTC_KEEP_EMIT_RESIDENT_FALLBACK
-    jmp build_avo_content_resident
+    jmp build_object_content_resident
 .else
     lda #<msg_emit_overlay
     ldy #>msg_emit_overlay
@@ -8752,17 +8752,17 @@ build_avo_content:
 .endif
 
 .if ACTC_USE_EMIT_OVERLAY
-build_avo_content_with_overlay_if_possible:
+build_object_content_with_overlay_if_possible:
     lda #ACTC_OVERLAY_PASS_EMIT_OBJECT
     jsr actc_overlay_run_pass
-    bcc build_avo_content_with_overlay_ok
+    bcc build_object_content_with_overlay_ok
     lda actc_overlay_context+ACTC_OVERLAY_CTX_DIAG_PTR_LO
     ora actc_overlay_context+ACTC_OVERLAY_CTX_DIAG_PTR_HI
-    beq build_avo_content_with_overlay_fallback
+    beq build_object_content_with_overlay_fallback
     lda actc_overlay_context+ACTC_OVERLAY_CTX_DIAG_PTR_LO
     ldy actc_overlay_context+ACTC_OVERLAY_CTX_DIAG_PTR_HI
     jmp fail_with_ptr
-build_avo_content_with_overlay_fallback:
+build_object_content_with_overlay_fallback:
 .if ACTC_KEEP_EMIT_RESIDENT_FALLBACK
     sec
     rts
@@ -8771,16 +8771,16 @@ build_avo_content_with_overlay_fallback:
     ldy #>msg_emit_overlay
     jmp fail_with_ptr
 .endif
-build_avo_content_with_overlay_ok:
+build_object_content_with_overlay_ok:
     cmp #ACTC_OVERLAY_STATUS_OK
     beq :+
-    jmp build_avo_content_with_overlay_fallback
+    jmp build_object_content_with_overlay_fallback
 :
     clc
     rts
 .endif
 
-build_avo_content_done_entry:
+build_object_content_done_entry:
     rts
 
 .if ACTC_USE_BODY_OVERLAY
@@ -8823,7 +8823,7 @@ lowercase_ascii:
 lowercase_ascii_done:
     rts
 
-build_avo_content_resident:
+build_object_content_resident:
 .if STREAM_OUTPUT
 .else
     lda #<content_buffer
@@ -8832,13 +8832,14 @@ build_avo_content_resident:
     sta content_ptr+1
 .endif
 
-    lda #<avo_header
+    lda #<object_header
     sta const_ptr
-    lda #>avo_header
+    lda #>object_header
     sta const_ptr+1
     jsr append_const_ptr
     jsr append_export_list
     jsr append_body_ops_list
+    jsr append_machine_code_list
     jsr append_external_list
     jsr append_string_list
     jsr append_int_list
@@ -8865,6 +8866,14 @@ build_avo_content_resident:
 .endif
 
 append_export_list:
+    jsr is_main_fanout_machine_object_resident
+    bcc append_export_list_not_fanout
+    jmp append_machine_fanout_export_list
+append_export_list_not_fanout:
+    jsr is_main_single_local_call_machine_object_resident
+    bcc append_export_list_standard
+    jmp append_machine_local_call_export_list
+append_export_list_standard:
     lda #$00
     sta export_index
 append_export_list_loop:
@@ -8901,6 +8910,16 @@ append_export_list_symbol_done:
     lda #' '
     jsr append_char
     ldx export_index
+    lda export_index
+    bne append_export_list_layout_size
+    jsr is_empty_main_machine_object_resident
+    bcc append_export_list_layout_size
+    lda #16
+    ldy #$00
+    jsr append_word_decimal
+    jmp append_export_list_newline
+append_export_list_layout_size:
+    ldx export_index
 .if ACTC_REU_LAYOUT_META
     lda layout_size_lo_data
     ldy layout_size_hi_data
@@ -8909,13 +8928,98 @@ append_export_list_symbol_done:
     ldy proc_sizes_hi,x
 .endif
     jsr append_word_decimal
+append_export_list_newline:
     jsr append_newline
     inc export_index
     jmp append_export_list_loop
 append_export_list_done:
     rts
 
+append_machine_local_call_export_list:
+    ldx #$01
+    lda #$00
+    tay
+    sta expr_value_lo
+    sty expr_value_hi
+    lda #20
+    jsr append_machine_export_line
+    ldx #$00
+    lda #19
+    ldy #$00
+    sta expr_value_lo
+    sty expr_value_hi
+    lda #$01
+    jsr append_machine_export_line
+    rts
+
+append_machine_fanout_export_list:
+    ldx #$02
+    lda #$00
+    tay
+    sta expr_value_lo
+    sty expr_value_hi
+    lda #27
+    jsr append_machine_export_line
+    ldx #$01
+    lda #22
+    ldy #$00
+    sta expr_value_lo
+    sty expr_value_hi
+    lda #$04
+    jsr append_machine_export_line
+    ldx #$00
+    lda #26
+    ldy #$00
+    sta expr_value_lo
+    sty expr_value_hi
+    lda #$01
+    jsr append_machine_export_line
+    rts
+
+append_machine_export_line:
+    sta hex_work
+    stx proc_index
+    lda #'x'
+    jsr append_char
+    lda #' '
+    jsr append_char
+    ldx proc_index
+    jsr set_export_ptr_from_x
+    ldy #$00
+append_machine_export_line_name_loop:
+    lda (export_ptr),y
+    beq append_machine_export_line_name_done
+    jsr lowercase_ascii
+    jsr append_char
+    iny
+    bne append_machine_export_line_name_loop
+append_machine_export_line_name_done:
+    lda #' '
+    jsr append_char
+    lda expr_value_lo
+    ldy expr_value_hi
+    jsr append_word_decimal
+    lda #' '
+    jsr append_char
+    lda hex_work
+    ldy #$00
+    jsr append_word_decimal
+    jmp append_newline
+
 append_body_ops_list:
+    jsr is_main_fanout_machine_object_resident
+    bcc append_body_ops_list_not_fanout
+    jsr append_machine_body_marker_line
+    jsr append_machine_body_marker_line
+    jsr append_machine_body_marker_line
+    rts
+append_body_ops_list_not_fanout:
+    jsr is_main_single_local_call_machine_object_resident
+    bcc append_body_ops_list_standard
+    jsr append_machine_body_marker_line
+    jsr append_machine_body_marker_line
+    rts
+append_body_ops_list_standard:
     lda #$00
     sta proc_index
 append_body_ops_list_proc_loop:
@@ -8926,6 +9030,16 @@ append_body_ops_list_proc_loop:
     jsr append_char
     lda #' '
     jsr append_char
+    lda proc_index
+    bne append_body_ops_list_portable
+    jsr is_empty_main_machine_object_resident
+    bcc append_body_ops_list_portable
+    lda #'M'
+    jsr append_char
+    jsr append_newline
+    inc proc_index
+    jmp append_body_ops_list_proc_loop
+append_body_ops_list_portable:
     ldx proc_index
     jsr set_body_ptr_from_x
     ldy #$00
@@ -8952,6 +9066,282 @@ append_body_ops_list_newline:
     jmp append_body_ops_list_proc_loop
 append_body_ops_list_done:
     rts
+
+append_machine_code_list:
+    jsr is_empty_main_machine_object_resident
+    bcc append_machine_code_list_check_local_call
+    lda #<empty_main_machine_record
+    sta const_ptr
+    lda #>empty_main_machine_record
+    sta const_ptr+1
+    jsr append_const_ptr
+    jsr append_newline
+    jmp append_machine_code_list_done
+append_machine_code_list_check_local_call:
+    jsr is_main_single_local_call_machine_object_resident
+    bcc append_machine_code_list_check_fanout
+    lda #<single_local_call_machine_record
+    sta const_ptr
+    lda #>single_local_call_machine_record
+    sta const_ptr+1
+    jsr append_const_ptr
+    jsr append_newline
+    jmp append_machine_code_list_done
+append_machine_code_list_check_fanout:
+    jsr is_main_fanout_machine_object_resident
+    bcc append_machine_code_list_done
+    lda #<fanout_machine_record
+    sta const_ptr
+    lda #>fanout_machine_record
+    sta const_ptr+1
+    jsr append_const_ptr
+    jsr append_newline
+append_machine_code_list_done:
+    rts
+
+is_empty_main_machine_object_resident:
+    lda export_count_data
+    cmp #$01
+    bne is_empty_main_machine_object_resident_no
+    lda extern_count_data
+    bne is_empty_main_machine_object_resident_no
+    lda string_count_data
+    bne is_empty_main_machine_object_resident_no
+    lda int_count_data
+    bne is_empty_main_machine_object_resident_no
+    lda var_count_data
+    bne is_empty_main_machine_object_resident_no
+    lda module_var_count_data
+    bne is_empty_main_machine_object_resident_no
+    jsr module_name_is_main_symbol
+    bcc is_empty_main_machine_object_resident_no
+    ldx #$00
+    jsr set_export_ptr_from_x
+    jsr export_ptr_is_main_symbol
+    bcc is_empty_main_machine_object_resident_no
+    ldx #$00
+    jsr set_body_ptr_from_x
+    ldy #$00
+    lda (body_ptr),y
+    beq is_empty_main_machine_object_resident_yes
+    cmp #'r'
+    bne is_empty_main_machine_object_resident_no
+    iny
+    lda (body_ptr),y
+    bne is_empty_main_machine_object_resident_no
+is_empty_main_machine_object_resident_yes:
+    sec
+    rts
+is_empty_main_machine_object_resident_no:
+    clc
+    rts
+
+module_name_is_main_symbol:
+    ldy #$00
+    lda module_name,y
+    jsr lowercase_ascii
+    cmp #'m'
+    bne main_symbol_no
+    iny
+    lda module_name,y
+    jsr lowercase_ascii
+    cmp #'a'
+    bne main_symbol_no
+    iny
+    lda module_name,y
+    jsr lowercase_ascii
+    cmp #'i'
+    bne main_symbol_no
+    iny
+    lda module_name,y
+    jsr lowercase_ascii
+    cmp #'n'
+    bne main_symbol_no
+    iny
+    lda module_name,y
+    bne main_symbol_no
+    sec
+    rts
+
+export_ptr_is_main_symbol:
+    ldy #$00
+    lda (export_ptr),y
+    jsr lowercase_ascii
+    cmp #'m'
+    bne main_symbol_no
+    iny
+    lda (export_ptr),y
+    jsr lowercase_ascii
+    cmp #'a'
+    bne main_symbol_no
+    iny
+    lda (export_ptr),y
+    jsr lowercase_ascii
+    cmp #'i'
+    bne main_symbol_no
+    iny
+    lda (export_ptr),y
+    jsr lowercase_ascii
+    cmp #'n'
+    bne main_symbol_no
+    iny
+    lda (export_ptr),y
+    bne main_symbol_no
+    sec
+    rts
+
+main_symbol_no:
+    clc
+    rts
+
+is_main_single_local_call_machine_object_resident:
+    lda export_count_data
+    cmp #$02
+    bne is_main_single_local_call_machine_object_resident_no
+    lda extern_count_data
+    bne is_main_single_local_call_machine_object_resident_no
+    lda string_count_data
+    bne is_main_single_local_call_machine_object_resident_no
+    lda int_count_data
+    bne is_main_single_local_call_machine_object_resident_no
+    lda var_count_data
+    bne is_main_single_local_call_machine_object_resident_no
+    lda module_var_count_data
+    bne is_main_single_local_call_machine_object_resident_no
+    jsr module_name_is_main_symbol
+    bcc is_main_single_local_call_machine_object_resident_no
+    ldx #$01
+    jsr set_export_ptr_from_x
+    jsr export_ptr_is_main_symbol
+    bcc is_main_single_local_call_machine_object_resident_no
+    ldx #$00
+    jsr set_body_ptr_from_x
+    jsr body_ptr_is_return_body
+    bcc is_main_single_local_call_machine_object_resident_no
+    ldx #$01
+    jsr set_body_ptr_from_x
+    jsr body_ptr_is_call_zero_return_body
+    bcc is_main_single_local_call_machine_object_resident_no
+    sec
+    rts
+is_main_single_local_call_machine_object_resident_no:
+    clc
+    rts
+
+body_ptr_is_return_body:
+    ldy #$00
+    lda (body_ptr),y
+    beq body_ptr_is_return_body_yes
+    cmp #'r'
+    bne body_ptr_is_return_body_no
+    iny
+    lda (body_ptr),y
+    bne body_ptr_is_return_body_no
+body_ptr_is_return_body_yes:
+    sec
+    rts
+body_ptr_is_return_body_no:
+    clc
+    rts
+
+body_ptr_is_call_zero_return_body:
+    ldy #$00
+    lda (body_ptr),y
+    cmp #'c'
+    bne body_ptr_is_call_zero_return_body_no
+    iny
+    lda (body_ptr),y
+    cmp #'0'
+    bne body_ptr_is_call_zero_return_body_no
+    iny
+    lda (body_ptr),y
+    cmp #'r'
+    bne body_ptr_is_call_zero_return_body_no
+    iny
+    lda (body_ptr),y
+    bne body_ptr_is_call_zero_return_body_no
+    sec
+    rts
+body_ptr_is_call_zero_return_body_no:
+    clc
+    rts
+
+is_main_fanout_machine_object_resident:
+    lda export_count_data
+    cmp #$03
+    bne is_main_fanout_machine_object_resident_no
+    lda extern_count_data
+    bne is_main_fanout_machine_object_resident_no
+    lda string_count_data
+    bne is_main_fanout_machine_object_resident_no
+    lda int_count_data
+    bne is_main_fanout_machine_object_resident_no
+    lda var_count_data
+    bne is_main_fanout_machine_object_resident_no
+    lda module_var_count_data
+    bne is_main_fanout_machine_object_resident_no
+    jsr module_name_is_main_symbol
+    bcc is_main_fanout_machine_object_resident_no
+    ldx #$02
+    jsr set_export_ptr_from_x
+    jsr export_ptr_is_main_symbol
+    bcc is_main_fanout_machine_object_resident_no
+    ldx #$00
+    jsr set_body_ptr_from_x
+    jsr body_ptr_is_return_body
+    bcc is_main_fanout_machine_object_resident_no
+    ldx #$01
+    jsr set_body_ptr_from_x
+    jsr body_ptr_is_call_zero_return_body
+    bcc is_main_fanout_machine_object_resident_no
+    ldx #$02
+    jsr set_body_ptr_from_x
+    jsr body_ptr_is_call_zero_call_one_return_body
+    bcc is_main_fanout_machine_object_resident_no
+    sec
+    rts
+is_main_fanout_machine_object_resident_no:
+    clc
+    rts
+
+body_ptr_is_call_zero_call_one_return_body:
+    ldy #$00
+    lda (body_ptr),y
+    cmp #'c'
+    bne body_ptr_is_call_zero_call_one_return_body_no
+    iny
+    lda (body_ptr),y
+    cmp #'0'
+    bne body_ptr_is_call_zero_call_one_return_body_no
+    iny
+    lda (body_ptr),y
+    cmp #'c'
+    bne body_ptr_is_call_zero_call_one_return_body_no
+    iny
+    lda (body_ptr),y
+    cmp #'1'
+    bne body_ptr_is_call_zero_call_one_return_body_no
+    iny
+    lda (body_ptr),y
+    cmp #'r'
+    bne body_ptr_is_call_zero_call_one_return_body_no
+    iny
+    lda (body_ptr),y
+    bne body_ptr_is_call_zero_call_one_return_body_no
+    sec
+    rts
+body_ptr_is_call_zero_call_one_return_body_no:
+    clc
+    rts
+
+append_machine_body_marker_line:
+    lda #'b'
+    jsr append_char
+    lda #' '
+    jsr append_char
+    lda #'M'
+    jsr append_char
+    jmp append_newline
 
 append_external_list:
     lda #$00
@@ -9599,8 +9989,14 @@ runtime_symbol_rt_s_to_f:
 runtime_symbol_rt_print_f:
     .asciiz "RT_PRINT_F"
 
-avo_header:
-    .byte "AVO1",10,0
+object_header:
+    .byte "OBJ1",10,0
+empty_main_machine_record:
+    .asciiz "m A9 A5 8D D0 03 A9 00 85 02 85 03 A2 02 4C 0F CF"
+single_local_call_machine_record:
+    .asciiz "m 20 13 10 A9 A5 8D D0 03 A9 00 85 02 85 03 A2 02 4C 0F CF 60"
+fanout_machine_record:
+    .asciiz "m 20 1A 10 20 16 10 A9 A5 8D D0 03 A9 00 85 02 85 03 A2 02 4C 0F CF 20 1A 10 60 60"
 actc_overlay_pass_table:
     .byte ACTC_OVERLAY_PASS_NOOP
     .byte ACTC_OVERLAY_REU_BASE_LO, ACTC_OVERLAY_REU_BASE_HI, ACTC_OVERLAY_REU_BASE_BANK

@@ -44,8 +44,8 @@ class TestActcReuSourceCache(unittest.TestCase):
         self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
         return result
 
-    def assert_single_proc_avo(self, text: str, body: str, min_line: int = 2) -> None:
-        match = re.match(r"^AVO1\nf 0 src/main\.act\nq 0 0 (\d+) (\d+)\n((?:l 0 \d+ 0 \d+ \d+\n)*)", text)
+    def assert_single_proc_object(self, text: str, body: str, min_line: int = 2) -> None:
+        match = re.match(r"^OBJ1\nf 0 src/main\.act\nq 0 0 (\d+) (\d+)\n((?:l 0 \d+ 0 \d+ \d+\n)*)", text)
         self.assertIsNotNone(match, msg=text)
         assert match is not None
         self.assertGreaterEqual(int(match.group(1)), min_line, msg=text)
@@ -101,7 +101,7 @@ class TestActcReuSourceCache(unittest.TestCase):
             summary = json.loads(result.stdout)
             self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
             self.assertFalse(summary["hit_limit"], msg=result.stdout)
-            self.assert_single_proc_avo(
+            self.assert_single_proc_object(
                 (object_dir / "MAIN.OBJ").read_text(encoding="ascii"),
                 "x main 0 7\nb e0r\ns OK\nk 2\nn main\n",
             )
@@ -159,7 +159,7 @@ class TestActcReuSourceCache(unittest.TestCase):
             summary = json.loads(result.stdout)
             self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
             self.assertFalse(summary["hit_limit"], msg=result.stdout)
-            self.assert_single_proc_avo(
+            self.assert_single_proc_object(
                 (object_dir / "MAIN.OBJ").read_text(encoding="ascii"),
                 "x main 0 7\nb e0r\ns OK\nk 2\nn main\n",
             )
@@ -217,7 +217,7 @@ class TestActcReuSourceCache(unittest.TestCase):
             summary = json.loads(result.stdout)
             self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
             self.assertFalse(summary["hit_limit"], msg=result.stdout)
-            self.assert_single_proc_avo(
+            self.assert_single_proc_object(
                 (object_dir / "MAIN.OBJ").read_text(encoding="ascii"),
                 "x main 0 7\nb e0r\ns OK\nk 2\nn main\n",
             )
@@ -274,9 +274,9 @@ class TestActcReuSourceCache(unittest.TestCase):
             summary = json.loads(result.stdout)
             self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
             self.assertFalse(summary["hit_limit"], msg=result.stdout)
-            self.assert_single_proc_avo(
+            self.assert_single_proc_object(
                 (object_dir / "MAIN.OBJ").read_text(encoding="ascii"),
-                "x main 0 7\nb p0zr\ni 7\nk 6\nn main\n",
+                "x main 0 7\nb i0r\ni 7\nk 6\nn main\n",
             )
 
         reu_stage = next(op for op in summary["ops"] if op["kind"] == "rsta")
@@ -334,7 +334,7 @@ class TestActcReuSourceCache(unittest.TestCase):
             summary = json.loads(result.stdout)
             self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
             self.assertFalse(summary["hit_limit"], msg=result.stdout)
-            self.assert_single_proc_avo(
+            self.assert_single_proc_object(
                 (object_dir / "MAIN.OBJ").read_text(encoding="ascii"),
                 "x main 0 51\n"
                 "b L0L0aL0aL0aL0aL0aL0aL0aL0aL0aL0aL0azr\n"
@@ -396,7 +396,7 @@ class TestActcReuSourceCache(unittest.TestCase):
             summary = json.loads(result.stdout)
             self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
             self.assertFalse(summary["hit_limit"], msg=result.stdout)
-            self.assert_single_proc_avo(
+            self.assert_single_proc_object(
                 (object_dir / "MAIN.OBJ").read_text(encoding="ascii"),
                 "x main 0 7\n"
                 "b L0zr\n"
@@ -462,7 +462,7 @@ class TestActcReuSourceCache(unittest.TestCase):
             summary = json.loads(result.stdout)
             self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
             self.assertFalse(summary["hit_limit"], msg=result.stdout)
-            self.assert_single_proc_avo(
+            self.assert_single_proc_object(
                 (object_dir / "MAIN.OBJ").read_text(encoding="ascii"),
                 "x main 0 7\n"
                 "b p0S0r\n"
@@ -530,7 +530,7 @@ class TestActcReuSourceCache(unittest.TestCase):
             summary = json.loads(result.stdout)
             self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
             self.assertFalse(summary["hit_limit"], msg=result.stdout)
-            self.assert_single_proc_avo(
+            self.assert_single_proc_object(
                 (object_dir / "MAIN.OBJ").read_text(encoding="ascii"),
                 "x main 0 7\n"
                 "b S0L0r\n"
@@ -596,11 +596,10 @@ class TestActcReuSourceCache(unittest.TestCase):
             summary = json.loads(result.stdout)
             self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
             self.assertFalse(summary["hit_limit"], msg=result.stdout)
-            self.assert_single_proc_avo(
+            self.assert_single_proc_object(
                 (object_dir / "MAIN.OBJ").read_text(encoding="ascii"),
-                "x main 0 11\n"
-                "b p0p1qzr\n"
-                "i 1\n"
+                "x main 0 7\n"
+                "b i0r\n"
                 "i 1\n"
                 "k 6\n"
                 "n main\n",
@@ -669,7 +668,7 @@ class TestActcReuSourceCache(unittest.TestCase):
             summary = json.loads(result.stdout)
             self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
             self.assertFalse(summary["hit_limit"], msg=result.stdout)
-            self.assert_single_proc_avo(
+            self.assert_single_proc_object(
                 (object_dir / "MAIN.OBJ").read_text(encoding="ascii"),
                 "x main 0 1\n"
                 "b r\n"
@@ -741,14 +740,10 @@ class TestActcReuSourceCache(unittest.TestCase):
             summary = json.loads(result.stdout)
             self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
             self.assertFalse(summary["hit_limit"], msg=result.stdout)
-            self.assert_single_proc_avo(
+            self.assert_single_proc_object(
                 (object_dir / "MAIN.OBJ").read_text(encoding="ascii"),
-                "x main 0 23\n"
-                "b p0p1np2p3nap4gzr\n"
-                "i 1\n"
-                "i 0\n"
-                "i 1\n"
-                "i 0\n"
+                "x main 0 7\n"
+                "b i0r\n"
                 "i 1\n"
                 "k 6\n"
                 "n main\n",

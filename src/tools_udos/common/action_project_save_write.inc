@@ -11,6 +11,11 @@ save_content_buffer_to_target:
     sta svc_retptr
     lda save_params+3
     sta svc_retptr+1
+.ifdef ACTION_PROJECT_SAVE_TREE_ONLY
+    lda #$00
+    sta save_params+4
+    sta save_params+5
+.else
     lda #$00
     sta save_params+4
     sta save_params+5
@@ -27,6 +32,7 @@ save_content_buffer_len_loop:
     inc save_params+5
     bne save_content_buffer_len_loop
 save_content_buffer_len_done:
+.endif
     lda #tool_file_status_fail
     sta save_params+6
     ldx #save_params

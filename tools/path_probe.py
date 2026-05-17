@@ -12,7 +12,6 @@ def main() -> int:
     targets = {
         "actionc64u": root,
         "cpm65-u64": workspace / "cpm65-u64",
-        "acheronvm": workspace / "acheronvm",
         "action.pdf": workspace / "action.pdf",
     }
 
@@ -27,8 +26,7 @@ def main() -> int:
     if missing:
         print(
             "Missing required local paths. Verify you are running inside "
-            "/mnt/c/test/action with adjacent cpm65-u64, acheronvm, and "
-            "action.pdf.",
+            "/mnt/c/test/action with adjacent cpm65-u64 and action.pdf.",
             file=sys.stderr,
         )
         return 1

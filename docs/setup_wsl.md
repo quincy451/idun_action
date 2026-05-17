@@ -20,7 +20,6 @@ environment you plan to use for this repo.
 ## Local Adjacent Repos Expected
 
 - `../cpm65-u64`
-- `../acheronvm`
 - `../action.pdf`
 
 Validate these paths with:

@@ -4,7 +4,7 @@
 ;
 ; Intent:
 ; - thin Action-facing declarations
-; - semantic numeric functions, not new AVM core opcodes
+; - semantic numeric functions, not new core runtime opcodes
 ; - operator-specific REAL runtime modules remain the implementation for
 ;   A+B, A-B, A*B, A/B, REAL(x), and INT(x)
 ; - raw 6502 implementation lives in RT_MATH1_HELPER.BIN

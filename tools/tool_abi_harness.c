@@ -51,7 +51,6 @@ typedef struct {
     uint16_t svc_program_get_cmdline_ptr;
     uint16_t svc_program_get_cmdline_len;
     uint16_t svc_program_exit;
-    uint16_t svc_vm_acheron_enter;
     uint16_t svc_file_load_sc0;
     uint16_t svc_file_save_sc0;
     uint16_t svc_file_write_begin_sc0;
@@ -387,8 +386,6 @@ static void load_services_inc(ServiceAbi* abi, const char* path)
             parse_u16_value(value, &abi->svc_program_get_cmdline_len);
         } else if (strcmp(name, "svc_program_exit") == 0) {
             parse_u16_value(value, &abi->svc_program_exit);
-        } else if (strcmp(name, "svc_vm_acheron_enter") == 0) {
-            parse_u16_value(value, &abi->svc_vm_acheron_enter);
         } else if (strcmp(name, "svc_file_load_sc0") == 0) {
             parse_u16_value(value, &abi->svc_file_load_sc0);
         } else if (strcmp(name, "svc_file_save_sc0") == 0) {
@@ -1182,17 +1179,6 @@ static int service_program_exit(M6502* cpu, uint16_t address, uint8_t data)
     longjmp(G->escape, 1);
 }
 
-static int service_vm_acheron_enter(M6502* cpu, uint16_t address, uint8_t data)
-{
-    (void)cpu;
-    (void)address;
-    (void)data;
-    append_console(G, "HARNESS NO ACHERON\n");
-    G->exit_status = 1;
-    G->exited = true;
-    longjmp(G->escape, 1);
-}
-
 static int service_file_load(M6502* cpu, uint16_t address, uint8_t data)
 {
     (void)address;
@@ -1662,9 +1648,6 @@ static void install_callbacks(Harness* h)
     M6502_setCallback(h->cpu, call, h->abi.svc_program_get_cmdline_ptr, service_program_get_cmdline_ptr);
     M6502_setCallback(h->cpu, call, h->abi.svc_program_get_cmdline_len, service_program_get_cmdline_len);
     M6502_setCallback(h->cpu, call, h->abi.svc_program_exit, service_program_exit);
-    if (h->abi.svc_vm_acheron_enter) {
-        M6502_setCallback(h->cpu, call, h->abi.svc_vm_acheron_enter, service_vm_acheron_enter);
-    }
     M6502_setCallback(h->cpu, call, h->abi.svc_file_load_sc0, service_file_load);
     M6502_setCallback(h->cpu, call, h->abi.svc_file_save_sc0, service_file_save);
     M6502_setCallback(h->cpu, call, h->abi.svc_file_write_begin_sc0, service_file_write_begin);

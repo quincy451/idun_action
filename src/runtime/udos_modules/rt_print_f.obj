@@ -1,0 +1,5 @@
+OBJ1
+x rt_print_f 0 4
+b Yr
+k 0
+n rt_print_f

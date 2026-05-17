@@ -25,17 +25,7 @@ copy_module_arg_extension:
     lda (src_ptr),y
     jsr normalize_module_arg_char
     cmp #'C'
-    beq copy_module_arg_extension_act
-    cmp #'V'
     bne copy_module_arg_fail
-    iny
-    lda (src_ptr),y
-    jsr normalize_module_arg_char
-    cmp #'M'
-    bne copy_module_arg_fail
-    lda #$01
-    sta explicit_avm_mode
-    jmp copy_module_arg_extension_done
 copy_module_arg_extension_act:
     iny
     lda (src_ptr),y

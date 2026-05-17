@@ -1,10 +1,13 @@
-# Architecture (Early Draft)
+# Architecture
 
-ActionC64U is currently planned as a staged toolchain:
+ActionC64U is now a UDOS-native Action-style toolchain.
 
-1. Frontend parser + semantic passes for an Action-like language.
-2. IR lowering to AcheronVM-compatible bytecode.
-3. Runtime and system bindings for CP/M-65 execution model.
-4. Packaging/link stage with dead-strip and overlay planning.
+Active flow:
 
-Initial architecture focus is on host-first determinism and testability.
+- `ACTC.PRG` compiles source into `OBJ/*.OBJ` object files.
+- `ALINK.PRG` resolves the object closure and emits `BIN/<MODULE>.PRG`.
+- UDOS launches the linked PRG directly.
+
+The linked PRG must contain the entry path, selected runtime helpers, and all
+program-owned code/data needed for execution. A separate runtime host is not
+part of the maintained architecture.

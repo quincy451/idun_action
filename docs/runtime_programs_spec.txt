@@ -2,335 +2,93 @@ RUNTIME PROGRAMS SPEC
 
 Purpose
 
-This document describes the programs required to run an ActionC64U program when
-the linker does not emit a standalone Commodore PRG and instead emits an AVM
-program image.
+This document defines the current runtime contract for ActionC64U programs.
 
-The short answer is:
+The maintained product path no longer uses a separate runtime program. The
+linker output is the program that runs.
 
-- ACTC builds objects
-- ALINK builds AVM programs
-- AVMRUN runs native-fast-path AVM programs
-- AVMRUNC runs compat/interpreter AVM programs
+Current model:
 
-If the final build product is BIN/<MODULE>.AVM, then AVMRUN.PRG is the runtime
-program required to execute it.
-
+- ACTC.PRG compiles SRC/<MODULE>.ACT to OBJ/<MODULE>.OBJ.
+- ALINK.PRG links OBJ/<MODULE>.OBJ and its dependency closure.
+- ALINK.PRG emits BIN/<MODULE>.PRG as a directly launchable Commodore program.
+- No separate runner is required after linking.
 
 Execution Model
 
-The ActionC64U toolchain is intentionally split into build-time and run-time
-stages.
-
 Build-time:
 
-- ACTC.PRG compiles SRC/<MODULE>.ACT to OBJ/<MODULE>.OBJ
-- ALINK.PRG links OBJ/<MODULE>.OBJ and its dependencies to BIN/<MODULE>.AVM
-
-Project objects remain `AVO1` text objects internally.
-The primary filename extension is now `.OBJ`; legacy `.AVO` remains accepted
-by linker-side compatibility paths.
+- ACTC.PRG parses source and writes project object files.
+- ALINK.PRG resolves the object graph, dead-strips unused code/data, selects
+  required runtime helper modules, and writes the final PRG image.
 
 Run-time:
 
-- AVMRUN.PRG loads BIN/<MODULE>.AVM when the payload stays on the shipped
-  native fast path
-- AVMRUNC.PRG loads BIN/<MODULE>.AVM when the payload needs the compat
-  interpreter/overlay path
-- the selected runner validates the image
-- the selected runner initializes the VM/runtime state
-- the selected runner transfers control to the program entry point
+- UDOS launches the linked PRG.
+- The linked PRG contains its own entry point, selected runtime helpers, and
+  program payload.
+- Control returns to UDOS through the normal resident/tool return path when the
+  program exits.
 
-So if the linker does not emit a directly bootable or directly SYS-able PRG,
-the missing piece is not another linker pass. The missing piece is the runtime
-launcher.
+There is no second launch stage where a generic runtime program interprets or
+hosts the linked output. If a helper is required, ALINK must put that helper into
+the final PRG or into an explicitly linked payload that the final PRG owns.
 
+Required Runtime Files
 
-Required Runtime Program
+Minimum runtime set after a successful link:
 
-1. AVMRUN.PRG
+- UDOS system/resident environment
+- BIN/<MODULE>.PRG
 
-AVMRUN.PRG is the required launcher and runtime host for linked AVM output.
-
-2. AVMRUNC.PRG
-
-AVMRUNC.PRG is the compatibility runner. It keeps the interpreter/overlay path
-that production `AVMRUN.PRG` no longer carries resident.
-
-Its job is to:
-
-- accept an AVM filename as its command-line argument
-- load the file through the UDOS file ABI
-- validate:
-  - magic
-  - internal version
-  - flags
-  - payload length
-  - entry offset
-- prepare the VM state
-- dispatch execution to the supported VM engine
-- return control to UDOS when the program exits
-
-Current binary AVM capacity:
-
-- AVMRUN.PRG loads binary AVM files into a runtime window at $3000 rather than
-  into its own BSS
-- the shipped production build is now binary-`AVM1` only; legacy text AVM
-  decode is no longer part of the normal runtime path
-- the shipped production build no longer links its own `Acheron` copy; the
-  normal fast path enters the resident UDOS engine through
-  `svc_vm_acheron_enter`
-- AVMRUN uses `$0001 = $36` during file load so BASIC ROM is hidden and the
-  runtime window can span `$3000-$EFFF`
-- after header validation it switches to `$0001 = $34` while patching and
-  executing, so RAM under both I/O and KERNAL is visible as well
-- the current configured binary file limit is $C000 bytes, or 49152 bytes
-- tests/test_avmrun_capacity.py proves a 49152-byte AVM patches and exits from
-  near the top of that widened runtime window through the tool ABI harness
-- AVMRUN restores the original memory configuration before returning to UDOS
-- the compat runner keeps the same `$3000-$EFFF` payload window while still
-  staging `AVMRUN_OVL1.BIN`, `AVMRUN_OVL2.BIN`, and `AVMRUN_OVL3.BIN` on
-  demand
-
-In practice, the run command is:
-
-- AVMRUN.PRG BIN/<MODULE>.AVM
-
-or, if already in BIN/:
-
-- AVMRUN.PRG <MODULE>.AVM
-
-
-What AVMRUN Provides
-
-AVMRUN is not just a file loader. It is the runtime environment for AVM
-programs.
-
-Its responsibilities include:
-
-- AVM header parsing
-- payload preparation
-- entry-point dispatch
-- resident-Acheron-backed execution for the supported format/flag set
-- interpreted support for the currently implemented opcode subset
-- runtime intrinsic handling
-
-It is no longer responsible for accepting legacy text-AVM source in the
-production build. That compatibility path is treated as debug-only baggage, not
-part of the shipped launcher contract.
-
-The currently documented intrinsic families include:
-
-- printing
-  - Print
-  - PrintE
-  - PrintI
-  - PrintIE
-  - PrintR / PrintRE
-- process exit
-  - Exit
-- REU services
-  - ReuAlloc
-  - ReuFree
-  - ReuPeek8
-  - ReuPoke8
-  - ReuPeek16
-  - ReuPoke16
-- console services
-  - ConIn
-
-The current shipped runner no longer keeps the print helper family in its
-always-resident body. `Print`, `PrintE`, `PrintI`, `PrintIE`, `PrintR`, and
-`PrintRE` now stage `AVMRUN_OVL1.BIN` from the program directory on first use
-and execute that helper from a dedicated overlay window at `$F000`. This is
-the first production proof that optional runtime helper code can be paid for on
-demand rather than permanently in `AVMRUN.PRG`.
-- the first linked native-helper proof now also exists: when linked
-  `rt_print_f` is live, `ALINK` appends a native-helper trailer to the final
-  `AVM1` file and emits a reserved `CALLN` pseudo-target instead of the old
-  runner-global `PRINTREAL` intrinsic; `ALINK` stages
-  `!RT_PRINT_F_HELPER.BIN` from the packaged tool set and streams it into that
-  trailer only when needed; `AVMRUN` loads the helper into a dedicated low-RAM
-  window at `$2400`, validates the helper's self-describing `AVNH` header, and
-  patches the pseudo-target to the embedded native entry on the normal fast
-  path
-- the stronger linked `PrintRE` proof is now real on an actual `ALINK`
-  program: `A=REAL(1)`, `B=REAL(8)`, `X=A/B`, `PrintRE(X)` still prints
-  `0.125` after removing `RT_PRINT_F_HELPER.BIN`, `RT_PRINT_STD_HELPER.BIN`,
-  `AVMRUN_OVL1.BIN`, `AVMRUN_OVL2.BIN`, and `AVMRUN_OVL3.BIN` from the
-  mounted workspace, which proves that shipped linked REAL print no longer
-  depends on loose helper sidecars or AVMRUN overlays for that case
-- the same `AVNH` convention now also has a second packaged helper artifact,
-  `!RT_PRINT_STD_HELPER.BIN`, for native standard print support (`Print`,
-  `PrintE`, `PrintI`, `PrintIE`) on the normal fast path
-- `ALINK` now emits the linked standard-print pseudo-targets
-  (`$FE00` / `$FE10` / `$FE30` / `$FE31`) for those sites instead of the old
-  runner-global `$FFxx` print targets
-- `ALINK` now also appends that standard print helper as a native-helper
-  trailer entry when those linked print sites are live, so standard print now
-  uses the same program-owned helper-trailer model as `rt_print_f`
-- the current harness proof for standard print still exercises the interpreter
-  fallback path through `AVMRUN_OVL1.BIN` and `AVMRUN_OVL3.BIN`; what is gone
-  is the runtime dependency on a loose `RT_PRINT_STD_HELPER.BIN` sidecar
-- production `AVMRUN.PRG` no longer contains the standard-print sidecar loader
-  compatibility path at all; linked standard print now requires the helper
-  trailer carried in the `AVM1` image
-- interpreted `REAL` arithmetic/conversion is also no longer resident in the
-  main runner body; `FADD` / `FSUB` / `FMUL` / `FDIV` / `FTOI` / `ITOF` now
-  stage `AVMRUN_OVL2.BIN` on first use through the same overlay window
-- the fallback interpreter shell is no longer resident either; it now stages
-  `AVMRUN_OVL3.BIN` and resumes through that overlay when the normal fast path
-  cannot execute the payload directly
-  - ConOut
-- file services
-  - FileOpenRead
-  - FileCloseRead
-  - FileRead8
-  - FileOpenWrite
-  - FileCloseWrite
-  - FileWrite8
-  - FileDelete
-
-The point is that ALINK does not need to emit a native machine-language PRG for
-the program to be runnable. The AVM plus AVMRUN pair is the intended completed
-execution model.
-
-
-Optional Supporting Runtime Programs
-
-2. AVMINFO.PRG
-
-AVMINFO.PRG is not required to execute a program, but it is the standard
-inspection and validation helper for AVM output.
-
-Its job is to:
-
-- load a candidate .AVM file
-- confirm the AVM header is present
-- report whether the file is structurally valid enough to be recognized as an
-  AVM image
-
-Use cases:
-
-- smoke-check a linked image before running it
-- distinguish BAD AVM from launch-path failures
-- validate packaging or file-copy results
-
-
-Programs Not Required At Runtime
-
-These tools are not required once BIN/<MODULE>.AVM already exists:
+Not required at program launch:
 
 - ACTC.PRG
 - ALINK.PRG
-- object files in OBJ/
-- source files in SRC/
-- developer-side link maps or status reports
+- OBJ/ files
+- SRC/ files
+- loose runtime module source/object files
+- a generic VM or bytecode runner
 
-Those are build-time artifacts or build-time tools.
+ALINK Responsibility
 
+ALINK is responsible for 100% of what the presented program needs in order to
+run. That includes:
 
-Runtime Files Not Required As Separate Sidecars
+- the PRG load address and entry path
+- linked code and data layout
+- selected runtime helpers
+- unresolved external closure loading
+- dead-strip decisions
+- any startup/return code needed by the program
 
-Once ALINK has successfully linked the program, the runtime library is expected
-to be folded into the AVM image by symbol resolution and dead-strip.
+A linked program must not depend on a separate resident instruction-set runtime
+or a separate interpreter-style launcher to make the program meaningful.
 
-That means the finished AVM should not require separate loose runtime module
-files at program launch time.
+Runtime Helper Policy
 
-In other words:
+Optional feature families such as REAL math, printing, graphics, SID/sprite,
+DBF, TCP, and 80-column support should be link-selected helper modules.
 
-- runtime modules are link-time inputs
-- REAL arithmetic/conversion/print routines are link-time inputs selected per
-  used operator, not AVMRUN opcodes and not an always-present REAL blob
-- the current UDOS `RT_F_ADD.AVO` file implements exact `+0.0` identity for
-  either operand, same-sign equal-power-of-two sums such as
-  `1.0 + 1.0 = 2.0`, `2.0 + 2.0 = 4.0`, `4.0 + 4.0 = 8.0`, and
-  `-2.0 + -2.0 = -4.0`, adjacent-exponent sums such as
-  `2.0 + 1.0 = 3.0`, adjacent-exponent mixed-sign differences such as
-  `2.0 + -1.0 = 1.0`, gap-two sums such as `4.0 + 1.0 = 5.0`,
-  gap-two mixed-sign differences such as `4.0 + -1.0 = 3.0` and
-  `1.0 + -4.0 = -3.0`, plus exact
-  `1.5 + 1.5 = 3.0`, but is still not complete IEEE-754 addition
-- the current UDOS `RT_F_SUB.AVO` file implements exact `x - +0.0`,
-  sign-flipped `+0.0 - x`, equal signed power-of-two subtraction as zero,
-  adjacent-exponent differences such as `4.0 - 2.0 = 2.0`,
-  adjacent-exponent mixed-sign sums such as `2.0 - -1.0 = 3.0`, gap-two
-  differences such as `4.0 - 1.0 = 3.0`, gap-two mixed-sign sums such as
-  `4.0 - -1.0 = 5.0` and `-4.0 - 1.0 = -5.0`, and exact
-  `2.0 - 1.0 = 1.0`, but is still not complete IEEE-754 subtraction
-- the current UDOS `RT_F_MUL.AVO` file implements zero identity, one identity,
-  and low-word-zero values scaled by exact power-of-two operands, including
-  `2.0 * 2.0 = 4.0`, `4.0 * 2.0 = 8.0`,
-  `-2.0 * 2.0 = -4.0`, `-2.0 * -2.0 = 4.0`, and
-  `1.5 * 2.0 = 3.0`, but is still not complete IEEE-754 multiplication
-- the current UDOS `RT_F_DIV.AVO` file implements zero numerator,
-  divide-by-zero as zero, `x / 1.0 = x`, and low-word-zero values divided by
-  exact power-of-two denominators, including `4.0 / 2.0 = 2.0`,
-  `8.0 / 2.0 = 4.0`, `2.0 / 4.0 = 0.5`,
-  `-4.0 / 2.0 = -2.0`, `2.0 / -4.0 = -0.5`, and
-  `3.0 / 2.0 = 1.5`, but is still not complete IEEE-754 division
-- AVMRUN is the run-time launcher
-- the linked AVM is the run-time payload
-
-
-Environment Required At Runtime
-
-To run an AVM image, the system still needs the ActionC64U execution
-environment:
-
-- a booted UDOS environment
-- the resident services AVMRUN expects to use
-- AVMRUN.PRG available on a launchable path
-- the target .AVM file on a readable mounted filesystem
-
-So the minimum practical runtime set is:
-
-- UDOS system
-- AVMRUN.PRG
-- <PROGRAM>.AVM
-
-
-What If A Standalone Commodore PRG Is Desired
-
-A native standalone PRG for a generic Commodore machine is a different product
-than the current AVM output.
-
-That would require an additional packaging strategy such as:
-
-- embedding AVMRUN plus the AVM payload into one PRG
-- generating a native loader stub that contains or locates the AVM image
-- or generating direct native machine code instead of AVM
-
-That is not ALINK's core contract today.
-
-So the correct architectural statement is:
-
-- ALINK is responsible for the linked AVM image
-- AVMRUN is responsible for executing that image
-- a standalone PRG packager would be a separate later tool, not a hidden part
-  of ALINK
-
+The rule is simple: if a program uses a feature, ALINK selects and places the
+needed helper code into the linked PRG. If a program does not use a feature, that
+helper code is not paid for in the final image.
 
 Recommended Operator View
 
 For someone building and running ActionC64U programs, the tool responsibilities
-should be understood as:
+are:
 
 - ACTC.PRG: compile source to object
-- ALINK.PRG: link object closure to AVM
-- AVMRUN.PRG: execute the AVM
-- AVMINFO.PRG: inspect or validate the AVM
-
+- ALINK.PRG: link object closure to a directly launchable PRG
+- BIN/<MODULE>.PRG: run this final program under UDOS
 
 Current Proven Status
 
-On the committed baseline, the real end-to-end proof already matches this
-architecture:
+The active proof chain is:
 
-- ACTC produces OBJ/<MODULE>.OBJ
-- ALINK produces BIN/<MODULE>.AVM
-- AVMRUN executes BIN/<MODULE>.AVM and returns to UDOS
+- ACTC produces OBJ/<MODULE>.OBJ.
+- ALINK produces BIN/<MODULE>.PRG.
+- UDOS launches BIN/<MODULE>.PRG directly.
 
-That is the completed runtime model the rest of the toolchain is being built
-toward.
+The maintained runtime direction is direct PRG output only.

@@ -1,15 +1,15 @@
-# UDOS Runtime AVO Modules
+# UDOS Runtime OBJ Modules
 
-This directory contains target-side text `AVO1` runtime modules that UDOS
+This directory contains target-side text `OBJ1` runtime modules that UDOS
 `ALINK.PRG` can parse from `LIB/`.
 
-The sibling `src/runtime/modules/` directory is the host/reference JSON-style AVO
+The sibling `src/runtime/modules/` directory is the host/reference JSON-style object
 format used by the Python linker. Keep the two formats separate until the host
 and UDOS object readers converge.
 
 Current status:
 
-- `rt_f_add.avo` is a partial REAL add helper. It preserves the current stack
+- `rt_f_add.obj` is a partial REAL add helper. It preserves the current stack
   contract, implements exact zero identity for either side
   (`x + +0.0 = x`, `+0.0 + x = x`), handles same-sign equal-power-of-two sums
   by exponent increment, including `1.0 + 1.0 = 2.0`,
@@ -26,7 +26,7 @@ Current status:
   cancellation is proven for the current direct `2.0 + -2.0` harness case,
   but broader mixed-sign addition remains incomplete. Other non-zero inputs still return REAL32 zero, so it is
   not the final IEEE-754 addition implementation.
-- `rt_f_sub.avo` is a partial REAL subtract helper. It preserves the same stack
+- `rt_f_sub.obj` is a partial REAL subtract helper. It preserves the same stack
   contract, implements `x - +0.0 = x`, `+0.0 - x` by flipping the sign bit, and
   handles equal signed power-of-two subtraction as zero, including
   `2.0 - 2.0 = 0.0` and `-2.0 - -2.0 = 0.0`, plus exact
@@ -41,7 +41,7 @@ Current status:
   `-4.0 - 1.0 = -5.0`, and `-1.0 - 4.0 = -5.0`. Other non-zero pairs still return REAL32 zero,
   so it is not the final IEEE-754 subtraction
   implementation.
-- `rt_f_mul.avo` is a partial REAL multiply helper. It preserves the same stack
+- `rt_f_mul.obj` is a partial REAL multiply helper. It preserves the same stack
   contract, implements zero identity, implements `x * 1.0 = x` and
   `1.0 * x = x`, and handles low-word-zero values scaled by an exact
   power-of-two operand using exponent addition plus sign-bit xor, including
@@ -51,7 +51,7 @@ Current status:
   `1.5 * -2.0 = -3.0`, `-1.5 * -2.0 = 3.0`, `1.5 * 1.5 = 2.25`, and
   `0.75 * 0.75 = 0.5625`. Other non-zero pairs still return REAL32 zero, so
   it is not the final IEEE-754 multiplication implementation.
-- `rt_f_div.avo` is a partial REAL divide helper. It preserves the same stack
+- `rt_f_div.obj` is a partial REAL divide helper. It preserves the same stack
   contract, implements zero numerator and divide-by-zero as REAL32 zero,
   implements `x / 1.0 = x`, and handles low-word-zero numerators divided by
   an exact power-of-two denominator using exponent subtraction plus
@@ -64,18 +64,18 @@ Current status:
   `1.0 / 10.0 = 0.100000001490116119384765625`. Other non-zero pairs still
   return REAL32 zero, so it is not the final IEEE-754 division
   implementation.
-- `rt_i_to_f.avo` is the first target-side integer-to-REAL helper. It converts
+- `rt_i_to_f.obj` is the first target-side integer-to-REAL helper. It converts
   one non-negative 16-bit stack cell to exact REAL32, including values such as
   `1`, `7`, `255`, `256`, and `65535`. The current UDOS-native compiler uses
   it only for the narrow `BYTE`/`CARD` to REAL bridge. Signed `INT` conversion
   is still intentionally not routed through it, because the current helper
   treats the incoming cell as an unsigned magnitude.
-- `rt_s_to_f.avo` is the first target-side signed-`INT` to REAL helper. It
+- `rt_s_to_f.obj` is the first target-side signed-`INT` to REAL helper. It
   converts one 16-bit two's-complement stack cell to exact REAL32 by deriving a
   branchless sign mask, converting the resulting magnitude through
   `rt_i_to_f`, and then applying the REAL sign bit. The current UDOS-native
   compiler uses it only for the narrow `INT` variable-to-REAL bridge.
-- `rt_print_f.avo` is the first target-side REAL print wrapper. It preserves
+- `rt_print_f.obj` is the first target-side REAL print wrapper. It preserves
   the current stack contract and routes the current narrow `PrintR` / `PrintRE`
   lowering through the runtime-side REAL print intrinsic. The current proven
   UDOS-native slice is intentionally narrow but no longer limited to
@@ -109,17 +109,10 @@ Current status:
   `X=A/B` with `A=3.0`, `B=-2.0` producing `-1.5`, and
   `X=A/B` with `A=-3.0`, `B=-2.0` producing `1.5`,
   and the linked helper-trailer model itself is now proven on a real
-  `ALINK`-produced program: `A=REAL(1)`, `B=REAL(8)`, `X=A/B`, `PrintRE(X)`
-  still produces `0.125` after removing `RT_PRINT_F_HELPER.BIN`,
-  `RT_PRINT_STD_HELPER.BIN`, `AVMRUN_OVL1.BIN`, `AVMRUN_OVL2.BIN`, and
-  `AVMRUN_OVL3.BIN` from the mounted workspace, so the shipped linked REAL
-  print path no longer depends on loose helper sidecars or runner overlays for
-  that proven case,
-  and the broader compat/interpreter payload surface now belongs to
-  `AVMRUNC.PRG`, while production `AVMRUN.PRG` is the native fast-path runner,
-  and production `AVMRUN.PRG` no longer falls back to loading a loose
-  `RT_PRINT_STD_HELPER.BIN` at runtime for standard print either; newly linked
-  programs must carry the standard-print helper trailer that `ALINK` emits,
+  `ALINK`-produced direct program: `A=REAL(1)`, `B=REAL(8)`, `X=A/B`,
+  `PrintRE(X)` still produces `0.125` without loose helper sidecars or a
+  separate runner; newly linked programs must carry the print helper trailer
+  bytes that `ALINK` selects,
   `X=A/B` with `A=1.5`, `B=1.5` producing `1`, and
   `X=A/B` with `A=1.5`, `B=0.75` producing `2`,
   `X=A/B` with `A=1.0`, `B=3.0` producing `0.3333333432674407958984375`,
