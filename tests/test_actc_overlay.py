@@ -1834,7 +1834,7 @@ class TestActcOverlay(unittest.TestCase):
         self.assertEqual(entry, 0xA000 + 14)
         self.assertEqual(length, len(data))
 
-    def test_actc_compile_path_maps_referenced_sprite_builtins_to_runtime_objs(self) -> None:
+    def test_actc_compile_path_maps_referenced_hardware_builtins_to_runtime_objs(self) -> None:
         self.require_toolchain()
         self.run_checked([str(self.root / "tools" / "build_tool_abi_harness.sh")])
         build_env = os.environ.copy()
@@ -1853,7 +1853,7 @@ class TestActcOverlay(unittest.TestCase):
         self.run_checked([str(self.root / "tools" / "build_actc_overlay_body_collect.sh")])
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            workspace = Path(tmpdir) / "actc-overlay-sprite-builtins"
+            workspace = Path(tmpdir) / "actc-overlay-hardware-builtins"
             image_root = workspace / "IMAGES" / "ACTION.DNP"
             project_root = image_root / "PROJ3"
             source_dir = project_root / "src"
@@ -1869,6 +1869,7 @@ class TestActcOverlay(unittest.TestCase):
                 "SpritePos(2,52,86)\r"
                 "SpriteData(2,64)\r"
                 "SetSpriteMC(5,10)\r"
+                "SidVol(10)\r"
                 "RETURN\r",
                 encoding="ascii",
             )
@@ -1905,11 +1906,13 @@ class TestActcOverlay(unittest.TestCase):
             self.assertIn("u rt_sprite_pos\n", obj)
             self.assertIn("u rt_sprite_data\n", obj)
             self.assertIn("u rt_sprite_set_mc\n", obj)
+            self.assertIn("u rt_sid_vol\n", obj)
             self.assertNotIn("u spriteon\n", obj)
             self.assertNotIn("u spritecolor\n", obj)
             self.assertNotIn("u spritepos\n", obj)
             self.assertNotIn("u spritedata\n", obj)
             self.assertNotIn("u setspritemc\n", obj)
+            self.assertNotIn("u sidvol\n", obj)
             self.assertNotIn("u rt_sprite_off\n", obj)
 
     def test_emit_object_overlay_builds_with_expected_header(self) -> None:
