@@ -170,3 +170,7 @@ Current status:
   in VIC-II register `$D015`, and returns with `RTS`; the ALINK direct-PRG
   probe proves the helper is selected from `LIB/` and carried in the final
   linked program.
+- `rt_sprite_off.obj` is the matching machine-code helper for clearing a sprite
+  enable bit. It expects a sprite index in `A`, clears the matching bit in
+  `$D015`, and returns with `RTS`; the probe seeds `$D015` first so the target
+  run verifies an actual bit-clear side effect.
