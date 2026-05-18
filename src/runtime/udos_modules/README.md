@@ -168,6 +168,10 @@ Current status:
 - `rt_sid_freq.obj` sets a SID voice frequency word. It expects the voice index
   in `A`, frequency low byte in `X`, and frequency high byte in `Y`; it stores
   to `$D400+7*voice` and `$D401+7*voice`, then returns with `RTS`.
+- `rt_sid_pulse.obj` sets a SID voice pulse-width word. It expects the voice
+  index in `A`, pulse low byte in `X`, and pulse high byte in `Y`; it masks
+  the high byte to the SID's 12-bit pulse-width range, stores to
+  `$D402+7*voice` and `$D403+7*voice`, then returns with `RTS`.
 - `rt_sid_state.obj` exports a three-byte SID control shadow used by the
   waveform and gate helpers. It is data, not a callable routine.
 - `rt_sid_wave.obj` sets a SID voice waveform/control byte exactly. It expects
