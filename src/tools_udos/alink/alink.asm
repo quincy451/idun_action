@@ -2968,9 +2968,10 @@ parse_ints_loop:
     lda #<msg_bad_object
     ldy #>msg_bad_object
     jmp fail_with_ptr
-:   jsr parse_decimal_byte_or_fail
+:   jsr parse_decimal_word_or_fail
+    lda current_bit_lo
     sta int_value_window
-    lda #$00
+    lda current_bit_hi
     sta int_value_window+1
     ldx int_count
     jsr store_int_value_window_from_x_or_fail
@@ -4011,6 +4012,8 @@ linked_divisor_value:
 linked_literal_count:
     .res 1
 linked_literal_values:
+    .res INT_LITERAL_MAX
+linked_literal_hi_values:
     .res INT_LITERAL_MAX
 linked_next_addr_lo:
     .res 1

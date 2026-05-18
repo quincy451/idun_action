@@ -400,6 +400,16 @@ find_runtime_literal_call_prg_case:
     sta linked_literal_count
     jmp find_runtime_literal_call_prg_case_body_ok
 find_runtime_literal_call_prg_case_not_single_byte:
+    lda #<direct_body_runtime_sprite_data_literal_call
+    sta const_ptr
+    lda #>direct_body_runtime_sprite_data_literal_call
+    sta const_ptr+1
+    jsr direct_entry_body_matches_const
+    bcs find_runtime_literal_call_prg_case_not_sprite_data
+    lda #$02
+    sta linked_literal_count
+    jmp find_runtime_literal_call_prg_case_body_ok
+find_runtime_literal_call_prg_case_not_sprite_data:
     lda #<direct_body_runtime_sound_literal_call
     sta const_ptr
     lda #>direct_body_runtime_sound_literal_call
@@ -420,10 +430,18 @@ find_runtime_literal_call_prg_case_body_ok:
     jmp fail_with_ptr
 find_runtime_literal_call_prg_case_have_external:
     lda linked_literal_count
+    cmp #$02
+    bne find_runtime_literal_call_prg_case_not_sprite_data_external
+    jsr runtime_literal_call_first_external_is_rt_sprite_data
+    bcc find_runtime_literal_call_prg_case_have_supported_external
+    jmp find_runtime_literal_call_prg_case_unsupported_value
+find_runtime_literal_call_prg_case_not_sprite_data_external:
+    lda linked_literal_count
     cmp #$04
     bne find_runtime_literal_call_prg_case_have_supported_external
     jsr runtime_literal_call_first_external_is_rt_sound
-    bcs find_runtime_literal_call_prg_case_unsupported_value
+    bcc find_runtime_literal_call_prg_case_have_supported_external
+    jmp find_runtime_literal_call_prg_case_unsupported_value
 find_runtime_literal_call_prg_case_have_supported_external:
     lda int_count
     cmp linked_literal_count
@@ -439,11 +457,19 @@ find_runtime_literal_call_prg_case_int_loop:
     cpx linked_literal_count
     beq find_runtime_literal_call_prg_case_loaded_ints
     jsr load_int_value_window_from_x_or_fail
-    lda int_value_window+1
-    bne find_runtime_literal_call_prg_case_unsupported_value
     lda int_value_window
     ldx linked_object_index
     sta linked_literal_values,x
+    lda int_value_window+1
+    sta linked_literal_hi_values,x
+    beq find_runtime_literal_call_prg_case_int_ok
+    lda linked_literal_count
+    cmp #$02
+    bne find_runtime_literal_call_prg_case_unsupported_value
+    ldx linked_object_index
+    cpx #$01
+    bne find_runtime_literal_call_prg_case_unsupported_value
+find_runtime_literal_call_prg_case_int_ok:
     inc linked_object_index
     jmp find_runtime_literal_call_prg_case_int_loop
 find_runtime_literal_call_prg_case_loaded_ints:
@@ -482,6 +508,15 @@ runtime_literal_call_first_external_is_rt_sound:
     lda #<runtime_name_rt_sound
     sta const_ptr
     lda #>runtime_name_rt_sound
+    sta const_ptr+1
+    jmp external_name_window_matches_const_ptr
+
+runtime_literal_call_first_external_is_rt_sprite_data:
+    ldx #$00
+    jsr load_external_name_window_from_x_or_fail
+    lda #<runtime_name_rt_sprite_data
+    sta const_ptr
+    lda #>runtime_name_rt_sprite_data
     sta const_ptr+1
     jmp external_name_window_matches_const_ptr
 
@@ -1202,6 +1237,12 @@ build_runtime_literal_call_prg_content_or_fail:
     jsr append_runtime_sound_literal_call_prefix
     jmp build_runtime_literal_call_jsr_and_exit
 build_runtime_literal_call_single_arg:
+    lda linked_literal_count
+    cmp #$02
+    bne build_runtime_literal_call_one_arg
+    jsr append_runtime_sprite_data_literal_call_prefix
+    jmp build_runtime_literal_call_jsr_and_exit
+build_runtime_literal_call_one_arg:
     jsr append_runtime_single_literal_call_prefix
 build_runtime_literal_call_jsr_and_exit:
     lda #$20
@@ -1250,6 +1291,20 @@ append_runtime_sound_literal_call_prefix:
     lda #$A0
     jsr append_payload_byte
     lda linked_literal_values+2
+    jmp append_payload_byte
+
+append_runtime_sprite_data_literal_call_prefix:
+    lda #$A9
+    jsr append_payload_byte
+    lda linked_literal_values
+    jsr append_payload_byte
+    lda #$A2
+    jsr append_payload_byte
+    lda linked_literal_values+1
+    jsr append_payload_byte
+    lda #$A0
+    jsr append_payload_byte
+    lda linked_literal_hi_values+1
     jmp append_payload_byte
 
 build_object_code_prg_content_or_fail:
@@ -1343,6 +1398,15 @@ build_runtime_literal_call_address_table_or_fail:
     sta linked_next_addr_hi
     jmp build_object_code_address_table_with_current_next_or_fail
 build_runtime_literal_call_address_table_single_arg:
+    lda linked_literal_count
+    cmp #$02
+    bne build_runtime_literal_call_address_table_one_arg
+    lda #$19
+    sta linked_next_addr_lo
+    lda #$10
+    sta linked_next_addr_hi
+    jmp build_object_code_address_table_with_current_next_or_fail
+build_runtime_literal_call_address_table_one_arg:
     lda #$15
     sta linked_next_addr_lo
     lda #$10
@@ -2259,10 +2323,14 @@ direct_body_seeded_runtime:
     .asciiz "e0u0p0p1ayp2p3gzr"
 direct_body_runtime_literal_call:
     .asciiz "p0u0r"
+direct_body_runtime_sprite_data_literal_call:
+    .asciiz "p0p1u0r"
 direct_body_runtime_sound_literal_call:
     .asciiz "p0p1p2p3u0r"
 runtime_name_rt_sound:
     .asciiz "rt_sound"
+runtime_name_rt_sprite_data:
+    .asciiz "rt_sprite_data"
 direct_body_real_print_int:
     .asciiz "p1u0T0S0L0U0p2u1r"
 direct_body_real_print_div:

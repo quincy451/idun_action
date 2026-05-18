@@ -3296,6 +3296,23 @@ emit_current_expr_push_or_fail:
     jsr append_body_op_for_current_proc
     clc
     rts
+
+emit_current_word_expr_push_or_fail:
+    tya
+    pha
+    lda expr_value_lo
+    ldy expr_value_hi
+    jsr store_word_literal_from_ay
+    bcc :+
+    pla
+    jmp emit_runtime_expr_push_fail
+:
+    pla
+    tay
+    lda #'p'
+    jsr append_body_op_for_current_proc
+    clc
+    rts
 emit_runtime_expr_push_fail:
     sec
     rts
@@ -3332,6 +3349,12 @@ emit_runtime_term_push_literal:
     bcc emit_runtime_term_push_literal_decimal
     pla
     tay
+    tya
+    pha
+    jsr parse_plain_word_decimal_at_scan_y
+    bcc emit_runtime_term_push_word_literal_decimal
+    pla
+    tay
     jsr emit_runtime_group_value_term_from_scan_y_or_fail
     bcs emit_runtime_expr_push_fail
     clc
@@ -3339,6 +3362,9 @@ emit_runtime_term_push_literal:
 emit_runtime_term_push_literal_decimal:
     pla
     jmp emit_current_expr_push_or_fail
+emit_runtime_term_push_word_literal_decimal:
+    pla
+    jmp emit_current_word_expr_push_or_fail
 :   clc
     rts
 
@@ -5712,6 +5738,61 @@ parse_small_decimal_at_scan_y_done_check:
     clc
     rts
 parse_small_decimal_at_scan_y_fail:
+    sec
+    rts
+
+parse_plain_word_decimal_at_scan_y:
+    lda #$00
+    sta expr_value_lo
+    sta expr_value_hi
+    lda (scan_ptr),y
+    cmp #'0'
+    bcc parse_plain_word_decimal_at_scan_y_fail
+    cmp #'9'+1
+    bcs parse_plain_word_decimal_at_scan_y_fail
+parse_plain_word_decimal_at_scan_y_digit:
+    sec
+    sbc #'0'
+    pha
+    lda expr_value_lo
+    sta expr_saved_lo
+    lda expr_value_hi
+    sta expr_saved_hi
+    lda #$00
+    sta expr_term_lo
+    sta expr_term_hi
+    ldx #10
+parse_plain_word_decimal_at_scan_y_mul10_loop:
+    clc
+    lda expr_term_lo
+    adc expr_saved_lo
+    sta expr_term_lo
+    lda expr_term_hi
+    adc expr_saved_hi
+    sta expr_term_hi
+    bcs parse_plain_word_decimal_at_scan_y_fail_pop
+    dex
+    bne parse_plain_word_decimal_at_scan_y_mul10_loop
+    clc
+    pla
+    adc expr_term_lo
+    sta expr_value_lo
+    lda expr_term_hi
+    adc #$00
+    sta expr_value_hi
+    bcs parse_plain_word_decimal_at_scan_y_fail
+    jsr advance_scan_y
+    lda (scan_ptr),y
+    cmp #'0'
+    bcc parse_plain_word_decimal_at_scan_y_done_check
+    cmp #'9'+1
+    bcc parse_plain_word_decimal_at_scan_y_digit
+parse_plain_word_decimal_at_scan_y_done_check:
+    clc
+    rts
+parse_plain_word_decimal_at_scan_y_fail_pop:
+    pla
+parse_plain_word_decimal_at_scan_y_fail:
     sec
     rts
 
