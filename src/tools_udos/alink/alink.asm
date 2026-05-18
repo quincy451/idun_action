@@ -4008,6 +4008,10 @@ linked_store_value:
     .res 1
 linked_divisor_value:
     .res 1
+linked_literal_count:
+    .res 1
+linked_literal_values:
+    .res INT_LITERAL_MAX
 linked_next_addr_lo:
     .res 1
 linked_next_addr_hi:
