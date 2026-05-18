@@ -1869,6 +1869,7 @@ class TestActcOverlay(unittest.TestCase):
                 "SpritePos(2,52,86)\r"
                 "SpriteData(2,64)\r"
                 "SetSpriteMC(5,10)\r"
+                "SidFreq(1,52)\r"
                 "SidVol(10)\r"
                 "RETURN\r",
                 encoding="ascii",
@@ -1906,12 +1907,14 @@ class TestActcOverlay(unittest.TestCase):
             self.assertIn("u rt_sprite_pos\n", obj)
             self.assertIn("u rt_sprite_data\n", obj)
             self.assertIn("u rt_sprite_set_mc\n", obj)
+            self.assertIn("u rt_sid_freq\n", obj)
             self.assertIn("u rt_sid_vol\n", obj)
             self.assertNotIn("u spriteon\n", obj)
             self.assertNotIn("u spritecolor\n", obj)
             self.assertNotIn("u spritepos\n", obj)
             self.assertNotIn("u spritedata\n", obj)
             self.assertNotIn("u setspritemc\n", obj)
+            self.assertNotIn("u sidfreq\n", obj)
             self.assertNotIn("u sidvol\n", obj)
             self.assertNotIn("u rt_sprite_off\n", obj)
 

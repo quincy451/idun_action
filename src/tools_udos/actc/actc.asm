@@ -8440,6 +8440,18 @@ find_or_store_real_operator_external:
 .endif
 
 find_or_store_builtin_runtime_external_from_declared:
+    lda #<builtin_symbol_sid_freq
+    sta const_ptr
+    lda #>builtin_symbol_sid_freq
+    sta const_ptr+1
+    jsr symbol_buffer_matches_const_ptr
+    bcs :+
+    lda #$02
+    sta call_expected_arg_count
+    lda #<runtime_symbol_rt_sid_freq
+    ldy #>runtime_symbol_rt_sid_freq
+    jmp find_or_store_runtime_external_from_ay
+:
     lda #<builtin_symbol_sid_vol
     sta const_ptr
     lda #>builtin_symbol_sid_vol
@@ -10138,6 +10150,8 @@ runtime_symbol_rt_s_to_f:
     .asciiz "RT_S_TO_F"
 runtime_symbol_rt_print_f:
     .asciiz "RT_PRINT_F"
+runtime_symbol_rt_sid_freq:
+    .asciiz "RT_SID_FREQ"
 runtime_symbol_rt_sid_vol:
     .asciiz "RT_SID_VOL"
 runtime_symbol_rt_sprite_on:
@@ -10180,6 +10194,8 @@ builtin_symbol_sprite_data:
     .asciiz "SPRITEDATA"
 builtin_symbol_set_sprite_mc:
     .asciiz "SETSPRITEMC"
+builtin_symbol_sid_freq:
+    .asciiz "SIDFREQ"
 builtin_symbol_sid_vol:
     .asciiz "SIDVOL"
 
