@@ -178,6 +178,9 @@ Current status:
 - `rt_sid_on.obj` sets a SID voice gate bit while preserving the last
   `SidWave` control byte from `rt_sid_state`. It expects the voice index in
   `A`; it stores to `$D404+7*voice`, then returns with `RTS`.
+- `rt_sid_off.obj` clears a SID voice gate bit while preserving the last
+  `SidWave` control byte from `rt_sid_state`. It expects the voice index in
+  `A`; it stores to `$D404+7*voice`, then returns with `RTS`.
 - `rt_sid_ad.obj` sets a SID voice attack/decay byte. It expects the voice
   index in `A` and the attack/decay byte in `Y`; it stores to
   `$D405+7*voice`, then returns with `RTS`.
