@@ -8583,6 +8583,8 @@ builtin_runtime_import_table:
     .byte $00, <builtin_symbol_sid_osc3, >builtin_symbol_sid_osc3, <runtime_symbol_rt_sid_osc3, >runtime_symbol_rt_sid_osc3
     .byte $00, <builtin_symbol_sid_env3, >builtin_symbol_sid_env3, <runtime_symbol_rt_sid_env3, >runtime_symbol_rt_sid_env3
     .byte $04, <builtin_symbol_sound, >builtin_symbol_sound, <runtime_symbol_rt_sound, >runtime_symbol_rt_sound
+    .byte $01, <builtin_symbol_bg_color, >builtin_symbol_bg_color, <runtime_symbol_rt_gfx_bgcolor, >runtime_symbol_rt_gfx_bgcolor
+    .byte $01, <builtin_symbol_border_color, >builtin_symbol_border_color, <runtime_symbol_rt_gfx_bordercolor, >runtime_symbol_rt_gfx_bordercolor
     .byte $01, <builtin_symbol_sprite_on, >builtin_symbol_sprite_on, <runtime_symbol_rt_sprite_on, >runtime_symbol_rt_sprite_on
     .byte $01, <builtin_symbol_sprite_off, >builtin_symbol_sprite_off, <runtime_symbol_rt_sprite_off, >runtime_symbol_rt_sprite_off
     .byte $00, <builtin_symbol_sprite_hit, >builtin_symbol_sprite_hit, <runtime_symbol_rt_sprite_hit, >runtime_symbol_rt_sprite_hit
@@ -10193,6 +10195,10 @@ runtime_symbol_rt_sid_env3:
     .asciiz "RT_SID_ENV3"
 runtime_symbol_rt_sound:
     .asciiz "RT_SOUND"
+runtime_symbol_rt_gfx_bgcolor:
+    .asciiz "RT_GFX_BGCOLOR"
+runtime_symbol_rt_gfx_bordercolor:
+    .asciiz "RT_GFX_BORDERCOLOR"
 runtime_symbol_rt_sprite_on:
     .asciiz "RT_SPRITE_ON"
 runtime_symbol_rt_sprite_off:
@@ -10279,6 +10285,10 @@ builtin_symbol_sid_env3:
     .asciiz "SIDENV3"
 builtin_symbol_sound:
     .asciiz "SOUND"
+builtin_symbol_bg_color:
+    .asciiz "BGCOLOR"
+builtin_symbol_border_color:
+    .asciiz "BORDERCOLOR"
 
 object_header:
     .byte "OBJ1",10,0
