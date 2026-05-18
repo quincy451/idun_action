@@ -168,6 +168,11 @@ Current status:
 - `rt_sid_freq.obj` sets a SID voice frequency word. It expects the voice index
   in `A`, frequency low byte in `X`, and frequency high byte in `Y`; it stores
   to `$D400+7*voice` and `$D401+7*voice`, then returns with `RTS`.
+- `rt_sid_wave.obj` sets a SID voice waveform/control byte exactly. It expects
+  the voice index in `A` and the waveform/control byte in `Y`; it stores to
+  `$D404+7*voice`, then returns with `RTS`. Gate control belongs to
+  `SidOn`/`SidOff`, because SID control registers should not be treated as a
+  reliable read/modify/write source.
 - `rt_sid_vol.obj` sets the SID master volume nybble. It expects the volume in
   `A`, masks it to four bits, stores `$D418`, and returns with `RTS`.
 - `rt_sprite_on.obj` is the first target-side SID/sprite helper implemented as
