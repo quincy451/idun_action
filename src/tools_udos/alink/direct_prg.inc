@@ -450,6 +450,8 @@ find_runtime_literal_call_prg_case_have_external:
     bcc find_runtime_literal_call_prg_case_have_supported_external
     jsr runtime_literal_call_first_external_is_sid_word_helper
     bcc find_runtime_literal_call_prg_case_have_supported_external
+    jsr runtime_literal_call_first_external_is_sid_byte_helper
+    bcc find_runtime_literal_call_prg_case_have_supported_external
     jsr runtime_literal_call_first_external_is_sprite_flag_helper
     bcc find_runtime_literal_call_prg_case_have_supported_external
     jsr runtime_literal_call_first_external_is_rt_sprite_set_mc
@@ -615,6 +617,46 @@ runtime_literal_call_first_external_is_rt_sid_pulse:
     lda #<runtime_name_rt_sid_pulse
     sta const_ptr
     lda #>runtime_name_rt_sid_pulse
+    sta const_ptr+1
+    jmp external_name_window_matches_const_ptr
+
+runtime_literal_call_first_external_is_sid_byte_helper:
+    jsr runtime_literal_call_first_external_is_rt_sid_wave
+    bcc runtime_literal_call_first_external_is_sid_byte_ok
+    jsr runtime_literal_call_first_external_is_rt_sid_ad
+    bcc runtime_literal_call_first_external_is_sid_byte_ok
+    jsr runtime_literal_call_first_external_is_rt_sid_sr
+    bcc runtime_literal_call_first_external_is_sid_byte_ok
+    sec
+    rts
+runtime_literal_call_first_external_is_sid_byte_ok:
+    clc
+    rts
+
+runtime_literal_call_first_external_is_rt_sid_wave:
+    ldx #$00
+    jsr load_external_name_window_from_x_or_fail
+    lda #<runtime_name_rt_sid_wave
+    sta const_ptr
+    lda #>runtime_name_rt_sid_wave
+    sta const_ptr+1
+    jmp external_name_window_matches_const_ptr
+
+runtime_literal_call_first_external_is_rt_sid_ad:
+    ldx #$00
+    jsr load_external_name_window_from_x_or_fail
+    lda #<runtime_name_rt_sid_ad
+    sta const_ptr
+    lda #>runtime_name_rt_sid_ad
+    sta const_ptr+1
+    jmp external_name_window_matches_const_ptr
+
+runtime_literal_call_first_external_is_rt_sid_sr:
+    ldx #$00
+    jsr load_external_name_window_from_x_or_fail
+    lda #<runtime_name_rt_sid_sr
+    sta const_ptr
+    lda #>runtime_name_rt_sid_sr
     sta const_ptr+1
     jmp external_name_window_matches_const_ptr
 
@@ -1414,6 +1456,11 @@ build_runtime_literal_call_not_sprite_data:
     jsr append_runtime_sid_word_literal_call_prefix
     jmp build_runtime_literal_call_jsr_and_exit
 build_runtime_literal_call_not_sid_word:
+    jsr runtime_literal_call_first_external_is_sid_byte_helper
+    bcs build_runtime_literal_call_not_sid_byte
+    jsr append_runtime_sid_byte_literal_call_prefix
+    jmp build_runtime_literal_call_jsr_and_exit
+build_runtime_literal_call_not_sid_byte:
     jsr runtime_literal_call_first_external_is_sprite_flag_helper
     bcs build_runtime_literal_call_not_sprite_flag
     jsr append_runtime_sprite_flag_literal_call_prefix
@@ -1503,6 +1550,16 @@ append_runtime_sid_word_literal_call_prefix:
     lda #$A0
     jsr append_payload_byte
     lda linked_literal_hi_values+1
+    jmp append_payload_byte
+
+append_runtime_sid_byte_literal_call_prefix:
+    lda #$A9
+    jsr append_payload_byte
+    lda linked_literal_values
+    jsr append_payload_byte
+    lda #$A0
+    jsr append_payload_byte
+    lda linked_literal_values+1
     jmp append_payload_byte
 
 append_runtime_sprite_pos_literal_call_prefix:
@@ -2604,6 +2661,12 @@ runtime_name_rt_sid_freq:
     .asciiz "rt_sid_freq"
 runtime_name_rt_sid_pulse:
     .asciiz "rt_sid_pulse"
+runtime_name_rt_sid_wave:
+    .asciiz "rt_sid_wave"
+runtime_name_rt_sid_ad:
+    .asciiz "rt_sid_ad"
+runtime_name_rt_sid_sr:
+    .asciiz "rt_sid_sr"
 runtime_name_rt_sprite_data:
     .asciiz "rt_sprite_data"
 runtime_name_rt_sprite_pos:
