@@ -204,6 +204,9 @@ Current status:
   resonance value in `A`, preserves the routing nybble from
   `rt_sid_filter_state`, stores to `$D417`, updates the shadow, and returns
   with `RTS`.
+- `rt_sid_cutoff.obj` sets the SID filter cutoff word. It expects the cutoff
+  low byte in `X` and high byte in `Y`; it stores the low three cutoff bits to
+  `$D415` and the upper eight cutoff bits to `$D416`, then returns with `RTS`.
 - `rt_sid_volume_state.obj` exports a one-byte shadow for SID filter mode and
   volume register `$D418`. It is data, not a callable routine.
 - `rt_sid_mode.obj` sets the SID filter mode high nybble. It expects the mode

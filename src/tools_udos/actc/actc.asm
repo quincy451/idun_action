@@ -8499,21 +8499,17 @@ find_or_store_builtin_runtime_external_from_declared:
     ldy #>builtin_symbol_sid_on
     jsr symbol_buffer_matches_ay
     bcs :+
-    lda #$01
-    sta call_expected_arg_count
     lda #<runtime_symbol_rt_sid_on
     ldy #>runtime_symbol_rt_sid_on
-    jmp find_or_store_runtime_external_from_ay
+    jmp find_or_store_one_arg_runtime_external_from_ay
 :
     lda #<builtin_symbol_sid_off
     ldy #>builtin_symbol_sid_off
     jsr symbol_buffer_matches_ay
     bcs :+
-    lda #$01
-    sta call_expected_arg_count
     lda #<runtime_symbol_rt_sid_off
     ldy #>runtime_symbol_rt_sid_off
-    jmp find_or_store_runtime_external_from_ay
+    jmp find_or_store_one_arg_runtime_external_from_ay
 :
     lda #<builtin_symbol_sid_rst
     ldy #>builtin_symbol_sid_rst
@@ -8539,61 +8535,57 @@ find_or_store_builtin_runtime_external_from_declared:
     ldy #>builtin_symbol_sid_route
     jsr symbol_buffer_matches_ay
     bcs :+
-    lda #$01
-    sta call_expected_arg_count
     lda #<runtime_symbol_rt_sid_route
     ldy #>runtime_symbol_rt_sid_route
-    jmp find_or_store_runtime_external_from_ay
+    jmp find_or_store_one_arg_runtime_external_from_ay
 :
     lda #<builtin_symbol_sid_res
     ldy #>builtin_symbol_sid_res
     jsr symbol_buffer_matches_ay
     bcs :+
-    lda #$01
-    sta call_expected_arg_count
     lda #<runtime_symbol_rt_sid_res
     ldy #>runtime_symbol_rt_sid_res
-    jmp find_or_store_runtime_external_from_ay
+    jmp find_or_store_one_arg_runtime_external_from_ay
+:
+    lda #<builtin_symbol_sid_cutoff
+    ldy #>builtin_symbol_sid_cutoff
+    jsr symbol_buffer_matches_ay
+    bcs :+
+    lda #<runtime_symbol_rt_sid_cutoff
+    ldy #>runtime_symbol_rt_sid_cutoff
+    jmp find_or_store_one_arg_runtime_external_from_ay
 :
     lda #<builtin_symbol_sid_mode
     ldy #>builtin_symbol_sid_mode
     jsr symbol_buffer_matches_ay
     bcs :+
-    lda #$01
-    sta call_expected_arg_count
     lda #<runtime_symbol_rt_sid_mode
     ldy #>runtime_symbol_rt_sid_mode
-    jmp find_or_store_runtime_external_from_ay
+    jmp find_or_store_one_arg_runtime_external_from_ay
 :
     lda #<builtin_symbol_sid_vol
     ldy #>builtin_symbol_sid_vol
     jsr symbol_buffer_matches_ay
     bcs :+
-    lda #$01
-    sta call_expected_arg_count
     lda #<runtime_symbol_rt_sid_vol
     ldy #>runtime_symbol_rt_sid_vol
-    jmp find_or_store_runtime_external_from_ay
+    jmp find_or_store_one_arg_runtime_external_from_ay
 :
     lda #<builtin_symbol_sprite_on
     ldy #>builtin_symbol_sprite_on
     jsr symbol_buffer_matches_ay
     bcs :+
-    lda #$01
-    sta call_expected_arg_count
     lda #<runtime_symbol_rt_sprite_on
     ldy #>runtime_symbol_rt_sprite_on
-    jmp find_or_store_runtime_external_from_ay
+    jmp find_or_store_one_arg_runtime_external_from_ay
 :
     lda #<builtin_symbol_sprite_off
     ldy #>builtin_symbol_sprite_off
     jsr symbol_buffer_matches_ay
     bcs :+
-    lda #$01
-    sta call_expected_arg_count
     lda #<runtime_symbol_rt_sprite_off
     ldy #>runtime_symbol_rt_sprite_off
-    jmp find_or_store_runtime_external_from_ay
+    jmp find_or_store_one_arg_runtime_external_from_ay
 :
     lda #<builtin_symbol_sprite_color
     ldy #>builtin_symbol_sprite_color
@@ -8677,6 +8669,13 @@ find_or_store_builtin_runtime_external_from_declared:
 find_or_store_builtin_runtime_external_from_declared_fail:
     sec
     rts
+
+find_or_store_one_arg_runtime_external_from_ay:
+    pha
+    lda #$01
+    sta call_expected_arg_count
+    pla
+    jmp find_or_store_runtime_external_from_ay
 
 find_or_store_runtime_external_from_ay:
     sta const_ptr
@@ -10261,6 +10260,8 @@ runtime_symbol_rt_sid_route:
     .asciiz "RT_SID_ROUTE"
 runtime_symbol_rt_sid_res:
     .asciiz "RT_SID_RES"
+runtime_symbol_rt_sid_cutoff:
+    .asciiz "RT_SID_CUTOFF"
 runtime_symbol_rt_sid_mode:
     .asciiz "RT_SID_MODE"
 runtime_symbol_rt_sid_vol:
@@ -10327,6 +10328,8 @@ builtin_symbol_sid_route:
     .asciiz "SIDROUTE"
 builtin_symbol_sid_res:
     .asciiz "SIDRES"
+builtin_symbol_sid_cutoff:
+    .asciiz "SIDCUTOFF"
 builtin_symbol_sid_mode:
     .asciiz "SIDMODE"
 builtin_symbol_sid_vol:
