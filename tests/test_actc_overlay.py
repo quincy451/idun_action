@@ -1884,6 +1884,8 @@ class TestActcOverlay(unittest.TestCase):
                 "SidCutoff(52)\r"
                 "SidMode(48)\r"
                 "SidVol(10)\r"
+                "SidOsc3()\r"
+                "SidEnv3()\r"
                 "RETURN\r",
                 encoding="ascii",
             )
@@ -1934,6 +1936,8 @@ class TestActcOverlay(unittest.TestCase):
             self.assertIn("u rt_sid_cutoff\n", obj)
             self.assertIn("u rt_sid_mode\n", obj)
             self.assertIn("u rt_sid_vol\n", obj)
+            self.assertIn("u rt_sid_osc3\n", obj)
+            self.assertIn("u rt_sid_env3\n", obj)
             self.assertNotIn("u spriteon\n", obj)
             self.assertNotIn("u spritecolor\n", obj)
             self.assertNotIn("u spritepos\n", obj)
@@ -1954,6 +1958,8 @@ class TestActcOverlay(unittest.TestCase):
             self.assertNotIn("u sidcutoff\n", obj)
             self.assertNotIn("u sidmode\n", obj)
             self.assertNotIn("u sidvol\n", obj)
+            self.assertNotIn("u sidosc3\n", obj)
+            self.assertNotIn("u sidenv3\n", obj)
             self.assertNotIn("u rt_sprite_off\n", obj)
 
     def test_emit_object_overlay_builds_with_expected_header(self) -> None:

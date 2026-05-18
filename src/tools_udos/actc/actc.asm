@@ -8445,228 +8445,74 @@ find_or_store_real_operator_external:
 .endif
 
 find_or_store_builtin_runtime_external_from_declared:
-    lda #<builtin_symbol_sid_freq
-    ldy #>builtin_symbol_sid_freq
-    jsr symbol_buffer_matches_ay
-    bcs :+
-    lda #<runtime_symbol_rt_sid_freq
-    ldy #>runtime_symbol_rt_sid_freq
-    jmp find_or_store_two_arg_runtime_external_from_ay
-:
-    lda #<builtin_symbol_sid_pulse
-    ldy #>builtin_symbol_sid_pulse
-    jsr symbol_buffer_matches_ay
-    bcs :+
-    lda #<runtime_symbol_rt_sid_pulse
-    ldy #>runtime_symbol_rt_sid_pulse
-    jmp find_or_store_two_arg_runtime_external_from_ay
-:
-    lda #<builtin_symbol_sid_wave
-    ldy #>builtin_symbol_sid_wave
-    jsr symbol_buffer_matches_ay
-    bcs :+
-    lda #<runtime_symbol_rt_sid_wave
-    ldy #>runtime_symbol_rt_sid_wave
-    jmp find_or_store_two_arg_runtime_external_from_ay
-:
-    lda #<builtin_symbol_sid_ad
-    ldy #>builtin_symbol_sid_ad
-    jsr symbol_buffer_matches_ay
-    bcs :+
-    lda #<runtime_symbol_rt_sid_ad
-    ldy #>runtime_symbol_rt_sid_ad
-    jmp find_or_store_two_arg_runtime_external_from_ay
-:
-    lda #<builtin_symbol_sid_sr
-    ldy #>builtin_symbol_sid_sr
-    jsr symbol_buffer_matches_ay
-    bcs :+
-    lda #<runtime_symbol_rt_sid_sr
-    ldy #>runtime_symbol_rt_sid_sr
-    jmp find_or_store_two_arg_runtime_external_from_ay
-:
-    lda #<builtin_symbol_sid_on
-    ldy #>builtin_symbol_sid_on
-    jsr symbol_buffer_matches_ay
-    bcs :+
-    lda #<runtime_symbol_rt_sid_on
-    ldy #>runtime_symbol_rt_sid_on
-    jmp find_or_store_one_arg_runtime_external_from_ay
-:
-    lda #<builtin_symbol_sid_off
-    ldy #>builtin_symbol_sid_off
-    jsr symbol_buffer_matches_ay
-    bcs :+
-    lda #<runtime_symbol_rt_sid_off
-    ldy #>runtime_symbol_rt_sid_off
-    jmp find_or_store_one_arg_runtime_external_from_ay
-:
-    lda #<builtin_symbol_sid_rst
-    ldy #>builtin_symbol_sid_rst
-    jsr symbol_buffer_matches_ay
-    bcs :+
-    lda #$00
+    lda #<builtin_runtime_import_table
+    sta content_ptr
+    lda #>builtin_runtime_import_table
+    sta content_ptr+1
+find_or_store_builtin_runtime_external_from_declared_loop:
+    ldy #$00
+    lda (content_ptr),y
+    cmp #$FF
+    beq find_or_store_builtin_runtime_external_from_declared_fail
     sta call_expected_arg_count
-    lda #<runtime_symbol_rt_sid_rst
-    ldy #>runtime_symbol_rt_sid_rst
+    iny
+    lda (content_ptr),y
+    pha
+    iny
+    lda (content_ptr),y
+    tay
+    pla
+    jsr symbol_buffer_matches_ay
+    bcc find_or_store_builtin_runtime_external_from_declared_found
+    clc
+    lda content_ptr
+    adc #$05
+    sta content_ptr
+    bcc find_or_store_builtin_runtime_external_from_declared_loop
+    inc content_ptr+1
+    jmp find_or_store_builtin_runtime_external_from_declared_loop
+find_or_store_builtin_runtime_external_from_declared_found:
+    ldy #$03
+    lda (content_ptr),y
+    pha
+    iny
+    lda (content_ptr),y
+    tay
+    pla
     jmp find_or_store_runtime_external_from_ay
-:
-    lda #<builtin_symbol_snd_rst
-    ldy #>builtin_symbol_snd_rst
-    jsr symbol_buffer_matches_ay
-    bcs :+
-    lda #$00
-    sta call_expected_arg_count
-    lda #<runtime_symbol_rt_sid_rst
-    ldy #>runtime_symbol_rt_sid_rst
-    jmp find_or_store_runtime_external_from_ay
-:
-    lda #<builtin_symbol_sid_route
-    ldy #>builtin_symbol_sid_route
-    jsr symbol_buffer_matches_ay
-    bcs :+
-    lda #<runtime_symbol_rt_sid_route
-    ldy #>runtime_symbol_rt_sid_route
-    jmp find_or_store_one_arg_runtime_external_from_ay
-:
-    lda #<builtin_symbol_sid_res
-    ldy #>builtin_symbol_sid_res
-    jsr symbol_buffer_matches_ay
-    bcs :+
-    lda #<runtime_symbol_rt_sid_res
-    ldy #>runtime_symbol_rt_sid_res
-    jmp find_or_store_one_arg_runtime_external_from_ay
-:
-    lda #<builtin_symbol_sid_cutoff
-    ldy #>builtin_symbol_sid_cutoff
-    jsr symbol_buffer_matches_ay
-    bcs :+
-    lda #<runtime_symbol_rt_sid_cutoff
-    ldy #>runtime_symbol_rt_sid_cutoff
-    jmp find_or_store_one_arg_runtime_external_from_ay
-:
-    lda #<builtin_symbol_sid_mode
-    ldy #>builtin_symbol_sid_mode
-    jsr symbol_buffer_matches_ay
-    bcs :+
-    lda #<runtime_symbol_rt_sid_mode
-    ldy #>runtime_symbol_rt_sid_mode
-    jmp find_or_store_one_arg_runtime_external_from_ay
-:
-    lda #<builtin_symbol_sid_vol
-    ldy #>builtin_symbol_sid_vol
-    jsr symbol_buffer_matches_ay
-    bcs :+
-    lda #<runtime_symbol_rt_sid_vol
-    ldy #>runtime_symbol_rt_sid_vol
-    jmp find_or_store_one_arg_runtime_external_from_ay
-:
-    lda #<builtin_symbol_sprite_on
-    ldy #>builtin_symbol_sprite_on
-    jsr symbol_buffer_matches_ay
-    bcs :+
-    lda #<runtime_symbol_rt_sprite_on
-    ldy #>runtime_symbol_rt_sprite_on
-    jmp find_or_store_one_arg_runtime_external_from_ay
-:
-    lda #<builtin_symbol_sprite_off
-    ldy #>builtin_symbol_sprite_off
-    jsr symbol_buffer_matches_ay
-    bcs :+
-    lda #<runtime_symbol_rt_sprite_off
-    ldy #>runtime_symbol_rt_sprite_off
-    jmp find_or_store_one_arg_runtime_external_from_ay
-:
-    lda #<builtin_symbol_sprite_color
-    ldy #>builtin_symbol_sprite_color
-    jsr symbol_buffer_matches_ay
-    bcs :+
-    lda #<runtime_symbol_rt_sprite_color
-    ldy #>runtime_symbol_rt_sprite_color
-    jmp find_or_store_two_arg_runtime_external_from_ay
-:
-    lda #<builtin_symbol_sprite_pos
-    ldy #>builtin_symbol_sprite_pos
-    jsr symbol_buffer_matches_ay
-    bcs :+
-    lda #$03
-    sta call_expected_arg_count
-    lda #<runtime_symbol_rt_sprite_pos
-    ldy #>runtime_symbol_rt_sprite_pos
-    jmp find_or_store_runtime_external_from_ay
-:
-    lda #<builtin_symbol_sprite_mc
-    ldy #>builtin_symbol_sprite_mc
-    jsr symbol_buffer_matches_ay
-    bcs :+
-    lda #<runtime_symbol_rt_sprite_mc
-    ldy #>runtime_symbol_rt_sprite_mc
-    jmp find_or_store_two_arg_runtime_external_from_ay
-:
-    lda #<builtin_symbol_sprite_xexp
-    ldy #>builtin_symbol_sprite_xexp
-    jsr symbol_buffer_matches_ay
-    bcs :+
-    lda #<runtime_symbol_rt_sprite_xexp
-    ldy #>runtime_symbol_rt_sprite_xexp
-    jmp find_or_store_two_arg_runtime_external_from_ay
-:
-    lda #<builtin_symbol_sprite_yexp
-    ldy #>builtin_symbol_sprite_yexp
-    jsr symbol_buffer_matches_ay
-    bcs :+
-    lda #<runtime_symbol_rt_sprite_yexp
-    ldy #>runtime_symbol_rt_sprite_yexp
-    jmp find_or_store_two_arg_runtime_external_from_ay
-:
-    lda #<builtin_symbol_sprite_prio
-    ldy #>builtin_symbol_sprite_prio
-    jsr symbol_buffer_matches_ay
-    bcs :+
-    lda #<runtime_symbol_rt_sprite_prio
-    ldy #>runtime_symbol_rt_sprite_prio
-    jmp find_or_store_two_arg_runtime_external_from_ay
-:
-    lda #<builtin_symbol_sprite_ptr
-    ldy #>builtin_symbol_sprite_ptr
-    jsr symbol_buffer_matches_ay
-    bcs :+
-    lda #<runtime_symbol_rt_sprite_ptr
-    ldy #>runtime_symbol_rt_sprite_ptr
-    jmp find_or_store_two_arg_runtime_external_from_ay
-:
-    lda #<builtin_symbol_sprite_data
-    ldy #>builtin_symbol_sprite_data
-    jsr symbol_buffer_matches_ay
-    bcs :+
-    lda #<runtime_symbol_rt_sprite_data
-    ldy #>runtime_symbol_rt_sprite_data
-    jmp find_or_store_two_arg_runtime_external_from_ay
-:
-    lda #<builtin_symbol_set_sprite_mc
-    ldy #>builtin_symbol_set_sprite_mc
-    jsr symbol_buffer_matches_ay
-    bcs find_or_store_builtin_runtime_external_from_declared_fail
-    lda #<runtime_symbol_rt_sprite_set_mc
-    ldy #>runtime_symbol_rt_sprite_set_mc
-    jmp find_or_store_two_arg_runtime_external_from_ay
 find_or_store_builtin_runtime_external_from_declared_fail:
     sec
     rts
 
-find_or_store_one_arg_runtime_external_from_ay:
-    pha
-    lda #$01
-    sta call_expected_arg_count
-    pla
-    jmp find_or_store_runtime_external_from_ay
-
-find_or_store_two_arg_runtime_external_from_ay:
-    pha
-    lda #$02
-    sta call_expected_arg_count
-    pla
-    jmp find_or_store_runtime_external_from_ay
+builtin_runtime_import_table:
+    .byte $02, <builtin_symbol_sid_freq, >builtin_symbol_sid_freq, <runtime_symbol_rt_sid_freq, >runtime_symbol_rt_sid_freq
+    .byte $02, <builtin_symbol_sid_pulse, >builtin_symbol_sid_pulse, <runtime_symbol_rt_sid_pulse, >runtime_symbol_rt_sid_pulse
+    .byte $02, <builtin_symbol_sid_wave, >builtin_symbol_sid_wave, <runtime_symbol_rt_sid_wave, >runtime_symbol_rt_sid_wave
+    .byte $02, <builtin_symbol_sid_ad, >builtin_symbol_sid_ad, <runtime_symbol_rt_sid_ad, >runtime_symbol_rt_sid_ad
+    .byte $02, <builtin_symbol_sid_sr, >builtin_symbol_sid_sr, <runtime_symbol_rt_sid_sr, >runtime_symbol_rt_sid_sr
+    .byte $01, <builtin_symbol_sid_on, >builtin_symbol_sid_on, <runtime_symbol_rt_sid_on, >runtime_symbol_rt_sid_on
+    .byte $01, <builtin_symbol_sid_off, >builtin_symbol_sid_off, <runtime_symbol_rt_sid_off, >runtime_symbol_rt_sid_off
+    .byte $00, <builtin_symbol_sid_rst, >builtin_symbol_sid_rst, <runtime_symbol_rt_sid_rst, >runtime_symbol_rt_sid_rst
+    .byte $00, <builtin_symbol_snd_rst, >builtin_symbol_snd_rst, <runtime_symbol_rt_sid_rst, >runtime_symbol_rt_sid_rst
+    .byte $01, <builtin_symbol_sid_route, >builtin_symbol_sid_route, <runtime_symbol_rt_sid_route, >runtime_symbol_rt_sid_route
+    .byte $01, <builtin_symbol_sid_res, >builtin_symbol_sid_res, <runtime_symbol_rt_sid_res, >runtime_symbol_rt_sid_res
+    .byte $01, <builtin_symbol_sid_cutoff, >builtin_symbol_sid_cutoff, <runtime_symbol_rt_sid_cutoff, >runtime_symbol_rt_sid_cutoff
+    .byte $01, <builtin_symbol_sid_mode, >builtin_symbol_sid_mode, <runtime_symbol_rt_sid_mode, >runtime_symbol_rt_sid_mode
+    .byte $01, <builtin_symbol_sid_vol, >builtin_symbol_sid_vol, <runtime_symbol_rt_sid_vol, >runtime_symbol_rt_sid_vol
+    .byte $00, <builtin_symbol_sid_osc3, >builtin_symbol_sid_osc3, <runtime_symbol_rt_sid_osc3, >runtime_symbol_rt_sid_osc3
+    .byte $00, <builtin_symbol_sid_env3, >builtin_symbol_sid_env3, <runtime_symbol_rt_sid_env3, >runtime_symbol_rt_sid_env3
+    .byte $01, <builtin_symbol_sprite_on, >builtin_symbol_sprite_on, <runtime_symbol_rt_sprite_on, >runtime_symbol_rt_sprite_on
+    .byte $01, <builtin_symbol_sprite_off, >builtin_symbol_sprite_off, <runtime_symbol_rt_sprite_off, >runtime_symbol_rt_sprite_off
+    .byte $02, <builtin_symbol_sprite_color, >builtin_symbol_sprite_color, <runtime_symbol_rt_sprite_color, >runtime_symbol_rt_sprite_color
+    .byte $03, <builtin_symbol_sprite_pos, >builtin_symbol_sprite_pos, <runtime_symbol_rt_sprite_pos, >runtime_symbol_rt_sprite_pos
+    .byte $02, <builtin_symbol_sprite_mc, >builtin_symbol_sprite_mc, <runtime_symbol_rt_sprite_mc, >runtime_symbol_rt_sprite_mc
+    .byte $02, <builtin_symbol_sprite_xexp, >builtin_symbol_sprite_xexp, <runtime_symbol_rt_sprite_xexp, >runtime_symbol_rt_sprite_xexp
+    .byte $02, <builtin_symbol_sprite_yexp, >builtin_symbol_sprite_yexp, <runtime_symbol_rt_sprite_yexp, >runtime_symbol_rt_sprite_yexp
+    .byte $02, <builtin_symbol_sprite_prio, >builtin_symbol_sprite_prio, <runtime_symbol_rt_sprite_prio, >runtime_symbol_rt_sprite_prio
+    .byte $02, <builtin_symbol_sprite_ptr, >builtin_symbol_sprite_ptr, <runtime_symbol_rt_sprite_ptr, >runtime_symbol_rt_sprite_ptr
+    .byte $02, <builtin_symbol_sprite_data, >builtin_symbol_sprite_data, <runtime_symbol_rt_sprite_data, >runtime_symbol_rt_sprite_data
+    .byte $02, <builtin_symbol_set_sprite_mc, >builtin_symbol_set_sprite_mc, <runtime_symbol_rt_sprite_set_mc, >runtime_symbol_rt_sprite_set_mc
+    .byte $FF
 
 find_or_store_runtime_external_from_ay:
     sta const_ptr
@@ -10257,6 +10103,10 @@ runtime_symbol_rt_sid_mode:
     .asciiz "RT_SID_MODE"
 runtime_symbol_rt_sid_vol:
     .asciiz "RT_SID_VOL"
+runtime_symbol_rt_sid_osc3:
+    .asciiz "RT_SID_OSC3"
+runtime_symbol_rt_sid_env3:
+    .asciiz "RT_SID_ENV3"
 runtime_symbol_rt_sprite_on:
     .asciiz "RT_SPRITE_ON"
 runtime_symbol_rt_sprite_off:
@@ -10329,6 +10179,10 @@ builtin_symbol_sid_mode:
     .asciiz "SIDMODE"
 builtin_symbol_sid_vol:
     .asciiz "SIDVOL"
+builtin_symbol_sid_osc3:
+    .asciiz "SIDOSC3"
+builtin_symbol_sid_env3:
+    .asciiz "SIDENV3"
 
 object_header:
     .byte "OBJ1",10,0

@@ -215,6 +215,10 @@ Current status:
 - `rt_sid_vol.obj` sets the SID master volume nybble. It expects the volume in
   `A`, preserves the filter mode nybble from `rt_sid_volume_state`, stores to
   `$D418`, updates the shadow, and returns with `RTS`.
+- `rt_sid_osc3.obj` returns SID oscillator 3 readback register `$D41B` in `A`,
+  then returns with `RTS`.
+- `rt_sid_env3.obj` returns SID envelope 3 readback register `$D41C` in `A`,
+  then returns with `RTS`.
 - `rt_sprite_on.obj` is the first target-side SID/sprite helper implemented as
   machine code. It expects a sprite index in `A`, sets the matching enable bit
   in VIC-II register `$D015`, and returns with `RTS`; the ALINK direct-PRG
