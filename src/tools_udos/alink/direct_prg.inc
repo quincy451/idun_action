@@ -446,6 +446,8 @@ find_runtime_literal_call_prg_case_have_external:
     bcc find_runtime_literal_call_prg_case_have_supported_external
     jsr runtime_literal_call_first_external_is_rt_sprite_color
     bcc find_runtime_literal_call_prg_case_have_supported_external
+    jsr runtime_literal_call_first_external_is_rt_sprite_ptr
+    bcc find_runtime_literal_call_prg_case_have_supported_external
     jmp find_runtime_literal_call_prg_case_unsupported_value
 find_runtime_literal_call_prg_case_not_sprite_data_external:
     lda linked_literal_count
@@ -566,6 +568,15 @@ runtime_literal_call_first_external_is_rt_sprite_color:
     lda #<runtime_name_rt_sprite_color
     sta const_ptr
     lda #>runtime_name_rt_sprite_color
+    sta const_ptr+1
+    jmp external_name_window_matches_const_ptr
+
+runtime_literal_call_first_external_is_rt_sprite_ptr:
+    ldx #$00
+    jsr load_external_name_window_from_x_or_fail
+    lda #<runtime_name_rt_sprite_ptr
+    sta const_ptr
+    lda #>runtime_name_rt_sprite_ptr
     sta const_ptr+1
     jmp external_name_window_matches_const_ptr
 
@@ -2445,6 +2456,8 @@ runtime_name_rt_sprite_pos:
     .asciiz "rt_sprite_pos"
 runtime_name_rt_sprite_color:
     .asciiz "rt_sprite_color"
+runtime_name_rt_sprite_ptr:
+    .asciiz "rt_sprite_ptr"
 direct_body_real_print_int:
     .asciiz "p1u0T0S0L0U0p2u1r"
 direct_body_real_print_div:
