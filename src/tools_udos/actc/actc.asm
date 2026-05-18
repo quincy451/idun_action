@@ -8555,6 +8555,16 @@ find_or_store_builtin_runtime_external_from_declared:
     ldy #>runtime_symbol_rt_sid_res
     jmp find_or_store_runtime_external_from_ay
 :
+    lda #<builtin_symbol_sid_mode
+    ldy #>builtin_symbol_sid_mode
+    jsr symbol_buffer_matches_ay
+    bcs :+
+    lda #$01
+    sta call_expected_arg_count
+    lda #<runtime_symbol_rt_sid_mode
+    ldy #>runtime_symbol_rt_sid_mode
+    jmp find_or_store_runtime_external_from_ay
+:
     lda #<builtin_symbol_sid_vol
     ldy #>builtin_symbol_sid_vol
     jsr symbol_buffer_matches_ay
@@ -10251,6 +10261,8 @@ runtime_symbol_rt_sid_route:
     .asciiz "RT_SID_ROUTE"
 runtime_symbol_rt_sid_res:
     .asciiz "RT_SID_RES"
+runtime_symbol_rt_sid_mode:
+    .asciiz "RT_SID_MODE"
 runtime_symbol_rt_sid_vol:
     .asciiz "RT_SID_VOL"
 runtime_symbol_rt_sprite_on:
@@ -10315,6 +10327,8 @@ builtin_symbol_sid_route:
     .asciiz "SIDROUTE"
 builtin_symbol_sid_res:
     .asciiz "SIDRES"
+builtin_symbol_sid_mode:
+    .asciiz "SIDMODE"
 builtin_symbol_sid_vol:
     .asciiz "SIDVOL"
 

@@ -186,7 +186,8 @@ Current status:
   `SidWave` control byte from `rt_sid_state`. It expects the voice index in
   `A`; it stores to `$D404+7*voice`, then returns with `RTS`.
 - `rt_sid_rst.obj` clears the SID register block `$D400-$D418` and the linked
-  `rt_sid_state` and `rt_sid_filter_state` shadows, then returns with `RTS`.
+  `rt_sid_state`, `rt_sid_filter_state`, and `rt_sid_volume_state` shadows,
+  then returns with `RTS`.
 - `rt_sid_ad.obj` sets a SID voice attack/decay byte. It expects the voice
   index in `A` and the attack/decay byte in `Y`; it stores to
   `$D405+7*voice`, then returns with `RTS`.
@@ -203,8 +204,14 @@ Current status:
   resonance value in `A`, preserves the routing nybble from
   `rt_sid_filter_state`, stores to `$D417`, updates the shadow, and returns
   with `RTS`.
+- `rt_sid_volume_state.obj` exports a one-byte shadow for SID filter mode and
+  volume register `$D418`. It is data, not a callable routine.
+- `rt_sid_mode.obj` sets the SID filter mode high nybble. It expects the mode
+  value in `A`, preserves the volume nybble from `rt_sid_volume_state`, stores
+  to `$D418`, updates the shadow, and returns with `RTS`.
 - `rt_sid_vol.obj` sets the SID master volume nybble. It expects the volume in
-  `A`, masks it to four bits, stores `$D418`, and returns with `RTS`.
+  `A`, preserves the filter mode nybble from `rt_sid_volume_state`, stores to
+  `$D418`, updates the shadow, and returns with `RTS`.
 - `rt_sprite_on.obj` is the first target-side SID/sprite helper implemented as
   machine code. It expects a sprite index in `A`, sets the matching enable bit
   in VIC-II register `$D015`, and returns with `RTS`; the ALINK direct-PRG
