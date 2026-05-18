@@ -1,0 +1,5 @@
+OBJ1
+x rt_sprite_ptr 0 4
+b M
+m 9D F8 07 60
+n rt_sprite_ptr

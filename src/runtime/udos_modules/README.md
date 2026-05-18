@@ -235,6 +235,9 @@ Current status:
   block from a sprite data address. It expects the sprite index in `A`, the
   address low byte in `X`, and the address high byte in `Y`, computes
   `addr / 64`, stores the pointer byte to `$07F8+slot`, and returns with `RTS`.
+- `rt_sprite_ptr.obj` writes the raw sprite pointer byte for the default screen
+  block. It expects the pointer byte in `A` and sprite index in `X`, stores to
+  `$07F8+slot`, and returns with `RTS`.
 - `rt_sprite_mc.obj`, `rt_sprite_xexp.obj`, `rt_sprite_yexp.obj`, and
   `rt_sprite_prio.obj` are per-sprite bit-control helpers. They expect the
   sprite index in `A` and a boolean flag in `Y`, then set or clear the matching

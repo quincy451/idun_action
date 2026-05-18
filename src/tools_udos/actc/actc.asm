@@ -8449,51 +8449,41 @@ find_or_store_builtin_runtime_external_from_declared:
     ldy #>builtin_symbol_sid_freq
     jsr symbol_buffer_matches_ay
     bcs :+
-    lda #$02
-    sta call_expected_arg_count
     lda #<runtime_symbol_rt_sid_freq
     ldy #>runtime_symbol_rt_sid_freq
-    jmp find_or_store_runtime_external_from_ay
+    jmp find_or_store_two_arg_runtime_external_from_ay
 :
     lda #<builtin_symbol_sid_pulse
     ldy #>builtin_symbol_sid_pulse
     jsr symbol_buffer_matches_ay
     bcs :+
-    lda #$02
-    sta call_expected_arg_count
     lda #<runtime_symbol_rt_sid_pulse
     ldy #>runtime_symbol_rt_sid_pulse
-    jmp find_or_store_runtime_external_from_ay
+    jmp find_or_store_two_arg_runtime_external_from_ay
 :
     lda #<builtin_symbol_sid_wave
     ldy #>builtin_symbol_sid_wave
     jsr symbol_buffer_matches_ay
     bcs :+
-    lda #$02
-    sta call_expected_arg_count
     lda #<runtime_symbol_rt_sid_wave
     ldy #>runtime_symbol_rt_sid_wave
-    jmp find_or_store_runtime_external_from_ay
+    jmp find_or_store_two_arg_runtime_external_from_ay
 :
     lda #<builtin_symbol_sid_ad
     ldy #>builtin_symbol_sid_ad
     jsr symbol_buffer_matches_ay
     bcs :+
-    lda #$02
-    sta call_expected_arg_count
     lda #<runtime_symbol_rt_sid_ad
     ldy #>runtime_symbol_rt_sid_ad
-    jmp find_or_store_runtime_external_from_ay
+    jmp find_or_store_two_arg_runtime_external_from_ay
 :
     lda #<builtin_symbol_sid_sr
     ldy #>builtin_symbol_sid_sr
     jsr symbol_buffer_matches_ay
     bcs :+
-    lda #$02
-    sta call_expected_arg_count
     lda #<runtime_symbol_rt_sid_sr
     ldy #>runtime_symbol_rt_sid_sr
-    jmp find_or_store_runtime_external_from_ay
+    jmp find_or_store_two_arg_runtime_external_from_ay
 :
     lda #<builtin_symbol_sid_on
     ldy #>builtin_symbol_sid_on
@@ -8591,11 +8581,9 @@ find_or_store_builtin_runtime_external_from_declared:
     ldy #>builtin_symbol_sprite_color
     jsr symbol_buffer_matches_ay
     bcs :+
-    lda #$02
-    sta call_expected_arg_count
     lda #<runtime_symbol_rt_sprite_color
     ldy #>runtime_symbol_rt_sprite_color
-    jmp find_or_store_runtime_external_from_ay
+    jmp find_or_store_two_arg_runtime_external_from_ay
 :
     lda #<builtin_symbol_sprite_pos
     ldy #>builtin_symbol_sprite_pos
@@ -8611,61 +8599,57 @@ find_or_store_builtin_runtime_external_from_declared:
     ldy #>builtin_symbol_sprite_mc
     jsr symbol_buffer_matches_ay
     bcs :+
-    lda #$02
-    sta call_expected_arg_count
     lda #<runtime_symbol_rt_sprite_mc
     ldy #>runtime_symbol_rt_sprite_mc
-    jmp find_or_store_runtime_external_from_ay
+    jmp find_or_store_two_arg_runtime_external_from_ay
 :
     lda #<builtin_symbol_sprite_xexp
     ldy #>builtin_symbol_sprite_xexp
     jsr symbol_buffer_matches_ay
     bcs :+
-    lda #$02
-    sta call_expected_arg_count
     lda #<runtime_symbol_rt_sprite_xexp
     ldy #>runtime_symbol_rt_sprite_xexp
-    jmp find_or_store_runtime_external_from_ay
+    jmp find_or_store_two_arg_runtime_external_from_ay
 :
     lda #<builtin_symbol_sprite_yexp
     ldy #>builtin_symbol_sprite_yexp
     jsr symbol_buffer_matches_ay
     bcs :+
-    lda #$02
-    sta call_expected_arg_count
     lda #<runtime_symbol_rt_sprite_yexp
     ldy #>runtime_symbol_rt_sprite_yexp
-    jmp find_or_store_runtime_external_from_ay
+    jmp find_or_store_two_arg_runtime_external_from_ay
 :
     lda #<builtin_symbol_sprite_prio
     ldy #>builtin_symbol_sprite_prio
     jsr symbol_buffer_matches_ay
     bcs :+
-    lda #$02
-    sta call_expected_arg_count
     lda #<runtime_symbol_rt_sprite_prio
     ldy #>runtime_symbol_rt_sprite_prio
-    jmp find_or_store_runtime_external_from_ay
+    jmp find_or_store_two_arg_runtime_external_from_ay
+:
+    lda #<builtin_symbol_sprite_ptr
+    ldy #>builtin_symbol_sprite_ptr
+    jsr symbol_buffer_matches_ay
+    bcs :+
+    lda #<runtime_symbol_rt_sprite_ptr
+    ldy #>runtime_symbol_rt_sprite_ptr
+    jmp find_or_store_two_arg_runtime_external_from_ay
 :
     lda #<builtin_symbol_sprite_data
     ldy #>builtin_symbol_sprite_data
     jsr symbol_buffer_matches_ay
     bcs :+
-    lda #$02
-    sta call_expected_arg_count
     lda #<runtime_symbol_rt_sprite_data
     ldy #>runtime_symbol_rt_sprite_data
-    jmp find_or_store_runtime_external_from_ay
+    jmp find_or_store_two_arg_runtime_external_from_ay
 :
     lda #<builtin_symbol_set_sprite_mc
     ldy #>builtin_symbol_set_sprite_mc
     jsr symbol_buffer_matches_ay
     bcs find_or_store_builtin_runtime_external_from_declared_fail
-    lda #$02
-    sta call_expected_arg_count
     lda #<runtime_symbol_rt_sprite_set_mc
     ldy #>runtime_symbol_rt_sprite_set_mc
-    jmp find_or_store_runtime_external_from_ay
+    jmp find_or_store_two_arg_runtime_external_from_ay
 find_or_store_builtin_runtime_external_from_declared_fail:
     sec
     rts
@@ -8673,6 +8657,13 @@ find_or_store_builtin_runtime_external_from_declared_fail:
 find_or_store_one_arg_runtime_external_from_ay:
     pha
     lda #$01
+    sta call_expected_arg_count
+    pla
+    jmp find_or_store_runtime_external_from_ay
+
+find_or_store_two_arg_runtime_external_from_ay:
+    pha
+    lda #$02
     sta call_expected_arg_count
     pla
     jmp find_or_store_runtime_external_from_ay
@@ -10274,6 +10265,8 @@ runtime_symbol_rt_sprite_color:
     .asciiz "RT_SPRITE_COLOR"
 runtime_symbol_rt_sprite_pos:
     .asciiz "RT_SPRITE_POS"
+runtime_symbol_rt_sprite_ptr:
+    .asciiz "RT_SPRITE_PTR"
 runtime_symbol_rt_sprite_mc:
     .asciiz "RT_SPRITE_MC"
 runtime_symbol_rt_sprite_xexp:
@@ -10294,6 +10287,8 @@ builtin_symbol_sprite_color:
     .asciiz "SPRITECOLOR"
 builtin_symbol_sprite_pos:
     .asciiz "SPRITEPOS"
+builtin_symbol_sprite_ptr:
+    .asciiz "SPRITEPTR"
 builtin_symbol_sprite_mc:
     .asciiz "SPRITEMC"
 builtin_symbol_sprite_xexp:
