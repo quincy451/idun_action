@@ -18,6 +18,10 @@ select_prg_build_strategy_not_real_print_int:
     bcs select_prg_build_strategy_not_real_print_div
     rts
 select_prg_build_strategy_not_real_print_div:
+    jsr find_runtime_literal_call_prg_case
+    bcs select_prg_build_strategy_not_runtime_literal_call
+    rts
+select_prg_build_strategy_not_runtime_literal_call:
     jsr find_object_code_external_prg_case
     bcs select_prg_build_strategy_not_object_code_external
     rts
@@ -103,6 +107,11 @@ build_prg_content_not_real_print_int:
     bne build_prg_content_not_real_print_div
     jmp build_real_print_div_prg_content_or_fail
 build_prg_content_not_real_print_div:
+    lda prg_build_strategy
+    cmp #PRG_BUILD_RUNTIME_LITERAL_CALL
+    bne build_prg_content_not_runtime_literal_call
+    jmp build_runtime_literal_call_prg_content_or_fail
+build_prg_content_not_runtime_literal_call:
     lda prg_build_strategy
     cmp #PRG_BUILD_OBJECT_CODE
     bne build_prg_content_not_object_code
@@ -377,6 +386,63 @@ find_linked_real_print_div_prg_case_have_ints:
     rts
 find_linked_real_print_div_prg_case_unsupported:
     jsr restore_saved_module_name
+    sec
+    rts
+
+find_runtime_literal_call_prg_case:
+    lda #<direct_body_runtime_literal_call
+    sta const_ptr
+    lda #>direct_body_runtime_literal_call
+    sta const_ptr+1
+    jsr direct_entry_body_matches_const
+    bcc find_runtime_literal_call_prg_case_body_ok
+    sec
+    rts
+find_runtime_literal_call_prg_case_body_ok:
+    lda external_count
+    bne find_runtime_literal_call_prg_case_have_external
+    lda #<msg_bad_object
+    ldy #>msg_bad_object
+    jmp fail_with_ptr
+find_runtime_literal_call_prg_case_have_external:
+    lda int_count
+    bne find_runtime_literal_call_prg_case_have_int
+    lda #<msg_bad_object
+    ldy #>msg_bad_object
+    jmp fail_with_ptr
+find_runtime_literal_call_prg_case_have_int:
+    ldx #$00
+    jsr load_int_value_window_from_x_or_fail
+    lda int_value_window+1
+    bne find_runtime_literal_call_prg_case_unsupported_value
+    lda int_value_window
+    sta linked_store_value
+    jsr save_current_module_name
+    lda #$00
+    sta linked_object_index
+find_runtime_literal_call_prg_case_loop:
+    ldx linked_object_index
+    cpx external_count
+    beq find_runtime_literal_call_prg_case_supported
+    jsr copy_external_name_to_module_name_from_x_or_fail
+    jsr build_object_target_path
+    jsr load_pending_object_or_library_or_fail
+    jsr require_loaded_source_not_truncated_or_fail
+    jsr require_supported_object_header_or_fail
+    jsr require_loaded_object_exports_module_or_fail
+    jsr loaded_first_body_is_object_code
+    bcs find_runtime_literal_call_prg_case_unsupported
+    inc linked_object_index
+    jmp find_runtime_literal_call_prg_case_loop
+find_runtime_literal_call_prg_case_supported:
+    jsr restore_saved_module_name
+    lda #PRG_BUILD_RUNTIME_LITERAL_CALL
+    sta prg_build_strategy
+    clc
+    rts
+find_runtime_literal_call_prg_case_unsupported:
+    jsr restore_saved_module_name
+find_runtime_literal_call_prg_case_unsupported_value:
     sec
     rts
 
@@ -1067,6 +1133,35 @@ build_real_print_div_prg_content_or_fail:
     lda #$00
     jmp append_payload_byte
 
+build_runtime_literal_call_prg_content_or_fail:
+    lda #$00
+    jsr append_payload_byte
+    lda #$10
+    jsr append_payload_byte
+    jsr build_runtime_literal_call_address_table_or_fail
+    lda #$A9
+    jsr append_payload_byte
+    lda linked_store_value
+    jsr append_payload_byte
+    lda #$20
+    jsr append_payload_byte
+    ldx #$00
+    jsr load_pending_target_offset_from_x
+    lda current_bit_lo
+    jsr append_payload_byte
+    lda current_bit_hi
+    jsr append_payload_byte
+    lda #<runtime_literal_call_prg_exit_template
+    sta const_ptr
+    lda #>runtime_literal_call_prg_exit_template
+    sta const_ptr+1
+    lda #<(runtime_literal_call_prg_exit_template_end - runtime_literal_call_prg_exit_template)
+    sta current_bit_lo
+    lda #>(runtime_literal_call_prg_exit_template_end - runtime_literal_call_prg_exit_template)
+    sta current_bit_hi
+    jsr copy_direct_prg_template
+    jmp append_object_code_external_modules_or_fail
+
 build_object_code_prg_content_or_fail:
     lda #$00
     jsr append_payload_byte
@@ -1105,6 +1200,7 @@ build_object_code_address_table_or_fail:
     lda export_meta_window+EXPORT_META_SIZE_HI
     adc #$10
     sta linked_next_addr_hi
+build_object_code_address_table_with_current_next_or_fail:
     jsr save_current_module_name
     lda #$00
     sta linked_object_index
@@ -1146,6 +1242,13 @@ build_object_code_address_table_size_ok:
 build_object_code_address_table_done:
     jsr restore_saved_module_name
     rts
+
+build_runtime_literal_call_address_table_or_fail:
+    lda #$15
+    sta linked_next_addr_lo
+    lda #$10
+    sta linked_next_addr_hi
+    jmp build_object_code_address_table_with_current_next_or_fail
 
 append_object_code_external_modules_or_fail:
     jsr save_current_module_name
@@ -2055,6 +2158,8 @@ direct_body_return:
     .asciiz "r"
 direct_body_seeded_runtime:
     .asciiz "e0u0p0p1ayp2p3gzr"
+direct_body_runtime_literal_call:
+    .asciiz "p0u0r"
 direct_body_real_print_int:
     .asciiz "p1u0T0S0L0U0p2u1r"
 direct_body_real_print_div:
@@ -2499,6 +2604,10 @@ direct_prg_template_seeded_runtime:
     .byte $00,$10,$A9,$A5,$8D,$D0,$03,$A9,$00,$85,$02,$85,$03,$A2,$02,$4C
     .byte $0F,$CF
 direct_prg_template_seeded_runtime_end:
+
+runtime_literal_call_prg_exit_template:
+    .byte $A9,$A5,$8D,$D0,$03,$A9,$00,$85,$02,$85,$03,$A2,$02,$4C,$0F,$CF
+runtime_literal_call_prg_exit_template_end:
 
 real_print_int_prg_template:
     .byte $00,$10,$A9,$20,$85,$02,$A9,$10,$85,$03,$A2,$02,$20,$03,$CF,$20
