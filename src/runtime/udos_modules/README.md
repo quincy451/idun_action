@@ -173,6 +173,9 @@ Current status:
   `$D404+7*voice`, then returns with `RTS`. Gate control belongs to
   `SidOn`/`SidOff`, because SID control registers should not be treated as a
   reliable read/modify/write source.
+- `rt_sid_ad.obj` sets a SID voice attack/decay byte. It expects the voice
+  index in `A` and the attack/decay byte in `Y`; it stores to
+  `$D405+7*voice`, then returns with `RTS`.
 - `rt_sid_vol.obj` sets the SID master volume nybble. It expects the volume in
   `A`, masks it to four bits, stores `$D418`, and returns with `RTS`.
 - `rt_sprite_on.obj` is the first target-side SID/sprite helper implemented as
