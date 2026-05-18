@@ -8501,6 +8501,7 @@ builtin_runtime_import_table:
     .byte $01, <builtin_symbol_sid_vol, >builtin_symbol_sid_vol, <runtime_symbol_rt_sid_vol, >runtime_symbol_rt_sid_vol
     .byte $00, <builtin_symbol_sid_osc3, >builtin_symbol_sid_osc3, <runtime_symbol_rt_sid_osc3, >runtime_symbol_rt_sid_osc3
     .byte $00, <builtin_symbol_sid_env3, >builtin_symbol_sid_env3, <runtime_symbol_rt_sid_env3, >runtime_symbol_rt_sid_env3
+    .byte $04, <builtin_symbol_sound, >builtin_symbol_sound, <runtime_symbol_rt_sound, >runtime_symbol_rt_sound
     .byte $01, <builtin_symbol_sprite_on, >builtin_symbol_sprite_on, <runtime_symbol_rt_sprite_on, >runtime_symbol_rt_sprite_on
     .byte $01, <builtin_symbol_sprite_off, >builtin_symbol_sprite_off, <runtime_symbol_rt_sprite_off, >runtime_symbol_rt_sprite_off
     .byte $00, <builtin_symbol_sprite_hit, >builtin_symbol_sprite_hit, <runtime_symbol_rt_sprite_hit, >runtime_symbol_rt_sprite_hit
@@ -10109,6 +10110,8 @@ runtime_symbol_rt_sid_osc3:
     .asciiz "RT_SID_OSC3"
 runtime_symbol_rt_sid_env3:
     .asciiz "RT_SID_ENV3"
+runtime_symbol_rt_sound:
+    .asciiz "RT_SOUND"
 runtime_symbol_rt_sprite_on:
     .asciiz "RT_SPRITE_ON"
 runtime_symbol_rt_sprite_off:
@@ -10193,6 +10196,8 @@ builtin_symbol_sid_osc3:
     .asciiz "SIDOSC3"
 builtin_symbol_sid_env3:
     .asciiz "SIDENV3"
+builtin_symbol_sound:
+    .asciiz "SOUND"
 
 object_header:
     .byte "OBJ1",10,0

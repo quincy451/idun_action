@@ -219,6 +219,12 @@ Current status:
   then returns with `RTS`.
 - `rt_sid_env3.obj` returns SID envelope 3 readback register `$D41C` in `A`,
   then returns with `RTS`.
+- `rt_sound.obj` is the Atari-style `Sound(voice,pitch,distortion,volume)`
+  compatibility wrapper. It expects voice in `A`, pitch in `X`, distortion in
+  `Y`, and volume in zero-page `$02`; lower pitch values produce higher SID
+  frequencies, distortion selects a coarse triangle/saw/pulse/noise waveform,
+  the selected voice is gated on, and volume preserves the filter mode nybble
+  through `rt_sid_volume_state`.
 - `rt_sprite_on.obj` is the first target-side SID/sprite helper implemented as
   machine code. It expects a sprite index in `A`, sets the matching enable bit
   in VIC-II register `$D015`, and returns with `RTS`; the ALINK direct-PRG
