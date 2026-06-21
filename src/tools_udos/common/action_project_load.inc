@@ -25,7 +25,11 @@ load_project_manifest:
     sta file_params+7
     sta file_params+8
     ldx #file_params
+.ifdef ALINK_PRESERVE_ZP_SERVICES
+    jsr alink_svc_file_load_sc0
+.else
     jsr svc_file_load_sc0
+.endif
     lda file_params+6
     cmp #tool_file_status_ok
     beq load_project_manifest_ok
@@ -49,13 +53,13 @@ load_project_manifest_fail:
 skip_current_line:
     ldy #$00
 skip_current_line_loop:
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_ptr
     beq skip_current_line_done
     cmp #13
     beq skip_current_line_done
     cmp #10
     beq skip_current_line_done
-    jsr advance_scan_ptr
+    jsr source_reader_consume_scan_ptr
     jmp skip_current_line_loop
 skip_current_line_done:
     rts
@@ -63,17 +67,43 @@ skip_current_line_done:
 skip_line_breaks:
     ldy #$00
 skip_line_breaks_loop:
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_ptr
     cmp #13
     beq skip_line_breaks_advance
     cmp #10
     bne skip_line_breaks_done
 skip_line_breaks_advance:
-    jsr advance_scan_ptr
+    jsr source_reader_consume_scan_ptr
     jmp skip_line_breaks_loop
 skip_line_breaks_done:
     rts
 
+source_reader_peek_scan_ptr:
+    ldy #$00
+    lda (scan_ptr),y
+    clc
+    rts
+
+source_reader_peek_scan_y:
+    lda (scan_ptr),y
+    clc
+    rts
+
+source_reader_consume_scan_ptr:
+    pha
+    tya
+    pha
+    jsr source_reader_peek_scan_ptr
+    bcc source_reader_consume_scan_ptr_ok
+    pla
+    tay
+    pla
+    sec
+    rts
+source_reader_consume_scan_ptr_ok:
+    pla
+    tay
+    pla
 advance_scan_ptr:
 .ifdef ACTC_REU_SOURCE_CACHE
 .if ACTC_REU_SOURCE_CACHE

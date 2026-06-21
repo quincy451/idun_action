@@ -1825,7 +1825,6 @@ rebuild_piece_table_if_dirty:
 rebuild_piece_table_ready:
     clc
     rts
-:   
 rebuild_piece_table_rebuild:
     lda #$00
     sta actedit_piece_count

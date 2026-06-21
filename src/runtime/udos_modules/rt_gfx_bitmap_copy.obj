@@ -1,5 +1,5 @@
 OBJ1
-x rt_gfx_bitmap_copy 0 4
-b ZCr
-k 0
+x rt_gfx_bitmap_copy 0 42
+b M
+m 86 02 84 03 A9 00 85 04 A9 20 85 05 A2 1F A0 00 B1 02 91 04 C8 D0 F9 E6 03 E6 05 CA D0 F2 A0 00 B1 02 91 04 C8 C0 40 D0 F7 60
 n rt_gfx_bitmap_copy

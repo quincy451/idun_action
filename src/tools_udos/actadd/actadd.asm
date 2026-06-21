@@ -2,7 +2,6 @@
 
 .export start
 
-ACTION_PROJECT_SAVE_TREE_ONLY = 1
 MANIFEST_LIMIT = 191
 
 .segment "ZPTEMP": zeropage

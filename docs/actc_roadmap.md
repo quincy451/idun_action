@@ -15,4 +15,5 @@ Proof gates:
 
 - `make -C ../udos vice-action-actc`
 - `make -C ../udos vice-action-actc-alink-launch`
+- `make -C ../udos vice-action-actc-alink-launch-runtime-matrices`
 - shape-specific launch gates such as the print/math direct PRG probes

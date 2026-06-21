@@ -16,6 +16,7 @@ Candidate families:
 - REAL math and conversion
 - graphics/resource helpers
 - SID/sprite helpers
+- joystick/mouse input helpers
 - DBF-style database helpers
 - TCP/network helpers
 - 80-column helpers

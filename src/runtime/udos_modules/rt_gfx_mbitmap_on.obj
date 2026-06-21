@@ -1,5 +1,5 @@
 OBJ1
-x rt_gfx_mbitmap_on 0 4
-b 9r
-k 0
+x rt_gfx_mbitmap_on 0 17
+b M
+m AD 11 D0 09 20 8D 11 D0 AD 16 D0 09 10 8D 16 D0 60
 n rt_gfx_mbitmap_on

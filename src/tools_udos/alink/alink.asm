@@ -2,6 +2,14 @@
 
 .export start
 
+READST = $FFB7
+CLOSE_K = $FFC3
+CLRCHN = $FFCC
+CHRIN = $FFCF
+VICE_LFN_FILE = 2
+TOOL_ABI_FILE_NAME_LO = $CDC6
+TOOL_ABI_FILE_NAME_HI = $CDC7
+
 MANIFEST_LIMIT = 191
 .ifndef SOURCE_LIMIT
 SOURCE_LIMIT = 255
@@ -193,6 +201,51 @@ ALINK_LOOP_LAYOUT_REU_BASE_HI = $43
 .ifndef ALINK_LOOP_LAYOUT_REU_BASE_BANK
 ALINK_LOOP_LAYOUT_REU_BASE_BANK = $03
 .endif
+.ifndef ALINK_RELOC_REU_BASE_LO
+ALINK_RELOC_REU_BASE_LO = $00
+.endif
+.ifndef ALINK_RELOC_REU_BASE_HI
+ALINK_RELOC_REU_BASE_HI = $44
+.endif
+.ifndef ALINK_RELOC_REU_BASE_BANK
+ALINK_RELOC_REU_BASE_BANK = $03
+.endif
+.ifndef ALINK_RUNTIME_STORE_REU_BASE_LO
+ALINK_RUNTIME_STORE_REU_BASE_LO = $00
+.endif
+.ifndef ALINK_RUNTIME_STORE_REU_BASE_HI
+ALINK_RUNTIME_STORE_REU_BASE_HI = $45
+.endif
+.ifndef ALINK_RUNTIME_STORE_REU_BASE_BANK
+ALINK_RUNTIME_STORE_REU_BASE_BANK = $03
+.endif
+.ifndef ALINK_LINKED_LITERAL_REU_BASE_LO
+ALINK_LINKED_LITERAL_REU_BASE_LO = $00
+.endif
+.ifndef ALINK_LINKED_LITERAL_REU_BASE_HI
+ALINK_LINKED_LITERAL_REU_BASE_HI = $46
+.endif
+.ifndef ALINK_LINKED_LITERAL_REU_BASE_BANK
+ALINK_LINKED_LITERAL_REU_BASE_BANK = $03
+.endif
+.ifndef ALINK_ROOT_EXPORT_REU_BASE_LO
+ALINK_ROOT_EXPORT_REU_BASE_LO = $00
+.endif
+.ifndef ALINK_ROOT_EXPORT_REU_BASE_HI
+ALINK_ROOT_EXPORT_REU_BASE_HI = $47
+.endif
+.ifndef ALINK_ROOT_EXPORT_REU_BASE_BANK
+ALINK_ROOT_EXPORT_REU_BASE_BANK = $03
+.endif
+.ifndef ALINK_FILE_LOAD_REU_BASE_LO
+ALINK_FILE_LOAD_REU_BASE_LO = $00
+.endif
+.ifndef ALINK_FILE_LOAD_REU_BASE_HI
+ALINK_FILE_LOAD_REU_BASE_HI = $00
+.endif
+.ifndef ALINK_FILE_LOAD_REU_BASE_BANK
+ALINK_FILE_LOAD_REU_BASE_BANK = $02
+.endif
 .ifndef LOOP_MAX
 LOOP_MAX = 8
 .endif
@@ -249,25 +302,47 @@ LIVE_FLAG_BYTES = 1
 LOOP_LAYOUT_LO = 0
 LOOP_LAYOUT_HI = 1
 LOOP_LAYOUT_BYTES = 2
+RELOC_RECORD_OFFSET_LO = 0
+RELOC_RECORD_OFFSET_HI = 1
+RELOC_RECORD_ADDR_LO = 2
+RELOC_RECORD_ADDR_HI = 3
+RELOC_RECORD_BYTES = 4
+RUNTIME_STORE_VAR = 0
+RUNTIME_STORE_LITERAL = 1
+RUNTIME_STORE_BYTES = 2
+LINKED_LITERAL_LO = 0
+LINKED_LITERAL_HI = 1
+LINKED_LITERAL_BYTES = 2
 PRG_BUILD_DIRECT = 0
-PRG_BUILD_EXTERNAL_PRINT = 1
-PRG_BUILD_TRANSITIVE_EXTERNAL_PRINT = 2
-PRG_BUILD_EXTERNAL_RETURN = 3
-PRG_BUILD_TRANSITIVE_EXTERNAL_RETURN = 4
-PRG_BUILD_EXTERNAL_RETURN_PAIR = 5
-PRG_BUILD_EXTERNAL_STORE = 6
-PRG_BUILD_TRANSITIVE_EXTERNAL_STORE = 7
-PRG_BUILD_EXTERNAL_LOAD_STORE = 8
-PRG_BUILD_TRANSITIVE_EXTERNAL_LOAD_STORE = 9
-PRG_BUILD_EXTERNAL_STRING_INT = 10
-PRG_BUILD_TRANSITIVE_EXTERNAL_STRING_INT = 11
 PRG_BUILD_PRINTMATH_STRING_INT = 12
 PRG_BUILD_REAL_PRINT_INT = 13
-PRG_BUILD_REAL_PRINT_DIV = 14
+PRG_BUILD_REAL_PRINT_BINARY = 14
 PRG_BUILD_OBJECT_CODE = 15
-PRG_BUILD_OBJECT_CODE_EXTERNAL = 16
-PRG_BUILD_RUNTIME_LITERAL_CALL = 17
-PRG_BUILD_RUNTIME_SID_GATE_CALLS = 18
+PRG_BUILD_REAL_IF_GT = 19
+PRG_BUILD_REAL_DO_UNTIL = 20
+PRG_BUILD_REAL_WHILE = 21
+PRG_BUILD_RUNTIME_HELPER_SEQUENCE = 23
+PRG_BUILD_REAL_PRINT_FABS = 24
+PRG_BUILD_INPUT_REAL_PRINT_INT = 25
+PRG_BUILD_INPUT_STORED_REAL_PRINT_INT = 26
+PRG_BUILD_REAL_TO_INT = 27
+PRG_BUILD_RUNTIME_HELPER_CONDITION = 28
+RUNTIME_HELPER_KIND_NONE = 0
+RUNTIME_HELPER_KIND_SPRITE_DATA = 1
+RUNTIME_HELPER_KIND_SPRITE_POS = 2
+RUNTIME_HELPER_KIND_GFX_BGCOLOR = 3
+RUNTIME_HELPER_KIND_SID_FREQ = 4
+RUNTIME_HELPER_KIND_XA_BYTE = 5
+RUNTIME_HELPER_KIND_XY_WORD = 6
+RUNTIME_HELPER_KIND_NO_ARG = 7
+RUNTIME_HELPER_KIND_A_BYTE = 8
+RUNTIME_HELPER_KIND_AY_BYTE = 9
+RUNTIME_HELPER_KIND_AXY_BYTES_CLC = 10
+RUNTIME_HELPER_KIND_X1_A0_BYTES = 11
+RUNTIME_HELPER_KIND_BYTE_READBACK = 12
+RUNTIME_HELPER_KIND_A_BYTE_READBACK = 13
+RUNTIME_HELPER_KIND_XY_WORD_READBACK = 14
+RUNTIME_HELPER_KIND_AY_BYTE_READBACK = 15
 
 
 .segment "ZPTEMP": zeropage
@@ -294,18 +369,45 @@ start:
     jsr require_loaded_project
     jsr require_manifest_entry_tracked
     jsr build_object_target_path
+    lda #$10
+    sta debug_phase_zp
     jsr load_object_or_fail
+    lda #$11
+    sta debug_phase_zp
     jsr parse_exports_or_fail
+    lda #$12
+    sta debug_phase_zp
     jsr parse_body_ops_or_fail
+    lda #$13
+    sta debug_phase_zp
     jsr parse_external_symbols_or_fail
+    lda #$14
+    sta debug_phase_zp
     jsr prune_direct_object_code_external_symbols
+    lda #$15
+    sta debug_phase_zp
     jsr parse_strings_or_fail
+    lda #$16
+    sta debug_phase_zp
     jsr parse_ints_or_fail
+    lda #$17
+    sta debug_phase_zp
     jsr parse_vars_or_fail
+    lda #$18
+    sta debug_phase_zp
     jsr resolve_external_objects_or_fail
+    lda #$19
+    sta debug_phase_zp
     jsr compute_code_bytes
+    lda #$1A
+    sta debug_phase_zp
     jsr build_live_set
+    lda #$1B
+    sta debug_phase_zp
     jsr select_prg_build_strategy_or_fail
+    lda #$1C
+    sta debug_phase_zp
+    jsr validate_prg_build_inputs_or_fail
     lda #$41
     sta debug_phase_zp
     jsr build_binary_save_target_path
@@ -331,12 +433,12 @@ save_ok:
 
 init_module_name:
     ldx #svc_retptr
-    jsr svc_program_get_cmdline_len
+    jsr alink_svc_program_get_cmdline_len
     lda svc_retptr
     ora svc_retptr+1
     beq init_module_name_default
     ldx #svc_retptr
-    jsr svc_program_get_cmdline_ptr
+    jsr alink_svc_program_get_cmdline_ptr
     lda svc_retptr
     sta src_ptr
     lda svc_retptr+1
@@ -432,6 +534,8 @@ resolve_external_objects_loop:
     jsr require_loaded_source_not_truncated_or_fail
     jsr require_supported_object_header_or_fail
     jsr require_loaded_object_exports_module_or_fail
+    lda saved_export_count
+    sta export_count
     jsr append_loaded_object_imports_to_queue_or_fail
     lda saved_export_count
     sta export_count
@@ -511,12 +615,14 @@ require_loaded_object_exports_module_done:
 
 append_loaded_object_imports_to_queue_or_fail:
     jsr find_loaded_export_index_from_module_name_or_fail
+    jsr load_loaded_export_meta_at_scan_ptr_or_fail
     jsr set_body_ptr_to_loaded_body_index_or_fail
     jsr loaded_body_ptr_is_object_code
     bcc append_loaded_object_imports_live
     jmp append_all_loaded_object_imports_to_queue_or_fail
 append_loaded_object_imports_live:
-    jmp append_imports_from_body_ptr_to_queue_or_fail
+    jsr append_imports_from_body_ptr_to_queue_or_fail
+    jmp append_named_relocs_current_export_to_queue_or_fail
 
 loaded_body_ptr_is_object_code:
     lda body_ptr
@@ -553,6 +659,47 @@ find_loaded_export_index_from_module_name_bad:
     ldy #>msg_bad_object
     jmp fail_with_ptr
 find_loaded_export_index_from_module_name_done:
+    rts
+
+load_loaded_export_meta_at_scan_ptr_or_fail:
+    jsr skip_symbol_at_scan_ptr_or_fail
+    jsr require_space_or_fail
+    jsr parse_decimal_word_or_fail
+    lda current_bit_lo
+    sta export_meta_window+EXPORT_META_OFFSET_LO
+    lda current_bit_hi
+    sta export_meta_window+EXPORT_META_OFFSET_HI
+    jsr require_space_or_fail
+    jsr parse_decimal_word_or_fail
+    lda current_bit_lo
+    sta export_meta_window+EXPORT_META_SIZE_LO
+    lda current_bit_hi
+    sta export_meta_window+EXPORT_META_SIZE_HI
+    rts
+
+skip_symbol_at_scan_ptr_or_fail:
+    lda #$00
+    sta linked_external_index
+skip_symbol_at_scan_ptr_loop:
+    ldy #$00
+    lda (scan_ptr),y
+    beq skip_symbol_at_scan_ptr_done
+    cmp #' '
+    beq skip_symbol_at_scan_ptr_done
+    cmp #10
+    beq skip_symbol_at_scan_ptr_done
+    cmp #13
+    beq skip_symbol_at_scan_ptr_done
+    jsr advance_scan_ptr
+    inc linked_external_index
+    bne skip_symbol_at_scan_ptr_loop
+skip_symbol_at_scan_ptr_bad:
+    lda #<msg_bad_object
+    ldy #>msg_bad_object
+    jmp fail_with_ptr
+skip_symbol_at_scan_ptr_done:
+    lda linked_external_index
+    beq skip_symbol_at_scan_ptr_bad
     rts
 
 set_body_ptr_to_loaded_body_index_or_fail:
@@ -617,11 +764,21 @@ append_imports_from_body_ptr_import:
     bcs append_imports_from_body_ptr_bad
     sta linked_import_index
     iny
-    sty saved_state_lo
+    tya
+    pha
+    lda body_ptr
+    pha
+    lda body_ptr+1
+    pha
     lda linked_import_index
     jsr copy_loaded_import_index_to_pending_window_or_fail
     jsr append_pending_name_to_external_queue_or_fail
-    ldy saved_state_lo
+    pla
+    sta body_ptr+1
+    pla
+    sta body_ptr
+    pla
+    tay
     jmp append_imports_from_body_ptr_loop
 append_imports_from_body_ptr_bad:
     lda #<msg_bad_object
@@ -658,21 +815,20 @@ prune_direct_object_code_external_symbols:
     rts
 prune_direct_object_code_external_symbols_have_entry:
     stx entry_export_index
-    jsr direct_entry_body_is_object_code_external
-    bcc prune_direct_object_code_external_symbols_prune
-    lda #<direct_body_object_code
-    sta const_ptr
-    lda #>direct_body_object_code
-    sta const_ptr+1
-    jsr direct_entry_body_matches_const
+    jsr direct_entry_body_is_object_code
     bcc prune_direct_object_code_external_symbols_prune
     rts
 prune_direct_object_code_external_symbols_prune:
     lda #$00
     sta external_count
     ldx entry_export_index
+    jsr load_export_meta_window_from_x_or_fail
+    ldx entry_export_index
     jsr set_body_ptr_from_x
-    jmp append_imports_from_body_ptr_to_queue_or_fail
+    jsr append_imports_from_body_ptr_to_queue_or_fail
+    ldx entry_export_index
+    jsr load_export_meta_window_from_x_or_fail
+    jmp append_named_relocs_current_export_to_queue_or_fail
 
 copy_import_symbol_line_to_pending_window_or_fail:
     lda #<pending_name_window
@@ -721,6 +877,8 @@ copy_import_symbol_line_to_pending_window_done:
 append_pending_name_to_external_queue_or_fail:
     jsr pending_name_already_external
     bcc append_pending_name_to_external_queue_done
+    jsr pending_name_already_exported
+    bcc append_pending_name_to_external_queue_done
     lda external_count
     cmp #EXTERNAL_MAX
     bcc :+
@@ -753,6 +911,25 @@ pending_name_already_external_not_found:
     sec
     rts
 
+pending_name_already_exported:
+    lda #$00
+    sta saved_pending_index
+pending_name_already_exported_loop:
+    ldx saved_pending_index
+    cpx export_count
+    beq pending_name_already_exported_not_found
+    jsr load_export_name_window_from_x_or_fail
+    jsr pending_name_matches_export_window
+    bcc pending_name_already_exported_found
+    inc saved_pending_index
+    jmp pending_name_already_exported_loop
+pending_name_already_exported_found:
+    clc
+    rts
+pending_name_already_exported_not_found:
+    sec
+    rts
+
 pending_name_matches_external_window:
     ldy #$00
 pending_name_matches_external_window_loop:
@@ -768,6 +945,86 @@ pending_name_matches_external_window_fail:
     sec
     rts
 pending_name_matches_external_window_ok:
+    clc
+    rts
+
+pending_name_matches_export_window:
+    ldy #$00
+pending_name_matches_export_window_loop:
+    lda pending_name_window,y
+    jsr lowercase_ascii
+    sta compare_char
+    lda export_name_window,y
+    jsr lowercase_ascii
+    cmp compare_char
+    bne pending_name_matches_export_window_fail
+    lda pending_name_window,y
+    beq pending_name_matches_export_window_ok
+    iny
+    cpy #25
+    bcc pending_name_matches_export_window_loop
+pending_name_matches_export_window_fail:
+    sec
+    rts
+pending_name_matches_export_window_ok:
+    clc
+    rts
+
+pending_name_already_loaded_exported:
+    jsr reset_scan_ptr_after_header
+pending_name_already_loaded_exported_loop:
+    jsr skip_line_breaks
+    ldy #$00
+    lda (scan_ptr),y
+    beq pending_name_already_loaded_exported_not_found
+    lda #<line_export
+    sta const_ptr
+    lda #>line_export
+    sta const_ptr+1
+    jsr pattern_matches_scan_ptr
+    bcs pending_name_already_loaded_exported_next
+    jsr advance_scan_ptr_by_const_ptr
+    jsr pending_name_matches_scan_symbol
+    bcc pending_name_already_loaded_exported_found
+pending_name_already_loaded_exported_next:
+    jsr skip_current_line
+    jmp pending_name_already_loaded_exported_loop
+pending_name_already_loaded_exported_found:
+    clc
+    rts
+pending_name_already_loaded_exported_not_found:
+    sec
+    rts
+
+pending_name_matches_scan_symbol:
+    ldy #$00
+pending_name_matches_scan_symbol_loop:
+    lda pending_name_window,y
+    beq pending_name_matches_scan_symbol_check_source_end
+    jsr lowercase_ascii
+    sta compare_char
+    lda (scan_ptr),y
+    jsr lowercase_ascii
+    cmp compare_char
+    bne pending_name_matches_scan_symbol_fail
+    iny
+    cpy #25
+    bcc pending_name_matches_scan_symbol_loop
+pending_name_matches_scan_symbol_fail:
+    sec
+    rts
+pending_name_matches_scan_symbol_check_source_end:
+    lda (scan_ptr),y
+    beq pending_name_matches_scan_symbol_ok
+    cmp #' '
+    beq pending_name_matches_scan_symbol_ok
+    cmp #10
+    beq pending_name_matches_scan_symbol_ok
+    cmp #13
+    beq pending_name_matches_scan_symbol_ok
+    sec
+    rts
+pending_name_matches_scan_symbol_ok:
     clc
     rts
 
@@ -1015,7 +1272,7 @@ load_export_name_window_from_x_or_fail:
     lda #$00
     sta file_params+7
     ldx #file_params
-    jsr svc_reu_read_sc0
+    jsr alink_svc_reu_read_sc0
     lda file_params+7
     cmp #tool_file_status_ok
     beq load_export_name_window_from_x_ok
@@ -1044,7 +1301,7 @@ store_export_name_window_from_x_or_fail:
     lda #$00
     sta file_params+7
     ldx #file_params
-    jsr svc_reu_write_sc0
+    jsr alink_svc_reu_write_sc0
     lda file_params+7
     cmp #tool_file_status_ok
     beq store_export_name_window_from_x_ok
@@ -1056,6 +1313,89 @@ store_export_name_window_from_x_or_fail:
 store_export_name_window_from_x_ok:
     pla
     tax
+    rts
+
+load_root_export_name_window_from_x_or_fail:
+    txa
+    pha
+    jsr set_root_export_name_reu_params_from_x
+    lda #<export_name_window
+    sta file_params+3
+    lda #>export_name_window
+    sta file_params+4
+    lda #<EXPORT_NAME_BYTES
+    sta file_params+5
+    lda #>EXPORT_NAME_BYTES
+    sta file_params+6
+    lda #$00
+    sta file_params+7
+    ldx #file_params
+    jsr alink_svc_reu_read_sc0
+    lda file_params+7
+    cmp #tool_file_status_ok
+    beq load_root_export_name_window_from_x_ok
+    pla
+    tax
+    lda #<msg_load_fail
+    ldy #>msg_load_fail
+    jmp fail_with_ptr
+load_root_export_name_window_from_x_ok:
+    pla
+    tax
+    rts
+
+store_root_export_name_window_from_x_or_fail:
+    txa
+    pha
+    jsr set_root_export_name_reu_params_from_x
+    lda #<export_name_window
+    sta file_params+3
+    lda #>export_name_window
+    sta file_params+4
+    lda #<EXPORT_NAME_BYTES
+    sta file_params+5
+    lda #>EXPORT_NAME_BYTES
+    sta file_params+6
+    lda #$00
+    sta file_params+7
+    ldx #file_params
+    jsr alink_svc_reu_write_sc0
+    lda file_params+7
+    cmp #tool_file_status_ok
+    beq store_root_export_name_window_from_x_ok
+    pla
+    tax
+    lda #<msg_save_fail
+    ldy #>msg_save_fail
+    jmp fail_with_ptr
+store_root_export_name_window_from_x_ok:
+    pla
+    tax
+    rts
+
+set_root_export_name_reu_params_from_x:
+    lda #ALINK_ROOT_EXPORT_REU_BASE_LO
+    sta file_params+0
+    lda #ALINK_ROOT_EXPORT_REU_BASE_HI
+    sta file_params+1
+    lda #ALINK_ROOT_EXPORT_REU_BASE_BANK
+    sta file_params+2
+set_root_export_name_reu_params_from_x_loop:
+    cpx #$00
+    beq set_root_export_name_reu_params_from_x_done
+    clc
+    lda file_params+0
+    adc #EXPORT_NAME_BYTES
+    sta file_params+0
+    lda file_params+1
+    adc #$00
+    sta file_params+1
+    lda file_params+2
+    adc #$00
+    sta file_params+2
+    dex
+    bne set_root_export_name_reu_params_from_x_loop
+set_root_export_name_reu_params_from_x_done:
     rts
 
 set_export_name_reu_params_from_x:
@@ -1109,7 +1449,7 @@ load_external_name_window_from_x_or_fail:
     lda #$00
     sta file_params+7
     ldx #file_params
-    jsr svc_reu_read_sc0
+    jsr alink_svc_reu_read_sc0
     lda file_params+7
     cmp #tool_file_status_ok
     beq load_external_name_window_from_x_ok
@@ -1138,7 +1478,7 @@ store_external_name_window_from_x_or_fail:
     lda #$00
     sta file_params+7
     ldx #file_params
-    jsr svc_reu_write_sc0
+    jsr alink_svc_reu_write_sc0
     lda file_params+7
     cmp #tool_file_status_ok
     beq store_external_name_window_from_x_ok
@@ -1203,7 +1543,7 @@ load_var_name_window_from_x_or_fail:
     lda #$00
     sta file_params+7
     ldx #file_params
-    jsr svc_reu_read_sc0
+    jsr alink_svc_reu_read_sc0
     lda file_params+7
     cmp #tool_file_status_ok
     beq load_var_name_window_from_x_ok
@@ -1232,7 +1572,7 @@ store_var_name_window_from_x_or_fail:
     lda #$00
     sta file_params+7
     ldx #file_params
-    jsr svc_reu_write_sc0
+    jsr alink_svc_reu_write_sc0
     lda file_params+7
     cmp #tool_file_status_ok
     beq store_var_name_window_from_x_ok
@@ -1297,7 +1637,7 @@ load_pending_name_window_from_x_or_fail:
     lda #$00
     sta file_params+7
     ldx #file_params
-    jsr svc_reu_read_sc0
+    jsr alink_svc_reu_read_sc0
     lda file_params+7
     cmp #tool_file_status_ok
     beq load_pending_name_window_from_x_ok
@@ -1326,7 +1666,7 @@ store_pending_name_window_from_x_or_fail:
     lda #$00
     sta file_params+7
     ldx #file_params
-    jsr svc_reu_write_sc0
+    jsr alink_svc_reu_write_sc0
     lda file_params+7
     cmp #tool_file_status_ok
     beq store_pending_name_window_from_x_ok
@@ -1391,7 +1731,7 @@ load_body_window_from_x_or_fail:
     lda #$00
     sta file_params+7
     ldx #file_params
-    jsr svc_reu_read_sc0
+    jsr alink_svc_reu_read_sc0
     lda file_params+7
     cmp #tool_file_status_ok
     beq load_body_window_from_x_ok
@@ -1420,7 +1760,7 @@ store_body_window_from_x_or_fail:
     lda #$00
     sta file_params+7
     ldx #file_params
-    jsr svc_reu_write_sc0
+    jsr alink_svc_reu_write_sc0
     lda file_params+7
     cmp #tool_file_status_ok
     beq store_body_window_from_x_ok
@@ -1485,7 +1825,7 @@ load_string_window_from_x_or_fail:
     lda #$00
     sta file_params+7
     ldx #file_params
-    jsr svc_reu_read_sc0
+    jsr alink_svc_reu_read_sc0
     lda file_params+7
     cmp #tool_file_status_ok
     beq load_string_window_from_x_ok
@@ -1514,7 +1854,7 @@ store_string_window_from_x_or_fail:
     lda #$00
     sta file_params+7
     ldx #file_params
-    jsr svc_reu_write_sc0
+    jsr alink_svc_reu_write_sc0
     lda file_params+7
     cmp #tool_file_status_ok
     beq store_string_window_from_x_ok
@@ -1543,7 +1883,7 @@ load_saved_string_window_from_x_or_fail:
     lda #$00
     sta file_params+7
     ldx #file_params
-    jsr svc_reu_read_sc0
+    jsr alink_svc_reu_read_sc0
     lda file_params+7
     cmp #tool_file_status_ok
     beq load_saved_string_window_from_x_ok
@@ -1572,7 +1912,7 @@ store_saved_string_window_from_x_or_fail:
     lda #$00
     sta file_params+7
     ldx #file_params
-    jsr svc_reu_write_sc0
+    jsr alink_svc_reu_write_sc0
     lda file_params+7
     cmp #tool_file_status_ok
     beq store_saved_string_window_from_x_ok
@@ -1677,7 +2017,7 @@ load_pending_meta_window_from_x_or_fail:
     lda #$00
     sta file_params+7
     ldx #file_params
-    jsr svc_reu_read_sc0
+    jsr alink_svc_reu_read_sc0
     lda file_params+7
     cmp #tool_file_status_ok
     beq load_pending_meta_window_from_x_ok
@@ -1706,7 +2046,7 @@ store_pending_meta_window_from_x_or_fail:
     lda #$00
     sta file_params+7
     ldx #file_params
-    jsr svc_reu_write_sc0
+    jsr alink_svc_reu_write_sc0
     lda file_params+7
     cmp #tool_file_status_ok
     beq store_pending_meta_window_from_x_ok
@@ -1783,6 +2123,255 @@ load_pending_string_use_mask_from_x_loop:
     bcc load_pending_string_use_mask_from_x_loop
     rts
 
+load_linked_reloc_record_window_from_x_or_fail:
+    txa
+    pha
+    jsr set_linked_reloc_reu_params_from_x
+    lda #<reloc_record_window
+    sta file_params+3
+    lda #>reloc_record_window
+    sta file_params+4
+    lda #<RELOC_RECORD_BYTES
+    sta file_params+5
+    lda #>RELOC_RECORD_BYTES
+    sta file_params+6
+    lda #$00
+    sta file_params+7
+    ldx #file_params
+    jsr alink_svc_reu_read_sc0
+    lda file_params+7
+    cmp #tool_file_status_ok
+    beq load_linked_reloc_record_window_from_x_ok
+    pla
+    tax
+    lda #<msg_load_fail
+    ldy #>msg_load_fail
+    jmp fail_with_ptr
+load_linked_reloc_record_window_from_x_ok:
+    pla
+    tax
+    rts
+
+store_linked_reloc_record_window_from_x_or_fail:
+    txa
+    pha
+    jsr set_linked_reloc_reu_params_from_x
+    lda #<reloc_record_window
+    sta file_params+3
+    lda #>reloc_record_window
+    sta file_params+4
+    lda #<RELOC_RECORD_BYTES
+    sta file_params+5
+    lda #>RELOC_RECORD_BYTES
+    sta file_params+6
+    lda #$00
+    sta file_params+7
+    ldx #file_params
+    jsr alink_svc_reu_write_sc0
+    lda file_params+7
+    cmp #tool_file_status_ok
+    beq store_linked_reloc_record_window_from_x_ok
+    pla
+    tax
+    lda #<msg_save_fail
+    ldy #>msg_save_fail
+    jmp fail_with_ptr
+store_linked_reloc_record_window_from_x_ok:
+    pla
+    tax
+    rts
+
+set_linked_reloc_reu_params_from_x:
+    lda #ALINK_RELOC_REU_BASE_LO
+    sta file_params+0
+    lda #ALINK_RELOC_REU_BASE_HI
+    sta file_params+1
+    lda #ALINK_RELOC_REU_BASE_BANK
+    sta file_params+2
+set_linked_reloc_reu_params_from_x_loop:
+    cpx #$00
+    beq set_linked_reloc_reu_params_from_x_done
+    clc
+    lda file_params+0
+    adc #RELOC_RECORD_BYTES
+    sta file_params+0
+    lda file_params+1
+    adc #$00
+    sta file_params+1
+    lda file_params+2
+    adc #$00
+    sta file_params+2
+    dex
+    bne set_linked_reloc_reu_params_from_x_loop
+set_linked_reloc_reu_params_from_x_done:
+    rts
+
+load_linked_runtime_store_window_from_x_or_fail:
+    txa
+    pha
+    jsr set_linked_runtime_store_reu_params_from_x
+    lda #<linked_runtime_store_window
+    sta file_params+3
+    lda #>linked_runtime_store_window
+    sta file_params+4
+    lda #<RUNTIME_STORE_BYTES
+    sta file_params+5
+    lda #>RUNTIME_STORE_BYTES
+    sta file_params+6
+    lda #$00
+    sta file_params+7
+    ldx #file_params
+    jsr alink_svc_reu_read_sc0
+    lda file_params+7
+    cmp #tool_file_status_ok
+    beq load_linked_runtime_store_window_from_x_ok
+    pla
+    tax
+    lda #<msg_load_fail
+    ldy #>msg_load_fail
+    jmp fail_with_ptr
+load_linked_runtime_store_window_from_x_ok:
+    pla
+    tax
+    rts
+
+store_linked_runtime_store_window_from_x_or_fail:
+    txa
+    pha
+    jsr set_linked_runtime_store_reu_params_from_x
+    lda #<linked_runtime_store_window
+    sta file_params+3
+    lda #>linked_runtime_store_window
+    sta file_params+4
+    lda #<RUNTIME_STORE_BYTES
+    sta file_params+5
+    lda #>RUNTIME_STORE_BYTES
+    sta file_params+6
+    lda #$00
+    sta file_params+7
+    ldx #file_params
+    jsr alink_svc_reu_write_sc0
+    lda file_params+7
+    cmp #tool_file_status_ok
+    beq store_linked_runtime_store_window_from_x_ok
+    pla
+    tax
+    lda #<msg_save_fail
+    ldy #>msg_save_fail
+    jmp fail_with_ptr
+store_linked_runtime_store_window_from_x_ok:
+    pla
+    tax
+    rts
+
+set_linked_runtime_store_reu_params_from_x:
+    lda #ALINK_RUNTIME_STORE_REU_BASE_LO
+    sta file_params+0
+    lda #ALINK_RUNTIME_STORE_REU_BASE_HI
+    sta file_params+1
+    lda #ALINK_RUNTIME_STORE_REU_BASE_BANK
+    sta file_params+2
+set_linked_runtime_store_reu_params_from_x_loop:
+    cpx #$00
+    beq set_linked_runtime_store_reu_params_from_x_done
+    clc
+    lda file_params+0
+    adc #RUNTIME_STORE_BYTES
+    sta file_params+0
+    lda file_params+1
+    adc #$00
+    sta file_params+1
+    lda file_params+2
+    adc #$00
+    sta file_params+2
+    dex
+    bne set_linked_runtime_store_reu_params_from_x_loop
+set_linked_runtime_store_reu_params_from_x_done:
+    rts
+
+load_linked_literal_window_from_x_or_fail:
+    txa
+    pha
+    jsr set_linked_literal_reu_params_from_x
+    lda #<linked_literal_window
+    sta file_params+3
+    lda #>linked_literal_window
+    sta file_params+4
+    lda #<LINKED_LITERAL_BYTES
+    sta file_params+5
+    lda #>LINKED_LITERAL_BYTES
+    sta file_params+6
+    lda #$00
+    sta file_params+7
+    ldx #file_params
+    jsr alink_svc_reu_read_sc0
+    lda file_params+7
+    cmp #tool_file_status_ok
+    beq load_linked_literal_window_from_x_ok
+    pla
+    tax
+    lda #<msg_load_fail
+    ldy #>msg_load_fail
+    jmp fail_with_ptr
+load_linked_literal_window_from_x_ok:
+    pla
+    tax
+    rts
+
+store_linked_literal_window_from_x_or_fail:
+    txa
+    pha
+    jsr set_linked_literal_reu_params_from_x
+    lda #<linked_literal_window
+    sta file_params+3
+    lda #>linked_literal_window
+    sta file_params+4
+    lda #<LINKED_LITERAL_BYTES
+    sta file_params+5
+    lda #>LINKED_LITERAL_BYTES
+    sta file_params+6
+    lda #$00
+    sta file_params+7
+    ldx #file_params
+    jsr alink_svc_reu_write_sc0
+    lda file_params+7
+    cmp #tool_file_status_ok
+    beq store_linked_literal_window_from_x_ok
+    pla
+    tax
+    lda #<msg_save_fail
+    ldy #>msg_save_fail
+    jmp fail_with_ptr
+store_linked_literal_window_from_x_ok:
+    pla
+    tax
+    rts
+
+set_linked_literal_reu_params_from_x:
+    lda #ALINK_LINKED_LITERAL_REU_BASE_LO
+    sta file_params+0
+    lda #ALINK_LINKED_LITERAL_REU_BASE_HI
+    sta file_params+1
+    lda #ALINK_LINKED_LITERAL_REU_BASE_BANK
+    sta file_params+2
+set_linked_literal_reu_params_from_x_loop:
+    cpx #$00
+    beq set_linked_literal_reu_params_from_x_done
+    clc
+    lda file_params+0
+    adc #LINKED_LITERAL_BYTES
+    sta file_params+0
+    lda file_params+1
+    adc #$00
+    sta file_params+1
+    lda file_params+2
+    adc #$00
+    sta file_params+2
+    dex
+    bne set_linked_literal_reu_params_from_x_loop
+set_linked_literal_reu_params_from_x_done:
+    rts
+
 load_int_value_window_from_x_or_fail:
     txa
     pha
@@ -1798,7 +2387,7 @@ load_int_value_window_from_x_or_fail:
     lda #$00
     sta file_params+7
     ldx #file_params
-    jsr svc_reu_read_sc0
+    jsr alink_svc_reu_read_sc0
     lda file_params+7
     cmp #tool_file_status_ok
     beq load_int_value_window_from_x_ok
@@ -1827,7 +2416,7 @@ store_int_value_window_from_x_or_fail:
     lda #$00
     sta file_params+7
     ldx #file_params
-    jsr svc_reu_write_sc0
+    jsr alink_svc_reu_write_sc0
     lda file_params+7
     cmp #tool_file_status_ok
     beq store_int_value_window_from_x_ok
@@ -1881,7 +2470,7 @@ load_var_meta_window_from_x_or_fail:
     lda #$00
     sta file_params+7
     ldx #file_params
-    jsr svc_reu_read_sc0
+    jsr alink_svc_reu_read_sc0
     lda file_params+7
     cmp #tool_file_status_ok
     beq load_var_meta_window_from_x_ok
@@ -1910,7 +2499,7 @@ store_var_meta_window_from_x_or_fail:
     lda #$00
     sta file_params+7
     ldx #file_params
-    jsr svc_reu_write_sc0
+    jsr alink_svc_reu_write_sc0
     lda file_params+7
     cmp #tool_file_status_ok
     beq store_var_meta_window_from_x_ok
@@ -1964,7 +2553,7 @@ load_export_meta_window_from_x_or_fail:
     lda #$00
     sta file_params+7
     ldx #file_params
-    jsr svc_reu_read_sc0
+    jsr alink_svc_reu_read_sc0
     lda file_params+7
     cmp #tool_file_status_ok
     beq load_export_meta_window_from_x_ok
@@ -1993,7 +2582,7 @@ store_export_meta_window_from_x_or_fail:
     lda #$00
     sta file_params+7
     ldx #file_params
-    jsr svc_reu_write_sc0
+    jsr alink_svc_reu_write_sc0
     lda file_params+7
     cmp #tool_file_status_ok
     beq store_export_meta_window_from_x_ok
@@ -2047,7 +2636,7 @@ load_root_export_layout_window_from_x_or_fail:
     lda #$00
     sta file_params+7
     ldx #file_params
-    jsr svc_reu_read_sc0
+    jsr alink_svc_reu_read_sc0
     lda file_params+7
     cmp #tool_file_status_ok
     beq load_root_export_layout_window_from_x_ok
@@ -2076,7 +2665,7 @@ store_root_export_layout_window_from_x_or_fail:
     lda #$00
     sta file_params+7
     ldx #file_params
-    jsr svc_reu_write_sc0
+    jsr alink_svc_reu_write_sc0
     lda file_params+7
     cmp #tool_file_status_ok
     beq store_root_export_layout_window_from_x_ok
@@ -2105,7 +2694,7 @@ load_current_export_layout_window_from_x_or_fail:
     lda #$00
     sta file_params+7
     ldx #file_params
-    jsr svc_reu_read_sc0
+    jsr alink_svc_reu_read_sc0
     lda file_params+7
     cmp #tool_file_status_ok
     beq load_current_export_layout_window_from_x_ok
@@ -2134,7 +2723,7 @@ store_current_export_layout_window_from_x_or_fail:
     lda #$00
     sta file_params+7
     ldx #file_params
-    jsr svc_reu_write_sc0
+    jsr alink_svc_reu_write_sc0
     lda file_params+7
     cmp #tool_file_status_ok
     beq store_current_export_layout_window_from_x_ok
@@ -2213,7 +2802,7 @@ load_root_var_layout_window_from_x_or_fail:
     lda #$00
     sta file_params+7
     ldx #file_params
-    jsr svc_reu_read_sc0
+    jsr alink_svc_reu_read_sc0
     lda file_params+7
     cmp #tool_file_status_ok
     beq load_root_var_layout_window_from_x_ok
@@ -2242,7 +2831,7 @@ store_root_var_layout_window_from_x_or_fail:
     lda #$00
     sta file_params+7
     ldx #file_params
-    jsr svc_reu_write_sc0
+    jsr alink_svc_reu_write_sc0
     lda file_params+7
     cmp #tool_file_status_ok
     beq store_root_var_layout_window_from_x_ok
@@ -2271,7 +2860,7 @@ load_current_var_layout_window_from_x_or_fail:
     lda #$00
     sta file_params+7
     ldx #file_params
-    jsr svc_reu_read_sc0
+    jsr alink_svc_reu_read_sc0
     lda file_params+7
     cmp #tool_file_status_ok
     beq load_current_var_layout_window_from_x_ok
@@ -2300,7 +2889,7 @@ store_current_var_layout_window_from_x_or_fail:
     lda #$00
     sta file_params+7
     ldx #file_params
-    jsr svc_reu_write_sc0
+    jsr alink_svc_reu_write_sc0
     lda file_params+7
     cmp #tool_file_status_ok
     beq store_current_var_layout_window_from_x_ok
@@ -2379,7 +2968,7 @@ load_root_string_layout_window_from_x_or_fail:
     lda #$00
     sta file_params+7
     ldx #file_params
-    jsr svc_reu_read_sc0
+    jsr alink_svc_reu_read_sc0
     lda file_params+7
     cmp #tool_file_status_ok
     beq load_root_string_layout_window_from_x_ok
@@ -2408,7 +2997,7 @@ store_root_string_layout_window_from_x_or_fail:
     lda #$00
     sta file_params+7
     ldx #file_params
-    jsr svc_reu_write_sc0
+    jsr alink_svc_reu_write_sc0
     lda file_params+7
     cmp #tool_file_status_ok
     beq store_root_string_layout_window_from_x_ok
@@ -2464,7 +3053,7 @@ load_live_flag_window_from_x_or_fail:
     lda #$00
     sta file_params+7
     ldx #file_params
-    jsr svc_reu_read_sc0
+    jsr alink_svc_reu_read_sc0
     lda file_params+7
     cmp #tool_file_status_ok
     beq load_live_flag_window_from_x_ok
@@ -2499,7 +3088,7 @@ store_live_flag_window_from_x_or_fail:
     lda #$00
     sta file_params+7
     ldx #file_params
-    jsr svc_reu_write_sc0
+    jsr alink_svc_reu_write_sc0
     lda file_params+7
     cmp #tool_file_status_ok
     beq store_live_flag_window_from_x_ok
@@ -2555,7 +3144,7 @@ load_loop_layout_window_from_x_or_fail:
     lda #$00
     sta file_params+7
     ldx #file_params
-    jsr svc_reu_read_sc0
+    jsr alink_svc_reu_read_sc0
     lda file_params+7
     cmp #tool_file_status_ok
     beq load_loop_layout_window_from_x_ok
@@ -2590,7 +3179,7 @@ store_loop_layout_window_from_x_or_fail:
     lda #$00
     sta file_params+7
     ldx #file_params
-    jsr svc_reu_write_sc0
+    jsr alink_svc_reu_write_sc0
     lda file_params+7
     cmp #tool_file_status_ok
     beq store_loop_layout_window_from_x_ok
@@ -2701,6 +3290,7 @@ copy_string_literal_block_done:
 parse_body_ops_or_fail:
     lda #$00
     sta export_index
+    sta debug_phase
     jsr reset_scan_ptr_after_header
 parse_body_ops_loop:
     jsr skip_line_breaks
@@ -2721,6 +3311,12 @@ parse_body_ops_loop:
     lda export_index
     cmp export_count
     bcc :+
+    lda #$21
+    sta debug_phase
+    lda export_index
+    sta $03FA
+    lda export_count
+    sta $03FB
     lda #<msg_bad_object
     ldy #>msg_bad_object
     jmp fail_with_ptr
@@ -2799,9 +3395,20 @@ parse_body_ops_store:
     sta (body_ptr),y
     iny
     cpy #BODY_OPS_STRIDE
-    bcs parse_body_ops_bad
+    bcc :+
+    lda #$22
+    sta debug_phase
+    sty $03FA
+    jmp parse_body_ops_bad
+:
     jmp parse_body_ops_string_loop
 parse_body_ops_bad:
+    sta $03FB
+    lda debug_phase
+    bne :+
+    lda #$23
+    sta debug_phase
+:
     lda #<msg_bad_object
     ldy #>msg_bad_object
     jmp fail_with_ptr
@@ -2818,6 +3425,12 @@ parse_body_ops_done_check:
     lda export_index
     cmp export_count
     beq parse_body_ops_done
+    lda #$24
+    sta debug_phase
+    lda export_index
+    sta $03FA
+    lda export_count
+    sta $03FB
     lda #<msg_bad_object
     ldy #>msg_bad_object
     jmp fail_with_ptr
@@ -3090,9 +3703,18 @@ copy_var_symbol_line_or_fail_advanced:
     rts
 
 reset_scan_ptr_after_header:
-    lda #<(source_buffer+5)
+    jsr source_reader_reset_to_start
+    bcc reset_scan_ptr_after_header_ok
+    lda #<msg_load_fail
+    ldy #>msg_load_fail
+    jmp fail_with_ptr
+reset_scan_ptr_after_header_ok:
+    clc
+    lda scan_ptr
+    adc #$05
     sta scan_ptr
-    lda #>(source_buffer+5)
+    lda scan_ptr+1
+    adc #$00
     sta scan_ptr+1
     rts
 
@@ -3673,7 +4295,7 @@ open_output_stream_to_target_or_fail:
     lda #tool_file_status_fail
     sta file_params+2
     ldx #file_params
-    jsr svc_file_write_begin_sc0
+    jsr alink_svc_file_write_begin_sc0
     lda file_params+2
     cmp #tool_file_status_ok
     beq open_output_stream_to_target_ok
@@ -3698,7 +4320,7 @@ flush_output_stream_or_fail:
     lda #tool_file_status_fail
     sta file_params+4
     ldx #file_params
-    jsr svc_file_write_chunk_sc0
+    jsr alink_svc_file_write_chunk_sc0
     lda file_params+4
     cmp #tool_file_status_ok
     beq flush_output_stream_ok
@@ -3716,7 +4338,7 @@ close_output_stream:
     lda #tool_file_status_fail
     sta file_params+0
     ldx #file_params
-    jsr svc_file_write_close_sc0
+    jsr alink_svc_file_write_close_sc0
     lda file_params+0
     cmp #tool_file_status_ok
     beq close_output_stream_ok
@@ -3726,11 +4348,269 @@ close_output_stream_ok:
     clc
     rts
 
+alink_save_zp_state:
+    ldx #$00
+alink_save_zp_state_loop:
+    lda $00E0,x
+    sta alink_zp_save,x
+    inx
+    cpx #$0F
+    bcc alink_save_zp_state_loop
+    rts
+
+alink_restore_zp_state:
+    ldx #$00
+alink_restore_zp_state_loop:
+    lda alink_zp_save,x
+    sta $00E0,x
+    inx
+    cpx #$0F
+    bcc alink_restore_zp_state_loop
+    rts
+
+alink_restore_service_status:
+    lda alink_service_status
+    pha
+    plp
+    rts
+
+alink_svc_program_get_cmdline_len:
+    jsr alink_save_zp_state
+    ldx #svc_retptr
+    jsr svc_program_get_cmdline_len
+    php
+    pla
+    sta alink_service_status
+    lda svc_retptr
+    sta alink_service_out+0
+    lda svc_retptr+1
+    sta alink_service_out+1
+    jsr alink_restore_zp_state
+    lda alink_service_out+0
+    sta svc_retptr
+    lda alink_service_out+1
+    sta svc_retptr+1
+    jmp alink_restore_service_status
+
+alink_svc_program_get_cmdline_ptr:
+    jsr alink_save_zp_state
+    ldx #svc_retptr
+    jsr svc_program_get_cmdline_ptr
+    php
+    pla
+    sta alink_service_status
+    lda svc_retptr
+    sta alink_service_out+0
+    lda svc_retptr+1
+    sta alink_service_out+1
+    jsr alink_restore_zp_state
+    lda alink_service_out+0
+    sta svc_retptr
+    lda alink_service_out+1
+    sta svc_retptr+1
+    jmp alink_restore_service_status
+
+alink_svc_file_load_sc0:
+    jsr alink_save_zp_state
+    lda alink_zp_save+2
+    sta TOOL_ABI_FILE_NAME_LO
+    lda alink_zp_save+3
+    sta TOOL_ABI_FILE_NAME_HI
+    lda #$00
+    sta alink_service_out+0
+    sta alink_service_out+1
+    sta alink_service_out+2
+    jsr svc_open_program_read_path_preserved
+    bcc alink_svc_file_load_open_ok
+    lda #tool_file_status_nofile
+    sta alink_service_out+0
+    jmp alink_svc_file_load_fail_flags
+alink_svc_file_load_open_ok:
+    lda alink_zp_save+4
+    ora alink_zp_save+5
+    ora alink_zp_save+6
+    ora alink_zp_save+7
+    bne alink_svc_file_load_has_dest
+    lda #tool_file_status_ok
+    sta alink_service_out+0
+    jsr alink_close_current_file
+    jmp alink_svc_file_load_success_flags
+alink_svc_file_load_has_dest:
+    jsr alink_svc_file_load_prepare_dest
+alink_svc_file_load_read_loop:
+    lda alink_service_out+2
+    cmp alink_zp_save+7
+    bcc alink_svc_file_load_read_byte
+    bne alink_svc_file_load_too_large
+    lda alink_service_out+1
+    cmp alink_zp_save+6
+    bcc alink_svc_file_load_read_byte
+alink_svc_file_load_too_large:
+    lda #tool_file_status_too_large
+    sta alink_service_out+0
+    jsr alink_close_current_file
+    jmp alink_svc_file_load_success_flags
+alink_svc_file_load_read_byte:
+    jsr CHRIN
+    ldy #$00
+    sta (svc_retptr),y
+    inc svc_retptr
+    bne :+
+    inc svc_retptr+1
+:
+    inc alink_service_out+1
+    bne :+
+    inc alink_service_out+2
+:
+    jsr READST
+    and #$40
+    beq alink_svc_file_load_read_loop
+    lda #tool_file_status_ok
+    sta alink_service_out+0
+    jsr alink_close_current_file
+    jmp alink_svc_file_load_success_flags
+
+alink_close_current_file:
+    jsr CLRCHN
+    lda #VICE_LFN_FILE
+    jmp CLOSE_K
+
+alink_svc_file_load_prepare_dest:
+    lda alink_zp_save+4
+    sta svc_retptr
+    lda alink_zp_save+5
+    sta svc_retptr+1
+    rts
+alink_svc_file_load_fail_flags:
+    sec
+    php
+    pla
+    sta alink_service_status
+    jmp alink_svc_file_load_done
+alink_svc_file_load_success_flags:
+    clc
+    php
+    pla
+    sta alink_service_status
+alink_svc_file_load_done:
+    jsr alink_restore_zp_state
+    lda alink_service_out+0
+    sta file_params+6
+    lda alink_service_out+1
+    sta file_params+7
+    lda alink_service_out+2
+    sta file_params+8
+    jmp alink_restore_service_status
+
+alink_svc_file_stage_reu_sc0:
+    jsr alink_save_zp_state
+    ldx #file_params
+    jsr svc_file_stage_reu_sc0
+    php
+    pla
+    sta alink_service_status
+    lda file_params+5
+    sta alink_service_out+0
+    lda file_params+6
+    sta alink_service_out+1
+    lda file_params+7
+    sta alink_service_out+2
+    lda file_params+8
+    sta alink_service_out+3
+    jsr alink_restore_zp_state
+    lda alink_service_out+0
+    sta file_params+5
+    lda alink_service_out+1
+    sta file_params+6
+    lda alink_service_out+2
+    sta file_params+7
+    lda alink_service_out+3
+    sta file_params+8
+    jmp alink_restore_service_status
+
+alink_svc_reu_read_sc0:
+    jsr alink_save_zp_state
+    ldx #file_params
+    jsr svc_reu_read_sc0
+    jmp alink_restore_reu_result
+
+alink_svc_reu_write_sc0:
+    jsr alink_save_zp_state
+    ldx #file_params
+    jsr svc_reu_write_sc0
+alink_restore_reu_result:
+    php
+    pla
+    sta alink_service_status
+    lda file_params+7
+    sta alink_service_out+0
+    jsr alink_restore_zp_state
+    lda alink_service_out+0
+    sta file_params+7
+    jmp alink_restore_service_status
+
+alink_svc_file_write_begin_sc0:
+    jsr alink_save_zp_state
+    ldx #file_params
+    jsr svc_file_write_begin_sc0
+    php
+    pla
+    sta alink_service_status
+    lda file_params+2
+    sta alink_service_out+0
+    jsr alink_restore_zp_state
+    lda alink_service_out+0
+    sta file_params+2
+    jmp alink_restore_service_status
+
+alink_svc_file_write_chunk_sc0:
+    jsr alink_save_zp_state
+    ldx #file_params
+    jsr svc_file_write_chunk_sc0
+    php
+    pla
+    sta alink_service_status
+    lda file_params+4
+    sta alink_service_out+0
+    jsr alink_restore_zp_state
+    lda alink_service_out+0
+    sta file_params+4
+    jmp alink_restore_service_status
+
+alink_svc_file_write_close_sc0:
+    jsr alink_save_zp_state
+    ldx #file_params
+    jsr svc_file_write_close_sc0
+    php
+    pla
+    sta alink_service_status
+    lda file_params+0
+    sta alink_service_out+0
+    jsr alink_restore_zp_state
+    lda alink_service_out+0
+    sta file_params+0
+    jmp alink_restore_service_status
+
+alink_svc_file_delete_sc0:
+    jsr alink_save_zp_state
+    ldx #file_params
+    jsr svc_file_delete_sc0
+    php
+    pla
+    sta alink_service_status
+    lda file_params+2
+    sta alink_service_out+0
+    jsr alink_restore_zp_state
+    lda alink_service_out+0
+    sta file_params+2
+    jmp alink_restore_service_status
+
 snapshot_bad_object_state:
     ldx #$00
 snapshot_bad_object_source_loop:
     lda source_buffer,x
     sta $03D0,x
+    sta $CFD0,x
     inx
     cpx #$10
     bcc snapshot_bad_object_source_loop
@@ -3738,6 +4618,7 @@ snapshot_bad_object_source_loop:
 snapshot_bad_object_target_loop:
     lda target_path,x
     sta $03E0,x
+    sta $CFC0,x
     inx
     cpx #$10
     bcc snapshot_bad_object_target_loop
@@ -3926,6 +4807,8 @@ source_window_end_ptr:
     .res 2
 source_window_valid:
     .res 1
+alink_source_direct_cached:
+    .res 1
 direct_candidate_index:
     .res 1
 prg_build_strategy:
@@ -3964,6 +4847,12 @@ truncated_flag:
     .res 1
 debug_phase_zp:
     .res 1
+alink_service_status:
+    .res 1
+alink_service_out:
+    .res 4
+alink_zp_save:
+    .res 15
 debug_sp_before_strings:
     .res 1
 debug_sp_after_strings:
@@ -4008,20 +4897,94 @@ external_print_string_ptr:
     .res 2
 linked_store_value:
     .res 1
-linked_divisor_value:
+linked_store_value_hi:
+    .res 1
+linked_unary_value_index:
+    .res 1
+linked_unary_print_index:
+    .res 1
+linked_machine_byte:
+    .res 1
+linked_binary_rhs_value:
+    .res 1
+linked_loop_update_value:
+    .res 1
+linked_real_binary_update_op:
+    .res 1
+linked_loop_update_uses_conversion:
+    .res 1
+linked_loop_update_uses_real_binary:
+    .res 1
+linked_real_binary_literal_layout:
+    .res 1
+linked_condition_store_value:
+    .res 1
+linked_condition_else_value:
+    .res 1
+linked_condition_cmp_value:
+    .res 1
+linked_condition_skip_opcode:
+    .res 1
+linked_condition_body_op:
+    .res 1
+linked_condition_has_else:
+    .res 1
+linked_condition_is_nested:
+    .res 1
+linked_condition_is_loop:
     .res 1
 linked_literal_count:
     .res 1
-linked_literal_values:
-    .res INT_LITERAL_MAX
-linked_literal_hi_values:
-    .res INT_LITERAL_MAX
+linked_literal_window:
+    .res LINKED_LITERAL_BYTES
 linked_next_addr_lo:
     .res 1
 linked_next_addr_hi:
     .res 1
 linked_object_index:
     .res 1
+current_object_addr_lo:
+    .res 1
+current_object_addr_hi:
+    .res 1
+current_object_export_start_lo:
+    .res 1
+current_object_export_start_hi:
+    .res 1
+current_object_export_end_lo:
+    .res 1
+current_object_export_end_hi:
+    .res 1
+linked_runtime_arg_count:
+    .res 1
+linked_runtime_arg0:
+    .res 1
+linked_runtime_arg1:
+    .res 1
+linked_runtime_arg2:
+    .res 1
+linked_runtime_call_count:
+    .res 1
+linked_runtime_body_pos:
+    .res 1
+linked_runtime_helper_kind:
+    .res 1
+linked_runtime_result_pending:
+    .res 1
+linked_runtime_result_arg_count:
+    .res 1
+linked_runtime_result_loaded:
+    .res 1
+linked_runtime_result_store_ordinal:
+    .res 1
+linked_runtime_store_count:
+    .res 1
+linked_runtime_store_addr_lo:
+    .res 1
+linked_runtime_store_addr_hi:
+    .res 1
+linked_runtime_store_window:
+    .res RUNTIME_STORE_BYTES
 linked_import_index:
     .res 1
 linked_external_index:
@@ -4032,12 +4995,12 @@ linked_reloc_saved_scan_lo:
     .res 1
 linked_reloc_saved_scan_hi:
     .res 1
-linked_reloc_offsets:
-    .res EXTERNAL_MAX
-linked_reloc_addr_los:
-    .res EXTERNAL_MAX
-linked_reloc_addr_his:
-    .res EXTERNAL_MAX
+linked_reloc_saved_scan_bank:
+    .res 1
+linked_reloc_saved_scan_abs:
+    .res 1
+reloc_record_window:
+    .res RELOC_RECORD_BYTES
 string_mask_saved_x:
     .res 1
 string_mask_saved_bit:

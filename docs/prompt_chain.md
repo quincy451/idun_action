@@ -1,48 +1,49 @@
-# Prompt Chain
+# Prompt Chain Archive
 
-ActionC64U was developed as a deterministic prompt sequence from the workspace
-root at `/mnt/c/test/action`.
+ActionC64U was originally bootstrapped through `prompt-1.txt` through
+`prompt-18.txt` from the workspace root. Those prompt files are historical
+inputs, not the active implementation workflow.
 
-## Locations
+Do not replay the prompt chain to continue current development. Continue from
+the checked-out source tree, current status docs, and active UDOS verification
+gates.
 
-- workspace root: `/mnt/c/test/action`
-- repo root: `/mnt/c/test/action/actionc64u`
-- prompt files: `/mnt/c/test/action/prompt-1.txt` through
-  `/mnt/c/test/action/prompt-18.txt`
+## Active Workflow
 
-## How To Run The Chain
+From the workspace root:
 
-From the workspace root, point Codex at the next prompt file and let it work in
-the repo:
-
-```text
-read prompt-1.txt to get started on your task.
+```sh
+make test
 ```
 
-Then continue in order:
+For end-to-end UDOS/VICE validation:
 
-- `prompt-2.txt`
-- `prompt-3.txt`
-- ...
-- `prompt-18.txt`
+```sh
+make -C udos PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-actc
+make -C udos PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-alink
+make -C udos PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-actc-alink-launch
+make -C udos PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-alink-prg-object-code-matrices
+make -C udos PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-actc-alink-launch-runtime-matrices
+```
 
-The prompts are cumulative. Each one assumes the previous prompt was completed,
-verified, and committed before moving on.
+## Active Target
 
-## Recommended Operator Workflow
+The maintained tool path is:
 
-1. Start in `/mnt/c/test/action`.
-2. Let Codex read the next `prompt-<n>.txt`.
-3. Wait for code, docs, tests, and commit completion.
-4. Verify the reported quality gate locally when needed.
-5. Move to the next prompt file.
+```text
+ACTC.PRG -> OBJ/<MODULE>.OBJ -> ALINK.PRG -> BIN/<MODULE>.PRG
+```
+
+The linked output is a direct 6502 `.PRG`; there is no separate runtime runner.
+Runtime families are link-selected `RT_*.OBJ` modules included only when
+reachable code imports them.
 
 ## Repo Guidance
 
-The repo-local workflow and constraints are documented in:
+Use these current docs instead:
 
-- [AGENTS.md](/mnt/c/test/action/actionc64u/AGENTS.md)
-- [README.md](/mnt/c/test/action/actionc64u/README.md)
-
-The prompt chain ends at `prompt-18.txt`. There is no prompt after that in this
-series.
+- [AGENTS.md](../AGENTS.md)
+- [README.md](../README.md)
+- [active_direction.md](active_direction.md)
+- [actc_status.md](actc_status.md)
+- [alink_status.md](alink_status.md)

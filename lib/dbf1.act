@@ -1,0 +1,22 @@
+; DBF1 C64 DBF binding reference.
+; ACTC recognizes these builtin helper names directly. ALINK includes only the
+; referenced RT_*.OBJ modules in the final PRG.
+;
+; Initial support exposes a single read-only DBF handle with header-backed
+; metadata, field lengths, current-record delete status, and raw current-record
+; byte reads. Field read/write helpers will extend this module without changing
+; the link-selected model.
+
+MODULE DBF1
+
+BYTE FUNC DbfOpen(CARD filename)
+PROC DbfClose(BYTE handle)
+BYTE FUNC DbfGo(BYTE handle,BYTE recno)
+BYTE FUNC DbfFieldCount(BYTE handle)
+BYTE FUNC DbfFieldLen(BYTE handle,BYTE field)
+BYTE FUNC DbfReadByte(BYTE handle,BYTE offset)
+BYTE FUNC DbfDeleted(BYTE handle)
+BYTE FUNC DbfHeaderLen(BYTE handle)
+BYTE FUNC DbfRecordLen(BYTE handle)
+BYTE FUNC DbfTotalRecs(BYTE handle)
+BYTE FUNC DbfCurrRecNo(BYTE handle)

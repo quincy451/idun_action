@@ -7,6 +7,8 @@
 OVERLAY_NAME_STRIDE = 25
 OVERLAY_VAR_MAX = 16
 OVERLAY_EXPORT_MAX = 16
+INIT_CAPTURE_LIMIT = 512
+ACTC_OVERLAY_CACHE_ZP = ACTC_OVERLAY_SCAN_ZP
 
 .segment "CODE"
 
@@ -62,8 +64,11 @@ decl_counts_loop:
     beq :+
     jmp decl_counts_fail
 :
+    lda source_window_remaining
+    ora source_window_remaining+1
+    beq decl_counts_done
     ldy #$00
-    lda (ACTC_OVERLAY_SCAN_ZP),y
+    jsr overlay_source_peek_scan_y
     beq decl_counts_done
 
     jsr match_proc_keyword
@@ -161,6 +166,7 @@ write_resident_decl_counts:
 
 write_module_var_decl:
     jsr skip_inline_spaces
+    jsr write_var_debug_offset_window
     jsr clear_var_name_window
     jsr copy_symbol_to_var_name_window
     bcs write_module_var_decl_fail
@@ -168,10 +174,8 @@ write_module_var_decl:
     bcs write_module_var_decl_fail
     jsr find_module_var_name_cache_match
     bcc write_module_var_decl_fail
-    jsr write_var_debug_offset_window
     ldx var_total_count
     jsr call_store_var_debug_offset
-    jsr advance_source_by_symbol_len
     jsr clear_decl_init_current
     jsr validate_module_decl_tail
     bcs write_module_var_decl_fail
@@ -205,7 +209,6 @@ write_proc_export_decl:
     sta proc_param_base_current
     lda #$00
     sta proc_param_count_current
-    jsr advance_source_by_symbol_len
     jsr skip_inline_spaces
     jsr parse_proc_params
     bcs write_proc_export_decl_fail
@@ -231,6 +234,7 @@ write_proc_export_decl_fail:
 
 write_proc_local_var_decl:
     jsr skip_inline_spaces
+    jsr write_var_debug_offset_window
     jsr clear_var_name_window
     jsr copy_symbol_to_var_name_window
     bcs write_proc_local_var_decl_fail
@@ -240,10 +244,8 @@ write_proc_local_var_decl:
     bcc write_proc_local_var_decl_fail
     jsr find_current_local_name_cache_match
     bcc write_proc_local_var_decl_fail
-    jsr write_var_debug_offset_window
     ldx var_total_count
     jsr call_store_var_debug_offset
-    jsr advance_source_by_symbol_len
     jsr validate_decl_tail
     bcs write_proc_local_var_decl_fail
     jsr clear_decl_init_current
@@ -269,22 +271,24 @@ write_proc_local_var_decl_fail:
 parse_proc_params:
     jsr skip_inline_spaces
     ldy #$00
-    lda (ACTC_OVERLAY_SCAN_ZP),y
+    jsr overlay_source_peek_scan_y
     cmp #'('
     beq parse_proc_params_open
     jsr require_line_end
     rts
 parse_proc_params_open:
-    jsr advance_source_scan
+    jsr overlay_source_consume_scan_ptr
+    bcs parse_proc_params_fail
     jsr skip_inline_spaces
     ldy #$00
-    lda (ACTC_OVERLAY_SCAN_ZP),y
+    jsr overlay_source_peek_scan_y
     cmp #')'
     bne parse_proc_params_loop
     clc
     rts
 parse_proc_params_loop:
     jsr clear_var_name_window
+    jsr write_var_debug_offset_window
     jsr copy_symbol_to_var_name_window
     bcc :+
     sec
@@ -296,7 +300,6 @@ parse_proc_params_loop:
     bcc parse_proc_params_fail
     jsr find_current_param_name_cache_match
     bcc parse_proc_params_fail
-    jsr write_var_debug_offset_window
     ldx var_total_count
     jsr call_store_var_debug_offset
     lda #$02
@@ -313,10 +316,9 @@ parse_proc_params_loop:
     jsr call_store_var_meta
     inc var_total_count
     inc proc_param_count_current
-    jsr advance_source_by_symbol_len
     jsr skip_inline_spaces
     ldy #$00
-    lda (ACTC_OVERLAY_SCAN_ZP),y
+    jsr overlay_source_peek_scan_y
     cmp #','
     beq parse_proc_params_next
     cmp #')'
@@ -325,18 +327,20 @@ parse_proc_params_fail:
     sec
     rts
 parse_proc_params_next:
-    jsr advance_source_scan
+    jsr overlay_source_consume_scan_ptr
+    bcs parse_proc_params_fail
     jsr skip_inline_spaces
     jmp parse_proc_params_loop
 parse_proc_params_done:
-    jsr advance_source_scan
+    jsr overlay_source_consume_scan_ptr
+    bcs parse_proc_params_fail
     jsr require_line_end
     rts
 
 validate_decl_tail:
     jsr skip_inline_spaces
     ldy #$00
-    lda (ACTC_OVERLAY_SCAN_ZP),y
+    jsr overlay_source_peek_scan_y
     beq validate_decl_tail_ok
     cmp #10
     beq validate_decl_tail_ok
@@ -350,7 +354,8 @@ validate_decl_tail_initializer:
     lda decl_width_current
     cmp #$02
     bne validate_decl_tail_fail
-    jsr advance_source_scan
+    jsr overlay_source_consume_scan_ptr
+    bcs validate_decl_tail_fail
     jsr skip_inline_spaces
     jsr validate_initializer_expr
     rts
@@ -364,7 +369,7 @@ validate_decl_tail_ok:
 validate_module_decl_tail:
     jsr skip_inline_spaces
     ldy #$00
-    lda (ACTC_OVERLAY_SCAN_ZP),y
+    jsr overlay_source_peek_scan_y
     beq validate_module_decl_tail_ok
     cmp #10
     beq validate_module_decl_tail_ok
@@ -383,7 +388,8 @@ validate_module_decl_tail_initializer:
     lda decl_type_current
     cmp #'r'
     bne validate_module_decl_tail_fail
-    jsr advance_source_scan
+    jsr overlay_source_consume_scan_ptr
+    bcs validate_module_decl_tail_fail
     jsr skip_inline_spaces
     lda ACTC_OVERLAY_SCAN_ZP
     sta initializer_value_scan_ptr
@@ -395,7 +401,8 @@ validate_module_decl_tail_initializer:
     bcs validate_module_decl_tail_fail
     jmp validate_module_decl_tail_ok
 validate_module_decl_tail_initializer_word:
-    jsr advance_source_scan
+    jsr overlay_source_consume_scan_ptr
+    bcs validate_module_decl_tail_fail
     jsr skip_inline_spaces
     lda ACTC_OVERLAY_SCAN_ZP
     sta initializer_value_scan_ptr
@@ -413,7 +420,7 @@ validate_module_decl_tail_fail:
 
 validate_initializer_expr:
     ldy #$00
-    lda (ACTC_OVERLAY_SCAN_ZP),y
+    jsr overlay_source_peek_scan_y
     bne :+
     jmp validate_initializer_expr_fail
 :
@@ -425,16 +432,23 @@ validate_initializer_expr:
     bne :+
     jmp validate_initializer_expr_fail
 :
+    pha
+    jsr init_capture_reset
+    pla
     cmp #'['
     beq validate_bracket_initializer_expr
     jmp validate_line_initializer_expr
 
 validate_bracket_initializer_expr:
-    jsr advance_source_scan
+    jsr init_capture_char
+    jsr overlay_source_consume_scan_ptr
+    bcc :+
+    jmp validate_initializer_expr_fail
+:
     jsr init_expr_state
 validate_bracket_initializer_expr_loop:
     ldy #$00
-    lda (ACTC_OVERLAY_SCAN_ZP),y
+    jsr overlay_source_peek_scan_y
     bne :+
     jmp validate_initializer_expr_fail
 :
@@ -448,18 +462,27 @@ validate_bracket_initializer_expr_loop:
 :
     cmp #']'
     beq validate_bracket_initializer_expr_done
+    jsr init_capture_char
     jsr validate_initializer_expr_char
     bcc :+
     jmp validate_initializer_expr_fail
 :
-    jsr advance_source_scan
+    jsr overlay_source_consume_scan_ptr
+    bcc :+
+    jmp validate_initializer_expr_fail
+:
     jmp validate_bracket_initializer_expr_loop
 validate_bracket_initializer_expr_done:
+    jsr init_capture_char
+    jsr init_capture_terminate
     jsr validate_initializer_expr_done
     bcc :+
     jmp validate_initializer_expr_fail
 :
-    jsr advance_source_scan
+    jsr overlay_source_consume_scan_ptr
+    bcc :+
+    jmp validate_initializer_expr_fail
+:
     jsr require_line_end
     rts
 
@@ -467,7 +490,7 @@ validate_line_initializer_expr:
     jsr init_expr_state
 validate_line_initializer_expr_loop:
     ldy #$00
-    lda (ACTC_OVERLAY_SCAN_ZP),y
+    jsr overlay_source_peek_scan_y
     beq validate_line_initializer_expr_done
     cmp #10
     beq validate_line_initializer_expr_done
@@ -477,13 +500,18 @@ validate_line_initializer_expr_loop:
     bne :+
     jmp validate_initializer_expr_fail
 :
+    jsr init_capture_char
     jsr validate_initializer_expr_char
     bcc :+
     jmp validate_initializer_expr_fail
 :
-    jsr advance_source_scan
+    jsr overlay_source_consume_scan_ptr
+    bcc :+
+    jmp validate_initializer_expr_fail
+:
     jmp validate_line_initializer_expr_loop
 validate_line_initializer_expr_done:
+    jsr init_capture_terminate
     jmp validate_initializer_expr_done
 
 init_expr_state:
@@ -492,6 +520,10 @@ init_expr_state:
     sta init_paren_depth
     sta init_last_char
     rts
+
+overlay_symbol_body_char_valid:
+    jsr uppercase_ascii
+    jmp uppercase_symbol_body_valid
 
 validate_initializer_expr_char:
     cmp #' '
@@ -507,8 +539,7 @@ validate_initializer_expr_char:
     beq validate_initializer_expr_char_fail
     cmp #','
     beq validate_initializer_expr_char_fail
-    jsr uppercase_ascii
-    jsr uppercase_symbol_body_valid
+    jsr overlay_symbol_body_char_valid
     bcc validate_initializer_expr_char_token
     jsr validate_initializer_operator_char
     bcs validate_initializer_expr_char_fail
@@ -583,10 +614,64 @@ validate_initializer_expr_fail:
     sec
     rts
 
-try_store_simple_initializer_value:
-    lda initializer_value_scan_ptr
+init_capture_reset:
+    lda #<init_capture_buffer
+    sta init_capture_write_ptr
+    lda #>init_capture_buffer
+    sta init_capture_write_ptr+1
+    lda #<INIT_CAPTURE_LIMIT
+    sta init_capture_remaining
+    lda #>INIT_CAPTURE_LIMIT
+    sta init_capture_remaining+1
+    lda #$00
+    sta init_capture_overflow
+    rts
+
+init_capture_char:
+    sta init_capture_saved_char
+    lda init_capture_remaining
+    ora init_capture_remaining+1
+    bne init_capture_char_store
+    lda #$01
+    sta init_capture_overflow
+    lda init_capture_saved_char
+    rts
+init_capture_char_store:
+    lda init_capture_write_ptr
     sta ACTC_OVERLAY_WORK_ZP
-    lda initializer_value_scan_ptr+1
+    lda init_capture_write_ptr+1
+    sta ACTC_OVERLAY_WORK_ZP+1
+    lda init_capture_saved_char
+    ldy #$00
+    sta (ACTC_OVERLAY_WORK_ZP),y
+    inc init_capture_write_ptr
+    bne :+
+    inc init_capture_write_ptr+1
+:
+    lda init_capture_remaining
+    bne :+
+    dec init_capture_remaining+1
+:
+    dec init_capture_remaining
+    lda init_capture_saved_char
+    rts
+
+init_capture_terminate:
+    lda init_capture_write_ptr
+    sta ACTC_OVERLAY_WORK_ZP
+    lda init_capture_write_ptr+1
+    sta ACTC_OVERLAY_WORK_ZP+1
+    ldy #$00
+    lda #$00
+    sta (ACTC_OVERLAY_WORK_ZP),y
+    rts
+
+try_store_simple_initializer_value:
+    lda init_capture_overflow
+    bne try_store_simple_initializer_value_unsupported
+    lda #<init_capture_buffer
+    sta ACTC_OVERLAY_WORK_ZP
+    lda #>init_capture_buffer
     sta ACTC_OVERLAY_WORK_ZP+1
     lda #$00
     sta init_parse_bracketed
@@ -622,9 +707,11 @@ try_store_simple_initializer_value_unsupported:
     rts
 
 require_real_zero_initializer_value:
-    lda initializer_value_scan_ptr
+    lda init_capture_overflow
+    bne require_real_zero_initializer_value_fail
+    lda #<init_capture_buffer
     sta ACTC_OVERLAY_WORK_ZP
-    lda initializer_value_scan_ptr+1
+    lda #>init_capture_buffer
     sta ACTC_OVERLAY_WORK_ZP+1
     lda #$00
     sta init_parse_bracketed
@@ -970,6 +1057,13 @@ init_value_parse_factor_work:
     jsr init_value_peek_char_work
     cmp #'('
     beq init_value_parse_factor_work_group
+    jsr init_value_parse_builtin_constant_work
+    bcs :+
+    lda init_parse_term
+    sta init_parse_value
+    clc
+    rts
+:
     jsr init_value_parse_number_work
     bcs init_value_parse_factor_work_fail
     lda init_parse_term
@@ -990,6 +1084,56 @@ init_value_parse_factor_work_group:
 init_value_parse_factor_work_fail:
     sec
     rts
+
+init_value_parse_builtin_constant_work:
+    jsr init_value_save_work_ptr
+    ldx #$00
+init_value_parse_builtin_constant_work_loop:
+    lda init_builtin_constant_table,x
+    beq init_value_parse_builtin_constant_work_fail_restore
+    sta init_value_builtin_symbol_load+1
+    inx
+    lda init_builtin_constant_table,x
+    sta init_value_builtin_symbol_load+2
+    inx
+    lda init_builtin_constant_table,x
+    sta init_parse_term
+    inx
+    stx init_const_table_index
+    jsr init_value_restore_work_ptr
+    jsr init_value_match_builtin_symbol_work
+    bcc init_value_parse_builtin_constant_work_ok
+    ldx init_const_table_index
+    jmp init_value_parse_builtin_constant_work_loop
+init_value_parse_builtin_constant_work_ok:
+    clc
+    rts
+init_value_parse_builtin_constant_work_fail_restore:
+    jsr init_value_restore_work_ptr
+    sec
+    rts
+
+init_value_match_builtin_symbol_work:
+    lda #$00
+    sta init_symbol_index
+init_value_match_builtin_symbol_work_loop:
+    ldy init_symbol_index
+init_value_builtin_symbol_load:
+    lda $FFFF,y
+    beq init_value_match_builtin_symbol_work_tail
+    sta init_parse_tmp
+    jsr init_value_peek_char_work
+    jsr uppercase_ascii
+    cmp init_parse_tmp
+    bne init_value_match_builtin_symbol_work_fail
+    jsr init_value_advance_work
+    inc init_symbol_index
+    bne init_value_match_builtin_symbol_work_loop
+init_value_match_builtin_symbol_work_fail:
+    sec
+    rts
+init_value_match_builtin_symbol_work_tail:
+    jmp init_value_keyword_tail_ok
 
 init_value_multiply_left_counter:
     lda #$00
@@ -1148,8 +1292,7 @@ init_value_consume_keyword_fail_restore:
 
 init_value_keyword_tail_ok:
     jsr init_value_peek_char_work
-    jsr uppercase_ascii
-    jsr uppercase_symbol_body_valid
+    jsr overlay_symbol_body_char_valid
     bcc init_value_keyword_tail_bad
     clc
     rts
@@ -1216,7 +1359,7 @@ clear_decl_init_current:
 require_line_end:
     jsr skip_inline_spaces
     ldy #$00
-    lda (ACTC_OVERLAY_SCAN_ZP),y
+    jsr overlay_source_peek_scan_y
     beq require_line_end_ok
     cmp #10
     beq require_line_end_ok
@@ -1231,14 +1374,14 @@ require_line_end_ok:
 skip_inline_spaces:
     ldy #$00
 skip_inline_spaces_loop:
-    lda (ACTC_OVERLAY_SCAN_ZP),y
+    jsr overlay_source_peek_scan_y
     cmp #' '
     beq skip_inline_spaces_advance
     cmp #9
     beq skip_inline_spaces_advance
     rts
 skip_inline_spaces_advance:
-    jsr advance_source_scan
+    jsr overlay_source_consume_scan_ptr
     jmp skip_inline_spaces_loop
 
 clear_var_name_window:
@@ -1271,16 +1414,21 @@ clear_export_name_window_loop:
     bpl clear_export_name_window_loop
     rts
 
+overlay_symbol_token_char_valid_current:
+    jsr uppercase_ascii
+    ldy symbol_len_current
+    bne overlay_symbol_token_char_valid_current_body
+    jmp uppercase_symbol_start_valid
+overlay_symbol_token_char_valid_current_body:
+    jmp uppercase_symbol_body_valid
+
 copy_symbol_to_var_name_window:
-    ldy #ACTC_OVERLAY_CTX_VAR_NAME_WINDOW_PTR_LO
-    lda (ACTC_OVERLAY_CONTEXT_ZP),y
-    sta ACTC_OVERLAY_WORK_ZP
-    ldy #ACTC_OVERLAY_CTX_VAR_NAME_WINDOW_PTR_HI
-    lda (ACTC_OVERLAY_CONTEXT_ZP),y
-    sta ACTC_OVERLAY_WORK_ZP+1
-    ldy #$00
+    jsr load_overlay_symbol_token_ptr
+    lda #$00
+    sta symbol_len_current
 copy_symbol_to_var_name_window_loop:
-    lda (ACTC_OVERLAY_SCAN_ZP),y
+    ldy #$00
+    jsr overlay_source_peek_scan_y
     beq copy_symbol_to_var_name_window_done
     cmp #' '
     beq copy_symbol_to_var_name_window_done
@@ -1298,26 +1446,24 @@ copy_symbol_to_var_name_window_loop:
     beq copy_symbol_to_var_name_window_done
     cmp #13
     beq copy_symbol_to_var_name_window_done
-    jsr uppercase_ascii
-    cpy #$00
-    bne copy_symbol_to_var_name_window_body
-    jsr uppercase_symbol_start_valid
-    bcs copy_symbol_to_var_name_window_fail
-    jmp copy_symbol_to_var_name_window_store
-copy_symbol_to_var_name_window_body:
-    jsr uppercase_symbol_body_valid
+    jsr overlay_symbol_token_char_valid_current
     bcs copy_symbol_to_var_name_window_fail
 copy_symbol_to_var_name_window_store:
+    ldy symbol_len_current
     sta (ACTC_OVERLAY_WORK_ZP),y
-    iny
-    cpy #24
+    inc symbol_len_current
+    jsr overlay_source_consume_scan_ptr
+    bcs copy_symbol_to_var_name_window_fail
+    lda symbol_len_current
+    cmp #24
     bcc copy_symbol_to_var_name_window_loop
 copy_symbol_to_var_name_window_done:
-    cpy #$00
+    lda symbol_len_current
     beq copy_symbol_to_var_name_window_fail
-    sty symbol_len_current
+    tay
     lda #$00
     sta (ACTC_OVERLAY_WORK_ZP),y
+    jsr publish_symbol_token_to_var_name_window
     clc
     rts
 copy_symbol_to_var_name_window_fail:
@@ -1325,15 +1471,12 @@ copy_symbol_to_var_name_window_fail:
     rts
 
 copy_symbol_to_export_name_window:
-    ldy #ACTC_OVERLAY_CTX_EXPORT_NAME_WINDOW_PTR_LO
-    lda (ACTC_OVERLAY_CONTEXT_ZP),y
-    sta ACTC_OVERLAY_WORK_ZP
-    ldy #ACTC_OVERLAY_CTX_EXPORT_NAME_WINDOW_PTR_HI
-    lda (ACTC_OVERLAY_CONTEXT_ZP),y
-    sta ACTC_OVERLAY_WORK_ZP+1
-    ldy #$00
+    jsr load_overlay_symbol_token_ptr
+    lda #$00
+    sta symbol_len_current
 copy_symbol_to_export_name_window_loop:
-    lda (ACTC_OVERLAY_SCAN_ZP),y
+    ldy #$00
+    jsr overlay_source_peek_scan_y
     beq copy_symbol_to_export_name_window_done
     cmp #' '
     beq copy_symbol_to_export_name_window_done
@@ -1347,26 +1490,24 @@ copy_symbol_to_export_name_window_loop:
     beq copy_symbol_to_export_name_window_done
     cmp #13
     beq copy_symbol_to_export_name_window_done
-    jsr uppercase_ascii
-    cpy #$00
-    bne copy_symbol_to_export_name_window_body
-    jsr uppercase_symbol_start_valid
-    bcs copy_symbol_to_export_name_window_fail
-    jmp copy_symbol_to_export_name_window_store
-copy_symbol_to_export_name_window_body:
-    jsr uppercase_symbol_body_valid
+    jsr overlay_symbol_token_char_valid_current
     bcs copy_symbol_to_export_name_window_fail
 copy_symbol_to_export_name_window_store:
+    ldy symbol_len_current
     sta (ACTC_OVERLAY_WORK_ZP),y
-    iny
-    cpy #24
+    inc symbol_len_current
+    jsr overlay_source_consume_scan_ptr
+    bcs copy_symbol_to_export_name_window_fail
+    lda symbol_len_current
+    cmp #24
     bcc copy_symbol_to_export_name_window_loop
 copy_symbol_to_export_name_window_done:
-    cpy #$00
+    lda symbol_len_current
     beq copy_symbol_to_export_name_window_fail
-    sty symbol_len_current
+    tay
     lda #$00
     sta (ACTC_OVERLAY_WORK_ZP),y
+    jsr publish_symbol_token_to_export_name_window
     clc
     rts
 copy_symbol_to_export_name_window_fail:
@@ -1435,17 +1576,6 @@ write_proc_debug_offset_window:
 
 write_var_debug_offset_window:
     jmp write_proc_debug_offset_window
-
-advance_source_by_symbol_len:
-    lda symbol_len_current
-    beq advance_source_by_symbol_len_done
-    sta advance_count
-advance_source_by_symbol_len_loop:
-    jsr advance_source_scan
-    dec advance_count
-    bne advance_source_by_symbol_len_loop
-advance_source_by_symbol_len_done:
-    rts
 
 ensure_var_capacity:
     lda var_total_count
@@ -1547,7 +1677,7 @@ compare_work_window_to_scan_cache:
     ldy #$00
 compare_work_window_to_scan_cache_loop:
     lda (ACTC_OVERLAY_WORK_ZP),y
-    cmp (ACTC_OVERLAY_SCAN_ZP),y
+    cmp (ACTC_OVERLAY_CACHE_ZP),y
     bne compare_work_window_to_scan_cache_no
     cmp #$00
     beq compare_work_window_to_scan_cache_yes
@@ -1587,7 +1717,7 @@ copy_work_window_to_scan_cache:
     ldy #$00
 copy_work_window_to_scan_cache_loop:
     lda (ACTC_OVERLAY_WORK_ZP),y
-    sta (ACTC_OVERLAY_SCAN_ZP),y
+    sta (ACTC_OVERLAY_CACHE_ZP),y
     iny
     cpy #OVERLAY_NAME_STRIDE
     bcc copy_work_window_to_scan_cache_loop
@@ -1595,27 +1725,27 @@ copy_work_window_to_scan_cache_loop:
 
 setup_var_cache_ptr_x:
     lda #<var_name_cache
-    sta ACTC_OVERLAY_SCAN_ZP
+    sta ACTC_OVERLAY_CACHE_ZP
     lda #>var_name_cache
-    sta ACTC_OVERLAY_SCAN_ZP+1
+    sta ACTC_OVERLAY_CACHE_ZP+1
     jmp setup_cache_ptr_x
 
 setup_export_cache_ptr_x:
     lda #<export_name_cache
-    sta ACTC_OVERLAY_SCAN_ZP
+    sta ACTC_OVERLAY_CACHE_ZP
     lda #>export_name_cache
-    sta ACTC_OVERLAY_SCAN_ZP+1
+    sta ACTC_OVERLAY_CACHE_ZP+1
 
 setup_cache_ptr_x:
     txa
     beq setup_cache_ptr_x_done
 setup_cache_ptr_x_loop:
     clc
-    lda ACTC_OVERLAY_SCAN_ZP
+    lda ACTC_OVERLAY_CACHE_ZP
     adc #OVERLAY_NAME_STRIDE
-    sta ACTC_OVERLAY_SCAN_ZP
+    sta ACTC_OVERLAY_CACHE_ZP
     bcc :+
-    inc ACTC_OVERLAY_SCAN_ZP+1
+    inc ACTC_OVERLAY_CACHE_ZP+1
 :
     dex
     bne setup_cache_ptr_x_loop
@@ -1638,6 +1768,36 @@ load_export_name_window_ptr:
     ldy #ACTC_OVERLAY_CTX_EXPORT_NAME_WINDOW_PTR_HI
     lda (ACTC_OVERLAY_CONTEXT_ZP),y
     sta ACTC_OVERLAY_WORK_ZP+1
+    rts
+
+load_overlay_symbol_token_ptr:
+    lda #<overlay_symbol_token_buffer
+    sta ACTC_OVERLAY_WORK_ZP
+    lda #>overlay_symbol_token_buffer
+    sta ACTC_OVERLAY_WORK_ZP+1
+    rts
+
+publish_symbol_token_to_var_name_window:
+    jsr load_var_name_window_ptr
+    jmp copy_overlay_symbol_token_to_work_window
+
+publish_symbol_token_to_export_name_window:
+    jsr load_export_name_window_ptr
+    jmp copy_overlay_symbol_token_to_work_window
+
+copy_overlay_symbol_token_to_work_window:
+    ldy #$00
+copy_overlay_symbol_token_to_work_window_loop:
+    lda overlay_symbol_token_buffer,y
+    sta (ACTC_OVERLAY_WORK_ZP),y
+    beq copy_overlay_symbol_token_to_work_window_done
+    iny
+    cpy #OVERLAY_NAME_STRIDE
+    bcc copy_overlay_symbol_token_to_work_window_loop
+    lda #$00
+    ldy #(OVERLAY_NAME_STRIDE - 1)
+    sta (ACTC_OVERLAY_WORK_ZP),y
+copy_overlay_symbol_token_to_work_window_done:
     rts
 
 save_source_scan_ptr:
@@ -1743,7 +1903,8 @@ call_target_address:
 skip_source_whitespace:
     ldy #$00
 skip_source_whitespace_loop:
-    lda (ACTC_OVERLAY_SCAN_ZP),y
+    ldy #$00
+    jsr overlay_source_peek_scan_y
     cmp #' '
     beq skip_source_whitespace_advance
     cmp #9
@@ -1752,46 +1913,43 @@ skip_source_whitespace_loop:
     beq skip_source_whitespace_advance
     cmp #13
     beq skip_source_whitespace_advance
+skip_source_whitespace_done:
     rts
 skip_source_whitespace_advance:
-    jsr advance_source_scan
+    jsr overlay_source_consume_scan_ptr
+    bcs skip_source_whitespace_done
     jmp skip_source_whitespace_loop
 
 skip_blank_lines_and_spaces:
-    ldy #$00
-skip_blank_lines_and_spaces_loop:
-    lda (ACTC_OVERLAY_SCAN_ZP),y
-    cmp #' '
-    beq skip_blank_lines_and_spaces_advance
-    cmp #9
-    beq skip_blank_lines_and_spaces_advance
-    cmp #10
-    beq skip_blank_lines_and_spaces_advance
-    cmp #13
-    beq skip_blank_lines_and_spaces_advance
-    rts
-skip_blank_lines_and_spaces_advance:
-    jsr advance_source_scan
-    jmp skip_blank_lines_and_spaces_loop
+    jmp skip_source_whitespace
 
 skip_source_line:
     ldy #$00
 skip_source_line_loop:
-    lda (ACTC_OVERLAY_SCAN_ZP),y
+    jsr ensure_source_window_available
+    lda source_page_failed
+    bne skip_source_line_done
+    ldy #$00
+    jsr overlay_source_peek_scan_y
     beq skip_source_line_done
     cmp #10
     beq skip_source_line_eol
     cmp #13
     beq skip_source_line_eol
-    jsr advance_source_scan
+    jsr overlay_source_consume_scan_ptr
+    bcs skip_source_line_done
     jmp skip_source_line_loop
 skip_source_line_eol:
-    jsr advance_source_scan
+    jsr overlay_source_consume_scan_ptr
+    bcs skip_source_line_done
+    jsr ensure_source_window_available
+    lda source_page_failed
+    bne skip_source_line_done
     ldy #$00
-    lda (ACTC_OVERLAY_SCAN_ZP),y
+    jsr overlay_source_peek_scan_y
     cmp #10
     bne skip_source_line_done
-    jsr advance_source_scan
+    jsr overlay_source_consume_scan_ptr
 skip_source_line_done:
     rts
 
@@ -1909,12 +2067,13 @@ match_real_keyword_loop:
 match_keyword_char:
     sta expected_char
     ldy #$00
-    lda (ACTC_OVERLAY_SCAN_ZP),y
+    jsr overlay_source_peek_scan_y
     beq match_keyword_char_fail
     jsr uppercase_ascii
     cmp expected_char
     bne match_keyword_char_fail
-    jsr advance_source_scan
+    jsr overlay_source_consume_scan_ptr
+    bcs match_keyword_char_fail
     clc
     rts
 match_keyword_char_fail:
@@ -1959,13 +2118,11 @@ match_keyword_at_scan_delimiter_width4:
 
 match_keyword_at_scan_delimiter:
     ldy #$00
-    lda (ACTC_OVERLAY_SCAN_ZP),y
+    jsr overlay_source_peek_scan_y
     beq match_keyword_at_scan_ok
     cmp #' '
     beq match_keyword_at_scan_ok
     cmp #9
-    beq match_keyword_at_scan_ok
-    cmp #'('
     beq match_keyword_at_scan_ok
     cmp #10
     beq match_keyword_at_scan_ok
@@ -2083,6 +2240,40 @@ source_mark_before_total_yes:
     sec
     rts
 
+ensure_source_window_available:
+    lda source_window_remaining
+    ora source_window_remaining+1
+    bne ensure_source_window_available_done
+    jsr source_mark_before_total
+    bcs ensure_source_window_available_load_next
+ensure_source_window_available_done:
+    rts
+ensure_source_window_available_load_next:
+    jmp load_next_source_window_from_context
+
+overlay_source_peek_scan_y:
+    jsr ensure_source_window_available
+    lda source_page_failed
+    beq overlay_source_peek_scan_y_read
+    lda #$00
+    rts
+overlay_source_peek_scan_y_read:
+    lda (ACTC_OVERLAY_SCAN_ZP),y
+    rts
+
+overlay_source_consume_scan_ptr:
+    jsr ensure_source_window_available
+    lda source_page_failed
+    bne overlay_source_consume_scan_ptr_fail
+    jsr advance_source_scan
+    lda source_page_failed
+    bne overlay_source_consume_scan_ptr_fail
+    clc
+    rts
+overlay_source_consume_scan_ptr_fail:
+    sec
+    rts
+
 advance_source_window_remaining:
     lda source_window_remaining
     ora source_window_remaining+1
@@ -2095,8 +2286,16 @@ advance_source_window_remaining:
     lda source_window_remaining
     ora source_window_remaining+1
     bne advance_source_window_remaining_done
+    tya
+    pha
     jsr source_mark_before_total
-    bcc advance_source_window_remaining_done
+    bcs advance_source_window_load_next
+    pla
+    tay
+    rts
+advance_source_window_load_next:
+    pla
+    tay
     jmp load_next_source_window_from_context
 advance_source_window_remaining_done:
     rts
@@ -2149,6 +2348,59 @@ card_keyword:
     .asciiz "CARD"
 real_keyword:
     .asciiz "REAL"
+init_builtin_constant_table:
+    .byte <init_builtin_const_sid_tri, >init_builtin_const_sid_tri, $10
+    .byte <init_builtin_const_sid_saw, >init_builtin_const_sid_saw, $20
+    .byte <init_builtin_const_sid_pulse, >init_builtin_const_sid_pulse, $40
+    .byte <init_builtin_const_sid_noise, >init_builtin_const_sid_noise, $80
+    .byte <init_builtin_const_sid_low, >init_builtin_const_sid_low, $10
+    .byte <init_builtin_const_sid_band, >init_builtin_const_sid_band, $20
+    .byte <init_builtin_const_sid_high, >init_builtin_const_sid_high, $40
+    .byte <init_builtin_const_spr_front, >init_builtin_const_spr_front, $00
+    .byte <init_builtin_const_spr_back, >init_builtin_const_spr_back, $01
+    .byte <init_builtin_const_joy_up, >init_builtin_const_joy_up, $01
+    .byte <init_builtin_const_joy_down, >init_builtin_const_joy_down, $02
+    .byte <init_builtin_const_joy_left, >init_builtin_const_joy_left, $04
+    .byte <init_builtin_const_joy_right, >init_builtin_const_joy_right, $08
+    .byte <init_builtin_const_joy_button1, >init_builtin_const_joy_button1, $10
+    .byte <init_builtin_const_joy_button2, >init_builtin_const_joy_button2, $20
+    .byte <init_builtin_const_mouse_button1, >init_builtin_const_mouse_button1, $01
+    .byte <init_builtin_const_mouse_button2, >init_builtin_const_mouse_button2, $02
+    .byte $00,$00,$00
+init_builtin_const_sid_tri:
+    .asciiz "SID_TRI"
+init_builtin_const_sid_saw:
+    .asciiz "SID_SAW"
+init_builtin_const_sid_pulse:
+    .asciiz "SID_PULSE"
+init_builtin_const_sid_noise:
+    .asciiz "SID_NOISE"
+init_builtin_const_sid_low:
+    .asciiz "SID_LOW"
+init_builtin_const_sid_band:
+    .asciiz "SID_BAND"
+init_builtin_const_sid_high:
+    .asciiz "SID_HIGH"
+init_builtin_const_spr_front:
+    .asciiz "SPR_FRONT"
+init_builtin_const_spr_back:
+    .asciiz "SPR_BACK"
+init_builtin_const_joy_up:
+    .asciiz "JOY_UP"
+init_builtin_const_joy_down:
+    .asciiz "JOY_DOWN"
+init_builtin_const_joy_left:
+    .asciiz "JOY_LEFT"
+init_builtin_const_joy_right:
+    .asciiz "JOY_RIGHT"
+init_builtin_const_joy_button1:
+    .asciiz "JOY_BUTTON1"
+init_builtin_const_joy_button2:
+    .asciiz "JOY_BUTTON2"
+init_builtin_const_mouse_button1:
+    .asciiz "MOUSE_BUTTON1"
+init_builtin_const_mouse_button2:
+    .asciiz "MOUSE_BUTTON2"
 source_mark:
     .byte $00,$00,$00
 source_window_remaining:
@@ -2199,6 +2451,14 @@ init_last_char:
     .byte $00
 initializer_value_scan_ptr:
     .word $0000
+init_capture_write_ptr:
+    .word $0000
+init_capture_remaining:
+    .word $0000
+init_capture_overflow:
+    .byte $00
+init_capture_saved_char:
+    .byte $00
 init_parse_bracketed:
     .byte $00
 init_parse_value:
@@ -2215,6 +2475,10 @@ init_parse_left:
     .byte $00
 init_parse_counter:
     .byte $00
+init_const_table_index:
+    .byte $00
+init_symbol_index:
+    .byte $00
 cache_index:
     .byte $00
 cache_range_base:
@@ -2225,6 +2489,14 @@ saved_source_scan_ptr:
     .word $0000
 saved_init_work_ptr:
     .word $0000
+init_capture_buffer:
+    .repeat INIT_CAPTURE_LIMIT + 1
+    .byte $00
+    .endrepeat
+overlay_symbol_token_buffer:
+    .repeat OVERLAY_NAME_STRIDE
+    .byte $00
+    .endrepeat
 var_name_cache:
     .repeat OVERLAY_VAR_MAX * OVERLAY_NAME_STRIDE
     .byte $00

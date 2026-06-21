@@ -1,5 +1,5 @@
 OBJ1
-x rt_gfx_color_copy 0 4
-b ZFr
-k 0
+x rt_gfx_color_copy 0 46
+b M
+m 86 02 84 03 A9 00 85 04 A9 D8 85 05 A2 03 A0 00 B1 02 29 0F 91 04 C8 D0 F7 E6 03 E6 05 CA D0 F0 A0 00 B1 02 29 0F 91 04 C8 C0 E8 D0 F5 60
 n rt_gfx_color_copy

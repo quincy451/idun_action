@@ -1,0 +1,25 @@
+; GFX1 C64 graphics binding reference.
+; ACTC recognizes these builtin helper names directly. ALINK includes only the
+; referenced RT_*.OBJ modules in the final PRG.
+;
+; These helpers expose the first low-level VIC-II graphics operations used by
+; the direct PRG runtime modules. Higher-level resource/tile helpers can build
+; on this file without becoming runner-global behavior.
+
+MODULE GFX1
+
+PROC VicBank(BYTE bank)
+PROC BgColor(BYTE color)
+PROC BorderColor(BYTE color)
+PROC ScreenBase(CARD base)
+PROC BitmapBase(CARD base)
+PROC ScreenCell(BYTE x,BYTE y,BYTE ch)
+PROC ColorCell(BYTE x,BYTE y,BYTE color)
+PROC ScreenCopy(CARD addr)
+PROC ColorCopy(CARD addr)
+PROC BitmapFill(BYTE value)
+PROC BitmapCopy(CARD addr)
+PROC BitmapOn()
+PROC BitmapOff()
+PROC MBitmapOn()
+PROC MBitmapOff()

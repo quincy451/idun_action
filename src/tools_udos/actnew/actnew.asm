@@ -66,62 +66,38 @@ have_args:
     ldy #>msg_mkdir_fail
     jmp fail_with_ptr
 :
-    lda #<project_marker
-    sta save_params+0
-    lda #>project_marker
-    sta save_params+1
     lda #<marker_text
-    sta save_params+2
+    sta src_ptr
     lda #>marker_text
-    sta save_params+3
-    jsr set_save_len_from_source
-    lda #tool_file_status_fail
-    sta save_params+6
-    ldx #save_params
-    jsr svc_file_save_sc0
-    lda save_params+6
-    cmp #tool_file_status_ok
-    beq :+
+    sta src_ptr+1
+    lda #<project_marker
+    ldy #>project_marker
+    jsr save_text_file
+    bcc :+
     lda #<msg_save_fail
     ldy #>msg_save_fail
     jmp fail_with_ptr
 :
-    lda #<project_readme
-    sta save_params+0
-    lda #>project_readme
-    sta save_params+1
     lda #<readme_text
-    sta save_params+2
+    sta src_ptr
     lda #>readme_text
-    sta save_params+3
-    jsr set_save_len_from_source
-    lda #tool_file_status_fail
-    sta save_params+6
-    ldx #save_params
-    jsr svc_file_save_sc0
-    lda save_params+6
-    cmp #tool_file_status_ok
-    beq :+
+    sta src_ptr+1
+    lda #<project_readme
+    ldy #>project_readme
+    jsr save_text_file
+    bcc :+
     lda #<msg_save_fail
     ldy #>msg_save_fail
     jmp fail_with_ptr
 :
-    lda #<project_main
-    sta save_params+0
-    lda #>project_main
-    sta save_params+1
     lda #<main_text
-    sta save_params+2
+    sta src_ptr
     lda #>main_text
-    sta save_params+3
-    jsr set_save_len_from_source
-    lda #tool_file_status_fail
-    sta save_params+6
-    ldx #save_params
-    jsr svc_file_save_sc0
-    lda save_params+6
-    cmp #tool_file_status_ok
-    beq :+
+    sta src_ptr+1
+    lda #<project_main
+    ldy #>project_main
+    jsr save_text_file
+    bcc :+
     lda #<msg_save_fail
     ldy #>msg_save_fail
     jmp fail_with_ptr
@@ -167,21 +143,27 @@ mkdir_ptr_ok:
     clc
     rts
 
-set_save_len_from_source:
-    lda save_params+2
-    sta src_ptr
-    lda save_params+3
-    sta src_ptr+1
-    ldy #$00
-set_save_len_loop:
-    lda (src_ptr),y
-    beq set_save_len_done
-    iny
-    bne set_save_len_loop
-set_save_len_done:
-    sty save_params+4
+save_text_file:
+    sta save_params+0
+    sty save_params+1
+    lda src_ptr
+    sta save_params+2
+    lda src_ptr+1
+    sta save_params+3
     lda #$00
+    sta save_params+4
     sta save_params+5
+    lda #tool_file_status_fail
+    sta save_params+6
+    ldx #save_params
+    jsr svc_file_save_sc0
+    lda save_params+6
+    cmp #tool_file_status_ok
+    bne save_text_file_fail
+    clc
+    rts
+save_text_file_fail:
+    sec
     rts
 
 copy_first_arg:
@@ -191,6 +173,7 @@ copy_first_arg_loop:
     beq copy_first_arg_done
     cmp #' '
     beq copy_first_arg_done
+    jsr normalize_project_name_char
     sta project_root,y
     iny
     cpy #28
@@ -198,6 +181,23 @@ copy_first_arg_loop:
 copy_first_arg_done:
     lda #$00
     sta project_root,y
+    rts
+
+normalize_project_name_char:
+    cmp #$01
+    bcc normalize_project_name_char_ascii
+    cmp #$1B
+    bcs normalize_project_name_char_ascii
+    clc
+    adc #$40
+    rts
+normalize_project_name_char_ascii:
+    cmp #'a'
+    bcc normalize_project_name_char_done
+    cmp #'z'+1
+    bcs normalize_project_name_char_done
+    and #$DF
+normalize_project_name_char_done:
     rts
 
 build_paths:
@@ -354,6 +354,7 @@ marker_text:
     .byte "MAIN.ACT", 13, 0
 
 readme_text:
+    .byte "UPDATES", 13
     .byte "ACTION PROJECT READY", 13
     .byte 13
     .byte "SRC contains Action source.", 13

@@ -1,14 +1,15 @@
 ; MATH1 binding draft
-; This is a design sketch for the next Action-facing helper-family binding.
-; It is not yet claimed as accepted compiler syntax or a shipped include file.
+; This is the wider design sketch beyond the shipped MATH1.ACT proof surface.
+; FAbs and FSqrt have been promoted into the shipped include; the remaining
+; functions are still deferred until matching RT_*.OBJ modules exist.
 ;
 ; Intent:
 ; - thin Action-facing declarations
 ; - semantic numeric functions, not new core runtime opcodes
 ; - operator-specific REAL runtime modules remain the implementation for
 ;   A+B, A-B, A*B, A/B, REAL(x), and INT(x)
-; - raw 6502 implementation lives in RT_MATH1_HELPER.BIN
-; - ALINK selects it only when used
+; - raw 6502 implementations live in link-selected RT_*.OBJ modules
+; - ALINK selects only the referenced modules
 
 MODULE MATH1
 

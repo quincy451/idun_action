@@ -30,11 +30,18 @@ Use UDOS gates as the source of truth:
 make -C ../udos PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-actc
 make -C ../udos PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-alink
 make -C ../udos PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-actc-alink-launch
+make -C ../udos PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-alink-prg-object-code-matrices
+make -C ../udos PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-actc-alink-launch-runtime-matrices
 ```
 
 Treat `vice-action-alink` as the default direct-native linker gate that emits
 `BIN/MAIN.PRG`.
 Treat `vice-action-actc-alink-launch` as the helper-free higher-level default.
+Treat `vice-action-alink-prg-object-code-matrices` as the focused direct
+object-code graph, behavior, and rejection gate.
+Treat `vice-action-actc-alink-launch-runtime-matrices` as the focused
+link-selected runtime helper gate, including exported helper demo programs via
+`vice-action-actc-alink-launch-helper-demos`.
 Treat `vice-action-actc-alink-launch-printmath` as a green named direct
 launch gate for the imported `printmath` shape.
 
@@ -73,6 +80,8 @@ Current concrete API inputs:
   - `docs/helper_family_abi_draft.md`
 - first Action-facing SID/sprite binding sketch:
   - `docs/sidspr1_bindings_draft.act`
+- first Action-facing joystick/mouse input binding sketch:
+  - `docs/input1_bindings_draft.act`
 
 These are design inputs for optional helper families. They should not be
 implemented as permanent runner-global features.
@@ -92,10 +101,10 @@ The current practical path is:
 7. Build on the resident REU stage/read services and convert ACTC toward the
    REU-backed source-streaming plan in `docs/actc_source_streaming_plan.md` so
    source size is no longer tied to one contiguous buffer.
-8. Move large ACTC/ALINK lookup payloads into REU-backed tables after source
-   paging is stable.
+8. Keep large ACTC/ALINK lookup payloads moving into REU-backed tables as new
+   capacity pressure appears.
 9. Keep `ACTC.PRG -> ALINK.PRG -> MAIN.PRG` green under UDOS.
-10. Treat graphics, SID/sprite, DBF, math, TCP, and 80-column support as
+10. Treat graphics, SID/sprite, input, DBF, math, TCP, and 80-column support as
     optional raw-6502 helper families with thin language bindings, not as
     new permanent runner-global behavior.
 11. Use `docs/helper_family_abi_draft.md` as the current concrete contract for

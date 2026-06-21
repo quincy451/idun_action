@@ -40,8 +40,38 @@ Current machine-code emission slices:
 
 - `PROC MAIN(); RETURN` emits `b M` plus an `m` record containing the UDOS
   success-exit sequence.
+- A no-data single external call (`MAIN(): ExtCall(); RETURN`) emits `b u0M`,
+  one `u <symbol>` import, the `JSR` plus UDOS success-exit machine stream, and
+  an `r 1 u0` relocation for ALINK.
+- A no-data repeated external call (`MAIN(): ExtCall(); ExtCall(); RETURN`)
+  keeps one import and emits two relocation records targeting that import.
+- A no-data pair of external calls (`MAIN(): A(); B(); RETURN`) emits
+  `b u0u1M`, two imports, two `JSR` slots, and relocations for both imported
+  targets.
+- A no-data trio of external calls (`MAIN(): A(); B(); C(); RETURN`) emits
+  `b u0u1u2M`, three imports, three `JSR` slots, and relocations for all
+  imported targets.
+- No-data external call sequences are generated from the collected body payload;
+  mixed repeated imports such as `MAIN(): A(); B(); A(); RETURN` keep unique
+  imports in the `b` marker while emitting relocations in call-site order.
 - A no-data two-procedure local call (`A(): RETURN`, `MAIN(): A(); RETURN`)
   emits one module-level `m` stream with `MAIN` first and the helper appended.
+- A no-data mixed local/external call (`A(): RETURN`,
+  `MAIN(): A(); Helper(); RETURN`) emits one module-level `m` stream with
+  `MAIN` first, the local helper appended, and an `r 4 u0` relocation for the
+  external helper.
+- A no-data mixed local/two-external call (`A(): RETURN`,
+  `MAIN(): A(); Helper(); Other(); RETURN`) emits one module-level `m` stream
+  with `MAIN` first, the local helper appended, and `r 4 u0`/`r 7 u1`
+  relocations for the external helpers.
+- A no-data mixed local/repeated-external call (`A(): RETURN`,
+  `MAIN(): A(); Helper(); Helper(); RETURN`) emits one module-level `m` stream
+  with one imported helper and relocations at both repeated external call
+  sites.
+- No-data local/external call sequences are generated from the collected main
+  body payload; mixed repeated imports such as
+  `MAIN(): A(); Helper(); Other(); Helper(); RETURN` keep the local helper
+  appended once and emit external relocations in call-site order.
 - A no-data fanout call graph (`A(): RETURN`, `B(): A(); RETURN`,
   `MAIN(): A(); B(); RETURN`) emits one module-level `m` stream with `MAIN`
   first, then `B`, then `A`.

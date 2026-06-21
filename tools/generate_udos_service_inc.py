@@ -32,6 +32,10 @@ FIXED_DATA = {
     "dir_entry_buffer": 0xCDD0,
 }
 
+LABEL_HELPERS = {
+    "svc_open_program_read_path_preserved": "tool_abi_open_program_read_path_preserved",
+}
+
 FIXED_CONSTANTS = {
     "tool_file_status_fail": 0,
     "tool_file_status_ok": 1,
@@ -82,6 +86,11 @@ def main(argv: list[str] | None = None) -> int:
     lines.append("")
     for name, addr in FIXED_DATA.items():
         lines.append(f"{name} = ${addr:04X}")
+    lines.append("")
+    for public_name, label_name in LABEL_HELPERS.items():
+        if label_name not in labels:
+            raise SystemExit(f"missing expected UDOS label: {label_name}")
+        lines.append(f"{public_name} = ${labels[label_name]:04X}")
     lines.append("")
     for name, value in FIXED_CONSTANTS.items():
         lines.append(f"{name} = {value}")

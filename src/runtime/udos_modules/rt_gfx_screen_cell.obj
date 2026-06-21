@@ -1,5 +1,5 @@
 OBJ1
-x rt_gfx_screen_cell 0 4
-b Z4r
-k 0
+x rt_gfx_screen_cell 0 52
+b M
+m 85 04 84 05 A9 00 85 02 A9 04 85 03 E0 00 F0 10 18 A5 02 69 28 85 02 A5 03 69 00 85 03 CA D0 F0 18 A5 02 65 04 85 02 A5 03 69 00 85 03 A0 00 A5 05 91 02 60
 n rt_gfx_screen_cell

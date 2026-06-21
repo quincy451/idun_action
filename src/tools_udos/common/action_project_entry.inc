@@ -31,8 +31,7 @@ manifest_contains_entry:
     jsr skip_current_line
     jsr skip_line_breaks
 manifest_contains_entry_loop:
-    ldy #$00
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_ptr
     beq manifest_contains_entry_fail
     jsr entry_matches_current_line
     bcc manifest_contains_entry_ok
@@ -51,7 +50,8 @@ entry_matches_current_line:
 entry_matches_current_line_loop:
     lda manifest_entry,y
     beq entry_matches_current_line_end
-    cmp (scan_ptr),y
+    jsr source_reader_peek_scan_y
+    cmp manifest_entry,y
     bne entry_matches_current_line_fail
     iny
     cpy #31
@@ -60,7 +60,7 @@ entry_matches_current_line_fail:
     sec
     rts
 entry_matches_current_line_end:
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     beq entry_matches_current_line_ok
     cmp #13
     beq entry_matches_current_line_ok

@@ -7,9 +7,9 @@ The active project path is UDOS-native. Action tools are built as standalone
 UDOS resident service layer to reach Commodore 64 Ultimate ROM/Ultimate DOS
 services.
 
-The older CP/M-65 bootstrap path remains in this repository as historical
-reference material only. It is not the active implementation target and should
-not drive feature work. See [docs/active_direction.md](./docs/active_direction.md).
+Retired CP/M-65 notes remain only where explicitly labeled as historical
+documentation. They are not an active implementation target and should not drive
+feature work. See [docs/active_direction.md](./docs/active_direction.md).
 
 The current UDOS-facing alpha ships:
 
@@ -55,7 +55,7 @@ Strict required-dependency check:
 ./tools/env_check.sh --strict
 ```
 
-WSL setup notes live in [docs/setup_wsl.md](/mnt/c/test/action/actionc64u/docs/setup_wsl.md).
+WSL setup notes live in [docs/setup_wsl.md](docs/setup_wsl.md).
 
 ## Active UDOS Verification
 
@@ -135,20 +135,20 @@ toolchain and direct `.PRG` output from `ALINK.PRG`.
 
 Key current docs:
 
-- [docs/actc_roadmap.md](/mnt/c/test/action/actionc64u/docs/actc_roadmap.md)
-- [docs/alink_roadmap.md](/mnt/c/test/action/actionc64u/docs/alink_roadmap.md)
-- [docs/active_direction.md](/mnt/c/test/action/actionc64u/docs/active_direction.md)
-- [docs/real32.md](/mnt/c/test/action/actionc64u/docs/real32.md)
-- [docs/reu.md](/mnt/c/test/action/actionc64u/docs/reu.md)
-- [docs/disk_layout.md](/mnt/c/test/action/actionc64u/docs/disk_layout.md)
-- [docs/release.md](/mnt/c/test/action/actionc64u/docs/release.md)
-- [docs/action_matrix.md](/mnt/c/test/action/actionc64u/docs/action_matrix.md)
-- [docs/udos_resume.md](/mnt/c/test/action/actionc64u/docs/udos_resume.md)
-- [docs/blockers.md](/mnt/c/test/action/actionc64u/docs/blockers.md)
-- [docs/prompt_chain.md](/mnt/c/test/action/actionc64u/docs/prompt_chain.md)
+- [docs/actc_roadmap.md](docs/actc_roadmap.md)
+- [docs/alink_roadmap.md](docs/alink_roadmap.md)
+- [docs/active_direction.md](docs/active_direction.md)
+- [docs/real32.md](docs/real32.md)
+- [docs/reu.md](docs/reu.md)
+- [docs/disk_layout.md](docs/disk_layout.md)
+- [docs/release.md](docs/release.md)
+- [docs/action_matrix.md](docs/action_matrix.md)
+- [docs/udos_resume.md](docs/udos_resume.md)
+- [docs/blockers.md](docs/blockers.md)
+- [docs/prompt_chain.md](docs/prompt_chain.md)
 
 ## Prompt Chain
 
 The repo was built through `prompt-1.txt` through `prompt-18.txt` from the
 workspace root. The workflow is documented in
-[docs/prompt_chain.md](/mnt/c/test/action/actionc64u/docs/prompt_chain.md).
+[docs/prompt_chain.md](docs/prompt_chain.md).

@@ -86,7 +86,7 @@ remove_manifest_shift_loop:
     sta (scan_ptr),y
     beq remove_manifest_done
     jsr advance_entry_ptr
-    jsr advance_scan_ptr
+    jsr source_reader_consume_scan_ptr
     jmp remove_manifest_shift_loop
 remove_manifest_done:
     rts

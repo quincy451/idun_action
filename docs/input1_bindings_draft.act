@@ -1,0 +1,47 @@
+; INPUT1 binding draft
+; This is the design sketch behind the shipped LIB/INPUT1.ACT binding
+; reference. ACTC currently recognizes these builtin helper names directly.
+;
+; Intent:
+; - thin Action-facing declarations
+; - C64-native joystick and 1351-style mouse support
+; - raw 6502 implementation lives in compact link-selected RT_*.OBJ modules
+; - ALINK selects it only when used
+;
+; Presence caveat:
+; - a passive C64 joystick cannot be reliably detected while idle
+; - mouse presence is inferred from observed movement or button activity
+; - presence returns observed/inferred presence, not a hard electrical guarantee
+;   that hardware is connected
+
+MODULE INPUT1
+
+BYTE CONST JOY_UP=$01
+BYTE CONST JOY_DOWN=$02
+BYTE CONST JOY_LEFT=$04
+BYTE CONST JOY_RIGHT=$08
+BYTE CONST JOY_BUTTON1=$10
+BYTE CONST JOY_BUTTON2=$20
+
+BYTE CONST MOUSE_BUTTON1=$01
+BYTE CONST MOUSE_BUTTON2=$02
+
+BYTE FUNC Joy(BYTE port)
+BYTE FUNC JoySeen(BYTE port)
+BYTE FUNC JoyBtn1(BYTE port)
+BYTE FUNC JoyBtn2(BYTE port)
+
+; MousePoll samples the requested control port, updates the accumulated mouse
+; position, and refreshes the button/presence state. MouseX and MouseY return
+; the current 8-bit accumulated position maintained by the linked helper state.
+BYTE FUNC MousePoll(BYTE port)
+BYTE FUNC MouseSeen()
+BYTE FUNC MouseX()
+BYTE FUNC MouseY()
+BYTE FUNC MouseBtn()
+BYTE FUNC MouseBtn1()
+BYTE FUNC MouseBtn2()
+
+; Two-button support follows the project C64 convention used by the first
+; helper modules: button 1 is the normal joystick fire line, and button 2 is
+; inferred from the selected POT line using a below-$80 active threshold.

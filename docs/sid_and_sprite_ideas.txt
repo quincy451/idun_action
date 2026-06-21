@@ -1,6 +1,6 @@
-Yes. I’d make them built-in PROC/FUNC intrinsics or library routines, not brand-new statement syntax. That matches existing Action! style much better: the Atari library already exposes graphics/game features as routines like Graphics, SetColor, Plot, DrawTo, Sound, SndRst, Paddle, and Stick, instead of inventing lots of one-off language statements.
+Yes. I’d make them built-in PROC/FUNC intrinsics or library routines, not brand-new statement syntax. That matches existing Action! style much better: the Atari library already exposes graphics/game features as routines instead of inventing lots of one-off language statements.
 For the C64, I’d also design the API around the real hardware model. VIC-II gives you 8 hardware sprites with per-sprite position and color, plus shared bitmapped control for enable, X-MSB, expansion, priority, multicolour, and collisions; the sprite pointers normally live at 2040–2047. SID gives you 3 voices with per-voice frequency, pulse width, control/waveform, and ADSR, plus shared filter routing and master volume.
-The big design choice: do not model SID after Atari POKEY distortion too closely. Atari Action!’s Sound routine is built around voice, pitch, distortion, and volume, but SID is much more naturally expressed as waveform + ADSR + filter + optional pulse width. Keep Sound only as a compatibility wrapper; make the real C64 API be Sid*.
+The big design choice: do not model SID after Atari POKEY distortion. The Atari sound routine shape is built around voice, pitch, distortion, and volume, but SID is much more naturally expressed as waveform + ADSR + filter + optional pulse width. Keep the C64 API SID-native through Sid* routines rather than adding compatibility sugar.
 Sprite set I’d add
 PROC SpriteOn(BYTE n)PROC SpriteOff(BYTE n)PROC SpritePos(BYTE n,CARD x,BYTE y)PROC SpritePtr(BYTE n,BYTE ptr)PROC SpriteData(BYTE n,CARD addr)PROC SpriteColor(BYTE n,BYTE col)PROC SpriteMC(BYTE n,BYTE on)PROC SpriteXExp(BYTE n,BYTE on)PROC SpriteYExp(BYTE n,BYTE on)PROC SpritePrio(BYTE n,BYTE behind)PROC SetSpriteMC(BYTE c0,BYTE c1)BYTE FUNC SpriteHit()BYTE FUNC SpriteHitBg()
 Why these names work:
@@ -15,15 +15,12 @@ SidFreq, SidPulse, SidWave, SidAD, and SidSR line up with the actual per-voice S
 SidOn/SidOff are friendlier than forcing everyone to manage the gate bit themselves.
 SidVol, SidCutoff, SidRes, SidMode, and SidRoute reflect the shared filter/volume section cleanly.
 SidOsc3 and SidEnv3 expose the useful readable SID state without forcing raw register reads.
-Compatibility layer I’d keep
-PROC Sound(BYTE voice,pitch,distortion,volume)PROC SndRst()
-But I would document Sound as simple legacy sugar, not the preferred SID interface. Internally, it could map a small distortion table onto SID waveforms and use a fixed ADSR.
 Constants worth shipping
 SID_TRISID_SAWSID_PULSESID_NOISESID_LOWSID_BANDSID_HIGHSPR_FRONTSPR_BACK
 The one thing I would not add
 I would not add lots of raw register keywords like D015, D01C, D418, etc. Power users already have the Action!-style Peek/Poke escape hatch, so your first-class API should stay semantic and compact.
 A pretty good first cut would be just this subset:
-SpriteOn SpriteOff SpritePos SpriteData SpriteColorSidFreq SidWave SidAD SidSR SidOn SidOff SidVolSound SndRst
+SpriteOn SpriteOff SpritePos SpriteData SpriteColorSidFreq SidWave SidAD SidSR SidOn SidOff SidVol
 That gives you enough to write real games quickly, while leaving raster IRQs, multiplexing, and music-driver integration for a second layer.
 Next step would be to sketch these as actual Action! declarations and show how each maps onto VIC-II and SID registers.
 Top of Form

@@ -8,8 +8,7 @@ begin_manifest_scan:
     rts
 
 manifest_scan_has_entry:
-    ldy #$00
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_ptr
     beq manifest_scan_empty
     clc
     rts
@@ -21,8 +20,7 @@ copy_manifest_line_to_buffer:
     lda #$00
     sta line_len
 copy_manifest_line_to_buffer_loop:
-    ldy #$00
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_ptr
     beq copy_manifest_line_to_buffer_done
     cmp #13
     beq copy_manifest_line_to_buffer_done
@@ -30,7 +28,7 @@ copy_manifest_line_to_buffer_loop:
     beq copy_manifest_line_to_buffer_done
     ldy line_len
     sta line_buffer,y
-    jsr advance_scan_ptr
+    jsr source_reader_consume_scan_ptr
     inc line_len
     lda line_len
     cmp #31

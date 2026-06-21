@@ -70,7 +70,7 @@ compute_payload_layout_overlay_loop:
     jsr load_resident_body_ptr_to_scan_zp
     ldy #$00
 compute_payload_layout_overlay_body_loop:
-    lda (ACTC_OVERLAY_SCAN_ZP),y
+    jsr payload_layout_peek_payload_y
     bne :+
     jmp compute_payload_layout_overlay_ret
 :
@@ -193,7 +193,7 @@ compute_payload_layout_overlay_ret:
     cpy #$00
     beq compute_payload_layout_overlay_ret_add
     dey
-    lda (ACTC_OVERLAY_SCAN_ZP),y
+    jsr payload_layout_peek_payload_y
     cmp #'r'
     bne compute_payload_layout_overlay_ret_add
     lda layout_size_lo_local
@@ -243,7 +243,7 @@ compute_payload_layout_overlay_strings_loop:
     jsr load_resident_body_ptr_to_scan_zp
     ldy #$00
 compute_payload_layout_overlay_string_len_loop:
-    lda (ACTC_OVERLAY_SCAN_ZP),y
+    jsr payload_layout_peek_payload_y
     beq compute_payload_layout_overlay_string_done
     inc payload_offset_lo
     bne :+
@@ -280,6 +280,12 @@ add_a_to_layout_size:
     bcc add_a_to_layout_size_done
     inc layout_size_hi_local
 add_a_to_layout_size_done:
+    rts
+
+payload_layout_peek_payload_y:
+    ; Reads resident body/string payload windows selected by SET_*_PTR,
+    ; not source text. Source-window paging belongs to SourceReader helpers.
+    lda (ACTC_OVERLAY_SCAN_ZP),y
     rts
 
 store_layout_locals_to_resident:

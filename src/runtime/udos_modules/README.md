@@ -9,168 +9,97 @@ and UDOS object readers converge.
 
 Current status:
 
-- `rt_f_add.obj` is a partial REAL add helper. It preserves the current stack
-  contract, implements exact zero identity for either side
-  (`x + +0.0 = x`, `+0.0 + x = x`), handles same-sign equal-power-of-two sums
-  by exponent increment, including `1.0 + 1.0 = 2.0`,
-  `2.0 + 2.0 = 4.0`, `4.0 + 4.0 = 8.0`, and
-  `-2.0 + -2.0 = -4.0`, and still handles exact `1.5 + 1.5 = 3.0`.
-  It also handles adjacent-exponent power-of-two sums such as
-  `2.0 + 1.0 = 3.0`, `1.0 + 2.0 = 3.0`, and
-  `-2.0 + -1.0 = -3.0`, adjacent-exponent mixed-sign differences
-  such as `2.0 + -1.0 = 1.0`, `1.0 + -2.0 = -1.0`,
-  `-2.0 + 1.0 = -1.0`, and `-1.0 + 2.0 = 1.0`, gap-two
-  power-of-two sums such as `4.0 + 1.0 = 5.0`, and gap-two mixed-sign
-  differences such as `4.0 + -1.0 = 3.0`, `1.0 + -4.0 = -3.0`,
-  `-4.0 + 1.0 = -3.0`, and `-1.0 + 4.0 = 3.0`. Equal-and-opposite
-  cancellation is proven for the current direct `2.0 + -2.0` harness case,
-  but broader mixed-sign addition remains incomplete. Other non-zero inputs still return REAL32 zero, so it is
-  not the final IEEE-754 addition implementation.
-- `rt_f_sub.obj` is a partial REAL subtract helper. It preserves the same stack
-  contract, implements `x - +0.0 = x`, `+0.0 - x` by flipping the sign bit, and
-  handles equal signed power-of-two subtraction as zero, including
-  `2.0 - 2.0 = 0.0` and `-2.0 - -2.0 = 0.0`, plus exact
-  `2.0 - 1.0 = 1.0`. It also handles adjacent-exponent power-of-two
-  differences such as `4.0 - 2.0 = 2.0`, `2.0 - 4.0 = -2.0`, and
-  `-4.0 - -2.0 = -2.0`, plus gap-two differences such as
-  `4.0 - 1.0 = 3.0` and `1.0 - 4.0 = -3.0`, plus
-  adjacent-exponent mixed-sign sums such as `2.0 - -1.0 = 3.0`,
-  `1.0 - -2.0 = 3.0`, `-2.0 - 1.0 = -3.0`, and
-  `-1.0 - 2.0 = -3.0`, and gap-two mixed-sign sums such as
-  `4.0 - -1.0 = 5.0`, `1.0 - -4.0 = 5.0`,
-  `-4.0 - 1.0 = -5.0`, and `-1.0 - 4.0 = -5.0`. Other non-zero pairs still return REAL32 zero,
-  so it is not the final IEEE-754 subtraction
-  implementation.
-- `rt_f_mul.obj` is a partial REAL multiply helper. It preserves the same stack
-  contract, implements zero identity, implements `x * 1.0 = x` and
-  `1.0 * x = x`, and handles low-word-zero values scaled by an exact
-  power-of-two operand using exponent addition plus sign-bit xor, including
-  `2.0 * 2.0 = 4.0`, `4.0 * 2.0 = 8.0`,
-  `-2.0 * 2.0 = -4.0`, `-2.0 * -2.0 = 4.0`,
-  `1.5 * 2.0 = 3.0`, `2.0 * 1.5 = 3.0`, `-1.5 * 2.0 = -3.0`,
-  `1.5 * -2.0 = -3.0`, `-1.5 * -2.0 = 3.0`, `1.5 * 1.5 = 2.25`, and
-  `0.75 * 0.75 = 0.5625`. Other non-zero pairs still return REAL32 zero, so
-  it is not the final IEEE-754 multiplication implementation.
-- `rt_f_div.obj` is a partial REAL divide helper. It preserves the same stack
-  contract, implements zero numerator and divide-by-zero as REAL32 zero,
-  implements `x / 1.0 = x`, and handles low-word-zero numerators divided by
-  an exact power-of-two denominator using exponent subtraction plus
-  sign-bit xor, including `4.0 / 2.0 = 2.0`,
-  `8.0 / 2.0 = 4.0`, `2.0 / 4.0 = 0.5`,
-  `-4.0 / 2.0 = -2.0`, `2.0 / -4.0 = -0.5`,
-  `3.0 / 2.0 = 1.5`, `1.5 / 2.0 = 0.75`, `-3.0 / 2.0 = -1.5`,
-  `3.0 / -2.0 = -1.5`, `-3.0 / -2.0 = 1.5`, `1.5 / 1.5 = 1.0`, and
-  `1.5 / 0.75 = 2.0`, `1.0 / 3.0 = 0.3333333432674407958984375`, and
-  `1.0 / 10.0 = 0.100000001490116119384765625`. Other non-zero pairs still
-  return REAL32 zero, so it is not the final IEEE-754 division
-  implementation.
-- `rt_i_to_f.obj` is the first target-side integer-to-REAL helper. It converts
-  one non-negative 16-bit stack cell to exact REAL32, including values such as
-  `1`, `7`, `255`, `256`, and `65535`. The current UDOS-native compiler uses
-  it only for the narrow `BYTE`/`CARD` to REAL bridge. Signed `INT` conversion
-  is still intentionally not routed through it, because the current helper
-  treats the incoming cell as an unsigned magnitude.
-- `rt_s_to_f.obj` is the first target-side signed-`INT` to REAL helper. It
-  converts one 16-bit two's-complement stack cell to exact REAL32 by deriving a
-  branchless sign mask, converting the resulting magnitude through
-  `rt_i_to_f`, and then applying the REAL sign bit. The current UDOS-native
-  compiler uses it only for the narrow `INT` variable-to-REAL bridge.
-- `rt_print_f.obj` is the first target-side REAL print wrapper. It preserves
-  the current stack contract and routes the current narrow `PrintR` / `PrintRE`
-  lowering through the runtime-side REAL print intrinsic. The current proven
-  UDOS-native slice is intentionally narrow but no longer limited to
-  low-word-zero values: `REAL X`, `X=REAL(7)`, `PrintRE(X)`, fractional
-  dyadic cases such as `A=REAL(3)`, `B=REAL(2)`, `X=A/B`, `PrintRE(X)`
-  producing `1.5`, `X=X/B`, `PrintRE(X)` producing `0.75`,
-  `A=REAL(1)`, `B=REAL(8)`, `X=A/B`, `PrintRE(X)` producing `0.125`,
-  `A=REAL(1)`, `B=REAL(32)`, `X=A/B`, `PrintRE(X)` producing `0.03125`,
-  `A=REAL(1)`, `B=REAL(64)`, `X=A/B`, `PrintRE(X)` producing `0.015625`,
-  `A=REAL(1)`, `B=REAL(256)`, `X=A/B`, `PrintRE(X)` producing `0.00390625`,
-  and `A=REAL(1)`, `B=REAL(32768)`, `X=A/B`, `PrintRE(X)` producing
-  `0.000030517578125`,
-  signed dyadic cases such as `INT N=[0]`, `N=0-1`, `A=REAL(N)`,
-  `B=REAL(2)`, `X=A/B`, `PrintRE(X)` producing `-0.5`, and
-  low-word-nonzero dyadic cases such as `A=REAL(129)`, `B=REAL(256)`,
-  `X=A/B`, `PrintRE(X)` producing `0.50390625`, plus first end-to-end
-  arithmetic print cases such as `X=X+A` after `X=1.5`, `A=1.5`,
-  `PrintRE(X)` producing `3`, `X=A+B` with `A=4.0`, `B=-1.0`
-  producing `3`, `X=A+B` with `A=1.0`, `B=-4.0` producing `-3`,
-  `X=A+B` with `A=-1.0`, `B=4.0` producing `3`,
-  `X=A-B` with `A=4.0`, `B=1.0` producing `3`,
-  `X=A-B` with `A=4.0`, `B=-1.0` producing `5`,
-  `X=A-B` with `A=-1.0`, `B=4.0` producing `-5`, and
-  `X=A*B` with `A=1.5`, `B=2.0` producing `3`,
-  `X=A*B` with `A=-1.5`, `B=2.0` producing `-3`,
-  `X=A*B` with `A=1.5`, `B=-2.0` producing `-3`,
-  `X=A*B` with `A=-1.5`, `B=-2.0` producing `3`,
-  `X=A*B` with `A=1.5`, `B=1.5` producing `2.25`,
-  `X=A*B` with `A=0.75`, `B=0.75` producing `0.5625`,
-  `X=A/B` with `A=-3.0`, `B=2.0` producing `-1.5`,
-  `X=A/B` with `A=3.0`, `B=-2.0` producing `-1.5`, and
-  `X=A/B` with `A=-3.0`, `B=-2.0` producing `1.5`,
-  and the linked helper-trailer model itself is now proven on a real
-  `ALINK`-produced direct program: `A=REAL(1)`, `B=REAL(8)`, `X=A/B`,
-  `PrintRE(X)` still produces `0.125` without loose helper sidecars or a
-  separate runner; newly linked programs must carry the print helper trailer
-  bytes that `ALINK` selects,
-  `X=A/B` with `A=1.5`, `B=1.5` producing `1`, and
-  `X=A/B` with `A=1.5`, `B=0.75` producing `2`,
-  `X=A/B` with `A=1.0`, `B=3.0` producing `0.3333333432674407958984375`,
-  `X=A/B` with `A=1.0`, `B=9.0` producing `0.111111111938953399658203125`,
-  `X=A/B` with `A=2.0`, `B=9.0` producing `0.22222222387790679931640625`,
-  `X=A/B` with `A=1.0`, `B=11.0` producing `0.0909090936183929443359375`,
-  `X=A/B` with `A=2.0`, `B=11.0` producing `0.181818187236785888671875`,
-  `X=A/B` with `A=1.0`, `B=13.0` producing `0.076923079788684844970703125`,
-  `X=A/B` with `A=2.0`, `B=13.0` producing `0.15384615957736968994140625`,
-  `X=A/B` with `A=2.0`, `B=3.0` producing `0.666666686534881591796875`,
-  `X=A/B` with `A=1.0`, `B=7.0` producing `0.14285714924335479736328125`,
-  `X=A/B` with `A=1.0`, `B=10.0` producing `0.100000001490116119384765625`,
-  `X=A+B` with `A=(1.0/10.0)`, `B=(1.0/5.0)` producing
-  `0.300000011920928955078125`,
-  `X=A+B` with `X=(1.0/10.0)+(1.0/5.0)` and `B=(1.0/5.0)` producing `0.5`,
-  `X=A-B` with `A=(1.0/2.0)`, `B=(1.0/10.0)` producing
-  `0.4000000059604644775390625`,
-  `X=X-C` after `X=(1.0/10.0)+(1.0/10.0)` and `C=(1.0/5.0)` producing `0`,
-  `X=(A+B+A)*10` after `A=(1.0/10.0)` and `B=(1.0/10.0)` producing `3`,
-  `X=A+B` with `A=(2.0/13.0)` and `B=(1.0/13.0)` producing
-  `0.2307692468166351318359375`,
-  `X=A+B` with `A=(2.0/17.0)` and `B=(1.0/17.0)` producing
-  `0.17647059261798858642578125`,
-  `X=A+B` with `A=(2.0/19.0)` and `B=(1.0/19.0)` producing
-  `0.15789473056793212890625`,
-  `X=A+B` with `A=(2.0/23.0)` and `B=(1.0/23.0)` producing
-  `0.1304347813129425048828125`,
-  `X=A*B` with `A=(1.0/7.0)`, `B=7.0` producing `1`,
-  `X=A*B` with `A=(1.0/9.0)`, `B=9.0` producing `1`,
-  `X=A*B` with `A=(1.0/11.0)`, `B=11.0` producing `1`,
-  `X=A*B` with `A=(1.0/13.0)`, `B=13.0` producing `1`,
-  `X=A*B` with `A=(1.0/17.0)`, `B=17.0` producing `1`,
-  `X=A*B` with `A=(1.0/19.0)`, `B=19.0` producing `1`,
-  `X=A*B` with `A=(1.0/23.0)`, `B=23.0` producing `1`,
-  `X=A*B` with `A=(1.0/5.0)`, `B=(1.0/5.0)` producing
-  `0.0400000028312206268310546875`,
-  `X=A/B` with `A=(1.0/10.0)`, `B=(1.0/5.0)` producing `0.5`,
-  `X=A/B` with `A=(1.0/17.0)`, `B=(2.0/17.0)` producing `0.5`,
-  `X=A/B` with `A=(1.0/19.0)`, `B=(2.0/19.0)` producing `0.5`,
-  `X=A/B` with `A=(1.0/23.0)`, `B=(2.0/23.0)` producing `0.5`,
-  `X=A/B` with `A=(6.0/5.0)`, `B=(3.0/10.0)` producing `4`, and
-  `X=A*B` with `A=(1.0/3.0)`, `B=3.0` producing `1`,
-  `X=A*B` with `A=(1.0/10.0)`, `B=10.0` producing `1`,
-  `X=A/B` with `A=1.0`, `B=17.0` producing `0.0588235296308994293212890625`,
-  `X=A/B` with `A=2.0`, `B=17.0` producing
-  `0.117647059261798858642578125`,
-  `X=A/B` with `A=1.0`, `B=19.0` producing `0.052631579339504241943359375`,
-  `X=A/B` with `A=2.0`, `B=19.0` producing
-  `0.10526315867900848388671875`,
-  `X=A/B` with `A=1.0`, `B=23.0` producing `0.0434782616794109344482421875`,
-  and `X=A/B` with `A=2.0`, `B=23.0` producing
-  `0.086956523358821868896484375`.
+- `rt_i_to_f.obj` converts an unsigned 16-bit integer in `A` low and `X` high
+  to a little-endian IEEE-754 binary32 value through the destination pointer in
+  zero page `$02/$03`.
+- `rt_s_to_f.obj` converts a signed 16-bit integer in `A` low and `X` high to a
+  little-endian IEEE-754 binary32 value through the destination pointer in zero
+  page `$02/$03`.
+- `rt_f_to_i.obj` converts a little-endian IEEE-754 binary32 value read through
+  the source pointer in zero page `$02/$03` back to a signed 16-bit integer in
+  `A` low and `X` high, truncating toward zero. Unsupported and out-of-range
+  inputs return zero.
+- `rt_f_add.obj` adds two non-negative REAL32 values with sums below `128.0`.
+  It reads source pointers from zero page `$02/$03` and `$04/$05`, writes
+  through the destination pointer in `$06/$07`, accumulates in Q8.8 precision,
+  and imports `rt_s_to_f` so ALINK must resolve its transitive runtime helper
+  dependency.
+- `rt_f_sub.obj` subtracts two non-negative REAL32 values where the result is
+  greater than or equal to zero and below `128.0`. It reads source pointers from
+  zero page `$02/$03` and `$04/$05`, writes through the destination pointer in
+  `$06/$07`, accumulates in Q8.8 precision, returns zero on underflow, and
+  imports `rt_s_to_f` so ALINK must resolve its transitive runtime helper
+  dependency.
+- `rt_f_mul.obj` multiplies two non-negative REAL32 values where the Q8.8
+  product is below `128.0`. It reads source pointers from zero page `$02/$03`
+  and `$04/$05`, writes through the destination pointer in `$06/$07`, returns
+  zero on overflow, and imports `rt_s_to_f` so ALINK must resolve its
+  transitive runtime helper dependency.
+- `rt_f_div.obj` divides two non-negative REAL32 values where the Q8.8 quotient
+  is below `128.0`. It reads source pointers from zero page `$02/$03` and
+  `$04/$05`, writes through the destination pointer in `$06/$07`, returns zero
+  on divide-by-zero or wider results, and imports `rt_s_to_f` so ALINK must
+  resolve its transitive runtime helper dependency.
+- `rt_f_cmp.obj` compares two non-negative REAL32 values below `128.0`. It
+  reads source pointers from zero page `$02/$03` and `$04/$05`, converts both
+  operands through Q8.8 fixed-point precision, and returns signed byte
+  comparison in `A`/`X` (`-1`, `0`, or `1`).
+- `rt_f_abs.obj` copies a REAL32 value read through zero page `$02/$03` to the
+  destination pointer in `$06/$07`, clearing the sign bit in the copied value.
+- `rt_f_sqrt.obj` reads a REAL32 value through zero page `$02/$03`, writes the
+  result through `$06/$07`, and currently returns floor square roots for
+  non-negative unsigned 16-bit REAL integer inputs. Unsupported inputs write zero.
+- `rt_print_f.obj` prints non-negative REAL32 values below `128.0` read through
+  zero page `$02/$03` as decimal text through the C64 `CHROUT` vector. It
+  converts through Q8.8 fixed-point precision and emits up to two fractional
+  decimal digits with trailing zeroes trimmed.
+- ALINK's current direct-PRG REAL proof cases lower the reachable ACTC body
+  operations into target-side calls to the referenced REAL helper OBJ modules,
+  including transitive helper imports such as `rt_s_to_f`.
 - `rt_gfx_bgcolor.obj` sets the VIC-II background color register `$D021`. It
   expects the color in `A`, masks it to the low nybble, stores it, and returns
   with `RTS`.
 - `rt_gfx_bordercolor.obj` sets the VIC-II border color register `$D020`. It
   expects the color in `A`, masks it to the low nybble, stores it, and returns
   with `RTS`.
+- `rt_gfx_vic_bank.obj` selects the VIC-II 16 KB memory bank through CIA2
+  register `$DD00`. It expects logical bank `0..3` in `A`, programs `$DD02`
+  bits 0-1 as outputs, writes the C64's inverted bank bits to `$DD00` while
+  preserving the upper six bits, and returns with `RTS`.
+- `rt_gfx_screen_base.obj` sets the VIC-II screen-memory base bits in `$D018`.
+  It expects a CARD address in `X`/`Y`, derives the 1 KB screen base from bits
+  `$3C00`, preserves the low `$D018` bits, and returns with `RTS`.
+- `rt_gfx_bitmap_base.obj` sets the VIC-II bitmap-memory base bit in `$D018`.
+  It expects a CARD address in `X`/`Y`, uses address bit `$2000`, preserves the
+  other `$D018` bits, and returns with `RTS`.
+- `rt_gfx_screen_cell.obj` writes one character byte to the default C64 screen
+  at `$0400 + y*40 + x`. It expects `x` in `A`, `y` in `X`, and the character
+  byte in `Y`, then returns with `RTS`.
+- `rt_gfx_color_cell.obj` writes one color nybble to C64 color RAM at
+  `$D800 + y*40 + x`. It expects `x` in `A`, `y` in `X`, and color in `Y`,
+  masks the color to the low nybble, and returns with `RTS`.
+- `rt_gfx_screen_copy.obj` copies 1000 bytes from a source CARD address to the
+  default C64 screen at `$0400-$07E7`. It expects the source address in `X`/`Y`
+  and returns with `RTS`.
+- `rt_gfx_color_copy.obj` copies 1000 low nybbles from a source CARD address to
+  C64 color RAM at `$D800-$DBE7`. It expects the source address in `X`/`Y`,
+  masks each source byte to `$0F`, and returns with `RTS`.
+- `rt_gfx_bitmap_fill.obj` fills the default C64 bitmap memory range
+  `$2000-$3F3F` with one byte. It expects the fill byte in `A` and returns with
+  `RTS`.
+- `rt_gfx_bitmap_copy.obj` copies 8000 bytes from a source CARD address to the
+  default C64 bitmap memory range `$2000-$3F3F`. It expects the source address
+  in `X`/`Y` and returns with `RTS`.
+- `rt_gfx_bitmap_on.obj` enables standard VIC-II bitmap mode by setting bit 5 of
+  `$D011`, preserving the other control bits, and returning with `RTS`.
+- `rt_gfx_bitmap_off.obj` disables VIC-II bitmap mode by clearing bit 5 of
+  `$D011`, preserving the other control bits, and returning with `RTS`.
+- `rt_gfx_mbitmap_on.obj` enables VIC-II multicolor bitmap mode by setting bit 5
+  of `$D011` and bit 4 of `$D016`, preserving the other control bits, and
+  returning with `RTS`.
+- `rt_gfx_mbitmap_off.obj` disables VIC-II multicolor bitmap mode by clearing
+  bit 5 of `$D011` and bit 4 of `$D016`, preserving the other control bits, and
+  returning with `RTS`.
 - `rt_sid_freq.obj` sets a SID voice frequency word. It expects the voice index
   in `A`, frequency low byte in `X`, and frequency high byte in `Y`; it stores
   to `$D400+7*voice` and `$D401+7*voice`, then returns with `RTS`.
@@ -225,12 +154,6 @@ Current status:
   then returns with `RTS`.
 - `rt_sid_env3.obj` returns SID envelope 3 readback register `$D41C` in `A`,
   then returns with `RTS`.
-- `rt_sound.obj` is the Atari-style `Sound(voice,pitch,distortion,volume)`
-  compatibility wrapper. It expects voice in `A`, pitch in `X`, distortion in
-  `Y`, and volume in zero-page `$02`; lower pitch values produce higher SID
-  frequencies, distortion selects a coarse triangle/saw/pulse/noise waveform,
-  the selected voice is gated on, and volume preserves the filter mode nybble
-  through `rt_sid_volume_state`.
 - `rt_sprite_on.obj` is the first target-side SID/sprite helper implemented as
   machine code. It expects a sprite index in `A`, sets the matching enable bit
   in VIC-II register `$D015`, and returns with `RTS`; the ALINK direct-PRG
@@ -265,3 +188,67 @@ Current status:
 - `rt_sprite_set_mc.obj` sets the shared multicolor sprite registers. It
   expects multicolor 0 in `A` and multicolor 1 in `X`, stores to `$D025` and
   `$D026`, and returns with `RTS`.
+- `rt_joy.obj` reads a C64 joystick port selected by `A` (`1` for CIA1
+  port B at `$DC01`, any other value for CIA1 port A at `$DC00`) and returns an
+  active-high bitfield in `A`: bit 0 up, bit 1 down, bit 2 left, bit 3 right,
+  bit 4 button 1/fire, and bit 5 button 2 using the project POT-line threshold
+  convention.
+- `rt_js.obj` exports two bytes of linked joystick presence state, one byte per
+  control port.
+- `rt_jp.obj` imports `rt_joy` and `rt_js`, latches a port's state to `1` after
+  observed joystick activity, and returns the latched byte. This is
+  observed/inferred presence; a passive idle C64 joystick cannot be electrically
+  distinguished from no joystick by this helper.
+- `rt_jb1.obj` and `rt_jb2.obj` import `rt_joy` and return `1` when joystick
+  button 1 or button 2 is active on the selected port, otherwise `0`.
+- `rt_ms.obj` exports seven bytes of linked helper state:
+  initialized, last raw POT X, last raw POT Y, accumulated X, accumulated Y,
+  buttons, and inferred presence.
+- `rt_mp.obj` samples the selected control port, updates
+  `rt_ms`, and returns inferred presence in `A`. It treats normal fire
+  as mouse button 1 and a selected POT line below `$80` as mouse button 2. The
+  first poll initializes the raw POT baseline before movement deltas are
+  accumulated.
+- `rt_mseen.obj` returns the last inferred mouse presence byte from `rt_ms`.
+- `rt_mx.obj` returns the current 8-bit accumulated mouse X position from
+  `rt_ms`.
+- `rt_my.obj` returns the current 8-bit accumulated mouse Y position from
+  `rt_ms`.
+- `rt_mb.obj` returns the current mouse button bitfield from `rt_ms`: bit 0
+  button 1, bit 1 button 2.
+- `rt_mb1.obj` and `rt_mb2.obj` import `rt_mb` and return `1` when mouse
+  button 1 or button 2 is active, otherwise `0`.
+- `rt_dbf_state.obj` exports nine bytes of linked DBF state: active handle,
+  total-record low/high bytes, current-record low/high bytes, DBF header-size
+  low/high bytes, and DBF record-size low/high bytes.
+- `rt_dbf_open.obj` expects a CARD filename pointer in `X`/`Y`, stages the file
+  into the DBF REU slot, reads the DBF header, and returns handle `1` in `A`
+  when the header can be parsed. It returns zero on missing file, missing REU,
+  too-short input, or staging failure.
+- `rt_dbf_close.obj` expects a DBF handle in `A` and clears the active handle
+  when it matches the current DBF state.
+- `rt_dbf_go.obj` expects a DBF handle in `A` and a one-based target record
+  number in `Y`. It updates the current-record state and returns `1` in `A`
+  when the handle is active and the target is in range; otherwise it returns
+  zero and leaves the current-record state unchanged.
+- `rt_dbf_fieldcount.obj` expects a DBF handle in `A` and returns the DBF field
+  count derived from the staged header size, or zero when the handle is inactive
+  or the staged header size is invalid.
+- `rt_dbf_fieldlen.obj` expects a DBF handle in `A` and a one-based field index
+  in `Y`. It returns the field length byte from the staged DBF field descriptor,
+  or zero when the handle, field index, or staged header bounds are invalid.
+- `rt_dbf_readbyte.obj` expects a DBF handle in `A` and a current-record byte
+  offset in `Y`. It returns the raw byte from the staged DBF record, including
+  offset zero for the delete flag, or zero when the handle is inactive, the
+  current record is invalid, the offset is out of range, or the REU read fails.
+- `rt_dbf_deleted.obj` imports `rt_dbf_readbyte`, reads current-record offset
+  zero, and returns `1` when the DBF delete flag is `*`, otherwise `0`.
+- `rt_dbf_headerlen.obj` expects a DBF handle in `A` and returns the staged
+  DBF header-size low byte in `A`, or zero when the handle is inactive.
+- `rt_dbf_recordlen.obj` expects a DBF handle in `A` and returns the staged
+  DBF record-size low byte in `A`, or zero when the handle is inactive.
+- `rt_dbf_totalrecs.obj` expects a DBF handle in `A` and returns the current
+  DBF header record-count low byte in `A`, or zero when the handle is inactive.
+- `rt_dbf_currrecno.obj` expects a DBF handle in `A` and returns the current
+  record number low byte in `A`, or zero when the handle is inactive. Open sets
+  this to `1` when the header record count is nonzero.

@@ -1,5 +1,8 @@
 OBJ1
-x rt_dbf_close 0 4
-b ZBr
-k 0
+x rt_dbf_close 0 15
+b u0M
+u rt_dbf_state
+m F0 0C A2 00 DD 00 00 D0 05 A9 00 9D 00 00 60
+r 5 u0
+r 12 u0
 n rt_dbf_close

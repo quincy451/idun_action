@@ -89,18 +89,15 @@ def locate_x64sc() -> Path:
     return prefer_known_good_linux_vice(Path(candidate).resolve())
 
 
-def default_cpm_images_dir() -> Path:
-    return Path(__file__).resolve().parents[2] / "cpm65-u64" / "images"
+def default_udos_resident_disk() -> Path:
+    return Path(__file__).resolve().parents[2] / "udos" / "build" / "udos-resident.d64"
 
 
-def find_c64_disk_image(images_dir: Path | None = None) -> Path:
-    search_dir = images_dir or default_cpm_images_dir()
-    if not search_dir.is_dir():
-        raise ViceUnavailable(f"CP/M-65 images directory not found: {search_dir}")
-    candidates = sorted(search_dir.glob("c64*.d64"))
-    if not candidates:
-        raise ViceUnavailable(f"no C64 CP/M disk image found under {search_dir}")
-    return candidates[0].resolve()
+def find_udos_resident_disk() -> Path:
+    disk_image = default_udos_resident_disk()
+    if not disk_image.is_file():
+        raise ViceUnavailable(f"UDOS resident disk not found: {disk_image}; run make -C ../udos resident")
+    return disk_image.resolve()
 
 
 def reserve_tcp_port() -> int:
@@ -285,7 +282,7 @@ class ViceHarness:
         timeout: float = 8.0,
     ):
         self.x64sc_path = x64sc_path or locate_x64sc()
-        self.disk_image = disk_image or find_c64_disk_image()
+        self.disk_image = disk_image or find_udos_resident_disk()
         self.port = port or reserve_tcp_port()
         self.timeout = timeout
         self.process: subprocess.Popen[str] | None = None
@@ -336,15 +333,22 @@ class ViceHarness:
 
     def stop(self) -> None:
         self.monitor.close()
-        if self.process is None:
+        process = self.process
+        if process is None:
             return
         try:
-            if self.process.poll() is None:
-                self.process.terminate()
-                self.process.wait(timeout=5)
+            if process.poll() is None:
+                process.terminate()
+                try:
+                    process.communicate(timeout=5)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.communicate(timeout=5)
+            else:
+                process.communicate(timeout=1)
         except subprocess.TimeoutExpired:
-            self.process.kill()
-            self.process.wait(timeout=5)
+            process.kill()
+            process.communicate(timeout=5)
         finally:
             self.process = None
 
@@ -374,15 +378,15 @@ class ViceHarness:
             time.sleep(poll_interval)
         raise ViceUnavailable(f"timed out waiting for screen text {fragment!r}; last screen was:\n{last_screen}")
 
-    def boot_to_cpm_prompt(self, *, timeout: float = 120.0, boot_keys: str = 'LOAD"CPM",8\rRUN\r') -> str:
-        self.feed_keys(boot_keys)
-        return self.wait_for_screen_contains("A>", timeout=timeout)
+    def boot_to_udos_prompt(self, *, timeout: float = 120.0) -> str:
+        return self.wait_for_screen_contains("A:D64/>", timeout=timeout)
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Boot the C64 CP/M-65 image in VICE and wait for a prompt")
-    parser.add_argument("--disk-image", help="explicit C64 CP/M disk image path")
-    parser.add_argument("--timeout", type=float, default=120.0, help="seconds to wait for the CP/M prompt")
+    parser = argparse.ArgumentParser(description="Boot a UDOS disk image in VICE and wait for screen text")
+    parser.add_argument("--disk-image", help="explicit UDOS disk image path")
+    parser.add_argument("--expected", default="A:D64/>", help="screen text to wait for")
+    parser.add_argument("--timeout", type=float, default=120.0, help="seconds to wait for expected screen text")
     return parser
 
 
@@ -398,7 +402,7 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         with harness as vice:
-            screen = vice.boot_to_cpm_prompt(timeout=args.timeout)
+            screen = vice.wait_for_screen_contains(args.expected, timeout=args.timeout)
     except ViceUnavailable as exc:
         print(exc, file=sys.stderr)
         return 1

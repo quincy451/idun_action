@@ -10,7 +10,7 @@ python3 -m pytest -q
 python3 ./tools/build_release_image.py
 
 if command -v x64sc >/dev/null 2>&1; then
-  python3 ./tools/verify_release.py --no-build
+  (cd "$ROOT_DIR/../udos" && make vice-release)
 else
   echo "Skipping VICE verification: x64sc not found on PATH"
 fi

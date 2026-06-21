@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -18,7 +19,8 @@ def markdown_to_text(markdown: str) -> str:
             while line.startswith("#"):
                 line = line[1:]
             line = line.lstrip()
-            line = line.replace("[", "").replace("](", " ").replace(")", "")
+            line = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r"\1 \2", line)
+            line = line.replace("`", "")
         lines.append(line)
     text = "\n".join(lines).strip() + "\n"
     return text
@@ -62,9 +64,22 @@ def export_docs(root: Path, docs_dir: Path) -> None:
             "# ActionC64U Source Notes\n\n"
             "Action source files use the .ACT extension. Project manifests use "
             "ACTION.PROJ and list the main source file. Linkable runtime modules "
-            "are selected by ALINK from the symbols required by the compiled objects.\n"
+            "are selected by ALINK from the symbols required by the compiled objects.\n\n"
+            "DOC/INPUT1.TXT describes the current C64 joystick and mouse helper "
+            "API. DOC/DBF1.TXT describes the current DBF helper API. "
+            "LIB/DBF1.ACT, LIB/GFX1.ACT, LIB/INPUT1.ACT, "
+            "LIB/MATH1.ACT, and LIB/SIDSPR1.ACT provide the matching Action "
+            "declarations for DBF, graphics, input, REAL math, SID, and sprite helpers. ACTC "
+            "recognizes those helper names directly and ALINK links only the "
+            "referenced RT_*.OBJ modules.\n"
         ),
     }
+    input1_doc = root / "docs" / "input1.md"
+    if input1_doc.is_file():
+        docs["INPUT1.TXT"] = input1_doc.read_text(encoding="utf-8")
+    dbf1_doc = root / "docs" / "dbf1.md"
+    if dbf1_doc.is_file():
+        docs["DBF1.TXT"] = dbf1_doc.read_text(encoding="utf-8")
     for name, text in docs.items():
         if name == "README.TXT":
             out = text.strip() + "\n"
@@ -78,7 +93,18 @@ def export_examples(root: Path, src_dir: Path) -> None:
         shutil.copy2(source, src_dir / source.name.upper())
 
 
+def export_library_sources(root: Path, lib_dir: Path) -> None:
+    source_root = root / "lib"
+    if not source_root.is_dir():
+        return
+    for source in sorted(source_root.glob("*.act")):
+        shutil.copy2(source, lib_dir / source.name.upper())
+
+
 def export_udos_tools(root: Path, image_root: Path, bin_dir: Path) -> None:
+    aliases = {
+        "ACT2SAVE.PRG": ["ACTSAVE.PRG"],
+    }
     tool_specs = [
         ("build_actadd_udos.sh", "ACTADD.PRG"),
         ("build_act2save_udos.sh", "ACT2SAVE.PRG"),
@@ -90,6 +116,7 @@ def export_udos_tools(root: Path, image_root: Path, bin_dir: Path) -> None:
         ("build_actc_overlay_runtime_imports.sh", "ACTC_OVL4.BIN"),
         ("build_actc_overlay_emit_object.sh", "ACTC_OVL5.BIN"),
         ("build_actc_overlay_body_collect.sh", "ACTC_OVL6.BIN"),
+        ("build_actc_overlay_body_preallocate.sh", "ACTC_OVL7.BIN"),
         ("build_alink_udos.sh", "ALINK.PRG"),
         ("build_actchk_udos.sh", "ACTCHK.PRG"),
         ("build_actdir_udos.sh", "ACTDIR.PRG"),
@@ -118,6 +145,8 @@ def export_udos_tools(root: Path, image_root: Path, bin_dir: Path) -> None:
         )
         built = Path(result.stdout.strip().splitlines()[-1])
         shutil.copy2(built, image_root / out_name)
+        for alias in aliases.get(out_name, []):
+            shutil.copy2(built, image_root / alias)
         if out_name == "ACTWRITE.PRG":
             shutil.copy2(built, image_root / "W.PRG")
 
@@ -172,7 +201,7 @@ def export_udos_tools(root: Path, image_root: Path, bin_dir: Path) -> None:
 
 
 def export_libs(root: Path, lib_dir: Path) -> None:
-    libmods = root / "src" / "tools_cpm" / "libmods"
+    libmods = root / "src" / "runtime" / "libmods"
     runtime_modules = root / "src" / "runtime" / "modules"
     udos_runtime_modules = root / "src" / "runtime" / "udos_modules"
     (lib_dir / "LIBMODS.DAT").write_text(build_manifest_bundle(libmods), encoding="ascii")
@@ -218,6 +247,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.build_udos_tools:
         export_udos_tools(root, image_root, bin_dir)
     export_libs(root, lib_dir)
+    export_library_sources(root, lib_dir)
 
     (image_root / "README.TXT").write_text(
         (
@@ -226,7 +256,7 @@ def main(argv: list[str] | None = None) -> int:
             "DOC contains operator and language guides.\n"
             "SRC contains sample Action source files.\n"
             "BIN contains generated native build outputs.\n"
-            "LIB contains the packed bootstrap runtime manifests.\n"
+            "LIB contains packed runtime manifests and linkable modules.\n"
         ),
         encoding="ascii",
     )

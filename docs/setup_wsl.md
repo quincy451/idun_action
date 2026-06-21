@@ -42,7 +42,6 @@ Useful now or in later prompts:
 
 - `cmake`
 - `poppler-utils` for `pdftotext`
-- `cpmtools`
 - `cc1541`
 - `vice`
 - `expect`, `socat`, or `nc`
@@ -63,19 +62,12 @@ If you intentionally want the script to run `apt-get`, invoke it yourself under
 sudo ./tools/setup_wsl.sh --run
 ```
 
-The script does not install `llvm-mos` automatically. The adjacent
-`../cpm65-u64/Makefile` defaults `LLVM` to `/opt/pkg/llvm-mos/bin`, and the
-project README documents building with:
+The script does not install specialized third-party toolchains automatically.
+If a later task needs one, install it separately and add it to `PATH`.
 
-```bash
-make LLVM=/path/to/llvm-mos/bin/
-```
-
-For CP/M-65 itself, the local README also calls out these Debian/Ubuntu
-packages as useful build dependencies:
+Additional optional packages sometimes useful for adjacent support tooling:
 
 - `cc1541`
-- `cpmtools`
 - `libfmt-dev`
 - `fp-compiler`
 - `moreutils`

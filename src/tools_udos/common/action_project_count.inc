@@ -8,8 +8,7 @@ count_manifest_entries:
     jsr skip_current_line
     jsr skip_line_breaks
 count_manifest_entries_loop:
-    ldy #$00
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_ptr
     beq count_manifest_entries_done
     inc module_count
     jsr skip_current_line

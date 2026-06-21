@@ -68,7 +68,8 @@ or a separate interpreter-style launcher to make the program meaningful.
 Runtime Helper Policy
 
 Optional feature families such as REAL math, printing, graphics, SID/sprite,
-DBF, TCP, and 80-column support should be link-selected helper modules.
+joystick/mouse input, DBF, TCP, and 80-column support should be link-selected
+helper modules.
 
 The rule is simple: if a program uses a feature, ALINK selects and places the
 needed helper code into the linked PRG. If a program does not use a feature, that

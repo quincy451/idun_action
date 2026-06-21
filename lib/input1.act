@@ -1,0 +1,31 @@
+; INPUT1 C64 joystick/mouse binding reference.
+; ACTC recognizes these builtin helper names directly. ALINK includes only the
+; referenced RT_*.OBJ modules in the final PRG.
+;
+; Presence caveat:
+; - a passive C64 joystick cannot be reliably detected while idle
+; - mouse presence is inferred from observed movement or button activity
+
+MODULE INPUT1
+
+BYTE CONST JOY_UP=$01
+BYTE CONST JOY_DOWN=$02
+BYTE CONST JOY_LEFT=$04
+BYTE CONST JOY_RIGHT=$08
+BYTE CONST JOY_BUTTON1=$10
+BYTE CONST JOY_BUTTON2=$20
+
+BYTE CONST MOUSE_BUTTON1=$01
+BYTE CONST MOUSE_BUTTON2=$02
+
+BYTE FUNC Joy(BYTE port)
+BYTE FUNC JoySeen(BYTE port)
+BYTE FUNC JoyBtn1(BYTE port)
+BYTE FUNC JoyBtn2(BYTE port)
+BYTE FUNC MousePoll(BYTE port)
+BYTE FUNC MouseSeen()
+BYTE FUNC MouseX()
+BYTE FUNC MouseY()
+BYTE FUNC MouseBtn()
+BYTE FUNC MouseBtn1()
+BYTE FUNC MouseBtn2()

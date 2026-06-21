@@ -1,12 +1,12 @@
 # REU Backend ABI
 
 ActionC64U keeps the REU-facing API stable across simulated and hardware
-backends so the compiler and VM can switch implementations without changing
-source-level semantics.
+backends so the compiler and UDOS-native tools can switch implementations
+without changing source-level semantics.
 
 ## Build Selection
 
-The CP/M build scripts select the backend with:
+Maintained UDOS-native build scripts select the backend with:
 
 ```text
 ACTIONC64U_REU_BACKEND=sim
@@ -15,11 +15,11 @@ ACTIONC64U_REU_BACKEND=hw
 
 Current defaults:
 
-- `sim` for local `cpmemu` builds
-- `hw` for VICE / real C64 validation builds
+- `sim` for host-side harness tests that need deterministic sparse REU behavior
+- `hw` for UDOS-native VICE / real C64 validation builds
 
 The build scripts currently default to `-Oz` when `ACTIONC64U_REU_BACKEND=hw`
-so the on-target tools keep fitting inside the CP/M transient program area.
+so the on-target tools keep fitting below the UDOS resident/tool memory floor.
 
 ## Stable C API
 
@@ -44,7 +44,8 @@ Declared in `src/runtime/reu_backend.h`:
 - only touched offsets consume local memory
 - bounds checks are enforced on every access
 
-This is the backend used by prompt-16 on-target tests under `cpmemu`.
+This is the backend used by host-side tool ABI tests when hardware REU behavior
+is not required.
 
 ## Hardware Backend
 
@@ -62,5 +63,5 @@ Current implementation limits:
 - `reu_copy()` is currently implemented as repeated `peek8` / `poke8`
   operations to keep code size under control
 
-This backend is now linkable into `actc.com`, `vm.com`, and `actmon.com`, and
-the repo test suite exercises those build paths.
+This backend is now maintained through the UDOS-native toolchain builds, and the
+repo test suite exercises those build paths.

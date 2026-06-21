@@ -71,7 +71,11 @@ load_source_file_scrub_stack_done:
     lda #$24
     sta ALINK_SOURCE_LOAD_PHASE_SNAPSHOT
 .endif
+.ifdef ALINK_PRESERVE_ZP_SERVICES
+    jsr alink_svc_file_load_sc0
+.else
     jsr svc_file_load_sc0
+.endif
 .ifdef ALINK_SOURCE_LOAD_PHASE_SNAPSHOT
     lda #$25
     sta ALINK_SOURCE_LOAD_PHASE_SNAPSHOT
@@ -199,6 +203,20 @@ load_source_file_reu_cache:
 .endif
     lda #$00
     sta source_window_valid
+.ifdef ALINK_PRESERVE_ZP_SERVICES
+    sta alink_source_direct_cached
+    jsr alink_try_load_source_direct_window
+    bcs :+
+    clc
+    rts
+:
+    lda file_params+6
+    cmp #tool_file_status_too_large
+    beq :+
+    sec
+    rts
+:
+.endif
     lda #ACTC_SOURCE_REU_BASE_LO
     sta file_params+2
     lda #ACTC_SOURCE_REU_BASE_HI
@@ -217,7 +235,11 @@ load_source_file_reu_cache:
     sta debug_phase_zp
 .endif
     ldx #file_params
+.ifdef ALINK_PRESERVE_ZP_SERVICES
+    jsr alink_svc_file_stage_reu_sc0
+.else
     jsr svc_file_stage_reu_sc0
+.endif
 .ifdef ALINK_SOURCE_LOAD_PHASE_SNAPSHOT
     lda #$C2
     sta debug_phase_zp
@@ -284,6 +306,56 @@ load_source_file_reu_read_ok:
 .endif
     clc
     rts
+
+.ifdef ALINK_PRESERVE_ZP_SERVICES
+alink_try_load_source_direct_window:
+    lda #<source_buffer
+    sta file_params+2
+    lda #>source_buffer
+    sta file_params+3
+    lda #<SOURCE_READ_LIMIT
+    sta file_params+4
+    lda #>SOURCE_READ_LIMIT
+    sta file_params+5
+    lda #$00
+    sta file_params+6
+    sta file_params+7
+    sta file_params+8
+    ldx #file_params
+    jsr alink_svc_file_load_sc0
+    lda file_params+6
+    cmp #tool_file_status_ok
+    beq alink_try_load_source_direct_ok
+    sec
+    rts
+
+alink_try_load_source_direct_ok:
+    lda file_params+7
+    sta source_total_len
+    sta source_window_len
+    sta source_window_read_len
+    sta source_window_next_offset
+    lda file_params+8
+    sta source_total_len+1
+    sta source_window_len+1
+    sta source_window_read_len+1
+    sta source_window_next_offset+1
+    lda #$00
+    sta source_total_len+2
+    sta source_window_next_offset+2
+    jsr source_reader_zero_terminate_window
+    lda #$01
+    sta source_window_valid
+    sta alink_source_direct_cached
+    lda #<source_buffer
+    sta scan_ptr
+    lda #>source_buffer
+    sta scan_ptr+1
+    lda #tool_file_status_ok
+    sta file_params+6
+    clc
+    rts
+.endif
 
 source_reader_load_next_window:
     sec
@@ -375,7 +447,11 @@ source_reader_load_window:
     lda #$00
     sta file_params+7
     ldx #file_params
+.ifdef ALINK_PRESERVE_ZP_SERVICES
+    jsr alink_svc_reu_read_sc0
+.else
     jsr svc_reu_read_sc0
+.endif
     lda file_params+7
     cmp #tool_file_status_ok
     beq source_reader_load_window_ok
@@ -448,6 +524,13 @@ source_reader_refill_if_at_window_end:
     lda scan_ptr+1
     cmp source_window_end_ptr+1
     bne source_reader_refill_not_needed
+.ifdef ALINK_PRESERVE_ZP_SERVICES
+    lda alink_source_direct_cached
+    beq :+
+    clc
+    rts
+:
+.endif
     jmp source_reader_load_next_window
 source_reader_refill_not_needed:
     clc

@@ -42,7 +42,6 @@ APT_PACKAGES=(
   clang
   cmake
   poppler-utils
-  cpmtools
   default-jre-headless
   vice
   expect
@@ -58,7 +57,7 @@ APT_PACKAGES=(
 )
 
 print_plan() {
-  echo "Suggested WSL2 packages for ActionC64U and local CP/M-65 work:"
+  echo "Suggested WSL2 packages for the maintained UDOS-native ActionC64U workflow:"
   echo
   echo "  apt-get update"
   printf '  apt-get install -y'
@@ -68,7 +67,6 @@ print_plan() {
   done
   printf '\n'
   echo
-  echo "Install llvm-mos separately; cpm65-u64 expects its bin directory as LLVM=<path>/ (default in its Makefile is /opt/pkg/llvm-mos/bin)."
   echo "If your distro packages cc1541, install it too; otherwise build it separately and place it on PATH."
   echo "Optional full pytest install: python3 -m pip install --user pytest"
 }
@@ -88,4 +86,4 @@ fi
 print_plan
 apt-get update
 apt-get install -y "${APT_PACKAGES[@]}"
-echo "Skipping llvm-mos and pytest automatic installation; follow the printed guidance for those."
+echo "Skipping pytest and specialized third-party toolchain installation; follow the printed guidance for those."

@@ -31,7 +31,11 @@ probe_target_path:
     sta file_params+7
     sta file_params+8
     ldx #file_params
+.ifdef ALINK_PRESERVE_ZP_SERVICES
+    jmp alink_svc_file_load_sc0
+.else
     jmp svc_file_load_sc0
+.endif
 
 delete_target_path:
     lda #<target_path
@@ -41,4 +45,8 @@ delete_target_path:
     lda #tool_file_status_fail
     sta file_params+2
     ldx #file_params
+.ifdef ALINK_PRESERVE_ZP_SERVICES
+    jmp alink_svc_file_delete_sc0
+.else
     jmp svc_file_delete_sc0
+.endif

@@ -1,12 +1,12 @@
 ; SIDSPR1 binding draft
-; This is a design sketch for the first Action-facing helper-family binding.
-; It is not yet claimed as accepted compiler syntax or a shipped include file.
+; This is the design sketch behind the shipped LIB/SIDSPR1.ACT binding
+; reference. ACTC currently recognizes these builtin helper names directly.
 ;
 ; Intent:
 ; - thin Action-facing declarations
 ; - semantic sprite/SID operations
 ; - raw 6502 implementation lives in link-selected RT_SPRITE_*.OBJ and
-;   future RT_SID_*.OBJ modules
+;   RT_SID_*.OBJ modules
 ; - ALINK selects it only when used
 
 MODULE SIDSPR1
@@ -54,6 +54,5 @@ PROC SidMode(BYTE mode)
 PROC SidRoute(BYTE mask)
 PROC SidRst()
 
-; Optional compatibility sugar only if later needed.
-PROC Sound(BYTE voice,pitch,distortion,volume)
-PROC SndRst()
+; Atari-style sound compatibility sugar is intentionally out of scope.
+; This C64 helper family exposes SID-native controls instead.

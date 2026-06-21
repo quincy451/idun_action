@@ -27,6 +27,12 @@ ACTC_USE_EMIT_OVERLAY = 0
 .ifndef ACTC_USE_BODY_OVERLAY
 ACTC_USE_BODY_OVERLAY = 0
 .endif
+.ifndef ACTC_PREALLOCATE_BODY_EXTERNALS
+ACTC_PREALLOCATE_BODY_EXTERNALS = 0
+.endif
+.ifndef ACTC_PREALLOCATE_BODY_EXTERNALS_IN_OVERLAY
+ACTC_PREALLOCATE_BODY_EXTERNALS_IN_OVERLAY = 0
+.endif
 .ifndef ACTC_KEEP_SOURCE_HEADER_RESIDENT_FALLBACK
 .if ACTC_USE_SOURCE_HEADER_OVERLAY
     .if ACTC_REU_SOURCE_CACHE
@@ -140,6 +146,7 @@ ACTC_KEEP_BODY_RESIDENT_FALLBACK = 0
 ACTC_KEEP_BODY_RESIDENT_FALLBACK = 1
 .endif
 .endif
+ACTC_USE_RESIDENT_BODY_PREALLOCATE = ACTC_PREALLOCATE_BODY_EXTERNALS * ((ACTC_PREALLOCATE_BODY_EXTERNALS_IN_OVERLAY = 0) + (ACTC_USE_BODY_OVERLAY = 0) + ACTC_KEEP_BODY_RESIDENT_FALLBACK)
 .ifndef ACTC_TABLE_REU_BASE_LO
 ACTC_TABLE_REU_BASE_LO = $00
 .endif
@@ -273,7 +280,22 @@ SOURCE_LIMIT = 255
 SOURCE_LOOKAHEAD = 255
 .endif
 SOURCE_READ_LIMIT = SOURCE_LIMIT + SOURCE_LOOKAHEAD
-PROC_DEBUG_SCAN_CHUNK_SIZE = 64
+SYMBOL_TEXT_LIMIT = 24
+.if SOURCE_LOOKAHEAD < 255
+SOURCE_READER_SCAN_Y_CHECKS_WINDOW = 1
+.else
+.if (SOURCE_LIMIT & $ff) <> 0
+SOURCE_READER_SCAN_Y_CHECKS_WINDOW = 1
+.else
+SOURCE_READER_SCAN_Y_CHECKS_WINDOW = 0
+.endif
+.endif
+.if SOURCE_LOOKAHEAD < SYMBOL_TEXT_LIMIT
+SOURCE_READER_STREAM_SYMBOL_COPY = 1
+.else
+SOURCE_READER_STREAM_SYMBOL_COPY = 0
+.endif
+PROC_DEBUG_SCAN_CHUNK_SIZE = 24
 .ifndef BODY_OPS_STRIDE
 BODY_OPS_STRIDE = 48
 .endif
@@ -400,6 +422,45 @@ source_loaded:
     jsr collect_decls_or_fail
     lda #$18
     jsr set_actc_trace
+.if ACTC_PREALLOCATE_BODY_EXTERNALS
+.if ACTC_PREALLOCATE_BODY_EXTERNALS_IN_OVERLAY
+.if ACTC_USE_BODY_OVERLAY
+.if !ACTC_KEEP_BODY_RESIDENT_FALLBACK
+    jsr preallocate_body_externals_with_overlay
+    bcc :+
+    lda actc_overlay_context+ACTC_OVERLAY_CTX_DIAG_PTR_LO
+    ora actc_overlay_context+ACTC_OVERLAY_CTX_DIAG_PTR_HI
+    beq preallocate_body_externals_with_overlay_fail
+    lda actc_overlay_context+ACTC_OVERLAY_CTX_DIAG_PTR_LO
+    ldy actc_overlay_context+ACTC_OVERLAY_CTX_DIAG_PTR_HI
+    jmp fail_with_ptr
+preallocate_body_externals_with_overlay_fail:
+    lda #<msg_body_overlay
+    ldy #>msg_body_overlay
+    jmp fail_with_ptr
+:
+.else
+    jsr preallocate_body_externals
+.endif
+.else
+    jsr preallocate_body_externals
+.endif
+.else
+.if ACTC_USE_BODY_OVERLAY
+.if !ACTC_KEEP_BODY_RESIDENT_FALLBACK
+    jsr load_body_overlay_builtin_runtime_table
+    bcc :+
+    lda #<msg_body_overlay
+    ldy #>msg_body_overlay
+    jmp fail_with_ptr
+:
+.endif
+.endif
+    jsr preallocate_body_externals
+.endif
+    lda #$18
+    jsr set_actc_trace
+.endif
     jsr collect_proc_body_ops
     lda #$19
     jsr set_actc_trace
@@ -514,9 +575,26 @@ actc_overlay_run_noop:
     lda #ACTC_OVERLAY_PASS_NOOP
     jmp actc_overlay_run_pass
 
+load_body_overlay_builtin_runtime_table:
+    lda #ACTC_OVERLAY_PASS_BODY_COLLECT
+    sta actc_overlay_requested_pass
+    jsr actc_overlay_init_context
+    lda #ACTC_OVERLAY_BODY_MODE_TABLE_ONLY
+    sta actc_overlay_context+ACTC_OVERLAY_CTX_BODY_MODE
+    jmp actc_overlay_run_pass_with_context
+
+preallocate_body_externals_with_overlay:
+    lda #ACTC_OVERLAY_PASS_BODY_PREALLOCATE
+    sta actc_overlay_requested_pass
+    jsr actc_overlay_init_context
+    lda #ACTC_OVERLAY_BODY_MODE_PREALLOCATE_EXTERNALS
+    sta actc_overlay_context+ACTC_OVERLAY_CTX_BODY_MODE
+    jmp actc_overlay_run_pass_with_context
+
 actc_overlay_run_pass:
     sta actc_overlay_requested_pass
     jsr actc_overlay_init_context
+actc_overlay_run_pass_with_context:
     jsr actc_overlay_find_pass_descriptor
     bcc :+
     lda #ACTC_OVERLAY_STATUS_UNSUPPORTED_ABI
@@ -735,9 +813,9 @@ actc_overlay_init_context_loop:
     sta actc_overlay_context+ACTC_OVERLAY_CTX_FINISH_BODY_SCAN_FN_LO
     lda #>collect_proc_body_ops_overlay_finish
     sta actc_overlay_context+ACTC_OVERLAY_CTX_FINISH_BODY_SCAN_FN_HI
-    lda #<advance_scan_ptr
+    lda #<source_reader_consume_scan_ptr
     sta actc_overlay_context+ACTC_OVERLAY_CTX_ADVANCE_SCAN_PTR_FN_LO
-    lda #>advance_scan_ptr
+    lda #>source_reader_consume_scan_ptr
     sta actc_overlay_context+ACTC_OVERLAY_CTX_ADVANCE_SCAN_PTR_FN_HI
     lda #<skip_source_spaces
     sta actc_overlay_context+ACTC_OVERLAY_CTX_SKIP_SOURCE_SPACES_FN_LO
@@ -755,9 +833,9 @@ actc_overlay_init_context_loop:
     sta actc_overlay_context+ACTC_OVERLAY_CTX_MATCH_SCALAR_DECL_FN_LO
     lda #>match_scalar_decl_at_scan_ptr
     sta actc_overlay_context+ACTC_OVERLAY_CTX_MATCH_SCALAR_DECL_FN_HI
-    lda #<advance_scan_ptr_by_const_ptr
+    lda #<source_reader_consume_const_ptr_at_scan_ptr
     sta actc_overlay_context+ACTC_OVERLAY_CTX_ADVANCE_SCAN_PTR_BY_CONST_FN_LO
-    lda #>advance_scan_ptr_by_const_ptr
+    lda #>source_reader_consume_const_ptr_at_scan_ptr
     sta actc_overlay_context+ACTC_OVERLAY_CTX_ADVANCE_SCAN_PTR_BY_CONST_FN_HI
     lda #<copy_symbol_from_scan_ptr
     sta actc_overlay_context+ACTC_OVERLAY_CTX_COPY_SYMBOL_FROM_SCAN_PTR_FN_LO
@@ -771,10 +849,22 @@ actc_overlay_init_context_loop:
     sta actc_overlay_context+ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     lda #>skip_inline_spaces_at_scan_y
     sta actc_overlay_context+ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_HI
-    lda #<advance_scan_y
+    lda #<source_reader_consume_scan_y
     sta actc_overlay_context+ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    lda #>advance_scan_y
+    lda #>source_reader_consume_scan_y
     sta actc_overlay_context+ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_HI
+    lda #<source_reader_peek_scan_y
+    sta actc_overlay_context+ACTC_OVERLAY_CTX_PEEK_SCAN_Y_FN_LO
+    lda #>source_reader_peek_scan_y
+    sta actc_overlay_context+ACTC_OVERLAY_CTX_PEEK_SCAN_Y_FN_HI
+    lda #<find_builtin_constant_from_scan_y
+    sta actc_overlay_context+ACTC_OVERLAY_CTX_FIND_BUILTIN_CONSTANT_FN_LO
+    lda #>find_builtin_constant_from_scan_y
+    sta actc_overlay_context+ACTC_OVERLAY_CTX_FIND_BUILTIN_CONSTANT_FN_HI
+    lda #<symbol_buffer_matches_const_ptr
+    sta actc_overlay_context+ACTC_OVERLAY_CTX_SYMBOL_BUFFER_MATCHES_CONST_PTR_FN_LO
+    lda #>symbol_buffer_matches_const_ptr
+    sta actc_overlay_context+ACTC_OVERLAY_CTX_SYMBOL_BUFFER_MATCHES_CONST_PTR_FN_HI
     lda #<require_var_index_word_or_fail
     sta actc_overlay_context+ACTC_OVERLAY_CTX_REQUIRE_WORD_VAR_FN_LO
     lda #>require_var_index_word_or_fail
@@ -831,7 +921,7 @@ actc_overlay_init_context_loop:
     sta actc_overlay_context+ACTC_OVERLAY_CTX_RESTORE_SOURCE_MARK_FN_LO
     lda #>restore_source_reader_mark
     sta actc_overlay_context+ACTC_OVERLAY_CTX_RESTORE_SOURCE_MARK_FN_HI
-.if ACTC_KEEP_BODY_RESIDENT_FALLBACK
+.if ACTC_KEEP_BODY_RESIDENT_FALLBACK + ACTC_PREALLOCATE_BODY_EXTERNALS
     lda #<parse_positive_word_sum_at_scan_y
     sta actc_overlay_context+ACTC_OVERLAY_CTX_PARSE_POSITIVE_WORD_SUM_FN_LO
     lda #>parse_positive_word_sum_at_scan_y
@@ -865,6 +955,10 @@ actc_overlay_init_context_loop:
     sta actc_overlay_context+ACTC_OVERLAY_CTX_FIND_OR_STORE_RT_F_TO_I_FN_LO
     lda #>find_or_store_rt_f_to_i_external
     sta actc_overlay_context+ACTC_OVERLAY_CTX_FIND_OR_STORE_RT_F_TO_I_FN_HI
+    lda #<find_or_store_rt_f_cmp_external
+    sta actc_overlay_context+ACTC_OVERLAY_CTX_FIND_OR_STORE_RT_F_CMP_FN_LO
+    lda #>find_or_store_rt_f_cmp_external
+    sta actc_overlay_context+ACTC_OVERLAY_CTX_FIND_OR_STORE_RT_F_CMP_FN_HI
     lda #<copy_symbol_from_scan_y
     sta actc_overlay_context+ACTC_OVERLAY_CTX_COPY_SYMBOL_FROM_SCAN_Y_FN_LO
     lda #>copy_symbol_from_scan_y
@@ -877,9 +971,9 @@ actc_overlay_init_context_loop:
     sta actc_overlay_context+ACTC_OVERLAY_CTX_FIND_OR_STORE_REAL_OPERATOR_EXTERNAL_FN_LO
     lda #>find_or_store_real_operator_external_from_a
     sta actc_overlay_context+ACTC_OVERLAY_CTX_FIND_OR_STORE_REAL_OPERATOR_EXTERNAL_FN_HI
-    lda #<resolve_call_target_from_declared_or_fail
+    lda #<resolve_body_overlay_call_target_from_declared_or_fail
     sta actc_overlay_context+ACTC_OVERLAY_CTX_RESOLVE_CALL_TARGET_FN_LO
-    lda #>resolve_call_target_from_declared_or_fail
+    lda #>resolve_body_overlay_call_target_from_declared_or_fail
     sta actc_overlay_context+ACTC_OVERLAY_CTX_RESOLVE_CALL_TARGET_FN_HI
     lda #<emit_call_args_from_scan_y_or_fail
     sta actc_overlay_context+ACTC_OVERLAY_CTX_EMIT_CALL_ARGS_FN_LO
@@ -1243,7 +1337,7 @@ parse_module_header_or_fail:
 parse_module_header_keyword_advance:
     lda (const_ptr),y
     beq parse_module_header_keyword_done
-    jsr advance_scan_ptr
+    jsr source_reader_consume_scan_ptr
     iny
     bne parse_module_header_keyword_advance
 parse_module_header_keyword_done:
@@ -1257,7 +1351,7 @@ parse_module_header_or_fail_done:
 skip_source_whitespace:
     ldy #$00
 skip_source_whitespace_loop:
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #' '
     beq skip_source_whitespace_advance
     cmp #9
@@ -1268,20 +1362,20 @@ skip_source_whitespace_loop:
     beq skip_source_whitespace_advance
     rts
 skip_source_whitespace_advance:
-    jsr advance_scan_ptr
+    jsr source_reader_consume_scan_ptr
     jmp skip_source_whitespace_loop
 
 skip_source_spaces:
     ldy #$00
 skip_source_spaces_loop:
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #' '
     beq skip_source_spaces_advance
     cmp #9
     beq skip_source_spaces_advance
     rts
 skip_source_spaces_advance:
-    jsr advance_scan_ptr
+    jsr source_reader_consume_scan_ptr
     jmp skip_source_spaces_loop
 
 .if ACTC_USE_SOURCE_HEADER_OVERLAY
@@ -1323,22 +1417,21 @@ parse_module_header_with_overlay_ok:
 
 .if ACTC_KEEP_SOURCE_HEADER_RESIDENT_FALLBACK
 copy_declared_module_or_fail:
+.if ACTC_REU_SOURCE_CACHE
+.if SOURCE_READER_STREAM_SYMBOL_COPY
+    jmp copy_declared_module_or_fail_stream
+.endif
+.endif
+    jsr source_reader_begin_symbol_token
     ldy #$00
 copy_declared_module_or_fail_loop:
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     beq copy_declared_module_or_fail_bad
-    jsr uppercase_ascii
-    cpy #$00
-    bne copy_declared_module_or_fail_body
-    jsr uppercase_symbol_start_valid
-    bcc copy_declared_module_or_fail_store
-    jmp copy_declared_module_or_fail_done
-copy_declared_module_or_fail_body:
-    jsr uppercase_symbol_body_valid
+    jsr source_reader_symbol_token_char_valid_y
     bcc copy_declared_module_or_fail_store
     jmp copy_declared_module_or_fail_done
 copy_declared_module_or_fail_store:
-    sta declared_module_name,y
+    jsr source_reader_store_symbol_token_y
     iny
     cpy #24
     bcc copy_declared_module_or_fail_loop
@@ -1350,9 +1443,54 @@ copy_declared_module_or_fail_bad:
 copy_declared_module_or_fail_done:
     cpy #$00
     beq copy_declared_module_or_fail_bad
-    lda #$00
-    sta declared_module_name,y
+    jsr source_reader_terminate_symbol_token_y
+    jsr source_reader_publish_symbol_token
     rts
+
+.if ACTC_REU_SOURCE_CACHE
+.if SOURCE_READER_STREAM_SYMBOL_COPY
+copy_declared_module_or_fail_stream:
+    txa
+    pha
+    jsr source_reader_begin_symbol_token
+    lda #$00
+    sta reader_scan_y_data
+    ldx #$00
+copy_declared_module_or_fail_stream_loop:
+    ldy reader_scan_y_data
+    jsr source_reader_peek_scan_y
+    beq copy_declared_module_or_fail_stream_bad
+    jsr source_reader_symbol_token_char_valid_x
+    bcc copy_declared_module_or_fail_stream_store
+    jmp copy_declared_module_or_fail_stream_done
+copy_declared_module_or_fail_stream_store:
+    jsr source_reader_store_symbol_token_x
+    ldy reader_scan_y_data
+    jsr source_reader_consume_scan_y
+    bcs copy_declared_module_or_fail_stream_bad
+    sty reader_scan_y_data
+    jsr source_reader_begin_symbol_token
+    inx
+    cpx #24
+    bcc copy_declared_module_or_fail_stream_loop
+copy_declared_module_or_fail_stream_bad:
+    pla
+    tax
+    jsr debug_bad_module_scan_head
+    lda #<msg_bad_module
+    ldy #>msg_bad_module
+    jmp fail_with_ptr
+copy_declared_module_or_fail_stream_done:
+    cpx #$00
+    beq copy_declared_module_or_fail_stream_bad
+    jsr source_reader_terminate_symbol_token_x
+    jsr source_reader_publish_symbol_token
+    ldy reader_scan_y_data
+    pla
+    tax
+    rts
+.endif
+.endif
 
 compare_declared_module_or_fail:
     ldy #$00
@@ -1378,7 +1516,7 @@ compare_declared_module_or_fail_done:
 debug_bad_module_scan_head:
     ldy #$00
 debug_bad_module_scan_head_loop:
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     sta $03E8,y
     iny
     cpy #$08
@@ -1412,6 +1550,8 @@ collect_decls_or_fail_done:
 .if ACTC_USE_DECL_OVERLAY
     .if ACTC_REU_SOURCE_CACHE
 collect_decls_with_overlay_if_possible:
+    jsr source_reader_reset_to_start
+    bcs collect_decls_with_overlay_fallback
     lda #ACTC_OVERLAY_PASS_DECL_COUNTS
     jsr actc_overlay_run_pass
     bcs collect_decls_with_overlay_fallback
@@ -1432,6 +1572,1624 @@ collect_decls_with_overlay_ok:
     .endif
 .endif
 
+.if ACTC_USE_RESIDENT_BODY_PREALLOCATE
+preallocate_body_externals:
+    lda #$00
+    sta extern_count_data
+    lda #$FF
+    sta current_proc_index_data
+    jsr source_reader_reset_to_start
+    bcc :+
+    lda #<msg_load_fail
+    ldy #>msg_load_fail
+    jmp fail_with_ptr
+:
+preallocate_body_externals_loop:
+    ldy #$00
+    jsr source_reader_peek_scan_y
+    bne preallocate_body_externals_have_char
+    clc
+    rts
+preallocate_body_externals_have_char:
+    cmp #10
+    beq preallocate_body_externals_advance_blank
+    cmp #13
+    beq preallocate_body_externals_advance_blank
+    jsr skip_source_spaces
+    ldy #$00
+    jsr source_reader_peek_scan_y
+    bne preallocate_body_externals_after_space
+    clc
+    rts
+preallocate_body_externals_after_space:
+    lda #<pattern_proc
+    sta const_ptr
+    lda #>pattern_proc
+    sta const_ptr+1
+    jsr pattern_matches_scan_ptr
+    bcs preallocate_body_externals_not_proc
+    jsr source_reader_consume_const_ptr_at_scan_ptr
+    jsr skip_source_spaces
+    jsr copy_symbol_from_scan_ptr
+    bcs preallocate_body_externals_bad_proc
+    jsr find_export_index_from_declared
+    bcs preallocate_body_externals_bad_proc
+    stx current_proc_index_data
+    jmp preallocate_body_externals_skip_line
+preallocate_body_externals_not_proc:
+    lda current_proc_index_data
+    cmp #$FF
+    beq preallocate_body_externals_skip_line
+    jsr copy_symbol_from_scan_ptr
+    bcs preallocate_body_externals_skip_line
+    sty symbol_end_y_data
+    jsr preallocate_declared_symbol_is_real_if_condition
+    bcc preallocate_body_externals_skip_line
+    jsr preallocate_declared_symbol_is_print_statement
+    bcc preallocate_body_externals_skip_line
+    jsr preallocate_declared_symbol_is_return_statement
+    bcc preallocate_body_externals_skip_line
+    ldy symbol_end_y_data
+    jsr skip_inline_spaces_at_scan_y
+    jsr source_reader_peek_scan_y
+    cmp #'('
+    beq preallocate_body_externals_call
+    cmp #'='
+    bne preallocate_body_externals_skip_line
+    jsr preallocate_real_assignment_externals_from_declared
+    bcc preallocate_body_externals_skip_line
+    jsr preallocate_word_assignment_externals_from_declared
+    jmp preallocate_body_externals_skip_line
+preallocate_body_externals_call:
+    jsr preallocate_plain_call_externals_from_declared
+    bcs preallocate_body_externals_bad_proc
+preallocate_body_externals_skip_line:
+    jsr skip_source_line
+    jmp preallocate_body_externals_loop
+preallocate_body_externals_advance_blank:
+    jsr source_reader_consume_scan_ptr
+    jmp preallocate_body_externals_loop
+preallocate_body_externals_bad_proc:
+    lda #<msg_bad_proc
+    ldy #>msg_bad_proc
+    jmp fail_with_ptr
+
+preallocate_real_assignment_externals_from_declared:
+    jsr preallocate_consume_real_assignment_equals_from_declared
+    bcs preallocate_real_assignment_externals_miss
+    jsr preallocate_real_plain_decimal_assignment_external_from_scan_y
+    bcc preallocate_real_assignment_externals_done
+    jsr preallocate_real_explicit_assignment_external_from_scan_y
+    bcc preallocate_real_assignment_externals_done
+    jsr preallocate_real_unary_operator_assignment_external_from_scan_y
+    bcc preallocate_real_assignment_externals_done
+    jsr preallocate_real_copy_or_bridge_assignment_external_from_scan_y
+    bcc preallocate_real_assignment_externals_done
+    jsr preallocate_real_binary_operator_assignment_external_from_scan_y
+    bcc preallocate_real_assignment_externals_done
+preallocate_real_assignment_externals_miss:
+    sec
+    rts
+preallocate_real_assignment_externals_done:
+    clc
+    rts
+
+preallocate_real_plain_decimal_assignment_external_from_declared:
+    jsr preallocate_consume_real_assignment_equals_from_declared
+    bcc :+
+    jmp preallocate_real_plain_decimal_assignment_external_miss
+:
+    jmp preallocate_real_plain_decimal_assignment_external_from_scan_y
+
+preallocate_consume_real_assignment_equals_from_declared:
+    jsr find_var_index_from_declared
+    bcs preallocate_consume_real_assignment_equals_from_declared_miss
+    jsr require_var_index_real_or_fail
+    bcs preallocate_consume_real_assignment_equals_from_declared_miss
+    ldy symbol_end_y_data
+    jsr skip_inline_spaces_at_scan_y
+    jsr source_reader_peek_scan_y
+    cmp #'='
+    bne preallocate_consume_real_assignment_equals_from_declared_miss
+    jsr source_reader_consume_scan_y
+    bcs preallocate_consume_real_assignment_equals_from_declared_miss
+    jsr skip_inline_spaces_at_scan_y
+    clc
+    rts
+preallocate_consume_real_assignment_equals_from_declared_miss:
+    sec
+    rts
+
+preallocate_real_plain_decimal_assignment_external_from_scan_y:
+    sty symbol_start_y_data
+    jsr save_source_reader_mark
+    jsr preallocate_real_plain_signed_assignment_external_from_scan_y
+    bcc preallocate_real_plain_decimal_assignment_external_done
+    jsr restore_source_reader_mark
+    ldy symbol_start_y_data
+    jsr save_source_reader_mark
+    jsr preallocate_real_plain_positive_assignment_external_from_scan_y
+    bcc preallocate_real_plain_decimal_assignment_external_done
+    jsr restore_source_reader_mark
+    ldy symbol_start_y_data
+    sec
+    rts
+
+preallocate_real_plain_positive_assignment_external_from_scan_y:
+    jsr parse_positive_word_sum_at_scan_y
+    bcs preallocate_real_plain_positive_assignment_external_miss
+    jsr skip_inline_spaces_at_scan_y
+    jsr require_line_end_at_scan_y
+    bcs preallocate_real_plain_positive_assignment_external_miss
+    lda expr_value_hi
+    beq preallocate_real_plain_positive_assignment_external_done
+    jsr find_or_store_rt_i_to_f_external
+    bcs preallocate_real_plain_positive_assignment_external_miss
+preallocate_real_plain_positive_assignment_external_done:
+    clc
+    rts
+preallocate_real_plain_positive_assignment_external_miss:
+    sec
+    rts
+
+preallocate_real_plain_signed_assignment_external_from_scan_y:
+    jsr preallocate_consume_signed_word_prefix_from_scan_y
+    bcs preallocate_real_plain_signed_assignment_external_miss
+    jsr parse_optional_grouped_positive_word_sum_at_scan_y
+    bcs preallocate_real_plain_signed_assignment_external_miss
+    jsr skip_inline_spaces_at_scan_y
+    jsr require_line_end_at_scan_y
+    bcs preallocate_real_plain_signed_assignment_external_miss
+    lda expr_value_lo
+    ora expr_value_hi
+    beq preallocate_real_plain_signed_assignment_external_done
+    jsr find_or_store_rt_s_to_f_external
+    bcs preallocate_real_plain_signed_assignment_external_miss
+preallocate_real_plain_signed_assignment_external_done:
+    clc
+    rts
+preallocate_real_plain_signed_assignment_external_miss:
+    sec
+    rts
+
+preallocate_real_plain_decimal_assignment_external_done:
+    clc
+    rts
+preallocate_real_plain_decimal_assignment_external_miss:
+    sec
+    rts
+
+preallocate_word_assignment_externals_from_declared:
+    jsr preallocate_consume_word_assignment_equals_from_declared
+    bcs preallocate_word_assignment_externals_miss
+    jsr preallocate_int_of_real_assignment_external_from_scan_y
+    bcc preallocate_word_assignment_externals_done
+    jsr preallocate_call_expression_external_from_scan_y
+    bcc preallocate_word_assignment_externals_done
+preallocate_word_assignment_externals_miss:
+    sec
+    rts
+preallocate_word_assignment_externals_done:
+    clc
+    rts
+
+preallocate_consume_word_assignment_equals_from_declared:
+    jsr find_var_index_from_declared
+    bcs preallocate_consume_word_assignment_equals_from_declared_miss
+    jsr require_var_index_word_or_fail
+    bcs preallocate_consume_word_assignment_equals_from_declared_miss
+    ldy symbol_end_y_data
+    jsr skip_inline_spaces_at_scan_y
+    jsr source_reader_peek_scan_y
+    cmp #'='
+    bne preallocate_consume_word_assignment_equals_from_declared_miss
+    jsr source_reader_consume_scan_y
+    bcs preallocate_consume_word_assignment_equals_from_declared_miss
+    jsr skip_inline_spaces_at_scan_y
+    clc
+    rts
+preallocate_consume_word_assignment_equals_from_declared_miss:
+    sec
+    rts
+
+preallocate_int_of_real_assignment_external_from_scan_y:
+    sty symbol_start_y_data
+    jsr save_source_reader_mark
+    jsr preallocate_int_conversion_external_from_scan_y
+    bcs preallocate_int_of_real_assignment_external_miss
+    jsr require_line_end_at_scan_y
+    bcs preallocate_int_of_real_assignment_external_miss
+    clc
+    rts
+preallocate_int_of_real_assignment_external_miss:
+    jsr restore_source_reader_mark
+    ldy symbol_start_y_data
+    sec
+    rts
+
+preallocate_int_conversion_external_from_scan_y:
+    sty symbol_start_y_data
+    jsr save_source_reader_mark
+    lda #<pattern_int_decl
+    sta const_ptr
+    lda #>pattern_int_decl
+    sta const_ptr+1
+    jsr consume_keyword_open_from_scan_y
+    bcs preallocate_int_conversion_external_miss_restore
+    jsr find_var_index_from_scan_y
+    bcs preallocate_int_conversion_external_miss_restore
+    jsr require_var_index_real_or_fail
+    bcs preallocate_int_conversion_external_miss_restore
+    jsr skip_inline_spaces_at_scan_y
+    jsr source_reader_peek_scan_y
+    cmp #')'
+    bne preallocate_int_conversion_external_miss_restore
+    jsr source_reader_consume_scan_y
+    bcs preallocate_int_conversion_external_miss_restore
+    jsr find_or_store_rt_f_to_i_external
+    bcs preallocate_int_conversion_external_miss_restore
+    clc
+    rts
+preallocate_int_conversion_external_miss_restore:
+    jsr restore_source_reader_mark
+    ldy symbol_start_y_data
+    sec
+    rts
+
+preallocate_real_bridge_conversion_external_from_scan_y:
+    sty symbol_start_y_data
+    jsr save_source_reader_mark
+    lda #<pattern_real_decl
+    sta const_ptr
+    lda #>pattern_real_decl
+    sta const_ptr+1
+    jsr consume_keyword_open_from_scan_y
+    bcs preallocate_real_bridge_conversion_external_miss_restore
+    jsr find_var_index_from_scan_y
+    bcs preallocate_real_bridge_conversion_external_miss_restore
+    jsr require_var_index_real_bridge_word_or_fail
+    bcs preallocate_real_bridge_conversion_external_miss_restore
+    jsr skip_inline_spaces_at_scan_y
+    jsr source_reader_peek_scan_y
+    cmp #')'
+    bne preallocate_real_bridge_conversion_external_miss_restore
+    jsr source_reader_consume_scan_y
+    bcs preallocate_real_bridge_conversion_external_miss_restore
+    sty symbol_end_y_data
+    jsr find_or_store_real_bridge_external_from_x
+    bcs preallocate_real_bridge_conversion_external_miss_restore
+    ldy symbol_end_y_data
+    clc
+    rts
+preallocate_real_bridge_conversion_external_miss_restore:
+    jsr restore_source_reader_mark
+    ldy symbol_start_y_data
+    sec
+    rts
+
+preallocate_real_numeric_conversion_external_from_scan_y:
+    sty symbol_start_y_data
+    jsr save_source_reader_mark
+    lda #<pattern_real_decl
+    sta const_ptr
+    lda #>pattern_real_decl
+    sta const_ptr+1
+    jsr consume_keyword_open_from_scan_y
+    bcs preallocate_real_numeric_conversion_external_miss_restore
+    sty symbol_end_y_data
+    jsr save_group_reader_mark
+    jsr preallocate_real_numeric_signed_conversion_external_from_scan_y
+    bcc preallocate_real_numeric_conversion_external_done
+    jsr restore_group_reader_mark
+    ldy symbol_end_y_data
+    jsr preallocate_real_numeric_positive_conversion_external_from_scan_y
+    bcc preallocate_real_numeric_conversion_external_done
+preallocate_real_numeric_conversion_external_miss_restore:
+    jsr restore_source_reader_mark
+    ldy symbol_start_y_data
+    sec
+    rts
+preallocate_real_numeric_conversion_external_done:
+    clc
+    rts
+
+preallocate_real_numeric_positive_conversion_external_from_scan_y:
+    jsr parse_positive_word_sum_at_scan_y
+    bcs preallocate_real_numeric_positive_conversion_external_miss
+    jsr skip_inline_spaces_at_scan_y
+    jsr source_reader_peek_scan_y
+    cmp #')'
+    bne preallocate_real_numeric_positive_conversion_external_miss
+    jsr source_reader_consume_scan_y
+    bcs preallocate_real_numeric_positive_conversion_external_miss
+    lda expr_value_lo
+    ora expr_value_hi
+    beq preallocate_real_numeric_positive_conversion_external_done
+    jsr find_or_store_rt_i_to_f_external
+    bcs preallocate_real_numeric_positive_conversion_external_miss
+preallocate_real_numeric_positive_conversion_external_done:
+    clc
+    rts
+preallocate_real_numeric_positive_conversion_external_miss:
+    sec
+    rts
+
+preallocate_real_numeric_signed_conversion_external_from_scan_y:
+    jsr preallocate_consume_signed_word_prefix_from_scan_y
+    bcs preallocate_real_numeric_signed_conversion_external_miss
+    jsr parse_optional_grouped_positive_word_sum_at_scan_y
+    bcs preallocate_real_numeric_signed_conversion_external_miss
+    jsr skip_inline_spaces_at_scan_y
+    jsr source_reader_peek_scan_y
+    cmp #')'
+    bne preallocate_real_numeric_signed_conversion_external_miss
+    jsr source_reader_consume_scan_y
+    bcs preallocate_real_numeric_signed_conversion_external_miss
+    lda expr_value_lo
+    ora expr_value_hi
+    beq preallocate_real_numeric_signed_conversion_external_done
+    jsr find_or_store_rt_s_to_f_external
+    bcs preallocate_real_numeric_signed_conversion_external_miss
+preallocate_real_numeric_signed_conversion_external_done:
+    clc
+    rts
+preallocate_real_numeric_signed_conversion_external_miss:
+    sec
+    rts
+
+preallocate_call_expression_external_from_scan_y:
+    jsr save_condition_reader_mark
+    jsr preallocate_call_with_arg_externals_from_scan_y
+    bcs preallocate_call_expression_external_try_bool_restore
+    jsr skip_inline_spaces_at_scan_y
+    jsr require_line_end_at_scan_y
+    bcs preallocate_call_expression_external_try_bool_restore
+    clc
+    rts
+preallocate_call_expression_external_try_bool_restore:
+    jsr restore_condition_reader_mark
+    jsr save_condition_reader_mark
+    jsr preallocate_scan_line_call_externals_from_scan_y
+    bcs preallocate_call_expression_external_miss_restore
+    jsr skip_inline_spaces_at_scan_y
+    jsr require_line_end_at_scan_y
+    bcs preallocate_call_expression_external_miss_restore
+    clc
+    rts
+preallocate_call_expression_external_miss_restore:
+    jsr restore_condition_reader_mark
+    sec
+    rts
+
+preallocate_call_with_arg_externals_from_scan_y:
+    jsr copy_symbol_from_scan_y
+    bcs preallocate_call_with_arg_externals_fail
+    sty symbol_end_y_data
+    jsr preallocate_declared_symbol_is_reserved_call_keyword
+    bcc preallocate_call_with_arg_externals_fail
+    ldy symbol_end_y_data
+    jsr skip_inline_spaces_at_scan_y
+    jsr source_reader_peek_scan_y
+    cmp #'('
+    bne preallocate_call_with_arg_externals_fail
+    jsr resolve_call_target_from_declared_or_fail
+    bcs preallocate_call_with_arg_externals_fail
+    ldy symbol_end_y_data
+    jsr skip_inline_spaces_at_scan_y
+    jsr source_reader_peek_scan_y
+    cmp #'('
+    bne preallocate_call_with_arg_externals_fail
+    jsr source_reader_consume_scan_y
+    bcs preallocate_call_with_arg_externals_fail
+    jsr preallocate_plain_call_arg_externals_from_scan_y
+    bcs preallocate_call_with_arg_externals_fail
+    clc
+    rts
+preallocate_call_with_arg_externals_fail:
+    sec
+    rts
+
+preallocate_plain_call_externals_from_declared:
+    jsr resolve_call_target_from_declared_or_fail
+    bcs preallocate_plain_call_externals_fail
+    ldy symbol_end_y_data
+    jsr skip_inline_spaces_at_scan_y
+    jsr source_reader_peek_scan_y
+    cmp #'('
+    bne preallocate_plain_call_externals_done
+    jsr source_reader_consume_scan_y
+    bcs preallocate_plain_call_externals_done
+    jsr preallocate_plain_call_arg_externals_from_scan_y
+preallocate_plain_call_externals_done:
+    clc
+    rts
+preallocate_plain_call_externals_fail:
+    sec
+    rts
+
+preallocate_plain_call_arg_externals_from_scan_y:
+    jsr skip_inline_spaces_at_scan_y
+    jsr source_reader_peek_scan_y
+    cmp #')'
+    beq preallocate_plain_call_arg_externals_consume_done
+preallocate_plain_call_arg_externals_loop:
+    jsr skip_inline_spaces_at_scan_y
+    jsr preallocate_scan_plain_call_arg_for_externals_from_scan_y
+    bcs preallocate_plain_call_arg_externals_done
+preallocate_plain_call_arg_externals_after_arg:
+    jsr skip_inline_spaces_at_scan_y
+    jsr source_reader_peek_scan_y
+    cmp #','
+    beq preallocate_plain_call_arg_externals_next
+    cmp #')'
+    beq preallocate_plain_call_arg_externals_consume_done
+    jmp preallocate_plain_call_arg_externals_done
+preallocate_plain_call_arg_externals_next:
+    jsr source_reader_consume_scan_y
+    bcs preallocate_plain_call_arg_externals_done
+    jmp preallocate_plain_call_arg_externals_loop
+preallocate_plain_call_arg_externals_consume_done:
+    jsr source_reader_consume_scan_y
+preallocate_plain_call_arg_externals_done:
+    clc
+    rts
+
+preallocate_scan_plain_call_arg_for_externals_from_scan_y:
+    lda #$00
+    sta preallocate_call_arg_scan_depth_data
+preallocate_scan_plain_call_arg_for_externals_loop:
+    jsr source_reader_peek_scan_y
+    beq preallocate_scan_plain_call_arg_for_externals_done
+    cmp #10
+    beq preallocate_scan_plain_call_arg_for_externals_done
+    cmp #13
+    beq preallocate_scan_plain_call_arg_for_externals_done
+    cmp #'"'
+    beq preallocate_scan_plain_call_arg_for_externals_string
+    cmp #'('
+    beq preallocate_scan_plain_call_arg_for_externals_lparen
+    cmp #')'
+    beq preallocate_scan_plain_call_arg_for_externals_rparen
+    cmp #','
+    beq preallocate_scan_plain_call_arg_for_externals_comma
+    jsr preallocate_int_conversion_external_from_scan_y
+    bcc preallocate_scan_plain_call_arg_for_externals_loop
+    jsr preallocate_call_name_external_from_scan_y
+    bcs preallocate_scan_plain_call_arg_for_externals_consume_one
+    sty expr_saved_y_data
+    jsr resolve_call_target_from_declared_or_fail
+    ldy expr_saved_y_data
+    jmp preallocate_scan_plain_call_arg_for_externals_loop
+preallocate_scan_plain_call_arg_for_externals_consume_one:
+    jsr source_reader_consume_scan_y
+    bcs preallocate_scan_plain_call_arg_for_externals_fail
+    jmp preallocate_scan_plain_call_arg_for_externals_loop
+preallocate_scan_plain_call_arg_for_externals_lparen:
+    inc preallocate_call_arg_scan_depth_data
+    jsr source_reader_consume_scan_y
+    bcs preallocate_scan_plain_call_arg_for_externals_fail
+    jmp preallocate_scan_plain_call_arg_for_externals_loop
+preallocate_scan_plain_call_arg_for_externals_rparen:
+    lda preallocate_call_arg_scan_depth_data
+    beq preallocate_scan_plain_call_arg_for_externals_done
+    dec preallocate_call_arg_scan_depth_data
+    jsr source_reader_consume_scan_y
+    bcs preallocate_scan_plain_call_arg_for_externals_fail
+    jmp preallocate_scan_plain_call_arg_for_externals_loop
+preallocate_scan_plain_call_arg_for_externals_comma:
+    lda preallocate_call_arg_scan_depth_data
+    beq preallocate_scan_plain_call_arg_for_externals_done
+    jsr source_reader_consume_scan_y
+    bcs preallocate_scan_plain_call_arg_for_externals_fail
+    jmp preallocate_scan_plain_call_arg_for_externals_loop
+preallocate_scan_plain_call_arg_for_externals_string:
+    jsr preallocate_skip_string_in_plain_call_arg_from_scan_y
+    bcs preallocate_scan_plain_call_arg_for_externals_fail
+    jmp preallocate_scan_plain_call_arg_for_externals_loop
+preallocate_scan_plain_call_arg_for_externals_done:
+    clc
+    rts
+preallocate_scan_plain_call_arg_for_externals_fail:
+    sec
+    rts
+
+preallocate_skip_string_in_plain_call_arg_from_scan_y:
+    jsr source_reader_consume_scan_y
+    bcs preallocate_skip_string_in_plain_call_arg_fail
+preallocate_skip_string_in_plain_call_arg_loop:
+    jsr source_reader_peek_scan_y
+    beq preallocate_skip_string_in_plain_call_arg_done
+    cmp #10
+    beq preallocate_skip_string_in_plain_call_arg_done
+    cmp #13
+    beq preallocate_skip_string_in_plain_call_arg_done
+    cmp #'"'
+    beq preallocate_skip_string_in_plain_call_arg_close
+    jsr source_reader_consume_scan_y
+    bcs preallocate_skip_string_in_plain_call_arg_fail
+    jmp preallocate_skip_string_in_plain_call_arg_loop
+preallocate_skip_string_in_plain_call_arg_close:
+    jsr source_reader_consume_scan_y
+    bcs preallocate_skip_string_in_plain_call_arg_fail
+preallocate_skip_string_in_plain_call_arg_done:
+    clc
+    rts
+preallocate_skip_string_in_plain_call_arg_fail:
+    sec
+    rts
+
+preallocate_scan_line_call_externals_from_scan_y:
+    lda #$00
+    sta bool_ops_used_data
+preallocate_scan_line_call_externals_loop:
+    jsr source_reader_peek_scan_y
+    beq preallocate_scan_line_call_externals_done
+    cmp #10
+    beq preallocate_scan_line_call_externals_done
+    cmp #13
+    beq preallocate_scan_line_call_externals_done
+    cmp #'"'
+    beq preallocate_scan_line_call_externals_string
+    jsr preallocate_int_conversion_external_from_scan_y
+    bcs preallocate_scan_line_call_externals_try_call
+    lda #$01
+    sta bool_ops_used_data
+    jmp preallocate_scan_line_call_externals_loop
+preallocate_scan_line_call_externals_try_call:
+    jsr preallocate_call_name_external_from_scan_y
+    bcs preallocate_scan_line_call_externals_consume_one
+    sty expr_saved_y_data
+    jsr resolve_call_target_from_declared_or_fail
+    lda #$01
+    sta bool_ops_used_data
+    ldy expr_saved_y_data
+    jmp preallocate_scan_line_call_externals_loop
+preallocate_scan_line_call_externals_consume_one:
+    jsr source_reader_consume_scan_y
+    bcs preallocate_scan_line_call_externals_fail
+    jmp preallocate_scan_line_call_externals_loop
+preallocate_scan_line_call_externals_string:
+    jsr preallocate_skip_string_in_plain_call_arg_from_scan_y
+    bcs preallocate_scan_line_call_externals_fail
+    jmp preallocate_scan_line_call_externals_loop
+preallocate_scan_line_call_externals_done:
+    lda bool_ops_used_data
+    beq preallocate_scan_line_call_externals_fail
+    clc
+    rts
+preallocate_scan_line_call_externals_fail:
+    sec
+    rts
+
+preallocate_call_name_external_from_scan_y:
+    sty symbol_start_y_data
+    jsr save_source_reader_mark
+    jsr copy_symbol_from_scan_y
+    bcs preallocate_call_name_external_miss_restore
+    sty symbol_end_y_data
+    jsr preallocate_declared_symbol_is_reserved_call_keyword
+    bcc preallocate_call_name_external_miss_restore
+    ldy symbol_end_y_data
+    jsr skip_inline_spaces_at_scan_y
+    jsr source_reader_peek_scan_y
+    cmp #'('
+    bne preallocate_call_name_external_miss_restore
+    clc
+    rts
+preallocate_call_name_external_miss_restore:
+    jsr restore_source_reader_mark
+    ldy symbol_start_y_data
+    sec
+    rts
+
+preallocate_declared_symbol_is_bool_keyword:
+    lda #<pattern_and
+    sta const_ptr
+    lda #>pattern_and
+    sta const_ptr+1
+    jsr symbol_buffer_matches_const_ptr
+    bcc preallocate_declared_symbol_is_bool_keyword_yes
+    lda #<pattern_or
+    sta const_ptr
+    lda #>pattern_or
+    sta const_ptr+1
+    jsr symbol_buffer_matches_const_ptr
+    bcc preallocate_declared_symbol_is_bool_keyword_yes
+    lda #<pattern_not
+    sta const_ptr
+    lda #>pattern_not
+    sta const_ptr+1
+    jsr symbol_buffer_matches_const_ptr
+    bcc preallocate_declared_symbol_is_bool_keyword_yes
+    sec
+    rts
+preallocate_declared_symbol_is_bool_keyword_yes:
+    clc
+    rts
+
+preallocate_declared_symbol_is_reserved_call_keyword:
+    jsr preallocate_declared_symbol_is_bool_keyword
+    bcc preallocate_declared_symbol_is_reserved_call_keyword_yes
+    lda #<pattern_int_decl
+    sta const_ptr
+    lda #>pattern_int_decl
+    sta const_ptr+1
+    jsr symbol_buffer_matches_const_ptr
+    bcc preallocate_declared_symbol_is_reserved_call_keyword_yes
+    lda #<pattern_real_decl
+    sta const_ptr
+    lda #>pattern_real_decl
+    sta const_ptr+1
+    jsr symbol_buffer_matches_const_ptr
+    bcc preallocate_declared_symbol_is_reserved_call_keyword_yes
+    lda #<pattern_fabs
+    sta const_ptr
+    lda #>pattern_fabs
+    sta const_ptr+1
+    jsr symbol_buffer_matches_const_ptr
+    bcc preallocate_declared_symbol_is_reserved_call_keyword_yes
+    lda #<pattern_fsqrt
+    sta const_ptr
+    lda #>pattern_fsqrt
+    sta const_ptr+1
+    jsr symbol_buffer_matches_const_ptr
+    bcc preallocate_declared_symbol_is_reserved_call_keyword_yes
+    sec
+    rts
+preallocate_declared_symbol_is_reserved_call_keyword_yes:
+    clc
+    rts
+
+preallocate_call_term_external_from_scan_y:
+    sty symbol_start_y_data
+    jsr save_source_reader_mark
+    jsr copy_symbol_from_scan_y
+    bcs preallocate_call_term_external_miss_restore
+    sty symbol_end_y_data
+    ldy symbol_end_y_data
+    jsr skip_inline_spaces_at_scan_y
+    jsr preallocate_consume_flat_call_args_from_scan_y
+    bcs preallocate_call_term_external_miss_restore
+    clc
+    rts
+preallocate_call_term_external_miss_restore:
+    jsr restore_source_reader_mark
+    ldy symbol_start_y_data
+    sec
+    rts
+
+preallocate_consume_flat_call_args_from_scan_y:
+    jsr skip_inline_spaces_at_scan_y
+    jsr source_reader_peek_scan_y
+    cmp #'('
+    bne preallocate_consume_flat_call_args_from_scan_y_fail
+    jsr source_reader_consume_scan_y
+    bcs preallocate_consume_flat_call_args_from_scan_y_fail
+preallocate_consume_flat_call_args_from_scan_y_loop:
+    jsr source_reader_peek_scan_y
+    beq preallocate_consume_flat_call_args_from_scan_y_fail
+    cmp #10
+    beq preallocate_consume_flat_call_args_from_scan_y_fail
+    cmp #13
+    beq preallocate_consume_flat_call_args_from_scan_y_fail
+    cmp #'"'
+    beq preallocate_consume_flat_call_args_from_scan_y_fail
+    cmp #'('
+    beq preallocate_consume_flat_call_args_from_scan_y_fail
+    cmp #')'
+    beq preallocate_consume_flat_call_args_from_scan_y_done
+    jsr source_reader_consume_scan_y
+    bcs preallocate_consume_flat_call_args_from_scan_y_fail
+    jmp preallocate_consume_flat_call_args_from_scan_y_loop
+preallocate_consume_flat_call_args_from_scan_y_done:
+    jsr source_reader_consume_scan_y
+    bcs preallocate_consume_flat_call_args_from_scan_y_fail
+    clc
+    rts
+preallocate_consume_flat_call_args_from_scan_y_fail:
+    sec
+    rts
+
+preallocate_real_explicit_assignment_external_from_scan_y:
+    sty symbol_start_y_data
+    jsr save_source_reader_mark
+    lda #<pattern_real_decl
+    sta const_ptr
+    lda #>pattern_real_decl
+    sta const_ptr+1
+    jsr consume_keyword_open_from_scan_y
+    bcc preallocate_real_explicit_assignment_external_after_open
+    jsr restore_source_reader_mark
+    ldy symbol_start_y_data
+    sec
+    rts
+preallocate_real_explicit_assignment_external_after_open:
+    jsr preallocate_real_explicit_bridge_assignment_external_from_scan_y
+    bcc preallocate_real_explicit_assignment_external_done
+    jsr preallocate_real_explicit_decimal_assignment_external_from_scan_y
+    bcc preallocate_real_explicit_assignment_external_done
+preallocate_real_explicit_assignment_external_miss:
+    sec
+    rts
+preallocate_real_explicit_assignment_external_done:
+    clc
+    rts
+
+preallocate_real_explicit_bridge_assignment_external_from_scan_y:
+    jsr find_var_index_from_scan_y
+    bcs preallocate_real_explicit_bridge_assignment_external_miss
+    jsr require_var_index_real_bridge_word_or_fail
+    bcs preallocate_real_explicit_bridge_assignment_external_miss
+    jsr skip_inline_spaces_at_scan_y
+    jsr source_reader_peek_scan_y
+    cmp #')'
+    bne preallocate_real_explicit_bridge_assignment_external_miss
+    jsr source_reader_consume_scan_y
+    bcs preallocate_real_explicit_bridge_assignment_external_miss
+    jsr require_line_end_at_scan_y
+    bcs preallocate_real_explicit_bridge_assignment_external_miss
+    jsr find_or_store_real_bridge_external_from_x
+    bcs preallocate_real_explicit_bridge_assignment_external_miss
+    clc
+    rts
+preallocate_real_explicit_bridge_assignment_external_miss:
+    sec
+    rts
+
+preallocate_real_explicit_decimal_assignment_external_from_scan_y:
+    sty symbol_start_y_data
+    jsr save_source_reader_mark
+    jsr preallocate_real_explicit_signed_assignment_external_from_scan_y
+    bcc preallocate_real_explicit_decimal_assignment_external_done
+    jsr restore_source_reader_mark
+    ldy symbol_start_y_data
+    jsr save_source_reader_mark
+    jsr preallocate_real_explicit_positive_assignment_external_from_scan_y
+    bcc preallocate_real_explicit_decimal_assignment_external_done
+    jsr restore_source_reader_mark
+    ldy symbol_start_y_data
+    sec
+    rts
+
+preallocate_real_explicit_positive_assignment_external_from_scan_y:
+    jsr parse_positive_word_sum_at_scan_y
+    bcs preallocate_real_explicit_positive_assignment_external_miss
+    jsr skip_inline_spaces_at_scan_y
+    jsr source_reader_peek_scan_y
+    cmp #')'
+    bne preallocate_real_explicit_positive_assignment_external_miss
+    jsr source_reader_consume_scan_y
+    bcs preallocate_real_explicit_positive_assignment_external_miss
+    jsr require_line_end_at_scan_y
+    bcs preallocate_real_explicit_positive_assignment_external_miss
+    lda expr_value_lo
+    ora expr_value_hi
+    beq preallocate_real_explicit_positive_assignment_external_done
+    jsr find_or_store_rt_i_to_f_external
+    bcs preallocate_real_explicit_positive_assignment_external_miss
+preallocate_real_explicit_positive_assignment_external_done:
+    clc
+    rts
+preallocate_real_explicit_positive_assignment_external_miss:
+    sec
+    rts
+
+preallocate_real_explicit_signed_assignment_external_from_scan_y:
+    jsr preallocate_consume_signed_word_prefix_from_scan_y
+    bcs preallocate_real_explicit_signed_assignment_external_miss
+    jsr parse_optional_grouped_positive_word_sum_at_scan_y
+    bcs preallocate_real_explicit_signed_assignment_external_miss
+    jsr skip_inline_spaces_at_scan_y
+    jsr source_reader_peek_scan_y
+    cmp #')'
+    bne preallocate_real_explicit_signed_assignment_external_miss
+    jsr source_reader_consume_scan_y
+    bcs preallocate_real_explicit_signed_assignment_external_miss
+    jsr require_line_end_at_scan_y
+    bcs preallocate_real_explicit_signed_assignment_external_miss
+    lda expr_value_lo
+    ora expr_value_hi
+    beq preallocate_real_explicit_signed_assignment_external_done
+    jsr find_or_store_rt_s_to_f_external
+    bcs preallocate_real_explicit_signed_assignment_external_miss
+preallocate_real_explicit_signed_assignment_external_done:
+    clc
+    rts
+preallocate_real_explicit_signed_assignment_external_miss:
+    sec
+    rts
+
+preallocate_real_explicit_decimal_assignment_external_done:
+    clc
+    rts
+
+preallocate_consume_signed_word_prefix_from_scan_y:
+    jsr skip_inline_spaces_at_scan_y
+    jsr source_reader_peek_scan_y
+    cmp #'0'
+    bne preallocate_consume_signed_word_prefix_fail
+    jsr source_reader_consume_scan_y
+    bcs preallocate_consume_signed_word_prefix_fail
+    jsr skip_inline_spaces_at_scan_y
+    jsr source_reader_peek_scan_y
+    cmp #'-'
+    bne preallocate_consume_signed_word_prefix_fail
+    jsr source_reader_consume_scan_y
+    bcs preallocate_consume_signed_word_prefix_fail
+    clc
+    rts
+preallocate_consume_signed_word_prefix_fail:
+    sec
+    rts
+
+preallocate_real_unary_operator_assignment_external_from_scan_y:
+    sty symbol_start_y_data
+    jsr save_source_reader_mark
+    lda #<pattern_fabs
+    sta const_ptr
+    lda #>pattern_fabs
+    sta const_ptr+1
+    jsr consume_keyword_open_from_scan_y
+    bcc preallocate_real_unary_operator_assignment_external_fabs
+    jsr restore_source_reader_mark
+    ldy symbol_start_y_data
+    jsr save_source_reader_mark
+    lda #<pattern_fsqrt
+    sta const_ptr
+    lda #>pattern_fsqrt
+    sta const_ptr+1
+    jsr consume_keyword_open_from_scan_y
+    bcc preallocate_real_unary_operator_assignment_external_fsqrt
+    jsr restore_source_reader_mark
+    ldy symbol_start_y_data
+    sec
+    rts
+preallocate_real_unary_operator_assignment_external_fabs:
+    lda #'a'
+    bne preallocate_real_unary_operator_assignment_external_parse
+preallocate_real_unary_operator_assignment_external_fsqrt:
+    lda #'q'
+preallocate_real_unary_operator_assignment_external_parse:
+    sta real_operator_data
+    jsr find_var_index_from_scan_y
+    bcs preallocate_real_unary_operator_assignment_external_miss
+    jsr require_var_index_real_or_fail
+    bcs preallocate_real_unary_operator_assignment_external_miss
+    jsr skip_inline_spaces_at_scan_y
+    jsr source_reader_peek_scan_y
+    cmp #')'
+    bne preallocate_real_unary_operator_assignment_external_miss
+    jsr source_reader_consume_scan_y
+    bcs preallocate_real_unary_operator_assignment_external_miss
+    jsr require_line_end_at_scan_y
+    bcs preallocate_real_unary_operator_assignment_external_miss
+    lda real_operator_data
+    jsr find_or_store_real_operator_external_from_a
+    bcs preallocate_real_unary_operator_assignment_external_miss
+    clc
+    rts
+preallocate_real_unary_operator_assignment_external_miss:
+    sec
+    rts
+
+preallocate_real_unary_print_external_from_scan_y:
+    sty symbol_start_y_data
+    jsr save_source_reader_mark
+    lda #<pattern_fabs
+    sta const_ptr
+    lda #>pattern_fabs
+    sta const_ptr+1
+    jsr consume_keyword_open_from_scan_y
+    bcc preallocate_real_unary_print_external_fabs
+    jsr restore_source_reader_mark
+    ldy symbol_start_y_data
+    jsr save_source_reader_mark
+    lda #<pattern_fsqrt
+    sta const_ptr
+    lda #>pattern_fsqrt
+    sta const_ptr+1
+    jsr consume_keyword_open_from_scan_y
+    bcc preallocate_real_unary_print_external_fsqrt
+    jsr restore_source_reader_mark
+    ldy symbol_start_y_data
+    sec
+    rts
+preallocate_real_unary_print_external_fabs:
+    lda #'a'
+    bne preallocate_real_unary_print_external_parse
+preallocate_real_unary_print_external_fsqrt:
+    lda #'q'
+preallocate_real_unary_print_external_parse:
+    sta real_operator_data
+    jsr find_var_index_from_scan_y
+    bcs preallocate_real_unary_print_external_miss_restore
+    jsr require_var_index_real_or_fail
+    bcs preallocate_real_unary_print_external_miss_restore
+    jsr skip_inline_spaces_at_scan_y
+    jsr source_reader_peek_scan_y
+    cmp #')'
+    bne preallocate_real_unary_print_external_miss_restore
+    jsr source_reader_consume_scan_y
+    bcs preallocate_real_unary_print_external_miss_restore
+    lda real_operator_data
+    jsr find_or_store_real_operator_external_from_a
+    bcs preallocate_real_unary_print_external_miss_restore
+    clc
+    rts
+preallocate_real_unary_print_external_miss_restore:
+    jsr restore_source_reader_mark
+    ldy symbol_start_y_data
+    sec
+    rts
+
+preallocate_real_copy_or_bridge_assignment_external_from_scan_y:
+    sty symbol_start_y_data
+    jsr save_source_reader_mark
+    jsr find_var_index_from_scan_y
+    bcs preallocate_real_copy_or_bridge_assignment_external_miss
+    stx real_lhs_index_data
+    jsr require_line_end_at_scan_y
+    bcs preallocate_real_copy_or_bridge_assignment_external_miss
+    ldx real_lhs_index_data
+    jsr require_var_index_real_or_fail
+    bcc preallocate_real_copy_or_bridge_assignment_external_done
+    ldx real_lhs_index_data
+    jsr require_var_index_real_bridge_word_or_fail
+    bcs preallocate_real_copy_or_bridge_assignment_external_miss
+    ldx real_lhs_index_data
+    jsr find_or_store_real_bridge_external_from_x
+    bcs preallocate_real_copy_or_bridge_assignment_external_miss
+preallocate_real_copy_or_bridge_assignment_external_done:
+    clc
+    rts
+preallocate_real_copy_or_bridge_assignment_external_miss:
+    jsr restore_source_reader_mark
+    ldy symbol_start_y_data
+    sec
+    rts
+
+preallocate_real_binary_operator_assignment_external_from_scan_y:
+    jsr find_var_index_from_scan_y
+    bcs preallocate_real_binary_operator_assignment_external_miss
+    jsr require_var_index_real_or_fail
+    bcs preallocate_real_binary_operator_assignment_external_miss
+    jsr skip_inline_spaces_at_scan_y
+    jsr source_reader_peek_scan_y
+    cmp #'+'
+    beq preallocate_real_binary_operator_assignment_external_operator
+    cmp #'-'
+    beq preallocate_real_binary_operator_assignment_external_operator
+    cmp #'*'
+    beq preallocate_real_binary_operator_assignment_external_operator
+    cmp #'/'
+    bne preallocate_real_binary_operator_assignment_external_miss
+preallocate_real_binary_operator_assignment_external_operator:
+    sta real_operator_data
+    jsr source_reader_consume_scan_y
+    bcs preallocate_real_binary_operator_assignment_external_miss
+    jsr skip_inline_spaces_at_scan_y
+    jsr find_var_index_from_scan_y
+    bcs preallocate_real_binary_operator_assignment_external_miss
+    jsr require_var_index_real_or_fail
+    bcs preallocate_real_binary_operator_assignment_external_miss
+    jsr require_line_end_at_scan_y
+    bcs preallocate_real_binary_operator_assignment_external_miss
+    lda real_operator_data
+    jsr find_or_store_real_operator_external_from_a
+    bcs preallocate_real_binary_operator_assignment_external_miss
+    clc
+    rts
+preallocate_real_binary_operator_assignment_external_miss:
+    sec
+    rts
+
+preallocate_real_binary_print_external_from_scan_y:
+    sty symbol_start_y_data
+    jsr save_source_reader_mark
+    jsr find_var_index_from_scan_y
+    bcs preallocate_real_binary_print_external_miss_restore
+    jsr require_var_index_real_or_fail
+    bcs preallocate_real_binary_print_external_miss_restore
+    jsr skip_inline_spaces_at_scan_y
+    jsr source_reader_peek_scan_y
+    cmp #'+'
+    beq preallocate_real_binary_print_external_operator
+    cmp #'-'
+    beq preallocate_real_binary_print_external_operator
+    cmp #'*'
+    beq preallocate_real_binary_print_external_operator
+    cmp #'/'
+    bne preallocate_real_binary_print_external_miss_restore
+preallocate_real_binary_print_external_operator:
+    sta real_operator_data
+    jsr source_reader_consume_scan_y
+    bcs preallocate_real_binary_print_external_miss_restore
+    jsr skip_inline_spaces_at_scan_y
+    jsr find_var_index_from_scan_y
+    bcs preallocate_real_binary_print_external_miss_restore
+    jsr require_var_index_real_or_fail
+    bcs preallocate_real_binary_print_external_miss_restore
+    jsr skip_inline_spaces_at_scan_y
+    jsr source_reader_peek_scan_y
+    cmp #')'
+    bne preallocate_real_binary_print_external_miss_restore
+    lda real_operator_data
+    jsr find_or_store_real_operator_external_from_a
+    bcs preallocate_real_binary_print_external_miss_restore
+    clc
+    rts
+preallocate_real_binary_print_external_miss_restore:
+    jsr restore_source_reader_mark
+    ldy symbol_start_y_data
+    sec
+    rts
+
+preallocate_declared_symbol_is_real_if_condition:
+    lda #<pattern_if
+    sta const_ptr
+    lda #>pattern_if
+    sta const_ptr+1
+    jsr symbol_buffer_matches_const_ptr
+    bcs preallocate_declared_symbol_is_real_if_condition_not_if
+    lda #'h'
+    bne preallocate_declared_symbol_is_real_condition_statement
+preallocate_declared_symbol_is_real_if_condition_not_if:
+    lda #<pattern_while
+    sta const_ptr
+    lda #>pattern_while
+    sta const_ptr+1
+    jsr symbol_buffer_matches_const_ptr
+    bcs preallocate_declared_symbol_is_real_condition_not_while
+    lda #'f'
+    bne preallocate_declared_symbol_is_real_condition_statement
+preallocate_declared_symbol_is_real_condition_not_while:
+    lda #<pattern_until
+    sta const_ptr
+    lda #>pattern_until
+    sta const_ptr+1
+    jsr symbol_buffer_matches_const_ptr
+    bcs preallocate_declared_symbol_is_real_if_condition_not_condition
+    lda #'t'
+preallocate_declared_symbol_is_real_condition_statement:
+    sta expr_print_op
+    ldy symbol_end_y_data
+    jsr skip_inline_spaces_at_scan_y
+    sty preallocate_condition_start_y_data
+    jsr preallocate_real_condition_cmp_external_from_scan_y
+    bcc preallocate_declared_symbol_is_real_condition_statement_done
+    ldy preallocate_condition_start_y_data
+    jsr preallocate_call_condition_external_from_scan_y
+    bcc preallocate_declared_symbol_is_real_condition_statement_done
+    ldy preallocate_condition_start_y_data
+    jsr preallocate_call_comparison_condition_external_from_scan_y
+    bcc preallocate_declared_symbol_is_real_condition_statement_done
+    ldy preallocate_condition_start_y_data
+    jsr preallocate_call_bool_condition_external_from_scan_y
+preallocate_declared_symbol_is_real_condition_statement_done:
+    clc
+    rts
+preallocate_declared_symbol_is_real_if_condition_not_condition:
+    sec
+    rts
+
+preallocate_real_condition_cmp_external_from_scan_y:
+    jsr find_var_index_from_scan_y
+    bcs preallocate_real_condition_cmp_external_miss
+    jsr require_var_index_real_or_fail
+    bcs preallocate_real_condition_cmp_external_miss
+    jsr skip_inline_spaces_at_scan_y
+    jsr source_reader_peek_scan_y
+    cmp #'='
+    beq preallocate_real_condition_cmp_external_consume_single
+    cmp #'<'
+    beq preallocate_real_condition_cmp_external_consume_lt
+    cmp #'>'
+    beq preallocate_real_condition_cmp_external_consume_gt
+    jmp preallocate_real_condition_cmp_external_miss
+preallocate_real_condition_cmp_external_consume_single:
+    jsr source_reader_consume_scan_y
+    bcs preallocate_real_condition_cmp_external_miss
+    jmp preallocate_real_condition_cmp_external_rhs
+preallocate_real_condition_cmp_external_consume_lt:
+    jsr source_reader_consume_scan_y
+    bcs preallocate_real_condition_cmp_external_miss
+    jsr source_reader_peek_scan_y
+    cmp #'>'
+    beq preallocate_real_condition_cmp_external_consume_second
+    cmp #'='
+    beq preallocate_real_condition_cmp_external_consume_second
+    jmp preallocate_real_condition_cmp_external_rhs
+preallocate_real_condition_cmp_external_consume_gt:
+    jsr source_reader_consume_scan_y
+    bcs preallocate_real_condition_cmp_external_miss
+    jsr source_reader_peek_scan_y
+    cmp #'='
+    bne preallocate_real_condition_cmp_external_rhs
+preallocate_real_condition_cmp_external_consume_second:
+    jsr source_reader_consume_scan_y
+    bcs preallocate_real_condition_cmp_external_miss
+preallocate_real_condition_cmp_external_rhs:
+    jsr skip_inline_spaces_at_scan_y
+    jsr find_var_index_from_scan_y
+    bcs preallocate_real_condition_cmp_external_miss
+    jsr require_var_index_real_or_fail
+    bcs preallocate_real_condition_cmp_external_miss
+    jsr preallocate_require_condition_terminator_at_scan_y
+    bcs preallocate_real_condition_cmp_external_miss
+    jsr find_or_store_rt_f_cmp_external
+    bcs preallocate_real_condition_cmp_external_miss
+    clc
+    rts
+preallocate_real_condition_cmp_external_miss:
+    sec
+    rts
+
+preallocate_declared_symbol_is_return_statement:
+    lda #<pattern_return
+    sta const_ptr
+    lda #>pattern_return
+    sta const_ptr+1
+    jsr symbol_buffer_matches_const_ptr
+    bcs preallocate_declared_symbol_is_return_statement_miss
+    ldy symbol_end_y_data
+    jsr skip_inline_spaces_at_scan_y
+    jsr source_reader_peek_scan_y
+    beq preallocate_declared_symbol_is_return_statement_done
+    cmp #10
+    beq preallocate_declared_symbol_is_return_statement_done
+    cmp #13
+    beq preallocate_declared_symbol_is_return_statement_done
+    jsr preallocate_call_expression_external_from_scan_y
+preallocate_declared_symbol_is_return_statement_done:
+    clc
+    rts
+preallocate_declared_symbol_is_return_statement_miss:
+    sec
+    rts
+
+preallocate_call_condition_external_from_scan_y:
+    jsr save_condition_reader_mark
+    jsr preallocate_call_with_arg_externals_from_scan_y
+    bcs preallocate_call_condition_external_miss_restore
+    jsr preallocate_require_condition_terminator_at_scan_y
+    bcs preallocate_call_condition_external_miss_restore
+    clc
+    rts
+preallocate_call_condition_external_miss_restore:
+    jsr restore_condition_reader_mark
+    sec
+    rts
+
+preallocate_call_comparison_condition_external_from_scan_y:
+    jsr save_condition_reader_mark
+    jsr preallocate_call_comparison_clause_external_from_scan_y
+    bcs preallocate_call_comparison_condition_external_miss_restore
+    jsr preallocate_require_condition_terminator_at_scan_y
+    bcs preallocate_call_comparison_condition_external_miss_restore
+    clc
+    rts
+preallocate_call_comparison_condition_external_miss_restore:
+    jsr restore_condition_reader_mark
+    sec
+    rts
+
+preallocate_call_comparison_clause_external_from_scan_y:
+    jsr preallocate_call_with_arg_externals_from_scan_y
+    bcs preallocate_call_comparison_clause_external_fail
+    jsr preallocate_consume_comparison_operator_at_scan_y
+    bcs preallocate_call_comparison_clause_external_fail
+    jsr skip_inline_spaces_at_scan_y
+    jsr preallocate_call_with_arg_externals_from_scan_y
+    bcs preallocate_call_comparison_clause_external_fail
+    clc
+    rts
+preallocate_call_comparison_clause_external_fail:
+    sec
+    rts
+
+preallocate_call_bool_condition_external_from_scan_y:
+    jsr save_condition_reader_mark
+    jsr preallocate_call_bool_or_external_from_scan_y
+    bcs preallocate_call_bool_condition_external_miss_restore
+    jsr preallocate_require_condition_terminator_at_scan_y
+    bcs preallocate_call_bool_condition_external_miss_restore
+    clc
+    rts
+preallocate_call_bool_condition_external_miss_restore:
+    jsr restore_condition_reader_mark
+    sec
+    rts
+
+preallocate_call_bool_or_external_from_scan_y:
+    jsr preallocate_call_bool_and_external_from_scan_y
+    bcs preallocate_call_bool_or_external_fail
+preallocate_call_bool_or_external_loop:
+    jsr consume_or_keyword_from_scan_y
+    bcs preallocate_call_bool_or_external_done
+    jsr preallocate_call_bool_and_external_from_scan_y
+    bcs preallocate_call_bool_or_external_fail
+    jmp preallocate_call_bool_or_external_loop
+preallocate_call_bool_or_external_done:
+    clc
+    rts
+preallocate_call_bool_or_external_fail:
+    sec
+    rts
+
+preallocate_call_bool_and_external_from_scan_y:
+    jsr preallocate_call_bool_not_external_from_scan_y
+    bcs preallocate_call_bool_and_external_fail
+preallocate_call_bool_and_external_loop:
+    jsr consume_and_keyword_from_scan_y
+    bcs preallocate_call_bool_and_external_done
+    jsr preallocate_call_bool_not_external_from_scan_y
+    bcs preallocate_call_bool_and_external_fail
+    jmp preallocate_call_bool_and_external_loop
+preallocate_call_bool_and_external_done:
+    clc
+    rts
+preallocate_call_bool_and_external_fail:
+    sec
+    rts
+
+preallocate_call_bool_not_external_from_scan_y:
+    jsr consume_not_keyword_from_scan_y
+    bcs preallocate_call_bool_primary_external_from_scan_y
+    jsr preallocate_call_bool_not_external_from_scan_y
+    bcs preallocate_call_bool_not_external_fail
+    clc
+    rts
+preallocate_call_bool_not_external_fail:
+    sec
+    rts
+
+preallocate_call_bool_primary_external_from_scan_y:
+    jsr skip_inline_spaces_at_scan_y
+    jsr source_reader_peek_scan_y
+    cmp #'('
+    beq preallocate_call_bool_primary_external_group
+    sty preallocate_bool_primary_start_y_data
+    jsr save_group_reader_mark
+    jsr preallocate_call_comparison_clause_external_from_scan_y
+    bcc preallocate_call_bool_primary_external_done
+    jsr restore_group_reader_mark
+    ldy preallocate_bool_primary_start_y_data
+    jmp preallocate_call_with_arg_externals_from_scan_y
+preallocate_call_bool_primary_external_group:
+    jsr source_reader_consume_scan_y
+    bcs preallocate_call_bool_primary_external_fail
+    jsr preallocate_call_bool_or_external_from_scan_y
+    bcs preallocate_call_bool_primary_external_fail
+    jsr skip_inline_spaces_at_scan_y
+    jsr source_reader_peek_scan_y
+    cmp #')'
+    bne preallocate_call_bool_primary_external_fail
+    jsr source_reader_consume_scan_y
+    bcs preallocate_call_bool_primary_external_fail
+preallocate_call_bool_primary_external_done:
+    clc
+    rts
+preallocate_call_bool_primary_external_fail:
+    sec
+    rts
+
+preallocate_consume_comparison_operator_at_scan_y:
+    jsr skip_inline_spaces_at_scan_y
+    jsr source_reader_peek_scan_y
+    cmp #'='
+    beq preallocate_consume_comparison_operator_single
+    cmp #'<'
+    beq preallocate_consume_comparison_operator_lt
+    cmp #'>'
+    beq preallocate_consume_comparison_operator_gt
+    sec
+    rts
+preallocate_consume_comparison_operator_single:
+    jsr source_reader_consume_scan_y
+    bcs preallocate_consume_comparison_operator_fail
+    clc
+    rts
+preallocate_consume_comparison_operator_lt:
+    jsr source_reader_consume_scan_y
+    bcs preallocate_consume_comparison_operator_fail
+    jsr source_reader_peek_scan_y
+    cmp #'>'
+    beq preallocate_consume_comparison_operator_second
+    cmp #'='
+    beq preallocate_consume_comparison_operator_second
+    clc
+    rts
+preallocate_consume_comparison_operator_gt:
+    jsr source_reader_consume_scan_y
+    bcs preallocate_consume_comparison_operator_fail
+    jsr source_reader_peek_scan_y
+    cmp #'='
+    bne preallocate_consume_comparison_operator_done
+preallocate_consume_comparison_operator_second:
+    jsr source_reader_consume_scan_y
+    bcs preallocate_consume_comparison_operator_fail
+preallocate_consume_comparison_operator_done:
+    clc
+    rts
+preallocate_consume_comparison_operator_fail:
+    sec
+    rts
+
+preallocate_save_declared_module_name:
+    ldy #$00
+preallocate_save_declared_module_name_loop:
+    lda declared_module_name,y
+    sta saved_var_name_data,y
+    beq preallocate_save_declared_module_name_done
+    iny
+    cpy #25
+    bcc preallocate_save_declared_module_name_loop
+    sec
+    rts
+preallocate_save_declared_module_name_done:
+    clc
+    rts
+
+preallocate_restore_saved_module_name:
+    ldy #$00
+preallocate_restore_saved_module_name_loop:
+    lda saved_var_name_data,y
+    sta declared_module_name,y
+    beq preallocate_restore_saved_module_name_done
+    iny
+    cpy #25
+    bcc preallocate_restore_saved_module_name_loop
+    sec
+    rts
+preallocate_restore_saved_module_name_done:
+    clc
+    rts
+
+preallocate_require_condition_terminator_at_scan_y:
+    lda expr_print_op
+    cmp #'h'
+    beq preallocate_require_then_or_line_end_at_scan_y
+    cmp #'f'
+    beq preallocate_require_do_or_line_end_at_scan_y
+    jmp require_line_end_at_scan_y
+
+preallocate_require_then_or_line_end_at_scan_y:
+    jsr skip_inline_spaces_at_scan_y
+    jsr source_reader_peek_scan_y
+    beq preallocate_require_then_or_line_end_at_scan_y_ok
+    cmp #10
+    beq preallocate_require_then_or_line_end_at_scan_y_ok
+    cmp #13
+    beq preallocate_require_then_or_line_end_at_scan_y_ok
+    jsr uppercase_ascii
+    cmp #'T'
+    bne preallocate_require_then_or_line_end_at_scan_y_fail
+    jsr source_reader_consume_scan_y
+    bcs preallocate_require_then_or_line_end_at_scan_y_fail
+    jsr source_reader_peek_scan_y
+    jsr uppercase_ascii
+    cmp #'H'
+    bne preallocate_require_then_or_line_end_at_scan_y_fail
+    jsr source_reader_consume_scan_y
+    bcs preallocate_require_then_or_line_end_at_scan_y_fail
+    jsr source_reader_peek_scan_y
+    jsr uppercase_ascii
+    cmp #'E'
+    bne preallocate_require_then_or_line_end_at_scan_y_fail
+    jsr source_reader_consume_scan_y
+    bcs preallocate_require_then_or_line_end_at_scan_y_fail
+    jsr source_reader_peek_scan_y
+    jsr uppercase_ascii
+    cmp #'N'
+    bne preallocate_require_then_or_line_end_at_scan_y_fail
+    jsr source_reader_consume_scan_y
+    bcs preallocate_require_then_or_line_end_at_scan_y_fail
+    jsr skip_inline_spaces_at_scan_y
+    jsr source_reader_peek_scan_y
+    beq preallocate_require_then_or_line_end_at_scan_y_ok
+    cmp #10
+    beq preallocate_require_then_or_line_end_at_scan_y_ok
+    cmp #13
+    beq preallocate_require_then_or_line_end_at_scan_y_ok
+preallocate_require_then_or_line_end_at_scan_y_fail:
+    sec
+    rts
+preallocate_require_then_or_line_end_at_scan_y_ok:
+    clc
+    rts
+
+preallocate_require_do_or_line_end_at_scan_y:
+    jsr skip_inline_spaces_at_scan_y
+    jsr source_reader_peek_scan_y
+    beq preallocate_require_do_or_line_end_at_scan_y_ok
+    cmp #10
+    beq preallocate_require_do_or_line_end_at_scan_y_ok
+    cmp #13
+    beq preallocate_require_do_or_line_end_at_scan_y_ok
+    jsr uppercase_ascii
+    cmp #'D'
+    bne preallocate_require_do_or_line_end_at_scan_y_fail
+    jsr source_reader_consume_scan_y
+    bcs preallocate_require_do_or_line_end_at_scan_y_fail
+    jsr source_reader_peek_scan_y
+    jsr uppercase_ascii
+    cmp #'O'
+    bne preallocate_require_do_or_line_end_at_scan_y_fail
+    jsr source_reader_consume_scan_y
+    bcs preallocate_require_do_or_line_end_at_scan_y_fail
+    jsr skip_inline_spaces_at_scan_y
+    jsr source_reader_peek_scan_y
+    beq preallocate_require_do_or_line_end_at_scan_y_ok
+    cmp #10
+    beq preallocate_require_do_or_line_end_at_scan_y_ok
+    cmp #13
+    beq preallocate_require_do_or_line_end_at_scan_y_ok
+preallocate_require_do_or_line_end_at_scan_y_fail:
+    sec
+    rts
+preallocate_require_do_or_line_end_at_scan_y_ok:
+    clc
+    rts
+
+preallocate_declared_symbol_is_print_statement:
+    lda #<preallocate_symbol_print
+    sta const_ptr
+    lda #>preallocate_symbol_print
+    sta const_ptr+1
+    jsr symbol_buffer_matches_const_ptr
+    bcc preallocate_declared_symbol_is_print_statement_done
+    lda #<preallocate_symbol_printe
+    sta const_ptr
+    lda #>preallocate_symbol_printe
+    sta const_ptr+1
+    jsr symbol_buffer_matches_const_ptr
+    bcc preallocate_declared_symbol_is_print_statement_done
+    lda #<preallocate_symbol_printi
+    sta const_ptr
+    lda #>preallocate_symbol_printi
+    sta const_ptr+1
+    jsr symbol_buffer_matches_const_ptr
+    bcc preallocate_declared_symbol_is_int_print_statement
+    lda #<preallocate_symbol_printie
+    sta const_ptr
+    lda #>preallocate_symbol_printie
+    sta const_ptr+1
+    jsr symbol_buffer_matches_const_ptr
+    bcc preallocate_declared_symbol_is_int_print_statement
+    lda #<preallocate_symbol_printr
+    sta const_ptr
+    lda #>preallocate_symbol_printr
+    sta const_ptr+1
+    jsr symbol_buffer_matches_const_ptr
+    bcc preallocate_declared_symbol_is_real_print_statement
+    lda #<preallocate_symbol_printre
+    sta const_ptr
+    lda #>preallocate_symbol_printre
+    sta const_ptr+1
+    jsr symbol_buffer_matches_const_ptr
+    bcc preallocate_declared_symbol_is_real_print_statement
+    sec
+    rts
+preallocate_declared_symbol_is_real_print_statement:
+    jsr preallocate_real_print_statement_external_from_scan_y
+    jmp preallocate_declared_symbol_is_print_statement_done
+preallocate_declared_symbol_is_int_print_statement:
+    jsr preallocate_int_print_statement_call_external_from_scan_y
+preallocate_declared_symbol_is_print_statement_done:
+    clc
+    rts
+
+preallocate_real_print_statement_external_from_scan_y:
+    ldy symbol_end_y_data
+    jsr skip_inline_spaces_at_scan_y
+    jsr source_reader_peek_scan_y
+    cmp #'('
+    bne preallocate_real_print_statement_external_miss
+    jsr source_reader_consume_scan_y
+    bcs preallocate_real_print_statement_external_miss
+    jsr skip_inline_spaces_at_scan_y
+    jsr preallocate_real_bridge_conversion_external_from_scan_y
+    bcc preallocate_real_print_statement_external_after_value
+    jsr preallocate_real_numeric_conversion_external_from_scan_y
+    bcc preallocate_real_print_statement_external_after_value
+    jsr preallocate_real_unary_print_external_from_scan_y
+    bcc preallocate_real_print_statement_external_after_value
+    jsr preallocate_real_binary_print_external_from_scan_y
+    bcc preallocate_real_print_statement_external_after_value
+    jsr copy_symbol_from_scan_y
+    bcs preallocate_real_print_statement_external_miss
+    sty symbol_start_y_data
+    jsr find_var_index_from_declared
+    bcs preallocate_real_print_statement_external_miss
+    jsr require_var_index_real_or_fail
+    bcs preallocate_real_print_statement_external_miss
+    ldy symbol_start_y_data
+preallocate_real_print_statement_external_after_value:
+    jsr skip_inline_spaces_at_scan_y
+    jsr source_reader_peek_scan_y
+    cmp #')'
+    bne preallocate_real_print_statement_external_miss
+    jsr source_reader_consume_scan_y
+    bcs preallocate_real_print_statement_external_miss
+    jsr skip_inline_spaces_at_scan_y
+    jsr require_line_end_at_scan_y
+    bcs preallocate_real_print_statement_external_miss
+    jsr find_or_store_rt_print_f_external
+    bcs preallocate_real_print_statement_external_miss
+    clc
+    rts
+preallocate_real_print_statement_external_miss:
+    sec
+    rts
+
+preallocate_int_print_statement_call_external_from_scan_y:
+    ldy symbol_end_y_data
+    sty preallocate_print_start_y_data
+    jsr save_condition_reader_mark
+    jsr skip_inline_spaces_at_scan_y
+    jsr source_reader_peek_scan_y
+    cmp #'('
+    bne preallocate_int_print_statement_call_external_miss
+    jsr source_reader_consume_scan_y
+    bcs preallocate_int_print_statement_call_external_miss
+    jsr skip_inline_spaces_at_scan_y
+    jsr preallocate_call_with_arg_externals_from_scan_y
+    bcs preallocate_int_print_statement_call_external_try_arg_scan
+    jsr skip_inline_spaces_at_scan_y
+    jsr source_reader_peek_scan_y
+    cmp #')'
+    bne preallocate_int_print_statement_call_external_try_arg_scan
+    jsr source_reader_consume_scan_y
+    bcs preallocate_int_print_statement_call_external_miss_restore
+    jsr skip_inline_spaces_at_scan_y
+    jsr require_line_end_at_scan_y
+    bcs preallocate_int_print_statement_call_external_miss_restore
+    clc
+    rts
+preallocate_int_print_statement_call_external_try_arg_scan:
+    jsr restore_condition_reader_mark
+    ldy preallocate_print_start_y_data
+    jsr save_condition_reader_mark
+    jsr skip_inline_spaces_at_scan_y
+    jsr source_reader_peek_scan_y
+    cmp #'('
+    bne preallocate_int_print_statement_call_external_miss_restore
+    jsr source_reader_consume_scan_y
+    bcs preallocate_int_print_statement_call_external_miss_restore
+    jsr skip_inline_spaces_at_scan_y
+    jsr preallocate_scan_plain_call_arg_for_externals_from_scan_y
+    bcs preallocate_int_print_statement_call_external_miss_restore
+    jsr skip_inline_spaces_at_scan_y
+    jsr source_reader_peek_scan_y
+    cmp #')'
+    bne preallocate_int_print_statement_call_external_miss_restore
+    jsr source_reader_consume_scan_y
+    bcs preallocate_int_print_statement_call_external_miss_restore
+    jsr skip_inline_spaces_at_scan_y
+    jsr require_line_end_at_scan_y
+    bcs preallocate_int_print_statement_call_external_miss_restore
+    clc
+    rts
+preallocate_int_print_statement_call_external_miss_restore:
+    jsr restore_condition_reader_mark
+preallocate_int_print_statement_call_external_miss:
+    sec
+    rts
+
+preallocate_symbol_print:
+    .asciiz "PRINT"
+preallocate_symbol_printe:
+    .asciiz "PRINTE"
+preallocate_symbol_printr:
+    .asciiz "PRINTR"
+preallocate_symbol_printre:
+    .asciiz "PRINTRE"
+preallocate_symbol_printi:
+    .asciiz "PRINTI"
+preallocate_symbol_printie:
+    .asciiz "PRINTIE"
+.endif
+
 .if ACTC_KEEP_DECL_RESIDENT_FALLBACK
 collect_module_vars_or_fail:
     lda #$40
@@ -1450,7 +3208,7 @@ collect_module_vars_or_fail:
     jsr skip_source_line
 collect_module_vars_or_fail_loop:
     ldy #$00
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     beq collect_module_vars_or_fail_done
     cmp #10
     beq collect_module_vars_or_fail_advance_blank
@@ -1458,7 +3216,7 @@ collect_module_vars_or_fail_loop:
     beq collect_module_vars_or_fail_advance_blank
     jsr skip_source_spaces
     ldy #$00
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     beq collect_module_vars_or_fail_done
     lda #<pattern_proc
     sta const_ptr
@@ -1472,7 +3230,7 @@ collect_module_vars_or_fail_loop:
     jsr skip_source_line
     jmp collect_module_vars_or_fail_loop
 collect_module_vars_or_fail_advance_blank:
-    jsr advance_scan_ptr
+    jsr source_reader_consume_scan_ptr
     jmp collect_module_vars_or_fail_loop
 collect_module_vars_or_fail_bad:
     lda #<msg_bad_var
@@ -1490,7 +3248,7 @@ store_module_var_from_scan_ptr_or_fail:
     bcc :+
     jmp store_module_var_from_scan_ptr_or_fail_bad
 :
-    jsr advance_scan_ptr_by_const_ptr
+    jsr source_reader_consume_const_ptr_at_scan_ptr
     jsr skip_source_spaces
     jsr copy_symbol_from_scan_ptr
     bcc :+
@@ -1517,7 +3275,7 @@ store_module_var_from_scan_ptr_or_fail_save_name_done:
     sta expr_term_lo
     ldy compare_char
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     beq store_module_var_from_scan_ptr_or_fail_store
     cmp #10
     beq store_module_var_from_scan_ptr_or_fail_store
@@ -1536,25 +3294,25 @@ store_module_var_from_scan_ptr_or_fail_save_name_done:
     cmp #'r'
     bne store_module_var_from_scan_ptr_or_fail_bad
 :
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     bcc :+
     jmp store_module_var_from_scan_ptr_or_fail_bad
 :
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #'['
     bne store_module_var_from_scan_ptr_or_fail_parse_value
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     bcc :+
     jmp store_module_var_from_scan_ptr_or_fail_bad
 :
     jsr parse_small_value_expr_at_scan_y
     bcs store_module_var_from_scan_ptr_or_fail_bad
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #']'
     bne store_module_var_from_scan_ptr_or_fail_bad
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     bcc :+
     jmp store_module_var_from_scan_ptr_or_fail_bad
 :
@@ -1650,7 +3408,7 @@ collect_proc_exports_or_fail:
     jsr set_actc_trace
 collect_proc_exports_or_fail_loop:
     ldy #$00
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     beq collect_proc_exports_or_fail_done_check
     cmp #10
     beq collect_proc_exports_or_fail_advance_blank
@@ -1658,7 +3416,7 @@ collect_proc_exports_or_fail_loop:
     beq collect_proc_exports_or_fail_advance_blank
     jsr skip_source_spaces
     ldy #$00
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     beq collect_proc_exports_or_fail_done_check
     lda #<pattern_proc
     sta const_ptr
@@ -1666,7 +3424,7 @@ collect_proc_exports_or_fail_loop:
     sta const_ptr+1
     jsr pattern_matches_scan_ptr
     bcs collect_proc_exports_or_fail_skip_line
-    jsr advance_scan_ptr_by_const_ptr
+    jsr source_reader_consume_const_ptr_at_scan_ptr
     jsr skip_source_spaces
     lda #$52
     jsr set_actc_trace
@@ -1675,7 +3433,7 @@ collect_proc_exports_or_fail_skip_line:
     jsr skip_source_line
     jmp collect_proc_exports_or_fail_loop
 collect_proc_exports_or_fail_advance_blank:
-    jsr advance_scan_ptr
+    jsr source_reader_consume_scan_ptr
     jmp collect_proc_exports_or_fail_loop
 collect_proc_exports_or_fail_done_check:
     lda export_count_data
@@ -1726,7 +3484,7 @@ collect_proc_locals_or_fail_clear_loop:
     jsr set_actc_trace
 collect_proc_locals_or_fail_loop:
     ldy #$00
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     beq collect_proc_locals_or_fail_done
     cmp #10
     beq collect_proc_locals_or_fail_advance_blank
@@ -1734,7 +3492,7 @@ collect_proc_locals_or_fail_loop:
     beq collect_proc_locals_or_fail_advance_blank
     jsr skip_source_spaces
     ldy #$00
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     beq collect_proc_locals_or_fail_done
     lda #<pattern_proc
     sta const_ptr
@@ -1742,7 +3500,7 @@ collect_proc_locals_or_fail_loop:
     sta const_ptr+1
     jsr pattern_matches_scan_ptr
     bcs collect_proc_locals_or_fail_try_int_decl
-    jsr advance_scan_ptr_by_const_ptr
+    jsr source_reader_consume_const_ptr_at_scan_ptr
     jsr skip_source_spaces
     jsr copy_symbol_from_scan_ptr
     bcs collect_proc_locals_or_fail_bad_proc
@@ -1775,7 +3533,7 @@ collect_proc_locals_or_fail_skip_line:
     jsr skip_source_line
     jmp collect_proc_locals_or_fail_loop
 collect_proc_locals_or_fail_advance_blank:
-    jsr advance_scan_ptr
+    jsr source_reader_consume_scan_ptr
     jmp collect_proc_locals_or_fail_loop
 collect_proc_locals_or_fail_bad_proc:
     lda #<msg_bad_proc
@@ -1793,7 +3551,7 @@ collect_proc_locals_or_fail_done:
 store_proc_local_var_from_scan_ptr_or_fail:
     jsr match_scalar_decl_at_scan_ptr
     bcs store_proc_local_var_from_scan_ptr_or_fail_bad
-    jsr advance_scan_ptr_by_const_ptr
+    jsr source_reader_consume_const_ptr_at_scan_ptr
     jsr skip_source_spaces
     jsr copy_symbol_from_scan_ptr
     bcc :+
@@ -1873,7 +3631,9 @@ collect_proc_body_ops_resident:
     lda #$00
     sta string_count_data
     sta int_count_data
+.if !ACTC_PREALLOCATE_BODY_EXTERNALS
     sta extern_count_data
+.endif
     sta loop_depth_data
     lda #$FF
     sta current_proc_index_data
@@ -1902,7 +3662,7 @@ collect_proc_body_ops_clear_loop:
 :
 collect_proc_body_ops_loop:
     ldy #$00
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     bne collect_proc_body_ops_have_char
     jmp collect_proc_body_ops_done
 collect_proc_body_ops_have_char:
@@ -1915,7 +3675,7 @@ collect_proc_body_ops_have_char:
 :
     jsr skip_source_spaces
     ldy #$00
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     bne collect_proc_body_ops_after_space_check
     jmp collect_proc_body_ops_done
 collect_proc_body_ops_after_space_check:
@@ -1939,7 +3699,7 @@ collect_proc_body_ops_after_space_check:
         bcc :+
         jmp collect_proc_body_ops_try_od
 :
-        jsr advance_scan_ptr_by_const_ptr
+        jsr source_reader_consume_const_ptr_at_scan_ptr
         jsr skip_source_spaces
         jsr copy_symbol_from_scan_ptr
         bcc :+
@@ -1957,7 +3717,7 @@ collect_proc_body_ops_after_space_check:
         pla
         tay
         jsr skip_inline_spaces_at_scan_y
-        lda (scan_ptr),y
+        jsr source_reader_peek_scan_y
         bne :+
         jmp collect_proc_body_ops_skip_line
 :
@@ -1981,25 +3741,25 @@ collect_proc_body_ops_after_space_check:
         bcc collect_proc_body_ops_try_local_real_assignment
         jmp collect_proc_body_ops_bad_var
 collect_proc_body_ops_try_local_int_assignment:
-        jsr advance_scan_y
+        jsr source_reader_consume_scan_y
         bcc :+
         jmp collect_proc_body_ops_bad_literal
 :
         jsr skip_inline_spaces_at_scan_y
-        lda (scan_ptr),y
+        jsr source_reader_peek_scan_y
         cmp #'='
         bne :+
-        jsr advance_scan_y
+        jsr source_reader_consume_scan_y
         bcc :+
         jmp collect_proc_body_ops_bad_literal
 :
         jsr skip_inline_spaces_at_scan_y
-        lda (scan_ptr),y
+        jsr source_reader_peek_scan_y
         cmp #'['
         beq :+
         jmp collect_proc_body_ops_try_local_int_parse_value
 :
-        jsr advance_scan_y
+        jsr source_reader_consume_scan_y
         bcc :+
         jmp collect_proc_body_ops_bad_literal
 :
@@ -2008,12 +3768,12 @@ collect_proc_body_ops_try_local_int_assignment:
         jmp collect_proc_body_ops_bad_literal
 :
         jsr skip_inline_spaces_at_scan_y
-        lda (scan_ptr),y
+        jsr source_reader_peek_scan_y
         cmp #']'
         beq :+
         jmp collect_proc_body_ops_bad_literal
 :
-        jsr advance_scan_y
+        jsr source_reader_consume_scan_y
         bcc :+
         jmp collect_proc_body_ops_bad_literal
 :
@@ -2034,15 +3794,15 @@ collect_proc_body_ops_try_local_int_after_value:
         jmp collect_proc_body_ops_skip_line
 
 collect_proc_body_ops_try_local_real_assignment:
-        jsr advance_scan_y
+        jsr source_reader_consume_scan_y
         bcc :+
         jmp collect_proc_body_ops_bad_literal
 :
         jsr skip_inline_spaces_at_scan_y
-        lda (scan_ptr),y
+        jsr source_reader_peek_scan_y
         cmp #'='
         bne :+
-        jsr advance_scan_y
+        jsr source_reader_consume_scan_y
         bcc :+
         jmp collect_proc_body_ops_bad_literal
 :       jsr emit_real_add_assignment_from_scan_y_or_fail
@@ -2076,7 +3836,7 @@ collect_proc_body_ops_try_until:
 	    sta const_ptr+1
 	    jsr pattern_matches_scan_ptr_keyword
 	    bcs collect_proc_body_ops_try_do
-	    jsr advance_scan_ptr_by_const_ptr
+	    jsr source_reader_consume_const_ptr_at_scan_ptr
 	    jsr store_small_runtime_until_from_scan_ptr
 	    bcc :+
 	    jmp collect_proc_body_ops_if_bad_literal
@@ -2093,7 +3853,7 @@ collect_proc_body_ops_try_do:
 	    jsr push_while_loop_kind_or_fail
 	    lda #'d'
 	    jsr append_body_op_no_arg_for_current_proc
-	    jsr advance_scan_ptr_by_const_ptr
+	    jsr source_reader_consume_const_ptr_at_scan_ptr
 	    lda #'f'
 	    sta expr_print_op
 	    jsr store_small_runtime_condition_core
@@ -2152,7 +3912,7 @@ collect_proc_body_ops_try_if:
 	    sta const_ptr+1
 	    jsr pattern_matches_scan_ptr_keyword
 	    bcs collect_proc_body_ops_try_printe
-	    jsr advance_scan_ptr_by_const_ptr
+	    jsr source_reader_consume_const_ptr_at_scan_ptr
 	    jsr store_small_runtime_condition_from_scan_ptr
 	    bcs collect_proc_body_ops_if_bad_literal
 	    jmp collect_proc_body_ops_skip_line
@@ -2165,7 +3925,7 @@ collect_proc_body_ops_if_bad_literal:
     sta const_ptr+1
     jsr pattern_matches_scan_ptr
     bcs collect_proc_body_ops_try_printe
-    jsr advance_scan_ptr_by_const_ptr
+    jsr source_reader_consume_const_ptr_at_scan_ptr
     lda #$12
     jsr set_actc_trace
     jsr store_string_literal_from_scan_ptr
@@ -2185,7 +3945,7 @@ collect_proc_body_ops_try_printe:
     sta const_ptr+1
     jsr pattern_matches_scan_ptr
     bcs collect_proc_body_ops_try_printre
-    jsr advance_scan_ptr_by_const_ptr
+    jsr source_reader_consume_const_ptr_at_scan_ptr
     lda #$14
     jsr set_actc_trace
     jsr store_string_literal_from_scan_ptr
@@ -2205,7 +3965,7 @@ collect_proc_body_ops_try_printre:
     sta const_ptr+1
     jsr pattern_matches_scan_ptr
     bcs collect_proc_body_ops_try_printr
-    jsr advance_scan_ptr_by_const_ptr
+    jsr source_reader_consume_const_ptr_at_scan_ptr
     lda #$01
     jsr store_runtime_real_print_with_newline_flag_from_scan_ptr
     bcs :+
@@ -2220,7 +3980,7 @@ collect_proc_body_ops_try_printr:
     sta const_ptr+1
     jsr pattern_matches_scan_ptr
     bcs collect_proc_body_ops_try_printie
-    jsr advance_scan_ptr_by_const_ptr
+    jsr source_reader_consume_const_ptr_at_scan_ptr
     lda #$00
     jsr store_runtime_real_print_with_newline_flag_from_scan_ptr
     bcs :+
@@ -2235,7 +3995,7 @@ collect_proc_body_ops_try_printie:
     sta const_ptr+1
     jsr pattern_matches_scan_ptr
     bcs collect_proc_body_ops_try_printi
-    jsr advance_scan_ptr_by_const_ptr
+    jsr source_reader_consume_const_ptr_at_scan_ptr
     jsr store_small_decimal_literal_from_scan_ptr
     bcc collect_proc_body_ops_try_printie_literal_done
     lda #'z'
@@ -2257,7 +4017,7 @@ collect_proc_body_ops_try_printi:
     sta const_ptr+1
     jsr pattern_matches_scan_ptr
     bcs collect_proc_body_ops_try_return
-    jsr advance_scan_ptr_by_const_ptr
+    jsr source_reader_consume_const_ptr_at_scan_ptr
     jsr store_small_decimal_literal_from_scan_ptr
     bcc collect_proc_body_ops_try_printi_literal_done
     lda #'y'
@@ -2279,10 +4039,10 @@ collect_proc_body_ops_try_return:
     sta const_ptr+1
     jsr pattern_matches_scan_ptr_keyword
     bcs collect_proc_body_ops_try_assignment
-    jsr advance_scan_ptr_by_const_ptr
+    jsr source_reader_consume_const_ptr_at_scan_ptr
     ldy #$00
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     beq collect_proc_body_ops_try_return_emit
     cmp #10
     beq collect_proc_body_ops_try_return_emit
@@ -2308,7 +4068,7 @@ collect_proc_body_ops_try_assignment:
     sty hex_work
     ldy hex_work
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #'='
     bne collect_proc_body_ops_try_local_call
     sty symbol_end_y_data
@@ -2330,7 +4090,7 @@ collect_proc_body_ops_try_assignment:
     jmp collect_proc_body_ops_bad_var
 collect_proc_body_ops_try_assignment_word:
     ldy symbol_end_y_data
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     bcc :+
     jmp collect_proc_body_ops_bad_literal
 :
@@ -2344,7 +4104,7 @@ collect_proc_body_ops_try_assignment_word:
     jmp collect_proc_body_ops_skip_line
 collect_proc_body_ops_try_assignment_real:
     ldy symbol_end_y_data
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     bcc :+
     jmp collect_proc_body_ops_bad_literal
 :
@@ -2354,7 +4114,7 @@ collect_proc_body_ops_try_assignment_real:
 
 collect_proc_body_ops_try_local_call:
     ldy hex_work
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #'('
     bne collect_proc_body_ops_skip_line
     sty symbol_end_y_data
@@ -2370,7 +4130,7 @@ collect_proc_body_ops_skip_line:
     jsr skip_source_line
     jmp collect_proc_body_ops_loop
 collect_proc_body_ops_proc_decl:
-    jsr advance_scan_ptr_by_const_ptr
+    jsr source_reader_consume_const_ptr_at_scan_ptr
     jsr skip_source_spaces
     jsr copy_symbol_from_scan_ptr
     bcs collect_proc_body_ops_bad_proc
@@ -2384,7 +4144,7 @@ collect_proc_body_ops_proc_decl:
     jsr skip_source_line
     jmp collect_proc_body_ops_loop
 collect_proc_body_ops_advance_blank:
-    jsr advance_scan_ptr
+    jsr source_reader_consume_scan_ptr
     jmp collect_proc_body_ops_loop
 collect_proc_body_ops_bad_proc:
     lda #<msg_bad_proc
@@ -2410,7 +4170,9 @@ collect_proc_body_ops_overlay_begin:
     lda #$00
     sta string_count_data
     sta int_count_data
+.if !ACTC_PREALLOCATE_BODY_EXTERNALS
     sta extern_count_data
+.endif
     lda #$FF
     sta current_proc_index_data
 .if ACTC_REU_BODY_DEBUG
@@ -2862,22 +4624,41 @@ store_string_literal_from_scan_ptr:
     jsr set_string_ptr_from_x
     pla
     tax
-    ldy #$00
+    lda body_ptr
+    sta reader_token_ptr_lo_data
+    lda body_ptr+1
+    sta reader_token_ptr_hi_data
+    lda #$00
+    sta reader_pattern_index_data
 store_string_literal_from_scan_ptr_loop:
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_ptr
     beq store_string_literal_from_scan_ptr_fail
     cmp #'"'
     beq store_string_literal_from_scan_ptr_done
+    ldx reader_pattern_index_data
+    cpx #23
+    bcs store_string_literal_from_scan_ptr_fail
+    sta compare_char
+    txa
+    tay
+    lda compare_char
     sta (body_ptr),y
-    iny
-    cpy #23
-    bcc store_string_literal_from_scan_ptr_loop
+    jsr source_reader_consume_scan_ptr
+    lda reader_token_ptr_lo_data
+    sta body_ptr
+    lda reader_token_ptr_hi_data
+    sta body_ptr+1
+    inc reader_pattern_index_data
+    jmp store_string_literal_from_scan_ptr_loop
 store_string_literal_from_scan_ptr_fail:
     sec
     rts
 store_string_literal_from_scan_ptr_done:
+    ldy reader_pattern_index_data
     lda #$00
     sta (body_ptr),y
+    jsr source_reader_consume_scan_ptr
+    ldx string_count_data
 .if ACTC_REU_STRING_LITERALS
     jsr store_string_literal_to_reu_x
 .endif
@@ -2982,7 +4763,7 @@ store_small_runtime_expr_sum_entry:
     sec
     rts
 :   jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     sta expr_compare_lo
     cmp #')'
     bne :+
@@ -3011,11 +4792,13 @@ store_small_runtime_expr_compare_entry:
 store_small_runtime_expr_eq:
     lda #'q'
     sta expr_runtime_op
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
+    bcs store_small_runtime_expr_fail
     jmp store_small_runtime_expr_rhs
 store_small_runtime_expr_lt_entry:
-    jsr advance_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_consume_scan_y
+    bcs store_small_runtime_expr_fail
+    jsr source_reader_peek_scan_y
     cmp #'>'
     beq store_small_runtime_expr_ne
     cmp #'='
@@ -3024,8 +4807,9 @@ store_small_runtime_expr_lt_entry:
     sta expr_runtime_op
     jmp store_small_runtime_expr_rhs
 store_small_runtime_expr_gt_entry:
-    jsr advance_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_consume_scan_y
+    bcs store_small_runtime_expr_fail
+    jsr source_reader_peek_scan_y
     cmp #'='
     beq store_small_runtime_expr_ge
     lda #'g'
@@ -3036,19 +4820,22 @@ store_small_runtime_expr_le:
     sta expr_runtime_op
     lda #$01
     sta expr_runtime_post_zero
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
+    bcs store_small_runtime_expr_fail
     jmp store_small_runtime_expr_rhs
 store_small_runtime_expr_ge:
     lda #'l'
     sta expr_runtime_op
     lda #$01
     sta expr_runtime_post_zero
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
+    bcs store_small_runtime_expr_fail
     jmp store_small_runtime_expr_rhs
 store_small_runtime_expr_ne:
     lda #'n'
     sta expr_runtime_op
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
+    bcs store_small_runtime_expr_fail
 store_small_runtime_expr_rhs:
     jsr emit_runtime_sum_from_scan_y_or_fail
     bcc :+
@@ -3056,7 +4843,7 @@ store_small_runtime_expr_fail:
     sec
     rts
 :   jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #')'
     bne store_small_runtime_expr_fail
     lda expr_runtime_op
@@ -3083,7 +4870,7 @@ store_small_runtime_expr_bool_entry:
     jsr emit_runtime_bool_or_from_scan_y_or_fail
     bcs store_small_runtime_expr_fail
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #')'
     bne store_small_runtime_expr_fail
     jmp store_small_runtime_expr_print
@@ -3122,12 +4909,12 @@ store_runtime_real_print_with_newline_flag_from_scan_ptr:
     jsr emit_runtime_real_value_from_scan_y_or_fail
     bcs store_small_runtime_expr_fail
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #')'
     beq :+
     jmp store_small_runtime_expr_fail
 :
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     bcc :+
     jmp store_small_runtime_expr_fail
 :
@@ -3200,7 +4987,7 @@ store_small_runtime_condition_done_ok:
 
 require_line_end_at_scan_y:
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     beq require_line_end_at_scan_y_ok
     cmp #10
     beq require_line_end_at_scan_y_ok
@@ -3215,7 +5002,7 @@ require_line_end_at_scan_y_ok:
 .if ACTC_KEEP_BODY_RESIDENT_FALLBACK
 require_then_or_line_end_at_scan_y:
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     beq require_then_or_line_end_at_scan_y_ok
     cmp #10
     beq require_then_or_line_end_at_scan_y_ok
@@ -3224,24 +5011,28 @@ require_then_or_line_end_at_scan_y:
     jsr uppercase_ascii
     cmp #'T'
     bne require_then_or_line_end_at_scan_y_fail
-    jsr advance_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_consume_scan_y
+    bcs require_then_or_line_end_at_scan_y_fail
+    jsr source_reader_peek_scan_y
     jsr uppercase_ascii
     cmp #'H'
     bne require_then_or_line_end_at_scan_y_fail
-    jsr advance_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_consume_scan_y
+    bcs require_then_or_line_end_at_scan_y_fail
+    jsr source_reader_peek_scan_y
     jsr uppercase_ascii
     cmp #'E'
     bne require_then_or_line_end_at_scan_y_fail
-    jsr advance_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_consume_scan_y
+    bcs require_then_or_line_end_at_scan_y_fail
+    jsr source_reader_peek_scan_y
     jsr uppercase_ascii
     cmp #'N'
     bne require_then_or_line_end_at_scan_y_fail
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
+    bcs require_then_or_line_end_at_scan_y_fail
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     beq require_then_or_line_end_at_scan_y_ok
     cmp #10
     beq require_then_or_line_end_at_scan_y_ok
@@ -3256,7 +5047,7 @@ require_then_or_line_end_at_scan_y_ok:
 
 require_do_or_line_end_at_scan_y:
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     beq require_do_or_line_end_at_scan_y_ok
     cmp #10
     beq require_do_or_line_end_at_scan_y_ok
@@ -3265,14 +5056,16 @@ require_do_or_line_end_at_scan_y:
     jsr uppercase_ascii
     cmp #'D'
     bne require_do_or_line_end_at_scan_y_fail
-    jsr advance_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_consume_scan_y
+    bcs require_do_or_line_end_at_scan_y_fail
+    jsr source_reader_peek_scan_y
     jsr uppercase_ascii
     cmp #'O'
     bne require_do_or_line_end_at_scan_y_fail
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
+    bcs require_do_or_line_end_at_scan_y_fail
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     beq require_do_or_line_end_at_scan_y_ok
     cmp #10
     beq require_do_or_line_end_at_scan_y_ok
@@ -3341,6 +5134,19 @@ emit_runtime_term_push_from_scan_y_or_fail:
 emit_runtime_term_push_literal:
     pla
     tay
+    tya
+    pha
+    jsr find_builtin_constant_from_scan_y
+    bcs emit_runtime_term_push_literal_call
+    pla
+    lda expr_value_hi
+    beq emit_runtime_term_push_builtin_byte_constant
+    jmp emit_current_word_expr_push_or_fail
+emit_runtime_term_push_builtin_byte_constant:
+    jmp emit_current_expr_push_or_fail
+emit_runtime_term_push_literal_call:
+    pla
+    tay
     jsr emit_runtime_call_term_from_scan_y_or_fail
     bcc :+
     tya
@@ -3365,23 +5171,23 @@ emit_runtime_term_push_literal_decimal:
 emit_runtime_term_push_word_literal_decimal:
     pla
     jmp emit_current_word_expr_push_or_fail
-:   clc
-    rts
+:   rts
 
 emit_runtime_group_value_term_from_scan_y_or_fail:
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #'('
     bne emit_runtime_group_value_term_from_scan_y_or_fail_fail
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
+    bcs emit_runtime_group_value_term_from_scan_y_or_fail_fail
     jsr emit_runtime_value_from_scan_y_or_fail
     bcs emit_runtime_group_value_term_from_scan_y_or_fail_fail
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #')'
     bne emit_runtime_group_value_term_from_scan_y_or_fail_fail
-    jsr advance_scan_y
-    clc
+    jsr source_reader_consume_scan_y
+    bcs emit_runtime_group_value_term_from_scan_y_or_fail_fail
     rts
 emit_runtime_group_value_term_from_scan_y_or_fail_fail:
     sec
@@ -3411,31 +5217,12 @@ emit_runtime_call_term_from_scan_y_or_fail_fail:
 try_consume_int_open_from_scan_y:
     sty symbol_start_y_data
     jsr save_source_reader_mark
-    lda (scan_ptr),y
-    jsr uppercase_ascii
-    cmp #'I'
-    bne try_consume_int_open_from_scan_y_fail_restore
-    jsr advance_scan_y
+    lda #<pattern_int_decl
+    sta const_ptr
+    lda #>pattern_int_decl
+    sta const_ptr+1
+    jsr consume_keyword_open_from_scan_y
     bcs try_consume_int_open_from_scan_y_fail_restore
-    lda (scan_ptr),y
-    jsr uppercase_ascii
-    cmp #'N'
-    bne try_consume_int_open_from_scan_y_fail_restore
-    jsr advance_scan_y
-    bcs try_consume_int_open_from_scan_y_fail_restore
-    lda (scan_ptr),y
-    jsr uppercase_ascii
-    cmp #'T'
-    bne try_consume_int_open_from_scan_y_fail_restore
-    jsr advance_scan_y
-    bcs try_consume_int_open_from_scan_y_fail_restore
-    lda (scan_ptr),y
-    cmp #'('
-    bne try_consume_int_open_from_scan_y_fail_restore
-    jsr advance_scan_y
-    bcs try_consume_int_open_from_scan_y_fail_restore
-    jsr skip_inline_spaces_at_scan_y
-    clc
     rts
 try_consume_int_open_from_scan_y_fail_restore:
     jsr restore_source_reader_mark
@@ -3454,10 +5241,10 @@ emit_runtime_int_explicit_value_from_scan_y_or_fail:
     bcs emit_runtime_int_explicit_value_from_scan_y_or_fail_fail
     ldy symbol_end_y_data
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #')'
     bne emit_runtime_int_explicit_value_from_scan_y_or_fail_fail
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     bcs emit_runtime_int_explicit_value_from_scan_y_or_fail_fail
     ldx real_lhs_index_data
     lda #'L'
@@ -3526,39 +5313,49 @@ emit_real_literal_assignment_from_saved_indexes:
 try_consume_real_open_from_scan_y:
     sty symbol_start_y_data
     jsr save_source_reader_mark
-    lda (scan_ptr),y
-    jsr uppercase_ascii
-    cmp #'R'
-    bne try_consume_real_open_from_scan_y_fail_restore
-    jsr advance_scan_y
+    lda #<pattern_real_decl
+    sta const_ptr
+    lda #>pattern_real_decl
+    sta const_ptr+1
+    jsr consume_keyword_open_from_scan_y
     bcs try_consume_real_open_from_scan_y_fail_restore
-    lda (scan_ptr),y
-    jsr uppercase_ascii
-    cmp #'E'
-    bne try_consume_real_open_from_scan_y_fail_restore
-    jsr advance_scan_y
-    bcs try_consume_real_open_from_scan_y_fail_restore
-    lda (scan_ptr),y
-    jsr uppercase_ascii
-    cmp #'A'
-    bne try_consume_real_open_from_scan_y_fail_restore
-    jsr advance_scan_y
-    bcs try_consume_real_open_from_scan_y_fail_restore
-    lda (scan_ptr),y
-    jsr uppercase_ascii
-    cmp #'L'
-    bne try_consume_real_open_from_scan_y_fail_restore
-    jsr advance_scan_y
-    bcs try_consume_real_open_from_scan_y_fail_restore
-    lda (scan_ptr),y
-    cmp #'('
-    bne try_consume_real_open_from_scan_y_fail_restore
-    jsr advance_scan_y
-    bcs try_consume_real_open_from_scan_y_fail_restore
-    jsr skip_inline_spaces_at_scan_y
     clc
     rts
 try_consume_real_open_from_scan_y_fail_restore:
+    jsr restore_source_reader_mark
+    ldy symbol_start_y_data
+    sec
+    rts
+
+try_consume_fabs_open_from_scan_y:
+    sty symbol_start_y_data
+    jsr save_source_reader_mark
+    lda #<pattern_fabs
+    sta const_ptr
+    lda #>pattern_fabs
+    sta const_ptr+1
+    jsr consume_keyword_open_from_scan_y
+    bcs try_consume_fabs_open_from_scan_y_fail_restore
+    clc
+    rts
+try_consume_fabs_open_from_scan_y_fail_restore:
+    jsr restore_source_reader_mark
+    ldy symbol_start_y_data
+    sec
+    rts
+
+try_consume_fsqrt_open_from_scan_y:
+    sty symbol_start_y_data
+    jsr save_source_reader_mark
+    lda #<pattern_fsqrt
+    sta const_ptr
+    lda #>pattern_fsqrt
+    sta const_ptr+1
+    jsr consume_keyword_open_from_scan_y
+    bcs try_consume_fsqrt_open_from_scan_y_fail_restore
+    clc
+    rts
+try_consume_fsqrt_open_from_scan_y_fail_restore:
     jsr restore_source_reader_mark
     ldy symbol_start_y_data
     sec
@@ -3571,10 +5368,10 @@ emit_real_explicit_bridge_assignment_from_scan_y_or_fail:
     jsr require_var_index_real_bridge_word_or_fail
     bcs emit_real_explicit_bridge_assignment_from_scan_y_or_fail_fail
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #')'
     bne emit_real_explicit_bridge_assignment_from_scan_y_or_fail_fail
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     bcs emit_real_explicit_bridge_assignment_from_scan_y_or_fail_fail
     jsr skip_inline_spaces_at_scan_y
     jsr require_line_end_at_scan_y
@@ -3600,12 +5397,12 @@ emit_real_explicit_value_after_open_from_scan_y_or_fail:
     jmp emit_real_explicit_value_after_open_from_scan_y_or_fail_wide
 :
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #')'
     beq :+
     jmp emit_real_explicit_value_after_open_from_scan_y_or_fail_wide
 :
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     bcc :+
     jmp emit_real_explicit_value_after_open_from_scan_y_or_fail_wide
 :
@@ -3665,12 +5462,12 @@ emit_real_explicit_value_after_open_from_scan_y_or_fail_wide:
     jmp emit_real_explicit_value_after_open_from_scan_y_or_fail_signed
 :
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #')'
     beq :+
     jmp emit_real_explicit_value_after_open_from_scan_y_or_fail_signed
 :
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     bcc :+
     jmp emit_real_explicit_value_after_open_from_scan_y_or_fail_signed
 :
@@ -3713,22 +5510,22 @@ emit_real_explicit_value_after_open_from_scan_y_or_fail_signed:
     jsr restore_group_reader_mark
     ldy symbol_start_y_data
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #'0'
     beq :+
     jmp emit_real_explicit_value_after_open_from_scan_y_or_fail_fail
 :
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     bcc :+
     jmp emit_real_explicit_value_after_open_from_scan_y_or_fail_fail
 :
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #'-'
     beq :+
     jmp emit_real_explicit_value_after_open_from_scan_y_or_fail_fail
 :
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     bcc :+
     jmp emit_real_explicit_value_after_open_from_scan_y_or_fail_fail
 :
@@ -3737,12 +5534,12 @@ emit_real_explicit_value_after_open_from_scan_y_or_fail_signed:
     jmp emit_real_explicit_value_after_open_from_scan_y_or_fail_fail
 :
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #')'
     beq :+
     jmp emit_real_explicit_value_after_open_from_scan_y_or_fail_fail
 :
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     bcc :+
     jmp emit_real_explicit_value_after_open_from_scan_y_or_fail_fail
 :
@@ -3889,16 +5686,16 @@ emit_real_wide_positive_int_assignment_from_scan_y_or_fail_fail:
 
 emit_real_wide_signed_int_assignment_from_scan_y_or_fail:
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #'0'
     bne emit_real_wide_signed_int_assignment_from_scan_y_or_fail_fail
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     bcs emit_real_wide_signed_int_assignment_from_scan_y_or_fail_fail
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #'-'
     bne emit_real_wide_signed_int_assignment_from_scan_y_or_fail_fail
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     bcs emit_real_wide_signed_int_assignment_from_scan_y_or_fail_fail
     jsr parse_optional_grouped_positive_word_sum_at_scan_y
     bcs emit_real_wide_signed_int_assignment_from_scan_y_or_fail_fail
@@ -3964,7 +5761,7 @@ emit_real_bridge_assignment_from_var_index_ok_fail:
 
 emit_real_add_assignment_from_scan_y_or_fail:
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #'('
     bne :+
     jmp emit_real_small_int_assignment_from_scan_y_or_fail
@@ -3978,6 +5775,18 @@ emit_real_add_assignment_from_scan_y_or_fail:
     jsr try_consume_real_open_from_scan_y
     bcs :+
     jmp emit_real_explicit_value_after_open_from_scan_y_or_fail
+:
+    jsr try_consume_fabs_open_from_scan_y
+    bcs :+
+    lda #'a'
+    sta real_operator_data
+    jmp emit_real_fabs_assignment_after_open_from_scan_y_or_fail
+:
+    jsr try_consume_fsqrt_open_from_scan_y
+    bcs :+
+    lda #'q'
+    sta real_operator_data
+    jmp emit_real_fabs_assignment_after_open_from_scan_y_or_fail
 :
     jsr find_var_index_from_scan_y
     bcc :+
@@ -4004,7 +5813,7 @@ emit_real_add_assignment_after_copy_check:
     jmp emit_real_add_assignment_from_scan_y_or_fail_fail
 :
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #'+'
     beq :+
     cmp #'-'
@@ -4015,7 +5824,10 @@ emit_real_add_assignment_after_copy_check:
     beq :+
     jmp emit_real_add_assignment_from_scan_y_or_fail_fail
 :   sta real_operator_data
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
+    bcc :+
+    jmp emit_real_add_assignment_from_scan_y_or_fail_fail
+:
     jsr skip_inline_spaces_at_scan_y
     jsr find_var_index_from_scan_y
     bcc :+
@@ -4071,7 +5883,7 @@ emit_real_zero_assignment_from_scan_y_or_fail:
     jsr store_zero_int_literal
     bcs emit_real_add_assignment_from_scan_y_or_fail_fail
     stx keyword_scan_ptr_lo_data
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     bcs emit_real_add_assignment_from_scan_y_or_fail_fail
     jsr require_line_end_at_scan_y
     bcs emit_real_add_assignment_from_scan_y_or_fail_fail
@@ -4081,12 +5893,70 @@ emit_real_zero_assignment_from_scan_y_or_fail:
 emit_real_add_assignment_from_scan_y_or_fail_fail:
     sec
     rts
+
+emit_real_fabs_assignment_after_open_from_scan_y_or_fail:
+    jsr find_var_index_from_scan_y
+    bcc :+
+    jmp emit_real_add_assignment_from_scan_y_or_fail_fail
+:   jsr require_var_index_real_or_fail
+    bcc :+
+    jmp emit_real_add_assignment_from_scan_y_or_fail_fail
+:   stx real_lhs_index_data
+    jsr skip_inline_spaces_at_scan_y
+    jsr source_reader_peek_scan_y
+    cmp #')'
+    beq :+
+    jmp emit_real_add_assignment_from_scan_y_or_fail_fail
+:   jsr source_reader_consume_scan_y
+    bcc :+
+    jmp emit_real_add_assignment_from_scan_y_or_fail_fail
+:   jsr skip_inline_spaces_at_scan_y
+    jsr require_line_end_at_scan_y
+    bcc :+
+    jmp emit_real_add_assignment_from_scan_y_or_fail_fail
+:   ldx real_lhs_index_data
+    lda #'L'
+    jsr append_body_op_for_current_proc
+    ldx real_lhs_index_data
+    lda #'U'
+    jsr append_body_op_for_current_proc
+    sty symbol_start_y_data
+    lda real_operator_data
+    jsr find_or_store_real_operator_external_from_a
+    bcc :+
+    jmp emit_real_add_assignment_from_scan_y_or_fail_fail
+:   ldy symbol_start_y_data
+    lda #'u'
+    jsr append_body_op_for_current_proc
+    ldx assignment_target_index_data
+    lda #'T'
+    jsr append_body_op_for_current_proc
+    ldx assignment_target_index_data
+    lda #'S'
+    jsr append_body_op_for_current_proc
+    clc
+    rts
 .endif
+
+; Keep the body overlay call-resolution ABI behind a named seam so resident
+; code owns local/unresolved side effects while the active overlay supplies
+; builtin runtime lookup data.
+resolve_body_overlay_call_target_from_declared_or_fail:
+    jmp resolve_call_target_from_declared_or_fail
 
 resolve_call_target_from_declared_or_fail:
     jsr find_export_index_from_declared
     bcc resolve_call_target_from_declared_or_fail_local
+.if ACTC_KEEP_BODY_RESIDENT_FALLBACK
     jsr find_or_store_builtin_runtime_external_from_declared
+.else
+    lda actc_overlay_context+ACTC_OVERLAY_CTX_BUILTIN_RUNTIME_TABLE_PTR_LO
+    ora actc_overlay_context+ACTC_OVERLAY_CTX_BUILTIN_RUNTIME_TABLE_PTR_HI
+    beq :+
+    lda actc_overlay_context+ACTC_OVERLAY_CTX_BUILTIN_RUNTIME_TABLE_PTR_LO
+    ldy actc_overlay_context+ACTC_OVERLAY_CTX_BUILTIN_RUNTIME_TABLE_PTR_HI
+    jsr find_or_store_builtin_runtime_external_from_table_ay
+.endif
     bcs :+
     stx call_target_index_data
     lda #'u'
@@ -4094,15 +5964,7 @@ resolve_call_target_from_declared_or_fail:
     clc
     rts
 :
-    jsr find_or_store_external_from_declared
-    bcs resolve_call_target_from_declared_or_fail_fail
-    stx call_target_index_data
-    lda #'u'
-    sta call_target_kind
-    lda #$FF
-    sta call_expected_arg_count
-    clc
-    rts
+    jmp resolve_unresolved_external_call_target_from_declared_or_fail
 resolve_call_target_from_declared_or_fail_local:
     cpx current_proc_index_data
     beq resolve_call_target_from_declared_or_fail_fail
@@ -4122,18 +5984,35 @@ resolve_call_target_from_declared_or_fail_fail:
     sec
     rts
 
+resolve_unresolved_external_call_target_from_declared_or_fail:
+    jsr find_or_store_external_from_declared
+    bcs resolve_unresolved_external_call_target_from_declared_or_fail_fail
+    stx call_target_index_data
+    lda #'u'
+    sta call_target_kind
+    lda #$FF
+    sta call_expected_arg_count
+    clc
+    rts
+resolve_unresolved_external_call_target_from_declared_or_fail_fail:
+    sec
+    rts
+
 emit_call_args_from_scan_y_or_fail:
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #'('
     beq :+
     sec
     rts
-:   jsr advance_scan_y
+:   jsr source_reader_consume_scan_y
+    bcc :+
+    jmp emit_call_args_from_scan_y_or_fail_fail
+:
     lda #$00
     sta call_arg_count_data
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #')'
     beq emit_call_args_from_scan_y_or_fail_done
 emit_call_args_from_scan_y_or_fail_loop:
@@ -4147,6 +6026,7 @@ emit_call_args_from_scan_y_or_fail_loop:
     pha
     jsr emit_runtime_value_from_scan_y_or_fail
     bcc emit_call_args_from_scan_y_or_fail_restore_ok
+emit_call_args_from_scan_y_or_fail_restore_fail:
     pla
     sta call_target_kind
     pla
@@ -4168,7 +6048,7 @@ emit_call_args_from_scan_y_or_fail_restore_ok:
     sta call_arg_count_data
     inc call_arg_count_data
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #','
     beq emit_call_args_from_scan_y_or_fail_next
     cmp #')'
@@ -4176,11 +6056,17 @@ emit_call_args_from_scan_y_or_fail_restore_ok:
     sec
     rts
 emit_call_args_from_scan_y_or_fail_next:
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
+    bcc :+
+    jmp emit_call_args_from_scan_y_or_fail_fail
+:
     jsr skip_inline_spaces_at_scan_y
     jmp emit_call_args_from_scan_y_or_fail_loop
 emit_call_args_from_scan_y_or_fail_done:
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
+    bcc :+
+    jmp emit_call_args_from_scan_y_or_fail_fail
+:
     lda call_expected_arg_count
     cmp #$FF
     beq emit_call_args_from_scan_y_or_fail_ok
@@ -4196,35 +6082,40 @@ emit_call_args_from_scan_y_or_fail_fail:
 
 emit_runtime_value_from_scan_y_or_fail:
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #'='
     bne emit_runtime_value_from_scan_y_or_fail_after_equals
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     bcc emit_runtime_value_from_scan_y_or_fail_after_equals
     jmp emit_runtime_expr_push_fail
 emit_runtime_value_from_scan_y_or_fail_after_equals:
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr emit_small_constant_sum_from_scan_y_or_fail
+    bcs :+
+    clc
+    rts
+:
+    jsr source_reader_peek_scan_y
     cmp #'['
     bne emit_runtime_value_from_scan_y_or_fail_after_group
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     bcc :+
     jmp emit_runtime_expr_push_fail
 :   jsr emit_runtime_value_from_scan_y_or_fail
     bcc :+
     jmp emit_runtime_expr_push_fail
 :   jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #']'
     beq :+
     jmp emit_runtime_expr_push_fail
-:   jsr advance_scan_y
+:   jsr source_reader_consume_scan_y
     bcc :+
     jmp emit_runtime_expr_push_fail
 :   clc
     rts
 emit_runtime_value_from_scan_y_or_fail_after_group:
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #'('
     bne :+
     jsr scan_value_expr_for_top_level_arith_from_scan_y
@@ -4239,13 +6130,42 @@ emit_runtime_value_from_scan_y_or_fail_bool:
     sta bool_ops_used_data
     jmp emit_runtime_bool_or_from_scan_y_or_fail
 
+emit_small_constant_sum_from_scan_y_or_fail:
+    sty expr_saved_y_data
+    jsr save_source_reader_mark
+    jsr parse_small_decimal_sum_at_scan_y
+    bcc :+
+    jmp emit_small_constant_sum_from_scan_y_or_fail_restore
+:
+    jsr skip_inline_spaces_at_scan_y
+    jsr source_reader_peek_scan_y
+    beq emit_small_constant_sum_from_scan_y_or_fail_ok
+    cmp #10
+    beq emit_small_constant_sum_from_scan_y_or_fail_ok
+    cmp #13
+    beq emit_small_constant_sum_from_scan_y_or_fail_ok
+    cmp #','
+    beq emit_small_constant_sum_from_scan_y_or_fail_ok
+    cmp #')'
+    beq emit_small_constant_sum_from_scan_y_or_fail_ok
+    cmp #']'
+    beq emit_small_constant_sum_from_scan_y_or_fail_ok
+    jmp emit_small_constant_sum_from_scan_y_or_fail_restore
+emit_small_constant_sum_from_scan_y_or_fail_ok:
+    jmp emit_current_expr_push_or_fail
+emit_small_constant_sum_from_scan_y_or_fail_restore:
+    jsr restore_source_reader_mark
+    ldy expr_saved_y_data
+    sec
+    rts
+
 scan_value_expr_for_top_level_arith_from_scan_y:
     sty symbol_start_y_data
     jsr save_source_reader_mark
     lda #$00
     sta hex_work
 scan_value_expr_for_top_level_arith_from_scan_y_loop:
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     beq scan_value_expr_for_top_level_arith_from_scan_y_not_found
     cmp #10
     beq scan_value_expr_for_top_level_arith_from_scan_y_not_found
@@ -4253,6 +6173,8 @@ scan_value_expr_for_top_level_arith_from_scan_y_loop:
     beq scan_value_expr_for_top_level_arith_from_scan_y_not_found
     cmp #','
     beq scan_value_expr_for_top_level_arith_from_scan_y_comma
+    cmp #']'
+    beq scan_value_expr_for_top_level_arith_from_scan_y_not_found
     cmp #')'
     beq scan_value_expr_for_top_level_arith_from_scan_y_rparen
     cmp #'('
@@ -4268,7 +6190,7 @@ scan_value_expr_for_top_level_arith_from_scan_y_loop:
     cmp #'/'
     beq scan_value_expr_for_top_level_arith_from_scan_y_found
 scan_value_expr_for_top_level_arith_from_scan_y_next:
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     bcc scan_value_expr_for_top_level_arith_from_scan_y_loop
 scan_value_expr_for_top_level_arith_from_scan_y_not_found:
     jsr restore_source_reader_mark
@@ -4278,7 +6200,7 @@ scan_value_expr_for_top_level_arith_from_scan_y_not_found:
 scan_value_expr_for_top_level_arith_from_scan_y_comma:
     lda hex_work
     beq scan_value_expr_for_top_level_arith_from_scan_y_not_found
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     bcc :+
     jmp scan_value_expr_for_top_level_arith_from_scan_y_not_found
 :
@@ -4287,14 +6209,14 @@ scan_value_expr_for_top_level_arith_from_scan_y_rparen:
     lda hex_work
     beq scan_value_expr_for_top_level_arith_from_scan_y_not_found
     dec hex_work
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     bcc :+
     jmp scan_value_expr_for_top_level_arith_from_scan_y_not_found
 :
     jmp scan_value_expr_for_top_level_arith_from_scan_y_loop
 scan_value_expr_for_top_level_arith_from_scan_y_lparen:
     inc hex_work
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     bcc :+
     jmp scan_value_expr_for_top_level_arith_from_scan_y_not_found
 :
@@ -4311,8 +6233,9 @@ scan_print_expr_for_bool_keywords_from_scan_y:
     jsr save_source_reader_mark
     lda #$00
     sta hex_work
+    sta reader_prev_symbol_data
 scan_print_expr_for_bool_keywords_from_scan_y_loop:
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     beq scan_print_expr_for_bool_keywords_from_scan_y_not_found
     cmp #10
     beq scan_print_expr_for_bool_keywords_from_scan_y_not_found
@@ -4330,7 +6253,9 @@ scan_print_expr_for_bool_keywords_from_scan_y_loop:
     cmp #'N'
     beq scan_print_expr_for_bool_keywords_from_scan_y_try_not
 scan_print_expr_for_bool_keywords_from_scan_y_next:
-    jsr advance_scan_y
+    jsr source_reader_peek_scan_y
+    jsr store_reader_prev_symbol_from_a
+    jsr source_reader_consume_scan_y
     bcc scan_print_expr_for_bool_keywords_from_scan_y_loop
     jmp scan_print_expr_for_bool_keywords_from_scan_y_found
 scan_print_expr_for_bool_keywords_from_scan_y_not_found:
@@ -4342,24 +6267,52 @@ scan_print_expr_for_bool_keywords_from_scan_y_rparen:
     lda hex_work
     beq scan_print_expr_for_bool_keywords_from_scan_y_not_found
     dec hex_work
-    jsr advance_scan_y
+    lda #$00
+    sta reader_prev_symbol_data
+    jsr source_reader_consume_scan_y
     bcc :+
     jmp scan_print_expr_for_bool_keywords_from_scan_y_found
 :
     jmp scan_print_expr_for_bool_keywords_from_scan_y_loop
 scan_print_expr_for_bool_keywords_from_scan_y_lparen:
     inc hex_work
-    jsr advance_scan_y
+    lda #$00
+    sta reader_prev_symbol_data
+    jsr source_reader_consume_scan_y
     bcc :+
     jmp scan_print_expr_for_bool_keywords_from_scan_y_found
 :
     jmp scan_print_expr_for_bool_keywords_from_scan_y_loop
 scan_print_expr_for_bool_keywords_from_scan_y_try_and:
-    jmp scan_print_expr_for_bool_keywords_from_scan_y_found
+    lda reader_prev_symbol_data
+    bne scan_print_expr_for_bool_keywords_from_scan_y_next
+    lda #<pattern_and
+    sta const_ptr
+    lda #>pattern_and
+    sta const_ptr+1
+    jsr scan_keyword_token_from_scan_y
+    bcc scan_print_expr_for_bool_keywords_from_scan_y_found
+    jmp scan_print_expr_for_bool_keywords_from_scan_y_next
 scan_print_expr_for_bool_keywords_from_scan_y_try_or:
-    jmp scan_print_expr_for_bool_keywords_from_scan_y_found
+    lda reader_prev_symbol_data
+    bne scan_print_expr_for_bool_keywords_from_scan_y_next
+    lda #<pattern_or
+    sta const_ptr
+    lda #>pattern_or
+    sta const_ptr+1
+    jsr scan_keyword_token_from_scan_y
+    bcc scan_print_expr_for_bool_keywords_from_scan_y_found
+    jmp scan_print_expr_for_bool_keywords_from_scan_y_next
 scan_print_expr_for_bool_keywords_from_scan_y_try_not:
-    jmp scan_print_expr_for_bool_keywords_from_scan_y_found
+    lda reader_prev_symbol_data
+    bne scan_print_expr_for_bool_keywords_from_scan_y_next
+    lda #<pattern_not
+    sta const_ptr
+    lda #>pattern_not
+    sta const_ptr+1
+    jsr scan_keyword_token_from_scan_y
+    bcc scan_print_expr_for_bool_keywords_from_scan_y_found
+    jmp scan_print_expr_for_bool_keywords_from_scan_y_next
 scan_print_expr_for_bool_keywords_from_scan_y_found:
     jsr restore_source_reader_mark
     ldy symbol_start_y_data
@@ -4372,8 +6325,9 @@ scan_value_expr_for_bool_tokens_from_scan_y:
     jsr save_source_reader_mark
     lda #$00
     sta hex_work
+    sta reader_prev_symbol_data
 scan_value_expr_for_bool_tokens_from_scan_y_loop:
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     beq scan_value_expr_for_bool_tokens_from_scan_y_not_found
     cmp #10
     beq scan_value_expr_for_bool_tokens_from_scan_y_not_found
@@ -4381,25 +6335,37 @@ scan_value_expr_for_bool_tokens_from_scan_y_loop:
     beq scan_value_expr_for_bool_tokens_from_scan_y_not_found
     cmp #','
     beq scan_value_expr_for_bool_tokens_from_scan_y_comma
+    cmp #']'
+    beq scan_value_expr_for_bool_tokens_from_scan_y_not_found
     cmp #')'
     beq scan_value_expr_for_bool_tokens_from_scan_y_rparen
     cmp #'('
     beq scan_value_expr_for_bool_tokens_from_scan_y_lparen
     cmp #'='
-    beq scan_value_expr_for_bool_tokens_from_scan_y_found
+    bne :+
+    jmp scan_value_expr_for_bool_tokens_from_scan_y_found
+:
     cmp #'<'
-    beq scan_value_expr_for_bool_tokens_from_scan_y_found
+    bne :+
+    jmp scan_value_expr_for_bool_tokens_from_scan_y_found
+:
     cmp #'>'
-    beq scan_value_expr_for_bool_tokens_from_scan_y_found
+    bne :+
+    jmp scan_value_expr_for_bool_tokens_from_scan_y_found
+:
     jsr uppercase_ascii
     cmp #'A'
     beq scan_value_expr_for_bool_tokens_from_scan_y_try_and
     cmp #'O'
     beq scan_value_expr_for_bool_tokens_from_scan_y_try_or
     cmp #'N'
-    beq scan_value_expr_for_bool_tokens_from_scan_y_try_not
+    bne :+
+    jmp scan_value_expr_for_bool_tokens_from_scan_y_try_not
+:
 scan_value_expr_for_bool_tokens_from_scan_y_next:
-    jsr advance_scan_y
+    jsr source_reader_peek_scan_y
+    jsr store_reader_prev_symbol_from_a
+    jsr source_reader_consume_scan_y
     bcc scan_value_expr_for_bool_tokens_from_scan_y_loop
     jmp scan_value_expr_for_bool_tokens_from_scan_y_found
 scan_value_expr_for_bool_tokens_from_scan_y_not_found:
@@ -4410,7 +6376,9 @@ scan_value_expr_for_bool_tokens_from_scan_y_not_found:
 scan_value_expr_for_bool_tokens_from_scan_y_comma:
     lda hex_work
     beq scan_value_expr_for_bool_tokens_from_scan_y_not_found
-    jsr advance_scan_y
+    lda #$00
+    sta reader_prev_symbol_data
+    jsr source_reader_consume_scan_y
     bcc :+
     jmp scan_value_expr_for_bool_tokens_from_scan_y_found
 :
@@ -4419,24 +6387,54 @@ scan_value_expr_for_bool_tokens_from_scan_y_rparen:
     lda hex_work
     beq scan_value_expr_for_bool_tokens_from_scan_y_not_found
     dec hex_work
-    jsr advance_scan_y
+    lda #$00
+    sta reader_prev_symbol_data
+    jsr source_reader_consume_scan_y
     bcc :+
     jmp scan_value_expr_for_bool_tokens_from_scan_y_found
 :
     jmp scan_value_expr_for_bool_tokens_from_scan_y_loop
 scan_value_expr_for_bool_tokens_from_scan_y_lparen:
     inc hex_work
-    jsr advance_scan_y
+    lda #$00
+    sta reader_prev_symbol_data
+    jsr source_reader_consume_scan_y
     bcc :+
     jmp scan_value_expr_for_bool_tokens_from_scan_y_found
 :
     jmp scan_value_expr_for_bool_tokens_from_scan_y_loop
 scan_value_expr_for_bool_tokens_from_scan_y_try_and:
-    jmp scan_value_expr_for_bool_tokens_from_scan_y_found
+    lda reader_prev_symbol_data
+    bne scan_value_expr_for_bool_tokens_from_scan_y_next
+    lda #<pattern_and
+    sta const_ptr
+    lda #>pattern_and
+    sta const_ptr+1
+    jsr scan_keyword_token_from_scan_y
+    bcc scan_value_expr_for_bool_tokens_from_scan_y_found
+    jmp scan_value_expr_for_bool_tokens_from_scan_y_next
 scan_value_expr_for_bool_tokens_from_scan_y_try_or:
-    jmp scan_value_expr_for_bool_tokens_from_scan_y_found
+    lda reader_prev_symbol_data
+    bne scan_value_expr_for_bool_tokens_from_scan_y_next
+    lda #<pattern_or
+    sta const_ptr
+    lda #>pattern_or
+    sta const_ptr+1
+    jsr scan_keyword_token_from_scan_y
+    bcc scan_value_expr_for_bool_tokens_from_scan_y_found
+    jmp scan_value_expr_for_bool_tokens_from_scan_y_next
 scan_value_expr_for_bool_tokens_from_scan_y_try_not:
-    jmp scan_value_expr_for_bool_tokens_from_scan_y_found
+    lda reader_prev_symbol_data
+    beq :+
+    jmp scan_value_expr_for_bool_tokens_from_scan_y_next
+:
+    lda #<pattern_not
+    sta const_ptr
+    lda #>pattern_not
+    sta const_ptr+1
+    jsr scan_keyword_token_from_scan_y
+    bcc scan_value_expr_for_bool_tokens_from_scan_y_found
+    jmp scan_value_expr_for_bool_tokens_from_scan_y_next
 scan_value_expr_for_bool_tokens_from_scan_y_found:
     jsr restore_source_reader_mark
     ldy symbol_start_y_data
@@ -4549,7 +6547,7 @@ emit_runtime_bool_not_from_scan_y_or_fail:
 
 emit_runtime_bool_primary_from_scan_y_or_fail:
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #'('
     beq :+
     jmp emit_runtime_condition_clause_from_scan_y_or_fail
@@ -4557,17 +6555,17 @@ emit_runtime_bool_primary_from_scan_y_or_fail:
     tya
     pha
     jsr save_group_reader_mark
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     jsr emit_runtime_bool_or_from_scan_y_or_fail
     bcs emit_runtime_bool_primary_restore_clause
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #')'
     bne emit_runtime_bool_primary_restore_clause
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     sty compare_char
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #'='
     beq emit_runtime_bool_primary_restore_clause
     cmp #'<'
@@ -4598,34 +6596,34 @@ emit_runtime_real_push_literal_from_saved_indexes:
 try_consume_real_open_for_runtime_condition_from_scan_y:
     sty symbol_start_y_data
     jsr save_source_reader_mark
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     jsr uppercase_ascii
     cmp #'R'
     bne try_consume_real_open_for_runtime_condition_from_scan_y_fail_restore
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     bcs try_consume_real_open_for_runtime_condition_from_scan_y_fail_restore
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     jsr uppercase_ascii
     cmp #'E'
     bne try_consume_real_open_for_runtime_condition_from_scan_y_fail_restore
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     bcs try_consume_real_open_for_runtime_condition_from_scan_y_fail_restore
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     jsr uppercase_ascii
     cmp #'A'
     bne try_consume_real_open_for_runtime_condition_from_scan_y_fail_restore
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     bcs try_consume_real_open_for_runtime_condition_from_scan_y_fail_restore
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     jsr uppercase_ascii
     cmp #'L'
     bne try_consume_real_open_for_runtime_condition_from_scan_y_fail_restore
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     bcs try_consume_real_open_for_runtime_condition_from_scan_y_fail_restore
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #'('
     bne try_consume_real_open_for_runtime_condition_from_scan_y_fail_restore
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     bcs try_consume_real_open_for_runtime_condition_from_scan_y_fail_restore
     jsr skip_inline_spaces_at_scan_y
     clc
@@ -4647,10 +6645,10 @@ emit_runtime_real_explicit_bridge_value_from_scan_y_or_fail:
     bcs emit_runtime_real_explicit_bridge_value_from_scan_y_or_fail_fail
     ldy symbol_end_y_data
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #')'
     bne emit_runtime_real_explicit_bridge_value_from_scan_y_or_fail_fail
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     bcs emit_runtime_real_explicit_bridge_value_from_scan_y_or_fail_fail
     ldx real_lhs_index_data
     lda #'L'
@@ -4673,18 +6671,21 @@ emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail:
     sty symbol_start_y_data
     jsr save_group_reader_mark
     jsr emit_runtime_real_explicit_bridge_value_from_scan_y_or_fail
-    bcc :+
+    bcs :+
+    clc
+    rts
+:
     jsr restore_group_reader_mark
     ldy symbol_start_y_data
     jsr parse_positive_word_sum_at_scan_y
     bcc :+
     jmp emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail_wide
 :   jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #')'
     beq :+
     jmp emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail_wide
-:   jsr advance_scan_y
+:   jsr source_reader_consume_scan_y
     bcc :+
     jmp emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail_wide
 :   jsr skip_inline_spaces_at_scan_y
@@ -4731,11 +6732,11 @@ emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail_wide:
     bcc :+
     jmp emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail_signed
 :   jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #')'
     beq :+
     jmp emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail_signed
-:   jsr advance_scan_y
+:   jsr source_reader_consume_scan_y
     bcc :+
     jmp emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail_signed
 :   jsr skip_inline_spaces_at_scan_y
@@ -4768,24 +6769,24 @@ emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail_signed:
     jsr restore_group_reader_mark
     ldy symbol_start_y_data
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #'0'
     bne emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail_fail
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     bcs emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail_fail
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #'-'
     bne emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail_fail
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     bcs emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail_fail
     jsr parse_optional_grouped_positive_word_sum_at_scan_y
     bcs emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail_fail
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #')'
     bne emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail_fail
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     bcs emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail_fail
     jsr skip_inline_spaces_at_scan_y
     lda expr_value_lo
@@ -4860,7 +6861,7 @@ emit_runtime_real_condition_clause_from_scan_y_or_fail:
     bcc :+
     sec
     rts
-:   lda (scan_ptr),y
+:   jsr source_reader_peek_scan_y
     sta expr_compare_lo
     cmp #'='
     beq emit_runtime_real_condition_clause_eq
@@ -4875,11 +6876,13 @@ emit_runtime_real_condition_clause_eq:
     sta expr_runtime_op
     lda #$01
     sta expr_value_lo
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
+    bcs emit_runtime_real_condition_clause_fail
     jmp emit_runtime_real_condition_clause_rhs
 emit_runtime_real_condition_clause_lt_entry:
-    jsr advance_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_consume_scan_y
+    bcs emit_runtime_real_condition_clause_fail
+    jsr source_reader_peek_scan_y
     cmp #'>'
     beq emit_runtime_real_condition_clause_ne
     cmp #'='
@@ -4890,8 +6893,9 @@ emit_runtime_real_condition_clause_lt_entry:
     sta expr_value_lo
     jmp emit_runtime_real_condition_clause_rhs
 emit_runtime_real_condition_clause_gt_entry:
-    jsr advance_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_consume_scan_y
+    bcs emit_runtime_real_condition_clause_fail
+    jsr source_reader_peek_scan_y
     cmp #'='
     beq emit_runtime_real_condition_clause_ge
     lda #'g'
@@ -4904,21 +6908,27 @@ emit_runtime_real_condition_clause_ne:
     sta expr_runtime_op
     lda #$01
     sta expr_value_lo
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
+    bcs emit_runtime_real_condition_clause_fail
     jmp emit_runtime_real_condition_clause_rhs
 emit_runtime_real_condition_clause_le:
     lda #'l'
     sta expr_runtime_op
     lda #$02
     sta expr_value_lo
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
+    bcs emit_runtime_real_condition_clause_fail
     jmp emit_runtime_real_condition_clause_rhs
 emit_runtime_real_condition_clause_ge:
     lda #'g'
     sta expr_runtime_op
     lda #$00
     sta expr_value_lo
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
+    bcc emit_runtime_real_condition_clause_rhs
+emit_runtime_real_condition_clause_fail:
+    sec
+    rts
 emit_runtime_real_condition_clause_rhs:
     jsr emit_runtime_real_value_from_scan_y_or_fail
     bcc :+
@@ -4963,7 +6973,7 @@ emit_runtime_condition_clause_from_scan_y_or_fail:
     sec
     rts
 :   jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     sta expr_compare_lo
     cmp #'='
     beq emit_runtime_condition_clause_compare_entry
@@ -4987,11 +6997,11 @@ emit_runtime_condition_clause_compare_entry:
 emit_runtime_condition_clause_eq:
     lda #'q'
     sta expr_runtime_op
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     jmp emit_runtime_condition_clause_rhs
 emit_runtime_condition_clause_lt_entry:
-    jsr advance_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_consume_scan_y
+    jsr source_reader_peek_scan_y
     cmp #'>'
     beq emit_runtime_condition_clause_ne
     cmp #'='
@@ -5000,8 +7010,8 @@ emit_runtime_condition_clause_lt_entry:
     sta expr_runtime_op
     jmp emit_runtime_condition_clause_rhs
 emit_runtime_condition_clause_gt_entry:
-    jsr advance_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_consume_scan_y
+    jsr source_reader_peek_scan_y
     cmp #'='
     beq emit_runtime_condition_clause_ge
     lda #'g'
@@ -5012,19 +7022,19 @@ emit_runtime_condition_clause_le:
     sta expr_runtime_op
     lda #$01
     sta expr_runtime_post_zero
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     jmp emit_runtime_condition_clause_rhs
 emit_runtime_condition_clause_ge:
     lda #'l'
     sta expr_runtime_op
     lda #$01
     sta expr_runtime_post_zero
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     jmp emit_runtime_condition_clause_rhs
 emit_runtime_condition_clause_ne:
     lda #'n'
     sta expr_runtime_op
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
 emit_runtime_condition_clause_rhs:
     jsr emit_runtime_sum_from_scan_y_or_fail
     bcc :+
@@ -5072,7 +7082,7 @@ emit_runtime_sum_from_scan_y_or_fail:
 :
 emit_runtime_sum_from_scan_y_loop:
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #'+'
     beq emit_runtime_sum_from_scan_y_add
     cmp #'-'
@@ -5080,7 +7090,7 @@ emit_runtime_sum_from_scan_y_loop:
     clc
     rts
 emit_runtime_sum_from_scan_y_add:
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     jsr emit_runtime_term_push_from_scan_y_or_fail
     bcc :+
     jmp emit_runtime_expr_push_fail
@@ -5089,7 +7099,7 @@ emit_runtime_sum_from_scan_y_add:
     jsr append_body_op_no_arg_for_current_proc
     jmp emit_runtime_sum_from_scan_y_loop
 emit_runtime_sum_from_scan_y_sub:
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     jsr emit_runtime_term_push_from_scan_y_or_fail
     bcc :+
     jmp emit_runtime_expr_push_fail
@@ -5122,30 +7132,30 @@ store_expr_value_as_int_literal:
 
 parse_small_value_expr_at_scan_y:
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #'='
     bne parse_small_value_expr_at_scan_y_after_equals
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     bcs parse_small_value_expr_at_scan_y_fail
     jsr skip_inline_spaces_at_scan_y
 parse_small_value_expr_at_scan_y_after_equals:
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #'['
     bne parse_small_value_expr_at_scan_y_after_group
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     bcs parse_small_value_expr_at_scan_y_fail
     jsr parse_small_value_expr_at_scan_y
     bcs parse_small_value_expr_at_scan_y_fail
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #']'
     bne parse_small_value_expr_at_scan_y_fail
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     bcs parse_small_value_expr_at_scan_y_fail
     clc
     rts
 parse_small_value_expr_at_scan_y_after_group:
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #'('
     bne :+
     jsr scan_value_expr_for_top_level_arith_from_scan_y
@@ -5239,23 +7249,23 @@ parse_small_bool_not_at_scan_y_fail:
 
 parse_small_bool_primary_at_scan_y:
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #'('
     bne parse_small_bool_condition_clause_at_scan_y
     tya
     pha
     jsr save_group_reader_mark
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     jsr parse_small_bool_or_at_scan_y
     bcs parse_small_bool_primary_restore_clause
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #')'
     bne parse_small_bool_primary_restore_clause
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     sty compare_char
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #'='
     beq parse_small_bool_primary_restore_clause
     cmp #'<'
@@ -5282,7 +7292,7 @@ parse_small_condition_clause_lhs_ok:
     lda expr_value_lo
     sta expr_compare_lo
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #'='
     beq parse_small_condition_clause_eq
     cmp #'<'
@@ -5295,7 +7305,7 @@ parse_small_condition_clause_lhs_ok:
     rts
 
 parse_small_condition_clause_eq:
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     jsr parse_small_decimal_sum_at_scan_y
     bcc parse_small_condition_clause_eq_ok
     jmp parse_small_condition_clause_at_scan_y_fail
@@ -5308,8 +7318,8 @@ parse_small_condition_clause_eq_ok:
     jmp parse_small_condition_clause_false
 
 parse_small_condition_clause_lt_entry:
-    jsr advance_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_consume_scan_y
+    jsr source_reader_peek_scan_y
     cmp #'='
     beq parse_small_condition_clause_le
     cmp #'>'
@@ -5324,8 +7334,8 @@ parse_small_condition_clause_lt_ok:
     jmp parse_small_condition_clause_false
 
 parse_small_condition_clause_gt_entry:
-    jsr advance_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_consume_scan_y
+    jsr source_reader_peek_scan_y
     cmp #'='
     beq parse_small_condition_clause_ge
     jsr parse_small_decimal_sum_at_scan_y
@@ -5339,7 +7349,7 @@ parse_small_condition_clause_gt_ok:
     jmp parse_small_condition_clause_false
 
 parse_small_condition_clause_le:
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     jsr parse_small_decimal_sum_at_scan_y
     bcc parse_small_condition_clause_le_ok
     jmp parse_small_condition_clause_at_scan_y_fail
@@ -5351,7 +7361,7 @@ parse_small_condition_clause_le_ok:
     jmp parse_small_condition_clause_false
 
 parse_small_condition_clause_ge:
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     jsr parse_small_decimal_sum_at_scan_y
     bcc parse_small_condition_clause_ge_ok
     jmp parse_small_condition_clause_at_scan_y_fail
@@ -5363,7 +7373,7 @@ parse_small_condition_clause_ge_ok:
     jmp parse_small_condition_clause_false
 
 parse_small_condition_clause_ne:
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     jsr parse_small_decimal_sum_at_scan_y
     bcc parse_small_condition_clause_ne_ok
     jmp parse_small_condition_clause_at_scan_y_fail
@@ -5398,7 +7408,7 @@ parse_small_decimal_expr_lhs_ok:
     lda expr_value_lo
     sta expr_compare_lo
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #'='
     beq parse_small_decimal_expr_eq
     cmp #'<'
@@ -5411,7 +7421,7 @@ parse_small_decimal_expr_lhs_ok:
     rts
 
 parse_small_decimal_expr_eq:
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     jsr parse_small_decimal_sum_at_scan_y
     bcc parse_small_decimal_expr_eq_ok
     jmp parse_small_decimal_expr_at_scan_y_fail
@@ -5424,8 +7434,8 @@ parse_small_decimal_expr_eq_true:
     jmp parse_small_decimal_expr_true
 
 parse_small_decimal_expr_lt_entry:
-    jsr advance_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_consume_scan_y
+    jsr source_reader_peek_scan_y
     cmp #'='
     beq parse_small_decimal_expr_le
     cmp #'>'
@@ -5442,8 +7452,8 @@ parse_small_decimal_expr_lt_true:
     jmp parse_small_decimal_expr_true
 
 parse_small_decimal_expr_gt_entry:
-    jsr advance_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_consume_scan_y
+    jsr source_reader_peek_scan_y
     cmp #'='
     beq parse_small_decimal_expr_ge
     jsr parse_small_decimal_sum_at_scan_y
@@ -5461,7 +7471,7 @@ parse_small_decimal_expr_gt_false:
     jmp parse_small_decimal_expr_false
 
 parse_small_decimal_expr_le:
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     jsr parse_small_decimal_sum_at_scan_y
     bcc parse_small_decimal_expr_le_ok
     jmp parse_small_decimal_expr_at_scan_y_fail
@@ -5475,7 +7485,7 @@ parse_small_decimal_expr_le_true:
     jmp parse_small_decimal_expr_true
 
 parse_small_decimal_expr_ge:
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     jsr parse_small_decimal_sum_at_scan_y
     bcc parse_small_decimal_expr_ge_ok
     jmp parse_small_decimal_expr_at_scan_y_fail
@@ -5489,7 +7499,7 @@ parse_small_decimal_expr_ge_true:
     jmp parse_small_decimal_expr_true
 
 parse_small_decimal_expr_ne:
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     jsr parse_small_decimal_sum_at_scan_y
     bcc parse_small_decimal_expr_ne_ok
     jmp parse_small_decimal_expr_at_scan_y_fail
@@ -5532,7 +7542,7 @@ parse_small_decimal_sum_at_scan_y:
     sta expr_saved_lo
 parse_small_decimal_sum_loop:
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     beq :+
     cmp #10
     beq :+
@@ -5563,23 +7573,25 @@ parse_small_decimal_sum_loop:
 :   jmp parse_small_decimal_sum_done
 
 parse_small_decimal_sum_try_and:
-    sty symbol_start_y_data
-    jsr consume_and_keyword_from_scan_y
-    bcc :+
+    lda #<pattern_and
+    sta const_ptr
+    lda #>pattern_and
+    sta const_ptr+1
+    jsr scan_keyword_token_from_scan_y
+    bcc parse_small_decimal_sum_done
     jmp parse_small_decimal_sum_at_scan_y_fail
-:   ldy symbol_start_y_data
-    jmp parse_small_decimal_sum_done
 
 parse_small_decimal_sum_try_or:
-    sty symbol_start_y_data
-    jsr consume_or_keyword_from_scan_y
-    bcc :+
+    lda #<pattern_or
+    sta const_ptr
+    lda #>pattern_or
+    sta const_ptr+1
+    jsr scan_keyword_token_from_scan_y
+    bcc parse_small_decimal_sum_done
     jmp parse_small_decimal_sum_at_scan_y_fail
-:   ldy symbol_start_y_data
-    jmp parse_small_decimal_sum_done
 
 parse_small_decimal_sum_add:
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     jsr parse_small_decimal_term_at_scan_y
     bcc :+
     jmp parse_small_decimal_sum_at_scan_y_fail
@@ -5592,7 +7604,7 @@ parse_small_decimal_sum_add:
     jmp parse_small_decimal_sum_loop
 
 parse_small_decimal_sum_sub:
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     jsr parse_small_decimal_term_at_scan_y
     bcc :+
     jmp parse_small_decimal_sum_at_scan_y_fail
@@ -5622,7 +7634,7 @@ parse_small_decimal_term_at_scan_y:
     sta expr_term_lo
 parse_small_decimal_term_loop:
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #'*'
     beq parse_small_decimal_term_mul
     cmp #'/'
@@ -5633,7 +7645,7 @@ parse_small_decimal_term_loop:
     rts
 
 parse_small_decimal_term_mul:
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     jsr parse_small_decimal_factor_at_scan_y
     bcs parse_small_decimal_term_at_scan_y_fail
     lda expr_term_lo
@@ -5654,7 +7666,7 @@ parse_small_decimal_term_mul_loop:
     jmp parse_small_decimal_term_mul_loop
 
 parse_small_decimal_term_div:
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     jsr parse_small_decimal_factor_at_scan_y
     bcs parse_small_decimal_term_at_scan_y_fail
     lda expr_value_lo
@@ -5680,20 +7692,29 @@ parse_small_decimal_term_at_scan_y_fail:
 
 parse_small_decimal_factor_at_scan_y:
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #'('
     beq parse_small_decimal_factor_group
+    jsr find_builtin_constant_from_scan_y
+    bcs :+
+    lda expr_value_hi
+    beq parse_small_decimal_factor_constant_ok
+    jmp parse_small_decimal_factor_at_scan_y_fail
+parse_small_decimal_factor_constant_ok:
+    clc
+    rts
+:
     jmp parse_small_decimal_at_scan_y
 
 parse_small_decimal_factor_group:
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     jsr parse_small_value_expr_at_scan_y
     bcs parse_small_decimal_factor_at_scan_y_fail
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #')'
     bne parse_small_decimal_factor_at_scan_y_fail
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     clc
     rts
 
@@ -5707,7 +7728,7 @@ parse_small_decimal_at_scan_y:
     sta expr_value_lo
     sta expr_digit_count
 parse_small_decimal_at_scan_y_loop:
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #'0'
     bcc parse_small_decimal_at_scan_y_done_check
     cmp #'9'+1
@@ -5729,7 +7750,7 @@ parse_small_decimal_at_scan_y_loop:
     adc compare_char
     bcs parse_small_decimal_at_scan_y_fail
     sta expr_value_lo
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     inc expr_digit_count
     bne parse_small_decimal_at_scan_y_loop
 parse_small_decimal_at_scan_y_done_check:
@@ -5745,7 +7766,7 @@ parse_plain_word_decimal_at_scan_y:
     lda #$00
     sta expr_value_lo
     sta expr_value_hi
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #'0'
     bcc parse_plain_word_decimal_at_scan_y_fail
     cmp #'9'+1
@@ -5781,8 +7802,8 @@ parse_plain_word_decimal_at_scan_y_mul10_loop:
     adc #$00
     sta expr_value_hi
     bcs parse_plain_word_decimal_at_scan_y_fail
-    jsr advance_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_consume_scan_y
+    jsr source_reader_peek_scan_y
     cmp #'0'
     bcc parse_plain_word_decimal_at_scan_y_done_check
     cmp #'9'+1
@@ -5796,7 +7817,7 @@ parse_plain_word_decimal_at_scan_y_fail:
     sec
     rts
 
-.if ACTC_KEEP_BODY_RESIDENT_FALLBACK
+.if ACTC_KEEP_BODY_RESIDENT_FALLBACK + ACTC_PREALLOCATE_BODY_EXTERNALS
 parse_positive_word_sum_at_scan_y:
     jsr skip_inline_spaces_at_scan_y
     jsr parse_positive_word_term_at_scan_y
@@ -5809,7 +7830,7 @@ parse_positive_word_sum_at_scan_y:
     sta expr_compare_hi
 parse_positive_word_sum_loop:
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     beq parse_positive_word_sum_done
     cmp #10
     beq parse_positive_word_sum_done
@@ -5835,7 +7856,7 @@ parse_positive_word_sum_loop:
     rts
 
 parse_positive_word_sum_add:
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     jsr parse_positive_word_term_at_scan_y
     bcc :+
     sec
@@ -5852,7 +7873,7 @@ parse_positive_word_sum_add:
     rts
 
 parse_positive_word_sum_sub:
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     jsr parse_positive_word_term_at_scan_y
     bcc :+
     sec
@@ -5888,7 +7909,7 @@ parse_positive_word_term_at_scan_y:
     sta expr_term_hi
 parse_positive_word_term_loop:
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #'*'
     beq parse_positive_word_term_mul
     cmp #'/'
@@ -5905,7 +7926,7 @@ parse_positive_word_term_mul:
     sta expr_compare_lo
     lda expr_term_hi
     sta expr_compare_hi
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     jsr parse_positive_word_factor_at_scan_y
     bcc :+
     sec
@@ -5944,7 +7965,7 @@ parse_positive_word_term_div:
     sta expr_compare_lo
     lda expr_term_hi
     sta expr_compare_hi
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     jsr parse_positive_word_factor_at_scan_y
     bcc :+
     sec
@@ -5988,9 +8009,14 @@ parse_positive_word_term_at_scan_y_fail:
 
 parse_positive_word_factor_at_scan_y:
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #'('
     beq parse_positive_word_factor_group
+    jsr find_builtin_constant_from_scan_y
+    bcs :+
+    clc
+    rts
+:
     jmp parse_positive_word_decimal_at_scan_y
 
 parse_positive_word_factor_group:
@@ -6002,16 +8028,18 @@ parse_positive_word_factor_group:
     sta expr_group_saved_saved_lo
     lda expr_saved_hi
     sta expr_group_saved_saved_hi
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     jsr parse_positive_word_sum_at_scan_y
     bcc :+
     sec
     rts
 :   jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #')'
-    bne parse_positive_word_decimal_at_scan_y_fail
-    jsr advance_scan_y
+    beq :+
+    jmp parse_positive_word_decimal_at_scan_y_fail
+:
+    jsr source_reader_consume_scan_y
     lda expr_group_saved_compare_lo
     sta expr_compare_lo
     lda expr_group_saved_compare_hi
@@ -6025,18 +8053,20 @@ parse_positive_word_factor_group:
 
 parse_optional_grouped_positive_word_sum_at_scan_y:
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #'('
-    bne parse_positive_word_sum_at_scan_y
-    jsr advance_scan_y
+    beq :+
+    jmp parse_positive_word_sum_at_scan_y
+:
+    jsr source_reader_consume_scan_y
     bcs parse_positive_word_term_at_scan_y_fail
     jsr parse_positive_word_sum_at_scan_y
     bcs parse_positive_word_term_at_scan_y_fail
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #')'
     bne parse_positive_word_decimal_at_scan_y_fail
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     clc
     rts
 
@@ -6047,7 +8077,7 @@ parse_positive_word_decimal_at_scan_y:
     sta expr_value_hi
     sta expr_digit_count
 parse_positive_word_decimal_at_scan_y_loop:
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #'0'
     bcc parse_positive_word_decimal_at_scan_y_done_check
     cmp #'9'+1
@@ -6082,7 +8112,7 @@ parse_positive_word_decimal_at_scan_y_mul10_loop:
     adc #$00
     sta expr_value_hi
     bcs parse_positive_word_decimal_at_scan_y_fail
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     inc expr_digit_count
     bne parse_positive_word_decimal_at_scan_y_loop
 parse_positive_word_decimal_at_scan_y_done_check:
@@ -6096,20 +8126,28 @@ parse_positive_word_decimal_at_scan_y_fail:
 .endif
 
 skip_inline_spaces_at_scan_y:
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #' '
     beq skip_inline_spaces_at_scan_y_advance
     cmp #9
     beq skip_inline_spaces_at_scan_y_advance
     rts
 skip_inline_spaces_at_scan_y_advance:
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     bcc skip_inline_spaces_at_scan_y
     rts
 
 advance_scan_y:
     iny
+.if ACTC_REU_SOURCE_CACHE
+.if SOURCE_READER_SCAN_Y_CHECKS_WINDOW
+    bne advance_scan_y_check_window
+.else
     bne advance_scan_y_ok
+.endif
+.else
+    bne advance_scan_y_ok
+.endif
     pha
     txa
     pha
@@ -6130,6 +8168,75 @@ advance_scan_y_commit_fail:
     rts
 advance_scan_y_ok:
     clc
+    rts
+
+.if ACTC_REU_SOURCE_CACHE
+.if SOURCE_READER_SCAN_Y_CHECKS_WINDOW
+advance_scan_y_check_window:
+    pha
+    txa
+    pha
+    tya
+    clc
+    adc scan_ptr
+    sta file_params+0
+    lda scan_ptr+1
+    adc #$00
+    sta file_params+1
+    lda file_params+1
+    cmp source_window_end_ptr+1
+    bcc advance_scan_y_check_window_ok
+    bne advance_scan_y_check_window_cross
+    lda file_params+0
+    cmp source_window_end_ptr
+    bcc advance_scan_y_check_window_ok
+advance_scan_y_check_window_cross:
+    sec
+    lda file_params+0
+    sbc source_window_end_ptr
+    sta content_ptr
+    lda file_params+1
+    sbc source_window_end_ptr+1
+    sta content_ptr+1
+    jsr source_reader_load_next_window
+    bcs advance_scan_y_check_window_fail
+    clc
+    lda scan_ptr
+    adc content_ptr
+    sta scan_ptr
+    lda scan_ptr+1
+    adc content_ptr+1
+    sta scan_ptr+1
+    ldy #$00
+advance_scan_y_check_window_ok:
+    pla
+    tax
+    pla
+    clc
+    rts
+advance_scan_y_check_window_fail:
+    pla
+    tax
+    pla
+    ldy #$00
+    sec
+    rts
+.endif
+.endif
+
+source_reader_consume_scan_y:
+    jsr source_reader_peek_scan_y
+    bcs source_reader_consume_scan_y_fail
+    pha
+    jsr advance_scan_y
+    bcs source_reader_consume_scan_y_fail_pop
+    pla
+    clc
+    rts
+source_reader_consume_scan_y_fail_pop:
+    pla
+source_reader_consume_scan_y_fail:
+    sec
     rts
 
 save_source_reader_mark:
@@ -6268,6 +8375,63 @@ restore_condition_reader_mark:
     lda condition_scan_ptr_lo_data
     sta scan_ptr
     lda condition_scan_ptr_hi_data
+    sta scan_ptr+1
+    rts
+
+save_reader_probe_mark:
+    lda scan_ptr
+    sta reader_probe_scan_ptr_lo_data
+    lda scan_ptr+1
+    sta reader_probe_scan_ptr_hi_data
+.if ACTC_REU_SOURCE_CACHE
+    sec
+    lda source_window_next_offset
+    sbc source_window_len
+    sta reader_probe_window_start_data
+    lda source_window_next_offset+1
+    sbc source_window_len+1
+    sta reader_probe_window_start_data+1
+    lda source_window_next_offset+2
+    sbc #$00
+    sta reader_probe_window_start_data+2
+.endif
+    rts
+
+restore_reader_probe_mark:
+.if ACTC_REU_SOURCE_CACHE
+    sec
+    lda source_window_next_offset
+    sbc source_window_len
+    sta file_params+0
+    lda source_window_next_offset+1
+    sbc source_window_len+1
+    sta file_params+1
+    lda source_window_next_offset+2
+    sbc #$00
+    sta file_params+2
+    lda file_params+0
+    cmp reader_probe_window_start_data
+    bne restore_reader_probe_mark_reload
+    lda file_params+1
+    cmp reader_probe_window_start_data+1
+    bne restore_reader_probe_mark_reload
+    lda file_params+2
+    cmp reader_probe_window_start_data+2
+    bne restore_reader_probe_mark_reload
+    jmp restore_reader_probe_mark_after_reload
+restore_reader_probe_mark_reload:
+    lda reader_probe_window_start_data
+    sta source_window_next_offset
+    lda reader_probe_window_start_data+1
+    sta source_window_next_offset+1
+    lda reader_probe_window_start_data+2
+    sta source_window_next_offset+2
+    jsr source_reader_load_next_window
+restore_reader_probe_mark_after_reload:
+.endif
+    lda reader_probe_scan_ptr_lo_data
+    sta scan_ptr
+    lda reader_probe_scan_ptr_hi_data
     sta scan_ptr+1
     rts
 
@@ -6561,13 +8725,13 @@ compute_payload_layout_with_overlay_ok:
 skip_source_line:
     ldy #$00
 skip_source_line_loop:
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     beq skip_source_line_done
     cmp #10
     beq skip_source_line_done
     cmp #13
     beq skip_source_line_done
-    jsr advance_scan_ptr
+    jsr source_reader_consume_scan_ptr
     jmp skip_source_line_loop
 skip_source_line_done:
     rts
@@ -6589,9 +8753,10 @@ store_proc_export_from_scan_ptr_or_fail:
 .if ACTC_REU_PROC_DEBUG
     jsr store_proc_debug_offset_from_current_scan_x
 .endif
+    jsr source_reader_begin_symbol_token
     ldy #$00
 store_proc_export_from_scan_ptr_or_fail_loop:
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     beq store_proc_export_from_scan_ptr_or_fail_done
     cmp #'('
     beq store_proc_export_from_scan_ptr_or_fail_done
@@ -6605,18 +8770,11 @@ store_proc_export_from_scan_ptr_or_fail_loop:
     beq store_proc_export_from_scan_ptr_or_fail_done
     cmp #13
     beq store_proc_export_from_scan_ptr_or_fail_done
-    jsr uppercase_ascii
-    cpy #$00
-    bne store_proc_export_from_scan_ptr_or_fail_body
-    jsr uppercase_symbol_start_valid
-    bcc store_proc_export_from_scan_ptr_or_fail_store
-    jmp store_proc_export_from_scan_ptr_or_fail_bad
-store_proc_export_from_scan_ptr_or_fail_body:
-    jsr uppercase_symbol_body_valid
+    jsr source_reader_symbol_token_char_valid_y
     bcc store_proc_export_from_scan_ptr_or_fail_store
     jmp store_proc_export_from_scan_ptr_or_fail_bad
 store_proc_export_from_scan_ptr_or_fail_store:
-    sta (export_ptr),y
+    jsr source_reader_store_symbol_token_y
     iny
     cpy #24
     bcc store_proc_export_from_scan_ptr_or_fail_loop
@@ -6627,11 +8785,13 @@ store_proc_export_from_scan_ptr_or_fail_bad:
 store_proc_export_from_scan_ptr_or_fail_done:
     cpy #$00
     beq store_proc_export_from_scan_ptr_or_fail_bad
-    lda #$00
-    sta (export_ptr),y
+    sty reader_scan_y_data
+    jsr source_reader_terminate_symbol_token_y
+    jsr source_reader_publish_symbol_token_to_export_ptr
 .if ACTC_REU_EXPORT_NAMES
     jsr store_export_name_to_reu_x
 .endif
+    ldy reader_scan_y_data
     txa
     pha
     jsr store_proc_params_from_scan_y_for_current_export_or_fail
@@ -6657,17 +8817,17 @@ store_proc_params_from_scan_y_for_current_export_or_fail:
     sta proc_param_var_base_data,x
 .endif
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #'('
     beq :+
     clc
     rts
-:   jsr advance_scan_y
+:   jsr source_reader_consume_scan_y
     bcc :+
     jmp store_proc_export_from_scan_ptr_or_fail_bad
 :
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #')'
     bne :+
     jmp store_proc_params_from_scan_y_for_current_export_done
@@ -6735,14 +8895,14 @@ store_proc_params_from_scan_y_for_current_export_copy_done:
 .endif
     ldy symbol_end_y_data
     jsr skip_inline_spaces_at_scan_y
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     cmp #','
     beq store_proc_params_from_scan_y_for_current_export_next
     cmp #')'
     beq store_proc_params_from_scan_y_for_current_export_done
     jmp store_proc_export_from_scan_ptr_or_fail_bad
 store_proc_params_from_scan_y_for_current_export_next:
-    jsr advance_scan_y
+    jsr source_reader_consume_scan_y
     bcc :+
     jmp store_proc_export_from_scan_ptr_or_fail_bad
 :
@@ -8027,23 +10187,38 @@ store_string_offset_to_reu_x_ok:
     rts
 .endif
 
-copy_symbol_from_scan_ptr:
-    ldy #$00
-copy_symbol_from_scan_ptr_loop:
-    lda (scan_ptr),y
-    beq copy_symbol_from_scan_ptr_done
+source_reader_symbol_token_char_valid_y:
     jsr uppercase_ascii
     cpy #$00
-    bne copy_symbol_from_scan_ptr_body
-    jsr uppercase_symbol_start_valid
-    bcc copy_symbol_from_scan_ptr_store
-    jmp copy_symbol_from_scan_ptr_done
-copy_symbol_from_scan_ptr_body:
-    jsr uppercase_symbol_body_valid
+    bne source_reader_symbol_token_char_valid_y_body
+    jmp uppercase_symbol_start_valid
+source_reader_symbol_token_char_valid_y_body:
+    jmp uppercase_symbol_body_valid
+
+source_reader_symbol_token_char_valid_x:
+    jsr uppercase_ascii
+    cpx #$00
+    bne source_reader_symbol_token_char_valid_x_body
+    jmp uppercase_symbol_start_valid
+source_reader_symbol_token_char_valid_x_body:
+    jmp uppercase_symbol_body_valid
+
+copy_symbol_from_scan_ptr:
+.if ACTC_REU_SOURCE_CACHE
+.if SOURCE_READER_STREAM_SYMBOL_COPY
+    jmp copy_symbol_from_scan_ptr_stream
+.endif
+.endif
+    jsr source_reader_begin_symbol_token
+    ldy #$00
+copy_symbol_from_scan_ptr_loop:
+    jsr source_reader_peek_scan_y
+    beq copy_symbol_from_scan_ptr_done
+    jsr source_reader_symbol_token_char_valid_y
     bcc copy_symbol_from_scan_ptr_store
     jmp copy_symbol_from_scan_ptr_done
 copy_symbol_from_scan_ptr_store:
-    sta declared_module_name,y
+    jsr source_reader_store_symbol_token_y
     iny
     cpy #24
     bcc copy_symbol_from_scan_ptr_loop
@@ -8054,8 +10229,8 @@ copy_symbol_from_scan_ptr_done:
     cpy #$00
     beq copy_symbol_from_scan_ptr_fail
     pha
-    lda #$00
-    sta declared_module_name,y
+    jsr source_reader_terminate_symbol_token_y
+    jsr source_reader_publish_symbol_token
     pla
     clc
     rts
@@ -8063,26 +10238,75 @@ copy_symbol_from_scan_ptr_fail:
     sec
     rts
 
+.if ACTC_REU_SOURCE_CACHE
+.if SOURCE_READER_STREAM_SYMBOL_COPY
+copy_symbol_from_scan_ptr_stream:
+    txa
+    pha
+    jsr source_reader_begin_symbol_token
+    lda #$00
+    sta reader_scan_y_data
+    ldx #$00
+copy_symbol_from_scan_ptr_stream_loop:
+    ldy reader_scan_y_data
+    jsr source_reader_peek_scan_y
+    beq copy_symbol_from_scan_ptr_stream_done
+    jsr source_reader_symbol_token_char_valid_x
+    bcc copy_symbol_from_scan_ptr_stream_store
+    jmp copy_symbol_from_scan_ptr_stream_done
+copy_symbol_from_scan_ptr_stream_store:
+    jsr source_reader_store_symbol_token_x
+    ldy reader_scan_y_data
+    jsr source_reader_consume_scan_y
+    bcs copy_symbol_from_scan_ptr_stream_fail
+    sty reader_scan_y_data
+    jsr source_reader_begin_symbol_token
+    inx
+    cpx #24
+    bcc copy_symbol_from_scan_ptr_stream_loop
+    pla
+    tax
+    lda #<msg_bad_proc
+    ldy #>msg_bad_proc
+    jmp fail_with_ptr
+copy_symbol_from_scan_ptr_stream_done:
+    cpx #$00
+    beq copy_symbol_from_scan_ptr_stream_fail
+    jsr source_reader_terminate_symbol_token_x
+    jsr source_reader_publish_symbol_token
+    ldy reader_scan_y_data
+    pla
+    tax
+    clc
+    rts
+copy_symbol_from_scan_ptr_stream_fail:
+    pla
+    tax
+    sec
+    rts
+.endif
+.endif
+
 copy_symbol_from_scan_y:
     txa
     pha
+    sty reader_scan_y_data
+    jsr source_reader_begin_symbol_token
     ldx #$00
 copy_symbol_from_scan_y_loop:
-    lda (scan_ptr),y
+    ldy reader_scan_y_data
+    jsr source_reader_peek_scan_y
     beq copy_symbol_from_scan_y_done_check
-    jsr uppercase_ascii
-    cpx #$00
-    bne copy_symbol_from_scan_y_body
-    jsr uppercase_symbol_start_valid
-    bcc copy_symbol_from_scan_y_store
-    jmp copy_symbol_from_scan_y_done_check
-copy_symbol_from_scan_y_body:
-    jsr uppercase_symbol_body_valid
+    jsr source_reader_symbol_token_char_valid_x
     bcc copy_symbol_from_scan_y_store
     jmp copy_symbol_from_scan_y_done_check
 copy_symbol_from_scan_y_store:
-    sta declared_module_name,x
-    jsr advance_scan_y
+    jsr source_reader_store_symbol_token_x
+    ldy reader_scan_y_data
+    jsr source_reader_consume_scan_y
+    bcs copy_symbol_from_scan_y_fail
+    sty reader_scan_y_data
+    jsr source_reader_begin_symbol_token
     inx
     cpx #24
     bcc copy_symbol_from_scan_y_loop
@@ -8094,11 +10318,71 @@ copy_symbol_from_scan_y_fail:
 copy_symbol_from_scan_y_done_check:
     cpx #$00
     beq copy_symbol_from_scan_y_fail
-    lda #$00
-    sta declared_module_name,x
+    jsr source_reader_terminate_symbol_token_x
+    jsr source_reader_publish_symbol_token
+    ldy reader_scan_y_data
     pla
     tax
     clc
+    rts
+
+source_reader_begin_symbol_token:
+    lda #<reader_token_buffer
+    sta body_ptr
+    lda #>reader_token_buffer
+    sta body_ptr+1
+    rts
+
+source_reader_store_symbol_token_y:
+    sta reader_token_buffer,y
+    rts
+
+source_reader_store_symbol_token_x:
+    sta compare_char
+    txa
+    tay
+    lda compare_char
+    sta reader_token_buffer,y
+    rts
+
+source_reader_terminate_symbol_token_y:
+    lda #$00
+    sta reader_token_buffer,y
+    rts
+
+source_reader_terminate_symbol_token_x:
+    txa
+    tay
+    lda #$00
+    sta reader_token_buffer,y
+    rts
+
+source_reader_publish_symbol_token:
+    ldy #$00
+source_reader_publish_symbol_token_loop:
+    lda reader_token_buffer,y
+    sta declared_module_name,y
+    beq source_reader_publish_symbol_token_done
+    iny
+    cpy #25
+    bcc source_reader_publish_symbol_token_loop
+    lda #$00
+    sta declared_module_name+24
+source_reader_publish_symbol_token_done:
+    rts
+
+source_reader_publish_symbol_token_to_export_ptr:
+    ldy #$00
+source_reader_publish_symbol_token_to_export_ptr_loop:
+    lda reader_token_buffer,y
+    sta (export_ptr),y
+    beq source_reader_publish_symbol_token_to_export_ptr_done
+    iny
+    cpy #25
+    bcc source_reader_publish_symbol_token_to_export_ptr_loop
+    lda #$00
+    sta (export_ptr),y
+source_reader_publish_symbol_token_to_export_ptr_done:
     rts
 
 consume_and_keyword_from_scan_y:
@@ -8120,6 +10404,151 @@ consume_not_keyword_from_scan_y:
     sta const_ptr
     lda #>pattern_not
     sta const_ptr+1
+    jmp consume_keyword_from_scan_y
+
+store_reader_prev_symbol_from_a:
+    jsr uppercase_ascii
+    jsr uppercase_symbol_body_valid
+    bcc store_reader_prev_symbol_yes
+    lda #$00
+    sta reader_prev_symbol_data
+    rts
+store_reader_prev_symbol_yes:
+    lda #$01
+    sta reader_prev_symbol_data
+    rts
+
+source_reader_consume_pattern_char_from_scan_y:
+    ldy reader_pattern_index_data
+    lda (const_ptr),y
+    sta compare_char
+    ldy reader_scan_y_data
+    jsr source_reader_peek_scan_y
+    jsr uppercase_ascii
+    cmp compare_char
+    bne source_reader_consume_pattern_char_from_scan_y_fail
+    ldy reader_scan_y_data
+    jsr source_reader_consume_scan_y
+    bcs source_reader_consume_pattern_char_from_scan_y_fail
+    sty reader_scan_y_data
+    inc reader_pattern_index_data
+    clc
+    rts
+source_reader_consume_pattern_char_from_scan_y_fail:
+    sec
+    rts
+
+source_reader_consume_pattern_char_from_scan_ptr:
+    ldy reader_pattern_index_data
+    lda (const_ptr),y
+    sta compare_char
+    jsr source_reader_peek_scan_ptr
+    beq source_reader_consume_pattern_char_from_scan_ptr_fail
+    jsr uppercase_ascii
+    cmp compare_char
+    bne source_reader_consume_pattern_char_from_scan_ptr_fail
+    jsr source_reader_consume_scan_ptr
+    bcs source_reader_consume_pattern_char_from_scan_ptr_fail
+    inc reader_pattern_index_data
+    clc
+    rts
+source_reader_consume_pattern_char_from_scan_ptr_fail:
+    sec
+    rts
+
+source_reader_peek_keyword_delimiter_from_scan_ptr:
+    jsr source_reader_peek_scan_ptr
+    jmp source_reader_keyword_delimiter_from_a
+
+source_reader_peek_keyword_delimiter_from_scan_y:
+    jsr source_reader_peek_scan_y
+    jmp source_reader_keyword_delimiter_from_a
+
+source_reader_keyword_delimiter_from_a:
+    beq source_reader_keyword_delimiter_from_a_ok
+    cmp #' '
+    beq source_reader_keyword_delimiter_from_a_ok
+    cmp #9
+    beq source_reader_keyword_delimiter_from_a_ok
+    cmp #10
+    beq source_reader_keyword_delimiter_from_a_ok
+    cmp #13
+    beq source_reader_keyword_delimiter_from_a_ok
+    sec
+    rts
+source_reader_keyword_delimiter_from_a_ok:
+    clc
+    rts
+
+source_reader_peek_keyword_token_boundary_from_scan_y:
+    ldy reader_scan_y_data
+    jsr source_reader_peek_scan_y
+    jsr uppercase_ascii
+    jsr uppercase_symbol_body_valid
+    bcc source_reader_peek_keyword_token_boundary_from_scan_y_fail
+    clc
+    rts
+source_reader_peek_keyword_token_boundary_from_scan_y_fail:
+    sec
+    rts
+
+scan_keyword_token_from_scan_y:
+    stx reader_saved_x_data
+    sty reader_start_y_data
+    sty reader_scan_y_data
+    jsr save_reader_probe_mark
+    lda #$00
+    sta reader_pattern_index_data
+scan_keyword_token_from_scan_y_loop:
+    ldy reader_pattern_index_data
+    lda (const_ptr),y
+    beq scan_keyword_token_from_scan_y_delimiter
+    jsr source_reader_consume_pattern_char_from_scan_y
+    bcs scan_keyword_token_from_scan_y_fail
+    bne scan_keyword_token_from_scan_y_loop
+scan_keyword_token_from_scan_y_fail:
+    jsr restore_reader_probe_mark
+    ldy reader_start_y_data
+    ldx reader_saved_x_data
+    sec
+    rts
+scan_keyword_token_from_scan_y_delimiter:
+    jsr source_reader_peek_keyword_token_boundary_from_scan_y
+    bcs scan_keyword_token_from_scan_y_fail
+    jsr restore_reader_probe_mark
+    ldy reader_start_y_data
+    ldx reader_saved_x_data
+    clc
+    rts
+
+consume_keyword_open_from_scan_y:
+    stx reader_saved_x_data
+    sty reader_scan_y_data
+    lda #$00
+    sta reader_pattern_index_data
+consume_keyword_open_from_scan_y_loop:
+    ldy reader_pattern_index_data
+    lda (const_ptr),y
+    beq consume_keyword_open_from_scan_y_open
+    jsr source_reader_consume_pattern_char_from_scan_y
+    bcs consume_keyword_open_from_scan_y_fail
+    bne consume_keyword_open_from_scan_y_loop
+consume_keyword_open_from_scan_y_fail:
+    ldx reader_saved_x_data
+    ldy reader_scan_y_data
+    sec
+    rts
+consume_keyword_open_from_scan_y_open:
+    ldy reader_scan_y_data
+    jsr source_reader_peek_scan_y
+    cmp #'('
+    bne consume_keyword_open_from_scan_y_fail
+    jsr source_reader_consume_scan_y
+    bcs consume_keyword_open_from_scan_y_fail
+    jsr skip_inline_spaces_at_scan_y
+    ldx reader_saved_x_data
+    clc
+    rts
 
 consume_keyword_from_scan_y:
     sty hex_work
@@ -8165,14 +10594,15 @@ symbol_buffer_matches_ay:
 
 find_var_index_from_scan_y:
     sty symbol_start_y_data
+    jsr save_reader_probe_mark
     jsr copy_symbol_from_scan_y
     bcc :+
-    ldy symbol_start_y_data
-    sec
-    rts
+    jmp find_var_index_from_scan_y_fail_restore
 :   sty symbol_end_y_data
     jsr find_var_index_from_declared
     bcc :+
+find_var_index_from_scan_y_fail_restore:
+    jsr restore_reader_probe_mark
     ldy symbol_start_y_data
     sec
     rts
@@ -8469,9 +10899,30 @@ find_or_store_rt_i_to_f_external:
     jmp find_or_store_external_from_declared
 
 find_or_store_rt_f_to_i_external:
+    tya
+    pha
     lda #<runtime_symbol_rt_f_to_i
     sta const_ptr
     lda #>runtime_symbol_rt_f_to_i
+    sta const_ptr+1
+    jsr copy_const_ptr_to_declared_module_name
+    jsr find_or_store_external_from_declared
+    pla
+    tay
+    rts
+
+find_or_store_rt_f_abs_external:
+    lda #<runtime_symbol_rt_f_abs
+    sta const_ptr
+    lda #>runtime_symbol_rt_f_abs
+    sta const_ptr+1
+    jsr copy_const_ptr_to_declared_module_name
+    jmp find_or_store_external_from_declared
+
+find_or_store_rt_f_sqrt_external:
+    lda #<runtime_symbol_rt_f_sqrt
+    sta const_ptr
+    lda #>runtime_symbol_rt_f_sqrt
     sta const_ptr+1
     jsr copy_const_ptr_to_declared_module_name
     jmp find_or_store_external_from_declared
@@ -8516,20 +10967,25 @@ find_or_store_real_operator_external_from_a:
 :   cmp #'/'
     bne :+
     jmp find_or_store_rt_f_div_external
+:   cmp #'a'
+    bne :+
+    jmp find_or_store_rt_f_abs_external
+:   cmp #'q'
+    bne :+
+    jmp find_or_store_rt_f_sqrt_external
 :   sec
     rts
 
-.if ACTC_KEEP_BODY_RESIDENT_FALLBACK
 find_or_store_real_operator_external:
     lda real_operator_data
     jmp find_or_store_real_operator_external_from_a
-.endif
 
+.if ACTC_KEEP_BODY_RESIDENT_FALLBACK
 find_or_store_builtin_runtime_external_from_declared:
     lda #<builtin_runtime_import_table
+    ldy #>builtin_runtime_import_table
     sta content_ptr
-    lda #>builtin_runtime_import_table
-    sta content_ptr+1
+    sty content_ptr+1
 find_or_store_builtin_runtime_external_from_declared_loop:
     ldy #$00
     lda (content_ptr),y
@@ -8564,7 +11020,55 @@ find_or_store_builtin_runtime_external_from_declared_found:
 find_or_store_builtin_runtime_external_from_declared_fail:
     sec
     rts
+.endif
 
+find_or_store_builtin_runtime_external_from_table_ay:
+    sta content_ptr
+    sty content_ptr+1
+find_or_store_builtin_runtime_external_from_table_loop:
+    ldy #$00
+    lda (content_ptr),y
+    beq find_or_store_builtin_runtime_external_from_table_fail
+    sta hex_work
+    and #$C0
+    lsr
+    lsr
+    lsr
+    lsr
+    lsr
+    lsr
+    sta call_expected_arg_count
+    ldy #$01
+    lda (content_ptr),y
+    pha
+    lda hex_work
+    and #$3F
+    ora #$80
+    tay
+    pla
+    jsr symbol_buffer_matches_ay
+    bcc find_or_store_builtin_runtime_external_from_table_found
+    clc
+    lda content_ptr
+    adc #$04
+    sta content_ptr
+    bcc find_or_store_builtin_runtime_external_from_table_loop
+    inc content_ptr+1
+    jmp find_or_store_builtin_runtime_external_from_table_loop
+find_or_store_builtin_runtime_external_from_table_found:
+    ldy #$02
+    lda (content_ptr),y
+    pha
+    iny
+    lda (content_ptr),y
+    tay
+    pla
+    jmp find_or_store_prefixed_rt_external_from_ay
+find_or_store_builtin_runtime_external_from_table_fail:
+    sec
+    rts
+
+.if ACTC_KEEP_BODY_RESIDENT_FALLBACK
 builtin_runtime_import_table:
     .byte $02, <builtin_symbol_sid_freq, >builtin_symbol_sid_freq, <runtime_symbol_rt_sid_freq, >runtime_symbol_rt_sid_freq
     .byte $02, <builtin_symbol_sid_pulse, >builtin_symbol_sid_pulse, <runtime_symbol_rt_sid_pulse, >runtime_symbol_rt_sid_pulse
@@ -8574,7 +11078,6 @@ builtin_runtime_import_table:
     .byte $01, <builtin_symbol_sid_on, >builtin_symbol_sid_on, <runtime_symbol_rt_sid_on, >runtime_symbol_rt_sid_on
     .byte $01, <builtin_symbol_sid_off, >builtin_symbol_sid_off, <runtime_symbol_rt_sid_off, >runtime_symbol_rt_sid_off
     .byte $00, <builtin_symbol_sid_rst, >builtin_symbol_sid_rst, <runtime_symbol_rt_sid_rst, >runtime_symbol_rt_sid_rst
-    .byte $00, <builtin_symbol_snd_rst, >builtin_symbol_snd_rst, <runtime_symbol_rt_sid_rst, >runtime_symbol_rt_sid_rst
     .byte $01, <builtin_symbol_sid_route, >builtin_symbol_sid_route, <runtime_symbol_rt_sid_route, >runtime_symbol_rt_sid_route
     .byte $01, <builtin_symbol_sid_res, >builtin_symbol_sid_res, <runtime_symbol_rt_sid_res, >runtime_symbol_rt_sid_res
     .byte $01, <builtin_symbol_sid_cutoff, >builtin_symbol_sid_cutoff, <runtime_symbol_rt_sid_cutoff, >runtime_symbol_rt_sid_cutoff
@@ -8582,9 +11085,21 @@ builtin_runtime_import_table:
     .byte $01, <builtin_symbol_sid_vol, >builtin_symbol_sid_vol, <runtime_symbol_rt_sid_vol, >runtime_symbol_rt_sid_vol
     .byte $00, <builtin_symbol_sid_osc3, >builtin_symbol_sid_osc3, <runtime_symbol_rt_sid_osc3, >runtime_symbol_rt_sid_osc3
     .byte $00, <builtin_symbol_sid_env3, >builtin_symbol_sid_env3, <runtime_symbol_rt_sid_env3, >runtime_symbol_rt_sid_env3
-    .byte $04, <builtin_symbol_sound, >builtin_symbol_sound, <runtime_symbol_rt_sound, >runtime_symbol_rt_sound
+    .byte $01, <builtin_symbol_vic_bank, >builtin_symbol_vic_bank, <runtime_symbol_rt_gfx_vic_bank, >runtime_symbol_rt_gfx_vic_bank
     .byte $01, <builtin_symbol_bg_color, >builtin_symbol_bg_color, <runtime_symbol_rt_gfx_bgcolor, >runtime_symbol_rt_gfx_bgcolor
     .byte $01, <builtin_symbol_border_color, >builtin_symbol_border_color, <runtime_symbol_rt_gfx_bordercolor, >runtime_symbol_rt_gfx_bordercolor
+    .byte $01, <builtin_symbol_screen_base, >builtin_symbol_screen_base, <runtime_symbol_rt_gfx_screen_base, >runtime_symbol_rt_gfx_screen_base
+    .byte $01, <builtin_symbol_bitmap_base, >builtin_symbol_bitmap_base, <runtime_symbol_rt_gfx_bitmap_base, >runtime_symbol_rt_gfx_bitmap_base
+    .byte $03, <builtin_symbol_screen_cell, >builtin_symbol_screen_cell, <runtime_symbol_rt_gfx_screen_cell, >runtime_symbol_rt_gfx_screen_cell
+    .byte $03, <builtin_symbol_color_cell, >builtin_symbol_color_cell, <runtime_symbol_rt_gfx_color_cell, >runtime_symbol_rt_gfx_color_cell
+    .byte $01, <builtin_symbol_screen_copy, >builtin_symbol_screen_copy, <runtime_symbol_rt_gfx_screen_copy, >runtime_symbol_rt_gfx_screen_copy
+    .byte $01, <builtin_symbol_color_copy, >builtin_symbol_color_copy, <runtime_symbol_rt_gfx_color_copy, >runtime_symbol_rt_gfx_color_copy
+    .byte $01, <builtin_symbol_bitmap_fill, >builtin_symbol_bitmap_fill, <runtime_symbol_rt_gfx_bitmap_fill, >runtime_symbol_rt_gfx_bitmap_fill
+    .byte $01, <builtin_symbol_bitmap_copy, >builtin_symbol_bitmap_copy, <runtime_symbol_rt_gfx_bitmap_copy, >runtime_symbol_rt_gfx_bitmap_copy
+    .byte $00, <builtin_symbol_bitmap_on, >builtin_symbol_bitmap_on, <runtime_symbol_rt_gfx_bitmap_on, >runtime_symbol_rt_gfx_bitmap_on
+    .byte $00, <builtin_symbol_bitmap_off, >builtin_symbol_bitmap_off, <runtime_symbol_rt_gfx_bitmap_off, >runtime_symbol_rt_gfx_bitmap_off
+    .byte $00, <builtin_symbol_mbitmap_on, >builtin_symbol_mbitmap_on, <runtime_symbol_rt_gfx_mbitmap_on, >runtime_symbol_rt_gfx_mbitmap_on
+    .byte $00, <builtin_symbol_mbitmap_off, >builtin_symbol_mbitmap_off, <runtime_symbol_rt_gfx_mbitmap_off, >runtime_symbol_rt_gfx_mbitmap_off
     .byte $01, <builtin_symbol_sprite_on, >builtin_symbol_sprite_on, <runtime_symbol_rt_sprite_on, >runtime_symbol_rt_sprite_on
     .byte $01, <builtin_symbol_sprite_off, >builtin_symbol_sprite_off, <runtime_symbol_rt_sprite_off, >runtime_symbol_rt_sprite_off
     .byte $00, <builtin_symbol_sprite_hit, >builtin_symbol_sprite_hit, <runtime_symbol_rt_sprite_hit, >runtime_symbol_rt_sprite_hit
@@ -8598,12 +11113,135 @@ builtin_runtime_import_table:
     .byte $02, <builtin_symbol_sprite_ptr, >builtin_symbol_sprite_ptr, <runtime_symbol_rt_sprite_ptr, >runtime_symbol_rt_sprite_ptr
     .byte $02, <builtin_symbol_sprite_data, >builtin_symbol_sprite_data, <runtime_symbol_rt_sprite_data, >runtime_symbol_rt_sprite_data
     .byte $02, <builtin_symbol_set_sprite_mc, >builtin_symbol_set_sprite_mc, <runtime_symbol_rt_sprite_set_mc, >runtime_symbol_rt_sprite_set_mc
+    .byte $01, <builtin_symbol_joy, >builtin_symbol_joy, <runtime_symbol_rt_joy, >runtime_symbol_rt_joy
+    .byte $01, <builtin_symbol_joy_seen, >builtin_symbol_joy_seen, <runtime_symbol_rt_jp, >runtime_symbol_rt_jp
+    .byte $01, <builtin_symbol_joy_btn1, >builtin_symbol_joy_btn1, <runtime_symbol_rt_jb1, >runtime_symbol_rt_jb1
+    .byte $01, <builtin_symbol_joy_btn2, >builtin_symbol_joy_btn2, <runtime_symbol_rt_jb2, >runtime_symbol_rt_jb2
+    .byte $01, <builtin_symbol_mouse_poll, >builtin_symbol_mouse_poll, <runtime_symbol_rt_mp, >runtime_symbol_rt_mp
+    .byte $00, <builtin_symbol_mouse_seen, >builtin_symbol_mouse_seen, <runtime_symbol_rt_mseen, >runtime_symbol_rt_mseen
+    .byte $00, <builtin_symbol_mouse_x, >builtin_symbol_mouse_x, <runtime_symbol_rt_mx, >runtime_symbol_rt_mx
+    .byte $00, <builtin_symbol_mouse_y, >builtin_symbol_mouse_y, <runtime_symbol_rt_my, >runtime_symbol_rt_my
+    .byte $00, <builtin_symbol_mouse_btn, >builtin_symbol_mouse_btn, <runtime_symbol_rt_mb, >runtime_symbol_rt_mb
+    .byte $00, <builtin_symbol_mouse_btn1, >builtin_symbol_mouse_btn1, <runtime_symbol_rt_mb1, >runtime_symbol_rt_mb1
+    .byte $00, <builtin_symbol_mouse_btn2, >builtin_symbol_mouse_btn2, <runtime_symbol_rt_mb2, >runtime_symbol_rt_mb2
+    .byte $01, <builtin_symbol_dbf_open, >builtin_symbol_dbf_open, <runtime_symbol_rt_dbf_open, >runtime_symbol_rt_dbf_open
+    .byte $01, <builtin_symbol_dbf_close, >builtin_symbol_dbf_close, <runtime_symbol_rt_dbf_close, >runtime_symbol_rt_dbf_close
+    .byte $02, <builtin_symbol_dbf_go, >builtin_symbol_dbf_go, <runtime_symbol_rt_dbf_go, >runtime_symbol_rt_dbf_go
+    .byte $01, <builtin_symbol_dbf_field_count, >builtin_symbol_dbf_field_count, <runtime_symbol_rt_dbf_fieldcount, >runtime_symbol_rt_dbf_fieldcount
+    .byte $02, <builtin_symbol_dbf_field_len, >builtin_symbol_dbf_field_len, <runtime_symbol_rt_dbf_fieldlen, >runtime_symbol_rt_dbf_fieldlen
+    .byte $02, <builtin_symbol_dbf_read_byte, >builtin_symbol_dbf_read_byte, <runtime_symbol_rt_dbf_readbyte, >runtime_symbol_rt_dbf_readbyte
+    .byte $01, <builtin_symbol_dbf_deleted, >builtin_symbol_dbf_deleted, <runtime_symbol_rt_dbf_deleted, >runtime_symbol_rt_dbf_deleted
+    .byte $01, <builtin_symbol_dbf_header_len, >builtin_symbol_dbf_header_len, <runtime_symbol_rt_dbf_headerlen, >runtime_symbol_rt_dbf_headerlen
+    .byte $01, <builtin_symbol_dbf_record_len, >builtin_symbol_dbf_record_len, <runtime_symbol_rt_dbf_recordlen, >runtime_symbol_rt_dbf_recordlen
+    .byte $01, <builtin_symbol_dbf_total_recs, >builtin_symbol_dbf_total_recs, <runtime_symbol_rt_dbf_totalrecs, >runtime_symbol_rt_dbf_totalrecs
+    .byte $01, <builtin_symbol_dbf_curr_rec_no, >builtin_symbol_dbf_curr_rec_no, <runtime_symbol_rt_dbf_currrecno, >runtime_symbol_rt_dbf_currrecno
     .byte $FF
+.endif
+
+find_builtin_constant_from_scan_y:
+    sty symbol_start_y_data
+    jsr save_source_reader_mark
+    jsr copy_symbol_from_scan_y
+    bcc :+
+    jmp find_builtin_constant_from_scan_y_fail_restore
+:
+    sty symbol_end_y_data
+    jsr find_builtin_constant_from_declared
+    bcc :+
+    jmp find_builtin_constant_from_scan_y_fail_restore
+:
+    ldy symbol_end_y_data
+    clc
+    rts
+find_builtin_constant_from_scan_y_fail_restore:
+    jsr restore_source_reader_mark
+    ldy symbol_start_y_data
+    sec
+    rts
+
+find_builtin_constant_from_declared:
+    lda #<builtin_constant_table
+    sta content_ptr
+    lda #>builtin_constant_table
+    sta content_ptr+1
+find_builtin_constant_from_declared_loop:
+    ldy #$00
+    lda (content_ptr),y
+    sta const_ptr
+    iny
+    lda (content_ptr),y
+    sta const_ptr+1
+    ora const_ptr
+    beq find_builtin_constant_from_declared_fail
+    jsr symbol_buffer_matches_const_ptr
+    bcc find_builtin_constant_from_declared_found
+    clc
+    lda content_ptr
+    adc #$04
+    sta content_ptr
+    bcc find_builtin_constant_from_declared_loop
+    inc content_ptr+1
+    jmp find_builtin_constant_from_declared_loop
+find_builtin_constant_from_declared_found:
+    ldy #$02
+    lda (content_ptr),y
+    sta expr_value_lo
+    iny
+    lda (content_ptr),y
+    sta expr_value_hi
+    clc
+    rts
+find_builtin_constant_from_declared_fail:
+    sec
+    rts
+
+builtin_constant_table:
+    .byte <builtin_const_sid_tri, >builtin_const_sid_tri, $10, $00
+    .byte <builtin_const_sid_saw, >builtin_const_sid_saw, $20, $00
+    .byte <builtin_const_sid_pulse, >builtin_const_sid_pulse, $40, $00
+    .byte <builtin_const_sid_noise, >builtin_const_sid_noise, $80, $00
+    .byte <builtin_const_sid_low, >builtin_const_sid_low, $10, $00
+    .byte <builtin_const_sid_band, >builtin_const_sid_band, $20, $00
+    .byte <builtin_const_sid_high, >builtin_const_sid_high, $40, $00
+    .byte <builtin_const_spr_front, >builtin_const_spr_front, $00, $00
+    .byte <builtin_const_spr_back, >builtin_const_spr_back, $01, $00
+    .byte <builtin_const_joy_up, >builtin_const_joy_up, $01, $00
+    .byte <builtin_const_joy_down, >builtin_const_joy_down, $02, $00
+    .byte <builtin_const_joy_left, >builtin_const_joy_left, $04, $00
+    .byte <builtin_const_joy_right, >builtin_const_joy_right, $08, $00
+    .byte <builtin_const_joy_button1, >builtin_const_joy_button1, $10, $00
+    .byte <builtin_const_joy_button2, >builtin_const_joy_button2, $20, $00
+    .byte <builtin_const_mouse_button1, >builtin_const_mouse_button1, $01, $00
+    .byte <builtin_const_mouse_button2, >builtin_const_mouse_button2, $02, $00
+    .byte $00, $00, $00, $00
 
 find_or_store_runtime_external_from_ay:
     sta const_ptr
     sty const_ptr+1
     jsr copy_const_ptr_to_declared_module_name
+    jmp find_or_store_external_from_declared
+
+find_or_store_prefixed_rt_external_from_ay:
+    sta const_ptr
+    sty const_ptr+1
+    lda #'R'
+    sta declared_module_name
+    lda #'T'
+    sta declared_module_name+1
+    lda #'_'
+    sta declared_module_name+2
+    ldy #$00
+find_or_store_prefixed_rt_external_from_ay_loop:
+    lda (const_ptr),y
+    sta declared_module_name+3,y
+    beq find_or_store_prefixed_rt_external_from_ay_done
+    iny
+    cpy #22
+    bcc find_or_store_prefixed_rt_external_from_ay_loop
+    lda #<msg_bad_proc
+    ldy #>msg_bad_proc
+    jmp fail_with_ptr
+find_or_store_prefixed_rt_external_from_ay_done:
     jmp find_or_store_external_from_declared
 
 copy_const_ptr_to_declared_module_name:
@@ -8723,9 +11361,12 @@ detect_runtime_imports_done:
 
 .if ACTC_USE_IMPORT_OVERLAY
 detect_runtime_imports_with_overlay_if_possible:
+    jsr source_reader_reset_to_start
+    bcs detect_runtime_imports_with_overlay_fail
     lda #ACTC_OVERLAY_PASS_RUNTIME_IMPORTS
     jsr actc_overlay_run_pass
     bcc detect_runtime_imports_with_overlay_ok
+detect_runtime_imports_with_overlay_fail:
     sec
     rts
 detect_runtime_imports_with_overlay_ok:
@@ -8746,11 +11387,11 @@ find_pattern_at_const_ptr:
 :
 find_pattern_at_const_ptr_loop:
     ldy #$00
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
     beq find_pattern_at_const_ptr_fail
     jsr pattern_matches_scan_ptr
     bcc find_pattern_at_const_ptr_ok
-    jsr advance_scan_ptr
+    jsr source_reader_consume_scan_ptr
     jmp find_pattern_at_const_ptr_loop
 find_pattern_at_const_ptr_ok:
     clc
@@ -8760,12 +11401,51 @@ find_pattern_at_const_ptr_fail:
     rts
 
 pattern_matches_scan_ptr:
+.if ACTC_REU_SOURCE_CACHE
     ldy #$00
 pattern_matches_scan_ptr_loop:
     lda (const_ptr),y
     beq pattern_matches_scan_ptr_ok
     sta compare_char
-    lda (scan_ptr),y
+    jsr source_reader_peek_scan_y
+    beq pattern_matches_scan_ptr_slow
+    jsr uppercase_ascii
+    cmp compare_char
+    bne pattern_matches_scan_ptr_fail
+    iny
+    bne pattern_matches_scan_ptr_loop
+pattern_matches_scan_ptr_fail:
+    sec
+    rts
+pattern_matches_scan_ptr_ok:
+    clc
+    rts
+pattern_matches_scan_ptr_slow:
+    jsr save_reader_probe_mark
+    lda #$00
+    sta reader_pattern_index_data
+pattern_matches_scan_ptr_slow_loop:
+    ldy reader_pattern_index_data
+    lda (const_ptr),y
+    beq pattern_matches_scan_ptr_slow_ok
+    jsr source_reader_consume_pattern_char_from_scan_ptr
+    bcs pattern_matches_scan_ptr_slow_fail
+    bne pattern_matches_scan_ptr_slow_loop
+pattern_matches_scan_ptr_slow_fail:
+    jsr restore_reader_probe_mark
+    sec
+    rts
+pattern_matches_scan_ptr_slow_ok:
+    jsr restore_reader_probe_mark
+    clc
+    rts
+.else
+    ldy #$00
+pattern_matches_scan_ptr_loop:
+    lda (const_ptr),y
+    beq pattern_matches_scan_ptr_ok
+    sta compare_char
+    jsr source_reader_peek_scan_y
     beq pattern_matches_scan_ptr_fail
     jsr uppercase_ascii
     cmp compare_char
@@ -8778,8 +11458,73 @@ pattern_matches_scan_ptr_fail:
 pattern_matches_scan_ptr_ok:
     clc
     rts
+.endif
 
 pattern_matches_scan_ptr_keyword:
+.if ACTC_REU_SOURCE_CACHE
+    jsr pattern_matches_scan_ptr
+    bcc :+
+    sec
+    rts
+:   ldy #$00
+pattern_matches_scan_ptr_keyword_len_loop:
+    lda (const_ptr),y
+    beq pattern_matches_scan_ptr_keyword_boundary
+    iny
+    bne pattern_matches_scan_ptr_keyword_len_loop
+    sec
+    rts
+pattern_matches_scan_ptr_keyword_boundary:
+.if SOURCE_READER_SCAN_Y_CHECKS_WINDOW
+    tya
+    clc
+    adc scan_ptr
+    sta file_params+0
+    lda scan_ptr+1
+    adc #$00
+    sta file_params+1
+    lda file_params+1
+    cmp source_window_end_ptr+1
+    bcc pattern_matches_scan_ptr_keyword_boundary_peek
+    bne pattern_matches_scan_ptr_keyword_slow
+    lda file_params+0
+    cmp source_window_end_ptr
+    bcs pattern_matches_scan_ptr_keyword_slow
+pattern_matches_scan_ptr_keyword_boundary_peek:
+.endif
+    jsr source_reader_peek_scan_y
+    beq pattern_matches_scan_ptr_keyword_slow
+    jsr source_reader_keyword_delimiter_from_a
+    bcc pattern_matches_scan_ptr_keyword_ok
+    sec
+    rts
+pattern_matches_scan_ptr_keyword_ok:
+    clc
+    rts
+pattern_matches_scan_ptr_keyword_slow:
+    jsr save_reader_probe_mark
+    lda #$00
+    sta reader_pattern_index_data
+pattern_matches_scan_ptr_keyword_slow_loop:
+    ldy reader_pattern_index_data
+    lda (const_ptr),y
+    beq pattern_matches_scan_ptr_keyword_slow_boundary
+    jsr source_reader_consume_pattern_char_from_scan_ptr
+    bcs pattern_matches_scan_ptr_keyword_slow_fail
+    bne pattern_matches_scan_ptr_keyword_slow_loop
+    jmp pattern_matches_scan_ptr_keyword_slow_fail
+pattern_matches_scan_ptr_keyword_slow_boundary:
+    jsr source_reader_peek_keyword_delimiter_from_scan_ptr
+    bcc pattern_matches_scan_ptr_keyword_slow_ok
+pattern_matches_scan_ptr_keyword_slow_fail:
+    jsr restore_reader_probe_mark
+    sec
+    rts
+pattern_matches_scan_ptr_keyword_slow_ok:
+    jsr restore_reader_probe_mark
+    clc
+    rts
+.else
     jsr pattern_matches_scan_ptr
     bcc :+
     sec
@@ -8791,21 +11536,14 @@ pattern_matches_scan_ptr_keyword_len_loop:
     iny
     bne pattern_matches_scan_ptr_keyword_len_loop
 pattern_matches_scan_ptr_keyword_boundary:
-    lda (scan_ptr),y
-    beq pattern_matches_scan_ptr_keyword_ok
-    cmp #' '
-    beq pattern_matches_scan_ptr_keyword_ok
-    cmp #9
-    beq pattern_matches_scan_ptr_keyword_ok
-    cmp #10
-    beq pattern_matches_scan_ptr_keyword_ok
-    cmp #13
-    beq pattern_matches_scan_ptr_keyword_ok
+    jsr source_reader_peek_keyword_delimiter_from_scan_y
+    bcc pattern_matches_scan_ptr_keyword_ok
     sec
     rts
 pattern_matches_scan_ptr_keyword_ok:
     clc
     rts
+.endif
 
 match_scalar_decl_at_scan_ptr:
     lda #<pattern_int_decl
@@ -8863,15 +11601,16 @@ match_scalar_decl_at_scan_ptr_width4:
     clc
     rts
 
+source_reader_consume_const_ptr_at_scan_ptr:
 advance_scan_ptr_by_const_ptr:
     ldy #$00
-advance_scan_ptr_by_const_ptr_loop:
+source_reader_consume_const_ptr_at_scan_ptr_loop:
     lda (const_ptr),y
-    beq advance_scan_ptr_by_const_ptr_done
-    jsr advance_scan_ptr
+    beq source_reader_consume_const_ptr_at_scan_ptr_done
+    jsr source_reader_consume_scan_ptr
     iny
-    bne advance_scan_ptr_by_const_ptr_loop
-advance_scan_ptr_by_const_ptr_done:
+    bne source_reader_consume_const_ptr_at_scan_ptr_loop
+source_reader_consume_const_ptr_at_scan_ptr_done:
     rts
 
 uppercase_ascii:
@@ -8960,6 +11699,8 @@ build_object_content_done_entry:
 
 .if ACTC_USE_BODY_OVERLAY
 collect_proc_body_ops_with_overlay_if_possible:
+    jsr source_reader_reset_to_start
+    bcs collect_proc_body_ops_with_overlay_fallback
     lda #ACTC_OVERLAY_PASS_BODY_COLLECT
     jsr actc_overlay_run_pass
     bcc collect_proc_body_ops_with_overlay_ok
@@ -9041,13 +11782,17 @@ build_object_content_resident:
 .endif
 
 append_export_list:
-    jsr is_main_fanout_machine_object_resident
-    bcc append_export_list_not_fanout
-    jmp append_machine_fanout_export_list
-append_export_list_not_fanout:
-    jsr is_main_single_local_call_machine_object_resident
+    jsr is_main_local_call_sequence_machine_object_resident
+    bcc append_export_list_not_local_call_sequence
+    jmp append_machine_local_call_sequence_export_list
+append_export_list_not_local_call_sequence:
+    jsr is_main_local_external_call_sequence_machine_object_resident
+    bcc append_export_list_not_local_external_call_sequence
+    jmp append_machine_local_external_call_sequence_export_list
+append_export_list_not_local_external_call_sequence:
+    jsr is_main_pure_external_call_sequence_machine_object_resident
     bcc append_export_list_standard
-    jmp append_machine_local_call_export_list
+    jmp append_machine_external_call_sequence_export_list
 append_export_list_standard:
     lda #$00
     sta export_index
@@ -9110,45 +11855,97 @@ append_export_list_newline:
 append_export_list_done:
     rts
 
-append_machine_local_call_export_list:
-    ldx #$01
-    lda #$00
-    tay
-    sta expr_value_lo
-    sty expr_value_hi
-    lda #20
-    jsr append_machine_export_line
+append_machine_external_call_sequence_export_list:
     ldx #$00
-    lda #19
+    jsr set_body_ptr_from_x
+    jsr append_count_external_call_sequence_body
+    lda #16
+    ldx call_arg_count_data
+append_machine_external_call_sequence_size_loop:
+    cpx #$00
+    beq append_machine_external_call_sequence_size_done
+    clc
+    adc #$03
+    dex
+    bne append_machine_external_call_sequence_size_loop
+append_machine_external_call_sequence_size_done:
+    ldx #$00
     ldy #$00
-    sta expr_value_lo
+    sty expr_value_lo
     sty expr_value_hi
-    lda #$01
     jsr append_machine_export_line
     rts
 
-append_machine_fanout_export_list:
-    ldx #$02
+append_machine_local_external_call_sequence_export_list:
+    jsr store_last_local_call_sequence_export_index_resident
+    lda call_target_index_data
+    sta export_index
+append_machine_local_external_call_sequence_export_loop:
+    lda export_index
+    cmp call_target_index_data
+    bne append_machine_local_external_call_sequence_export_helper
     lda #$00
     tay
     sta expr_value_lo
-    sty expr_value_hi
-    lda #27
+    sta expr_value_hi
+    jsr compute_local_external_call_sequence_total_size_resident
+    ldx export_index
     jsr append_machine_export_line
-    ldx #$01
-    lda #22
-    ldy #$00
+    jmp append_machine_local_external_call_sequence_export_next
+append_machine_local_external_call_sequence_export_helper:
+    lda export_index
+    sta hex_work
+    jsr compute_local_external_call_sequence_offset_for_hex_work_resident
+    lda expr_saved_lo
     sta expr_value_lo
-    sty expr_value_hi
-    lda #$04
+    lda #$00
+    sta expr_value_hi
+    ldx export_index
+    jsr compute_local_external_call_sequence_helper_size_for_x_resident
+    ldx export_index
     jsr append_machine_export_line
-    ldx #$00
-    lda #26
-    ldy #$00
+append_machine_local_external_call_sequence_export_next:
+    lda export_index
+    beq append_machine_local_external_call_sequence_export_done
+    dec export_index
+    jmp append_machine_local_external_call_sequence_export_loop
+append_machine_local_external_call_sequence_export_done:
+    rts
+
+append_machine_local_call_sequence_export_list:
+    jsr store_last_local_call_sequence_export_index_resident
+    lda call_target_index_data
+    sta export_index
+append_machine_local_call_sequence_export_loop:
+    lda export_index
+    cmp call_target_index_data
+    bne append_machine_local_call_sequence_export_helper
+    lda #$00
+    tay
     sta expr_value_lo
-    sty expr_value_hi
-    lda #$01
+    sta expr_value_hi
+    jsr compute_local_call_sequence_total_size_resident
+    ldx export_index
     jsr append_machine_export_line
+    jmp append_machine_local_call_sequence_export_next
+append_machine_local_call_sequence_export_helper:
+    lda export_index
+    sta hex_work
+    jsr compute_local_call_sequence_offset_for_hex_work_resident
+    lda expr_saved_lo
+    sta expr_value_lo
+    lda #$00
+    sta expr_value_hi
+    ldx export_index
+    jsr compute_local_call_sequence_helper_size_for_x_resident
+    ldx export_index
+    jsr append_machine_export_line
+append_machine_local_call_sequence_export_next:
+    lda export_index
+    beq append_machine_local_call_sequence_export_done
+    dec export_index
+    jmp append_machine_local_call_sequence_export_loop
+append_machine_local_call_sequence_export_done:
     rts
 
 append_machine_export_line:
@@ -9182,17 +11979,19 @@ append_machine_export_line_name_done:
     jmp append_newline
 
 append_body_ops_list:
-    jsr is_main_fanout_machine_object_resident
-    bcc append_body_ops_list_not_fanout
-    jsr append_machine_body_marker_line
-    jsr append_machine_body_marker_line
-    jsr append_machine_body_marker_line
+    jsr is_main_local_call_sequence_machine_object_resident
+    bcc append_body_ops_list_not_local_call_sequence
+    jsr append_machine_local_call_sequence_body_marker_list
     rts
-append_body_ops_list_not_fanout:
-    jsr is_main_single_local_call_machine_object_resident
+append_body_ops_list_not_local_call_sequence:
+    jsr is_main_local_external_call_sequence_machine_object_resident
+    bcc append_body_ops_list_not_local_external_call_sequence
+    jsr append_machine_local_external_call_sequence_body_marker_list
+    rts
+append_body_ops_list_not_local_external_call_sequence:
+    jsr is_main_pure_external_call_sequence_machine_object_resident
     bcc append_body_ops_list_standard
-    jsr append_machine_body_marker_line
-    jsr append_machine_body_marker_line
+    jsr append_machine_external_call_sequence_body_marker_line
     rts
 append_body_ops_list_standard:
     lda #$00
@@ -9253,25 +12052,652 @@ append_machine_code_list:
     jsr append_newline
     jmp append_machine_code_list_done
 append_machine_code_list_check_local_call:
-    jsr is_main_single_local_call_machine_object_resident
-    bcc append_machine_code_list_check_fanout
-    lda #<single_local_call_machine_record
-    sta const_ptr
-    lda #>single_local_call_machine_record
-    sta const_ptr+1
-    jsr append_const_ptr
-    jsr append_newline
+    jsr is_main_local_call_sequence_machine_object_resident
+    bcc append_machine_code_list_check_local_external_call
+    jsr append_machine_local_call_sequence_code_list
     jmp append_machine_code_list_done
-append_machine_code_list_check_fanout:
-    jsr is_main_fanout_machine_object_resident
+append_machine_code_list_check_local_external_call:
+    jsr is_main_local_external_call_sequence_machine_object_resident
+    bcc append_machine_code_list_check_external_call_sequence
+    jsr append_machine_local_external_call_sequence_code_list
+    jmp append_machine_code_list_done
+append_machine_code_list_check_external_call_sequence:
+    jsr is_main_pure_external_call_sequence_machine_object_resident
     bcc append_machine_code_list_done
-    lda #<fanout_machine_record
+    jsr append_machine_external_call_sequence_code_list
+    jmp append_machine_code_list_done
+append_machine_code_list_done:
+    rts
+
+append_machine_external_call_sequence_code_list:
+    lda #'m'
+    jsr append_char
+    ldx #$00
+    jsr set_body_ptr_from_x
+    lda #$00
+    sta proc_index
+append_machine_external_call_sequence_code_loop:
+    ldy proc_index
+    lda (body_ptr),y
+    cmp #'r'
+    beq append_machine_external_call_sequence_code_epilogue
+    cmp #'u'
+    bne append_machine_external_call_sequence_code_done
+    jsr append_machine_external_jsr_placeholder_bytes
+    inc proc_index
+    inc proc_index
+    jmp append_machine_external_call_sequence_code_loop
+append_machine_external_call_sequence_code_epilogue:
+    lda #<external_call_sequence_epilogue_bytes
     sta const_ptr
-    lda #>fanout_machine_record
+    lda #>external_call_sequence_epilogue_bytes
     sta const_ptr+1
     jsr append_const_ptr
     jsr append_newline
-append_machine_code_list_done:
+    jsr append_machine_external_call_sequence_reloc_list
+append_machine_external_call_sequence_code_done:
+    rts
+
+append_machine_external_jsr_placeholder_bytes:
+    lda #' '
+    jsr append_char
+    lda #'2'
+    jsr append_char
+    lda #'0'
+    jsr append_char
+    lda #' '
+    jsr append_char
+    lda #'0'
+    jsr append_char
+    lda #'0'
+    jsr append_char
+    lda #' '
+    jsr append_char
+    lda #'0'
+    jsr append_char
+    lda #'0'
+    jmp append_char
+
+append_machine_external_call_sequence_reloc_list:
+    ldx #$00
+    jsr set_body_ptr_from_x
+    lda #$00
+    sta proc_index
+    lda #$01
+    sta expr_saved_lo
+    lda #$00
+    sta expr_saved_hi
+append_machine_external_call_sequence_reloc_loop:
+    ldy proc_index
+    lda (body_ptr),y
+    cmp #'r'
+    beq append_machine_external_call_sequence_reloc_done
+    cmp #'u'
+    bne append_machine_external_call_sequence_reloc_done
+    inc proc_index
+    ldy proc_index
+    lda (body_ptr),y
+    sta call_target_index_data
+    lda #'r'
+    jsr append_char
+    lda #' '
+    jsr append_char
+    lda expr_saved_lo
+    ldy expr_saved_hi
+    jsr append_word_decimal
+    lda #' '
+    jsr append_char
+    lda #'u'
+    jsr append_char
+    lda call_target_index_data
+    jsr append_char
+    jsr append_newline
+    clc
+    lda expr_saved_lo
+    adc #$03
+    sta expr_saved_lo
+    bcc :+
+    inc expr_saved_hi
+:
+    inc proc_index
+    jmp append_machine_external_call_sequence_reloc_loop
+append_machine_external_call_sequence_reloc_done:
+    rts
+
+append_machine_local_external_call_sequence_code_list:
+    jsr store_last_local_call_sequence_export_index_resident
+    lda #'m'
+    jsr append_char
+    lda call_target_index_data
+    sta export_index
+append_machine_local_external_call_sequence_code_export_loop:
+    ldx export_index
+    jsr set_body_ptr_from_x
+    lda #$00
+    sta proc_index
+    jsr append_machine_local_external_call_sequence_body_jsrs
+    lda export_index
+    cmp call_target_index_data
+    bne append_machine_local_external_call_sequence_code_helper_return
+    lda #<external_call_sequence_epilogue_bytes
+    sta const_ptr
+    lda #>external_call_sequence_epilogue_bytes
+    sta const_ptr+1
+    jsr append_const_ptr
+    jmp append_machine_local_external_call_sequence_code_next
+append_machine_local_external_call_sequence_code_helper_return:
+    lda #' '
+    jsr append_char
+    lda #'6'
+    jsr append_char
+    lda #'0'
+    jsr append_char
+append_machine_local_external_call_sequence_code_next:
+    lda export_index
+    beq append_machine_local_external_call_sequence_code_done
+    dec export_index
+    jmp append_machine_local_external_call_sequence_code_export_loop
+append_machine_local_external_call_sequence_code_done:
+    jsr append_newline
+    jsr append_machine_local_external_call_sequence_reloc_list
+    rts
+
+append_machine_local_external_call_sequence_body_jsrs:
+    ldy proc_index
+    lda (body_ptr),y
+    cmp #'c'
+    beq append_machine_local_external_call_sequence_body_jsrs_local
+    cmp #'u'
+    beq append_machine_local_external_call_sequence_body_jsrs_external
+    rts
+append_machine_local_external_call_sequence_body_jsrs_local:
+    inc proc_index
+    ldy proc_index
+    lda (body_ptr),y
+    sec
+    sbc #'0'
+    sta hex_work
+    jsr compute_local_external_call_sequence_offset_for_hex_work_resident
+    jsr append_machine_local_jsr_to_expr_saved_lo
+    ldx export_index
+    jsr set_body_ptr_from_x
+    inc proc_index
+    jmp append_machine_local_external_call_sequence_body_jsrs
+append_machine_local_external_call_sequence_body_jsrs_external:
+    jsr append_machine_external_jsr_placeholder_bytes
+    inc proc_index
+    inc proc_index
+    jmp append_machine_local_external_call_sequence_body_jsrs
+
+append_machine_local_jsr_to_expr_saved_lo:
+    lda #' '
+    jsr append_char
+    lda #'2'
+    jsr append_char
+    lda #'0'
+    jsr append_char
+    lda #' '
+    jsr append_char
+    lda expr_saved_lo
+    jsr append_hex_byte_upper
+    lda #' '
+    jsr append_char
+    lda #'1'
+    jsr append_char
+    lda #'0'
+    jmp append_char
+
+append_machine_local_external_call_sequence_reloc_list:
+    jsr store_last_local_call_sequence_export_index_resident
+    lda #$00
+    sta expr_saved_lo
+    sta expr_saved_hi
+    lda call_target_index_data
+    sta export_index
+append_machine_local_external_call_sequence_reloc_export_loop:
+    ldx export_index
+    jsr set_body_ptr_from_x
+    lda #$00
+    sta proc_index
+    jsr append_machine_local_external_call_sequence_relocs_for_body
+    lda export_index
+    cmp call_target_index_data
+    bne append_machine_local_external_call_sequence_reloc_helper_size
+    jsr compute_local_external_call_sequence_main_code_size_resident
+    jmp append_machine_local_external_call_sequence_reloc_after_size
+append_machine_local_external_call_sequence_reloc_helper_size:
+    ldx export_index
+    jsr compute_local_external_call_sequence_helper_size_for_x_resident
+append_machine_local_external_call_sequence_reloc_after_size:
+    clc
+    adc expr_saved_lo
+    sta expr_saved_lo
+    bcc :+
+    inc expr_saved_hi
+:
+    lda export_index
+    beq append_machine_local_external_call_sequence_reloc_done
+    dec export_index
+    jmp append_machine_local_external_call_sequence_reloc_export_loop
+append_machine_local_external_call_sequence_reloc_done:
+    rts
+
+append_machine_local_external_call_sequence_relocs_for_body:
+    lda #$00
+    sta call_arg_count_data
+append_machine_local_external_call_sequence_relocs_for_body_loop:
+    ldy proc_index
+    lda (body_ptr),y
+    cmp #'c'
+    beq append_machine_local_external_call_sequence_reloc_local
+    cmp #'u'
+    beq append_machine_local_external_call_sequence_reloc_external
+    cmp #'r'
+    beq append_machine_local_external_call_sequence_reloc_body_done
+    rts
+append_machine_local_external_call_sequence_reloc_local:
+    inc proc_index
+    inc proc_index
+    jsr append_advance_local_external_reloc_body_offset_by_three
+    jmp append_machine_local_external_call_sequence_relocs_for_body_loop
+append_machine_local_external_call_sequence_reloc_external:
+    inc proc_index
+    ldy proc_index
+    lda (body_ptr),y
+    pha
+    lda #'r'
+    jsr append_char
+    lda #' '
+    jsr append_char
+    ldy expr_saved_hi
+    lda expr_saved_lo
+    clc
+    adc call_arg_count_data
+    bcc :+
+    iny
+:
+    clc
+    adc #$01
+    bcc :+
+    iny
+:
+    jsr append_word_decimal
+    lda #' '
+    jsr append_char
+    lda #'u'
+    jsr append_char
+    pla
+    jsr append_char
+    jsr append_newline
+    inc proc_index
+    jsr append_advance_local_external_reloc_body_offset_by_three
+    jmp append_machine_local_external_call_sequence_relocs_for_body_loop
+append_machine_local_external_call_sequence_reloc_body_done:
+    rts
+
+append_advance_local_external_reloc_body_offset_by_three:
+    clc
+    lda call_arg_count_data
+    adc #$03
+    sta call_arg_count_data
+    rts
+
+append_machine_local_call_sequence_code_list:
+    jsr store_last_local_call_sequence_export_index_resident
+    lda #'m'
+    jsr append_char
+    lda call_target_index_data
+    sta export_index
+append_machine_local_call_sequence_code_export_loop:
+    ldx export_index
+    jsr set_body_ptr_from_x
+    lda #$00
+    sta proc_index
+    jsr append_machine_local_call_sequence_body_jsrs
+    lda export_index
+    cmp call_target_index_data
+    bne append_machine_local_call_sequence_code_helper_return
+    lda #<external_call_sequence_epilogue_bytes
+    sta const_ptr
+    lda #>external_call_sequence_epilogue_bytes
+    sta const_ptr+1
+    jsr append_const_ptr
+    jmp append_machine_local_call_sequence_code_next
+append_machine_local_call_sequence_code_helper_return:
+    lda #' '
+    jsr append_char
+    lda #'6'
+    jsr append_char
+    lda #'0'
+    jsr append_char
+append_machine_local_call_sequence_code_next:
+    lda export_index
+    beq append_machine_local_call_sequence_code_done
+    dec export_index
+    jmp append_machine_local_call_sequence_code_export_loop
+append_machine_local_call_sequence_code_done:
+    jsr append_newline
+    rts
+
+append_machine_local_call_sequence_body_jsrs:
+    ldy proc_index
+    lda (body_ptr),y
+    cmp #'c'
+    bne append_machine_local_call_sequence_body_jsrs_done
+    inc proc_index
+    ldy proc_index
+    lda (body_ptr),y
+    sec
+    sbc #'0'
+    sta hex_work
+    jsr compute_local_call_sequence_offset_for_hex_work_resident
+    jsr append_machine_local_jsr_to_expr_saved_lo
+    ldx export_index
+    jsr set_body_ptr_from_x
+    inc proc_index
+    jmp append_machine_local_call_sequence_body_jsrs
+append_machine_local_call_sequence_body_jsrs_done:
+    rts
+
+append_machine_local_call_sequence_body_marker_list:
+    lda #$00
+    sta export_index
+append_machine_local_call_sequence_body_marker_loop:
+    ldx export_index
+    cpx export_count_data
+    beq append_machine_local_call_sequence_body_marker_done
+    jsr append_machine_body_marker_line
+    inc export_index
+    jmp append_machine_local_call_sequence_body_marker_loop
+append_machine_local_call_sequence_body_marker_done:
+    rts
+
+store_last_local_call_sequence_export_index_resident:
+    lda export_count_data
+    sec
+    sbc #$01
+    sta call_target_index_data
+    rts
+
+compute_local_call_sequence_total_size_resident:
+    jsr compute_local_call_sequence_main_code_size_resident
+    sta expr_saved_lo
+    lda call_target_index_data
+    beq compute_local_call_sequence_total_size_resident_done
+    sec
+    sbc #$01
+    sta hex_work
+compute_local_call_sequence_total_size_resident_loop:
+    ldx hex_work
+    jsr compute_local_call_sequence_helper_size_for_x_resident
+    clc
+    adc expr_saved_lo
+    sta expr_saved_lo
+    lda hex_work
+    beq compute_local_call_sequence_total_size_resident_done
+    dec hex_work
+    jmp compute_local_call_sequence_total_size_resident_loop
+compute_local_call_sequence_total_size_resident_done:
+    lda expr_saved_lo
+    rts
+
+compute_local_call_sequence_main_code_size_resident:
+    ldx call_target_index_data
+    jsr set_body_ptr_from_x
+    jsr append_count_local_call_sequence_body
+    lda #16
+    jmp append_add_three_times_call_arg_count
+
+compute_local_call_sequence_helper_size_for_x_resident:
+    jsr set_body_ptr_from_x
+    jsr append_count_local_call_sequence_body
+    lda #$01
+    jmp append_add_three_times_call_arg_count
+
+append_add_three_times_call_arg_count:
+    ldx call_arg_count_data
+append_add_three_times_call_arg_count_loop:
+    cpx #$00
+    beq append_add_three_times_call_arg_count_done
+    clc
+    adc #$03
+    dex
+    jmp append_add_three_times_call_arg_count_loop
+append_add_three_times_call_arg_count_done:
+    rts
+
+compute_local_call_sequence_offset_for_hex_work_resident:
+    lda hex_work
+    cmp call_target_index_data
+    bne compute_local_call_sequence_offset_for_helper_resident
+    lda #$00
+    sta expr_saved_lo
+    rts
+compute_local_call_sequence_offset_for_helper_resident:
+    jsr compute_local_call_sequence_main_code_size_resident
+    sta expr_saved_lo
+    lda call_target_index_data
+    sec
+    sbc #$01
+    sta expr_saved_hi
+compute_local_call_sequence_offset_for_helper_resident_loop:
+    lda expr_saved_hi
+    cmp hex_work
+    beq compute_local_call_sequence_offset_for_helper_resident_done
+    ldx expr_saved_hi
+    jsr compute_local_call_sequence_helper_size_for_x_resident
+    clc
+    adc expr_saved_lo
+    sta expr_saved_lo
+    dec expr_saved_hi
+    jmp compute_local_call_sequence_offset_for_helper_resident_loop
+compute_local_call_sequence_offset_for_helper_resident_done:
+    rts
+
+compute_local_external_call_sequence_total_size_resident:
+    jsr compute_local_external_call_sequence_main_code_size_resident
+    sta expr_saved_lo
+    lda call_target_index_data
+    beq compute_local_external_call_sequence_total_size_resident_done
+    sec
+    sbc #$01
+    sta hex_work
+compute_local_external_call_sequence_total_size_resident_loop:
+    ldx hex_work
+    jsr compute_local_external_call_sequence_helper_size_for_x_resident
+    clc
+    adc expr_saved_lo
+    sta expr_saved_lo
+    lda hex_work
+    beq compute_local_external_call_sequence_total_size_resident_done
+    dec hex_work
+    jmp compute_local_external_call_sequence_total_size_resident_loop
+compute_local_external_call_sequence_total_size_resident_done:
+    lda expr_saved_lo
+    rts
+
+compute_local_external_call_sequence_main_code_size_resident:
+    ldx call_target_index_data
+    jsr set_body_ptr_from_x
+    jsr append_count_local_external_call_sequence_body
+    lda #16
+    jmp append_add_three_times_call_arg_count
+
+compute_local_external_call_sequence_helper_size_for_x_resident:
+    jsr set_body_ptr_from_x
+    jsr append_count_local_external_call_sequence_body
+    lda #$01
+    jmp append_add_three_times_call_arg_count
+
+compute_local_external_call_sequence_offset_for_hex_work_resident:
+    lda hex_work
+    cmp call_target_index_data
+    bne compute_local_external_call_sequence_offset_for_helper_resident
+    lda #$00
+    sta expr_saved_lo
+    rts
+compute_local_external_call_sequence_offset_for_helper_resident:
+    jsr compute_local_external_call_sequence_main_code_size_resident
+    sta expr_saved_lo
+    lda call_target_index_data
+    sec
+    sbc #$01
+    sta expr_saved_hi
+compute_local_external_call_sequence_offset_for_helper_resident_loop:
+    lda expr_saved_hi
+    cmp hex_work
+    beq compute_local_external_call_sequence_offset_for_helper_resident_done
+    ldx expr_saved_hi
+    jsr compute_local_external_call_sequence_helper_size_for_x_resident
+    clc
+    adc expr_saved_lo
+    sta expr_saved_lo
+    dec expr_saved_hi
+    jmp compute_local_external_call_sequence_offset_for_helper_resident_loop
+compute_local_external_call_sequence_offset_for_helper_resident_done:
+    rts
+
+append_machine_local_external_call_sequence_body_marker_list:
+    jsr store_last_local_call_sequence_export_index_resident
+    jsr append_machine_local_external_call_sequence_flat_body_marker_line
+    lda call_target_index_data
+    beq append_machine_local_external_call_sequence_body_marker_done
+    sec
+    sbc #$01
+    sta export_index
+append_machine_local_external_call_sequence_body_marker_loop:
+    ldx export_index
+    jsr set_body_ptr_from_x
+    jsr append_machine_local_external_call_sequence_body_marker_line
+    lda export_index
+    beq append_machine_local_external_call_sequence_body_marker_done
+    dec export_index
+    jmp append_machine_local_external_call_sequence_body_marker_loop
+append_machine_local_external_call_sequence_body_marker_done:
+    rts
+
+append_machine_local_external_call_sequence_flat_body_marker_line:
+    lda #'b'
+    jsr append_char
+    lda #' '
+    jsr append_char
+    lda call_target_index_data
+    sta export_index
+append_machine_local_external_call_sequence_flat_body_marker_loop:
+    ldx export_index
+    jsr set_body_ptr_from_x
+    jsr append_machine_local_external_call_sequence_body_marker_refs
+    lda export_index
+    bne append_machine_local_external_call_sequence_flat_body_marker_continue
+    jmp append_machine_local_external_call_sequence_body_marker_machine
+append_machine_local_external_call_sequence_flat_body_marker_continue:
+    dec export_index
+    jmp append_machine_local_external_call_sequence_flat_body_marker_loop
+
+append_machine_local_external_call_sequence_body_marker_line:
+    lda #'b'
+    jsr append_char
+    lda #' '
+    jsr append_char
+    lda #$00
+    sta body_marker_visit_mask_data
+    ldx export_index
+    jsr append_machine_local_external_call_sequence_body_marker_closure_refs_for_x
+    jmp append_machine_local_external_call_sequence_body_marker_machine
+
+append_machine_local_external_call_sequence_body_marker_closure_refs_for_x:
+    stx current_proc_index_data
+    jsr append_machine_local_external_call_sequence_body_marker_index_mask
+    and body_marker_visit_mask_data
+    beq append_machine_local_external_call_sequence_body_marker_closure_refs_new
+    rts
+append_machine_local_external_call_sequence_body_marker_closure_refs_new:
+    jsr append_machine_local_external_call_sequence_body_marker_index_mask
+    ora body_marker_visit_mask_data
+    sta body_marker_visit_mask_data
+    ldx current_proc_index_data
+    jsr set_body_ptr_from_x
+    jsr append_machine_local_external_call_sequence_body_marker_refs
+    lda #$00
+    sta proc_index
+append_machine_local_external_call_sequence_body_marker_closure_refs_loop:
+    ldy proc_index
+    lda (body_ptr),y
+    cmp #'c'
+    beq append_machine_local_external_call_sequence_body_marker_closure_refs_local
+    cmp #'u'
+    beq append_machine_local_external_call_sequence_body_marker_closure_refs_skip_external
+    rts
+append_machine_local_external_call_sequence_body_marker_closure_refs_local:
+    inc proc_index
+    ldy proc_index
+    lda (body_ptr),y
+    sec
+    sbc #'0'
+    sta expr_saved_lo
+    inc proc_index
+    lda proc_index
+    pha
+    lda body_ptr
+    pha
+    lda body_ptr+1
+    pha
+    ldx expr_saved_lo
+    jsr append_machine_local_external_call_sequence_body_marker_closure_refs_for_x
+    pla
+    sta body_ptr+1
+    pla
+    sta body_ptr
+    pla
+    sta proc_index
+    jmp append_machine_local_external_call_sequence_body_marker_closure_refs_loop
+append_machine_local_external_call_sequence_body_marker_closure_refs_skip_external:
+    inc proc_index
+    inc proc_index
+    jmp append_machine_local_external_call_sequence_body_marker_closure_refs_loop
+
+append_machine_local_external_call_sequence_body_marker_index_mask:
+    lda #$01
+    ldx current_proc_index_data
+    beq append_machine_local_external_call_sequence_body_marker_index_mask_done
+append_machine_local_external_call_sequence_body_marker_index_mask_loop:
+    asl a
+    dex
+    bne append_machine_local_external_call_sequence_body_marker_index_mask_loop
+append_machine_local_external_call_sequence_body_marker_index_mask_done:
+    rts
+
+append_machine_local_external_call_sequence_body_marker_refs:
+    lda #$00
+    sta proc_index
+append_machine_local_external_call_sequence_body_marker_line_loop:
+    ldy proc_index
+    lda (body_ptr),y
+    cmp #'c'
+    beq append_machine_local_external_call_sequence_body_marker_line_local
+    cmp #'u'
+    beq append_machine_local_external_call_sequence_body_marker_line_external
+    jmp append_machine_local_external_call_sequence_body_marker_line_machine
+append_machine_local_external_call_sequence_body_marker_line_local:
+    inc proc_index
+    inc proc_index
+    jmp append_machine_local_external_call_sequence_body_marker_line_loop
+append_machine_local_external_call_sequence_body_marker_line_external:
+    lda #'u'
+    jsr append_char
+    inc proc_index
+    ldy proc_index
+    lda (body_ptr),y
+    jsr append_char
+    inc proc_index
+    jmp append_machine_local_external_call_sequence_body_marker_line_loop
+append_machine_local_external_call_sequence_body_marker_line_machine:
+    rts
+
+append_machine_local_external_call_sequence_body_marker_machine:
+    lda #'M'
+    jsr append_char
+    jsr append_newline
     rts
 
 is_empty_main_machine_object_resident:
@@ -9369,40 +12795,6 @@ main_symbol_no:
     clc
     rts
 
-is_main_single_local_call_machine_object_resident:
-    lda export_count_data
-    cmp #$02
-    bne is_main_single_local_call_machine_object_resident_no
-    lda extern_count_data
-    bne is_main_single_local_call_machine_object_resident_no
-    lda string_count_data
-    bne is_main_single_local_call_machine_object_resident_no
-    lda int_count_data
-    bne is_main_single_local_call_machine_object_resident_no
-    lda var_count_data
-    bne is_main_single_local_call_machine_object_resident_no
-    lda module_var_count_data
-    bne is_main_single_local_call_machine_object_resident_no
-    jsr module_name_is_main_symbol
-    bcc is_main_single_local_call_machine_object_resident_no
-    ldx #$01
-    jsr set_export_ptr_from_x
-    jsr export_ptr_is_main_symbol
-    bcc is_main_single_local_call_machine_object_resident_no
-    ldx #$00
-    jsr set_body_ptr_from_x
-    jsr body_ptr_is_return_body
-    bcc is_main_single_local_call_machine_object_resident_no
-    ldx #$01
-    jsr set_body_ptr_from_x
-    jsr body_ptr_is_call_zero_return_body
-    bcc is_main_single_local_call_machine_object_resident_no
-    sec
-    rts
-is_main_single_local_call_machine_object_resident_no:
-    clc
-    rts
-
 body_ptr_is_return_body:
     ldy #$00
     lda (body_ptr),y
@@ -9419,94 +12811,322 @@ body_ptr_is_return_body_no:
     clc
     rts
 
-body_ptr_is_call_zero_return_body:
-    ldy #$00
-    lda (body_ptr),y
-    cmp #'c'
-    bne body_ptr_is_call_zero_return_body_no
-    iny
-    lda (body_ptr),y
-    cmp #'0'
-    bne body_ptr_is_call_zero_return_body_no
-    iny
-    lda (body_ptr),y
-    cmp #'r'
-    bne body_ptr_is_call_zero_return_body_no
-    iny
-    lda (body_ptr),y
-    bne body_ptr_is_call_zero_return_body_no
-    sec
-    rts
-body_ptr_is_call_zero_return_body_no:
-    clc
-    rts
-
-is_main_fanout_machine_object_resident:
+is_main_pure_external_call_sequence_machine_object_resident:
     lda export_count_data
-    cmp #$03
-    bne is_main_fanout_machine_object_resident_no
+    cmp #$01
+    bne is_main_pure_external_call_sequence_machine_object_resident_no
     lda extern_count_data
-    bne is_main_fanout_machine_object_resident_no
+    beq is_main_pure_external_call_sequence_machine_object_resident_no
+    cmp #36
+    bcs is_main_pure_external_call_sequence_machine_object_resident_no
+    sta hex_work
     lda string_count_data
-    bne is_main_fanout_machine_object_resident_no
+    bne is_main_pure_external_call_sequence_machine_object_resident_no
     lda int_count_data
-    bne is_main_fanout_machine_object_resident_no
+    bne is_main_pure_external_call_sequence_machine_object_resident_no
     lda var_count_data
-    bne is_main_fanout_machine_object_resident_no
+    bne is_main_pure_external_call_sequence_machine_object_resident_no
     lda module_var_count_data
-    bne is_main_fanout_machine_object_resident_no
+    bne is_main_pure_external_call_sequence_machine_object_resident_no
     jsr module_name_is_main_symbol
-    bcc is_main_fanout_machine_object_resident_no
-    ldx #$02
+    bcc is_main_pure_external_call_sequence_machine_object_resident_no
+    ldx #$00
     jsr set_export_ptr_from_x
     jsr export_ptr_is_main_symbol
-    bcc is_main_fanout_machine_object_resident_no
+    bcc is_main_pure_external_call_sequence_machine_object_resident_no
     ldx #$00
     jsr set_body_ptr_from_x
-    jsr body_ptr_is_return_body
-    bcc is_main_fanout_machine_object_resident_no
-    ldx #$01
-    jsr set_body_ptr_from_x
-    jsr body_ptr_is_call_zero_return_body
-    bcc is_main_fanout_machine_object_resident_no
-    ldx #$02
-    jsr set_body_ptr_from_x
-    jsr body_ptr_is_call_zero_call_one_return_body
-    bcc is_main_fanout_machine_object_resident_no
+    jsr body_ptr_is_external_call_sequence_return_body
+    bcc is_main_pure_external_call_sequence_machine_object_resident_no
     sec
     rts
-is_main_fanout_machine_object_resident_no:
+is_main_pure_external_call_sequence_machine_object_resident_no:
     clc
     rts
 
-body_ptr_is_call_zero_call_one_return_body:
+body_ptr_is_external_call_sequence_return_body:
     ldy #$00
+    sty call_arg_count_data
+body_ptr_is_external_call_sequence_return_body_loop:
+    lda (body_ptr),y
+    cmp #'u'
+    beq body_ptr_is_external_call_sequence_return_body_call
+    cmp #'r'
+    beq body_ptr_is_external_call_sequence_return_body_ret
+    jmp body_ptr_is_external_call_sequence_return_body_no
+body_ptr_is_external_call_sequence_return_body_call:
+    iny
+    lda (body_ptr),y
+    jsr external_import_selector_to_index
+    bcc body_ptr_is_external_call_sequence_return_body_no
+    cmp hex_work
+    bcs body_ptr_is_external_call_sequence_return_body_no
+    inc call_arg_count_data
+    iny
+    jmp body_ptr_is_external_call_sequence_return_body_loop
+body_ptr_is_external_call_sequence_return_body_ret:
+    lda call_arg_count_data
+    beq body_ptr_is_external_call_sequence_return_body_no
+    iny
+    lda (body_ptr),y
+    bne body_ptr_is_external_call_sequence_return_body_no
+    sec
+    rts
+body_ptr_is_external_call_sequence_return_body_no:
+    clc
+    rts
+
+external_import_selector_to_index:
+    ; Object body selectors are one-byte base36 import IDs: 0-9, A-Z.
+    cmp #'0'
+    bcc external_import_selector_to_index_no
+    cmp #':'
+    bcc external_import_selector_to_index_digit
+    cmp #'A'
+    bcc external_import_selector_to_index_no
+    cmp #'['
+    bcs external_import_selector_to_index_no
+    sec
+    sbc #55
+    sec
+    rts
+external_import_selector_to_index_digit:
+    sec
+    sbc #'0'
+    sec
+    rts
+external_import_selector_to_index_no:
+    clc
+    rts
+
+append_count_external_call_sequence_body:
+    ldy #$00
+    sty call_arg_count_data
+append_count_external_call_sequence_body_loop:
+    lda (body_ptr),y
+    cmp #'u'
+    bne append_count_external_call_sequence_body_done
+    inc call_arg_count_data
+    iny
+    iny
+    jmp append_count_external_call_sequence_body_loop
+append_count_external_call_sequence_body_done:
+    rts
+
+is_main_local_call_sequence_machine_object_resident:
+    lda export_count_data
+    cmp #$02
+    bcc is_main_local_call_sequence_machine_object_resident_no
+    cmp #10
+    bcs is_main_local_call_sequence_machine_object_resident_no
+    sta expr_saved_hi
+    sec
+    sbc #$01
+    sta call_target_index_data
+    lda extern_count_data
+    bne is_main_local_call_sequence_machine_object_resident_no
+    lda string_count_data
+    bne is_main_local_call_sequence_machine_object_resident_no
+    lda int_count_data
+    bne is_main_local_call_sequence_machine_object_resident_no
+    lda var_count_data
+    bne is_main_local_call_sequence_machine_object_resident_no
+    lda module_var_count_data
+    bne is_main_local_call_sequence_machine_object_resident_no
+    jsr module_name_is_main_symbol
+    bcc is_main_local_call_sequence_machine_object_resident_no
+    ldx call_target_index_data
+    jsr set_export_ptr_from_x
+    jsr export_ptr_is_main_symbol
+    bcc is_main_local_call_sequence_machine_object_resident_no
+    lda #$00
+    sta export_index
+is_main_local_call_sequence_machine_object_resident_body_loop:
+    lda export_index
+    cmp expr_saved_hi
+    beq is_main_local_call_sequence_machine_object_resident_yes
+    ldx export_index
+    jsr set_body_ptr_from_x
+    jsr body_ptr_is_local_call_sequence_return_body
+    bcc is_main_local_call_sequence_machine_object_resident_no
+    lda export_index
+    cmp call_target_index_data
+    bne is_main_local_call_sequence_machine_object_resident_next_body
+    lda call_arg_count_data
+    beq is_main_local_call_sequence_machine_object_resident_no
+is_main_local_call_sequence_machine_object_resident_next_body:
+    inc export_index
+    jmp is_main_local_call_sequence_machine_object_resident_body_loop
+is_main_local_call_sequence_machine_object_resident_yes:
+    sec
+    rts
+is_main_local_call_sequence_machine_object_resident_no:
+    clc
+    rts
+
+body_ptr_is_local_call_sequence_return_body:
+    ldy #$00
+    sty call_arg_count_data
+body_ptr_is_local_call_sequence_return_body_loop:
     lda (body_ptr),y
     cmp #'c'
-    bne body_ptr_is_call_zero_call_one_return_body_no
+    beq body_ptr_is_local_call_sequence_return_body_call
+    cmp #'r'
+    beq body_ptr_is_local_call_sequence_return_body_ret
+    jmp body_ptr_is_local_call_sequence_return_body_no
+body_ptr_is_local_call_sequence_return_body_call:
     iny
     lda (body_ptr),y
     cmp #'0'
-    bne body_ptr_is_call_zero_call_one_return_body_no
+    bcc body_ptr_is_local_call_sequence_return_body_no
+    cmp #':'
+    bcs body_ptr_is_local_call_sequence_return_body_no
+    sec
+    sbc #'0'
+    cmp expr_saved_hi
+    bcs body_ptr_is_local_call_sequence_return_body_no
+    inc call_arg_count_data
+    iny
+    jmp body_ptr_is_local_call_sequence_return_body_loop
+body_ptr_is_local_call_sequence_return_body_ret:
     iny
     lda (body_ptr),y
-    cmp #'c'
-    bne body_ptr_is_call_zero_call_one_return_body_no
-    iny
-    lda (body_ptr),y
-    cmp #'1'
-    bne body_ptr_is_call_zero_call_one_return_body_no
-    iny
-    lda (body_ptr),y
-    cmp #'r'
-    bne body_ptr_is_call_zero_call_one_return_body_no
-    iny
-    lda (body_ptr),y
-    bne body_ptr_is_call_zero_call_one_return_body_no
+    bne body_ptr_is_local_call_sequence_return_body_no
     sec
     rts
-body_ptr_is_call_zero_call_one_return_body_no:
+body_ptr_is_local_call_sequence_return_body_no:
     clc
+    rts
+
+append_count_local_call_sequence_body:
+    ldy #$00
+    sty call_arg_count_data
+append_count_local_call_sequence_body_loop:
+    lda (body_ptr),y
+    cmp #'c'
+    bne append_count_local_call_sequence_body_done
+    inc call_arg_count_data
+    iny
+    iny
+    jmp append_count_local_call_sequence_body_loop
+append_count_local_call_sequence_body_done:
+    rts
+
+is_main_local_external_call_sequence_machine_object_resident:
+    lda export_count_data
+    cmp #$02
+    bcc is_main_local_external_call_sequence_machine_object_resident_no
+    cmp #10
+    bcs is_main_local_external_call_sequence_machine_object_resident_no
+    sta expr_saved_hi
+    sec
+    sbc #$01
+    sta call_target_index_data
+    lda extern_count_data
+    beq is_main_local_external_call_sequence_machine_object_resident_no
+    cmp #10
+    bcs is_main_local_external_call_sequence_machine_object_resident_no
+    sta hex_work
+    lda string_count_data
+    bne is_main_local_external_call_sequence_machine_object_resident_no
+    lda int_count_data
+    bne is_main_local_external_call_sequence_machine_object_resident_no
+    lda var_count_data
+    bne is_main_local_external_call_sequence_machine_object_resident_no
+    lda module_var_count_data
+    bne is_main_local_external_call_sequence_machine_object_resident_no
+    jsr module_name_is_main_symbol
+    bcc is_main_local_external_call_sequence_machine_object_resident_no
+    ldx call_target_index_data
+    jsr set_export_ptr_from_x
+    jsr export_ptr_is_main_symbol
+    bcc is_main_local_external_call_sequence_machine_object_resident_no
+    lda #$00
+    sta export_index
+is_main_local_external_call_sequence_machine_object_resident_body_loop:
+    lda export_index
+    cmp expr_saved_hi
+    beq is_main_local_external_call_sequence_machine_object_resident_yes
+    ldx export_index
+    jsr set_body_ptr_from_x
+    jsr body_ptr_is_local_external_call_sequence_return_body
+    bcc is_main_local_external_call_sequence_machine_object_resident_no
+    inc export_index
+    jmp is_main_local_external_call_sequence_machine_object_resident_body_loop
+is_main_local_external_call_sequence_machine_object_resident_yes:
+    sec
+    rts
+is_main_local_external_call_sequence_machine_object_resident_no:
+    clc
+    rts
+
+body_ptr_is_local_external_call_sequence_return_body:
+    ldy #$00
+    sty call_arg_count_data
+body_ptr_is_local_external_call_sequence_return_body_loop:
+    lda (body_ptr),y
+    cmp #'c'
+    beq body_ptr_is_local_external_call_sequence_return_body_local_call
+    cmp #'u'
+    beq body_ptr_is_local_external_call_sequence_return_body_external_call
+    cmp #'r'
+    beq body_ptr_is_local_external_call_sequence_return_body_ret
+    jmp body_ptr_is_local_external_call_sequence_return_body_no
+body_ptr_is_local_external_call_sequence_return_body_local_call:
+    iny
+    lda (body_ptr),y
+    cmp #'0'
+    bcc body_ptr_is_local_external_call_sequence_return_body_no
+    cmp #':'
+    bcs body_ptr_is_local_external_call_sequence_return_body_no
+    sec
+    sbc #'0'
+    cmp expr_saved_hi
+    bcs body_ptr_is_local_external_call_sequence_return_body_no
+    inc call_arg_count_data
+    iny
+    jmp body_ptr_is_local_external_call_sequence_return_body_loop
+body_ptr_is_local_external_call_sequence_return_body_external_call:
+    iny
+    lda (body_ptr),y
+    cmp #'0'
+    bcc body_ptr_is_local_external_call_sequence_return_body_no
+    cmp #':'
+    bcs body_ptr_is_local_external_call_sequence_return_body_no
+    sec
+    sbc #'0'
+    cmp hex_work
+    bcs body_ptr_is_local_external_call_sequence_return_body_no
+    inc call_arg_count_data
+    iny
+    jmp body_ptr_is_local_external_call_sequence_return_body_loop
+body_ptr_is_local_external_call_sequence_return_body_ret:
+    iny
+    lda (body_ptr),y
+    bne body_ptr_is_local_external_call_sequence_return_body_no
+    sec
+    rts
+body_ptr_is_local_external_call_sequence_return_body_no:
+    clc
+    rts
+
+append_count_local_external_call_sequence_body:
+    ldy #$00
+    lda #$00
+    sta call_arg_count_data
+append_count_local_external_call_sequence_body_loop:
+    lda (body_ptr),y
+    cmp #'c'
+    beq append_count_local_external_call_sequence_body_call
+    cmp #'u'
+    beq append_count_local_external_call_sequence_body_call
+    jmp append_count_local_external_call_sequence_body_done
+append_count_local_external_call_sequence_body_call:
+    inc call_arg_count_data
+    iny
+    iny
+    jmp append_count_local_external_call_sequence_body_loop
+append_count_local_external_call_sequence_body_done:
     rts
 
 append_machine_body_marker_line:
@@ -9517,6 +13137,41 @@ append_machine_body_marker_line:
     lda #'M'
     jsr append_char
     jmp append_newline
+
+append_machine_external_call_sequence_body_marker_line:
+    lda #'b'
+    jsr append_char
+    lda #' '
+    jsr append_char
+    lda #$00
+    sta proc_index
+append_machine_external_call_sequence_body_marker_loop:
+    ldx proc_index
+    cpx extern_count_data
+    beq append_machine_external_call_sequence_body_marker_done
+    lda #'u'
+    jsr append_char
+    lda proc_index
+    jsr append_object_selector
+    inc proc_index
+    jmp append_machine_external_call_sequence_body_marker_loop
+append_machine_external_call_sequence_body_marker_done:
+    lda #'M'
+    jsr append_char
+    jmp append_newline
+
+append_object_selector:
+    cmp #10
+    bcc append_object_selector_digit
+    sec
+    sbc #10
+    clc
+    adc #'A'
+    jmp append_char
+append_object_selector_digit:
+    clc
+    adc #'0'
+    jmp append_char
 
 append_external_list:
     lda #$00
@@ -9889,6 +13544,28 @@ append_hex_nibble_digit:
     clc
     adc #'0'
     jmp append_char
+
+append_hex_byte_upper:
+    sta hex_work
+    lsr a
+    lsr a
+    lsr a
+    lsr a
+    jsr append_hex_nibble_upper
+    lda hex_work
+    and #$0F
+    jmp append_hex_nibble_upper
+
+append_hex_nibble_upper:
+    cmp #$0A
+    bcc append_hex_nibble_upper_digit
+    clc
+    adc #('A'-10)
+    jmp append_char
+append_hex_nibble_upper_digit:
+    clc
+    adc #'0'
+    jmp append_char
 .endif
 
 append_char:
@@ -10096,6 +13773,10 @@ pattern_card_decl:
     .asciiz "CARD"
 pattern_real_decl:
     .asciiz "REAL"
+pattern_fabs:
+    .asciiz "FABS"
+pattern_fsqrt:
+    .asciiz "FSQRT"
 pattern_proc:
     .asciiz "PROC"
 pattern_if:
@@ -10159,10 +13840,15 @@ runtime_symbol_rt_i_to_f:
     .asciiz "RT_I_TO_F"
 runtime_symbol_rt_f_to_i:
     .asciiz "RT_F_TO_I"
+runtime_symbol_rt_f_abs:
+    .asciiz "RT_F_ABS"
+runtime_symbol_rt_f_sqrt:
+    .asciiz "RT_F_SQRT"
 runtime_symbol_rt_s_to_f:
     .asciiz "RT_S_TO_F"
 runtime_symbol_rt_print_f:
     .asciiz "RT_PRINT_F"
+.if ACTC_KEEP_BODY_RESIDENT_FALLBACK
 runtime_symbol_rt_sid_freq:
     .asciiz "RT_SID_FREQ"
 runtime_symbol_rt_sid_pulse:
@@ -10193,12 +13879,36 @@ runtime_symbol_rt_sid_osc3:
     .asciiz "RT_SID_OSC3"
 runtime_symbol_rt_sid_env3:
     .asciiz "RT_SID_ENV3"
-runtime_symbol_rt_sound:
-    .asciiz "RT_SOUND"
+runtime_symbol_rt_gfx_vic_bank:
+    .asciiz "RT_GFX_VIC_BANK"
 runtime_symbol_rt_gfx_bgcolor:
     .asciiz "RT_GFX_BGCOLOR"
 runtime_symbol_rt_gfx_bordercolor:
     .asciiz "RT_GFX_BORDERCOLOR"
+runtime_symbol_rt_gfx_screen_base:
+    .asciiz "RT_GFX_SCREEN_BASE"
+runtime_symbol_rt_gfx_bitmap_base:
+    .asciiz "RT_GFX_BITMAP_BASE"
+runtime_symbol_rt_gfx_screen_cell:
+    .asciiz "RT_GFX_SCREEN_CELL"
+runtime_symbol_rt_gfx_color_cell:
+    .asciiz "RT_GFX_COLOR_CELL"
+runtime_symbol_rt_gfx_screen_copy:
+    .asciiz "RT_GFX_SCREEN_COPY"
+runtime_symbol_rt_gfx_color_copy:
+    .asciiz "RT_GFX_COLOR_COPY"
+runtime_symbol_rt_gfx_bitmap_fill:
+    .asciiz "RT_GFX_BITMAP_FILL"
+runtime_symbol_rt_gfx_bitmap_copy:
+    .asciiz "RT_GFX_BITMAP_COPY"
+runtime_symbol_rt_gfx_bitmap_on:
+    .asciiz "RT_GFX_BITMAP_ON"
+runtime_symbol_rt_gfx_bitmap_off:
+    .asciiz "RT_GFX_BITMAP_OFF"
+runtime_symbol_rt_gfx_mbitmap_on:
+    .asciiz "RT_GFX_MBITMAP_ON"
+runtime_symbol_rt_gfx_mbitmap_off:
+    .asciiz "RT_GFX_MBITMAP_OFF"
 runtime_symbol_rt_sprite_on:
     .asciiz "RT_SPRITE_ON"
 runtime_symbol_rt_sprite_off:
@@ -10225,6 +13935,50 @@ runtime_symbol_rt_sprite_data:
     .asciiz "RT_SPRITE_DATA"
 runtime_symbol_rt_sprite_set_mc:
     .asciiz "RT_SPRITE_SET_MC"
+runtime_symbol_rt_joy:
+    .asciiz "RT_JOY"
+runtime_symbol_rt_jp:
+    .asciiz "RT_JP"
+runtime_symbol_rt_jb1:
+    .asciiz "RT_JB1"
+runtime_symbol_rt_jb2:
+    .asciiz "RT_JB2"
+runtime_symbol_rt_mp:
+    .asciiz "RT_MP"
+runtime_symbol_rt_mseen:
+    .asciiz "RT_MSEEN"
+runtime_symbol_rt_mx:
+    .asciiz "RT_MX"
+runtime_symbol_rt_my:
+    .asciiz "RT_MY"
+runtime_symbol_rt_mb:
+    .asciiz "RT_MB"
+runtime_symbol_rt_mb1:
+    .asciiz "RT_MB1"
+runtime_symbol_rt_mb2:
+    .asciiz "RT_MB2"
+runtime_symbol_rt_dbf_open:
+    .asciiz "RT_DBF_OPEN"
+runtime_symbol_rt_dbf_close:
+    .asciiz "RT_DBF_CLOSE"
+runtime_symbol_rt_dbf_go:
+    .asciiz "RT_DBF_GO"
+runtime_symbol_rt_dbf_fieldcount:
+    .asciiz "RT_DBF_FIELDCOUNT"
+runtime_symbol_rt_dbf_fieldlen:
+    .asciiz "RT_DBF_FIELDLEN"
+runtime_symbol_rt_dbf_readbyte:
+    .asciiz "RT_DBF_READBYTE"
+runtime_symbol_rt_dbf_deleted:
+    .asciiz "RT_DBF_DELETED"
+runtime_symbol_rt_dbf_headerlen:
+    .asciiz "RT_DBF_HEADERLEN"
+runtime_symbol_rt_dbf_recordlen:
+    .asciiz "RT_DBF_RECORDLEN"
+runtime_symbol_rt_dbf_totalrecs:
+    .asciiz "RT_DBF_TOTALRECS"
+runtime_symbol_rt_dbf_currrecno:
+    .asciiz "RT_DBF_CURRRECNO"
 builtin_symbol_sprite_on:
     .asciiz "SPRITEON"
 builtin_symbol_sprite_off:
@@ -10251,6 +14005,50 @@ builtin_symbol_sprite_data:
     .asciiz "SPRITEDATA"
 builtin_symbol_set_sprite_mc:
     .asciiz "SETSPRITEMC"
+builtin_symbol_joy:
+    .asciiz "JOY"
+builtin_symbol_joy_seen:
+    .asciiz "JOYSEEN"
+builtin_symbol_joy_btn1:
+    .asciiz "JOYBTN1"
+builtin_symbol_joy_btn2:
+    .asciiz "JOYBTN2"
+builtin_symbol_mouse_poll:
+    .asciiz "MOUSEPOLL"
+builtin_symbol_mouse_seen:
+    .asciiz "MOUSESEEN"
+builtin_symbol_mouse_x:
+    .asciiz "MOUSEX"
+builtin_symbol_mouse_y:
+    .asciiz "MOUSEY"
+builtin_symbol_mouse_btn:
+    .asciiz "MOUSEBTN"
+builtin_symbol_mouse_btn1:
+    .asciiz "MOUSEBTN1"
+builtin_symbol_mouse_btn2:
+    .asciiz "MOUSEBTN2"
+builtin_symbol_dbf_open:
+    .asciiz "DBFOPEN"
+builtin_symbol_dbf_close:
+    .asciiz "DBFCLOSE"
+builtin_symbol_dbf_go:
+    .asciiz "DBFGO"
+builtin_symbol_dbf_field_count:
+    .asciiz "DBFFIELDCOUNT"
+builtin_symbol_dbf_field_len:
+    .asciiz "DBFFIELDLEN"
+builtin_symbol_dbf_read_byte:
+    .asciiz "DBFREADBYTE"
+builtin_symbol_dbf_deleted:
+    .asciiz "DBFDELETED"
+builtin_symbol_dbf_header_len:
+    .asciiz "DBFHEADERLEN"
+builtin_symbol_dbf_record_len:
+    .asciiz "DBFRECORDLEN"
+builtin_symbol_dbf_total_recs:
+    .asciiz "DBFTOTALRECS"
+builtin_symbol_dbf_curr_rec_no:
+    .asciiz "DBFCURRRECNO"
 builtin_symbol_sid_freq:
     .asciiz "SIDFREQ"
 builtin_symbol_sid_pulse:
@@ -10267,8 +14065,6 @@ builtin_symbol_sid_off:
     .asciiz "SIDOFF"
 builtin_symbol_sid_rst:
     .asciiz "SIDRST"
-builtin_symbol_snd_rst:
-    .asciiz "SNDRST"
 builtin_symbol_sid_route:
     .asciiz "SIDROUTE"
 builtin_symbol_sid_res:
@@ -10283,21 +14079,78 @@ builtin_symbol_sid_osc3:
     .asciiz "SIDOSC3"
 builtin_symbol_sid_env3:
     .asciiz "SIDENV3"
-builtin_symbol_sound:
-    .asciiz "SOUND"
+builtin_symbol_vic_bank:
+    .asciiz "VICBANK"
 builtin_symbol_bg_color:
     .asciiz "BGCOLOR"
 builtin_symbol_border_color:
     .asciiz "BORDERCOLOR"
+builtin_symbol_screen_base:
+    .asciiz "SCREENBASE"
+builtin_symbol_bitmap_base:
+    .asciiz "BITMAPBASE"
+builtin_symbol_screen_cell:
+    .asciiz "SCREENCELL"
+builtin_symbol_color_cell:
+    .asciiz "COLORCELL"
+builtin_symbol_screen_copy:
+    .asciiz "SCREENCOPY"
+builtin_symbol_color_copy:
+    .asciiz "COLORCOPY"
+builtin_symbol_bitmap_fill:
+    .asciiz "BITMAPFILL"
+builtin_symbol_bitmap_copy:
+    .asciiz "BITMAPCOPY"
+builtin_symbol_bitmap_on:
+    .asciiz "BITMAPON"
+builtin_symbol_bitmap_off:
+    .asciiz "BITMAPOFF"
+builtin_symbol_mbitmap_on:
+    .asciiz "MBITMAPON"
+builtin_symbol_mbitmap_off:
+    .asciiz "MBITMAPOFF"
+.endif
+builtin_const_sid_tri:
+    .asciiz "SID_TRI"
+builtin_const_sid_saw:
+    .asciiz "SID_SAW"
+builtin_const_sid_pulse:
+    .asciiz "SID_PULSE"
+builtin_const_sid_noise:
+    .asciiz "SID_NOISE"
+builtin_const_sid_low:
+    .asciiz "SID_LOW"
+builtin_const_sid_band:
+    .asciiz "SID_BAND"
+builtin_const_sid_high:
+    .asciiz "SID_HIGH"
+builtin_const_spr_front:
+    .asciiz "SPR_FRONT"
+builtin_const_spr_back:
+    .asciiz "SPR_BACK"
+builtin_const_joy_up:
+    .asciiz "JOY_UP"
+builtin_const_joy_down:
+    .asciiz "JOY_DOWN"
+builtin_const_joy_left:
+    .asciiz "JOY_LEFT"
+builtin_const_joy_right:
+    .asciiz "JOY_RIGHT"
+builtin_const_joy_button1:
+    .asciiz "JOY_BUTTON1"
+builtin_const_joy_button2:
+    .asciiz "JOY_BUTTON2"
+builtin_const_mouse_button1:
+    .asciiz "MOUSE_BUTTON1"
+builtin_const_mouse_button2:
+    .asciiz "MOUSE_BUTTON2"
 
 object_header:
     .byte "OBJ1",10,0
 empty_main_machine_record:
     .asciiz "m A9 A5 8D D0 03 A9 00 85 02 85 03 A2 02 4C 0F CF"
-single_local_call_machine_record:
-    .asciiz "m 20 13 10 A9 A5 8D D0 03 A9 00 85 02 85 03 A2 02 4C 0F CF 60"
-fanout_machine_record:
-    .asciiz "m 20 1A 10 20 16 10 A9 A5 8D D0 03 A9 00 85 02 85 03 A2 02 4C 0F CF 20 1A 10 60 60"
+external_call_sequence_epilogue_bytes:
+    .asciiz " A9 A5 8D D0 03 A9 00 85 02 85 03 A2 02 4C 0F CF"
 actc_overlay_pass_table:
     .byte ACTC_OVERLAY_PASS_NOOP
     .byte ACTC_OVERLAY_REU_BASE_LO, ACTC_OVERLAY_REU_BASE_HI, ACTC_OVERLAY_REU_BASE_BANK
@@ -10320,6 +14173,9 @@ actc_overlay_pass_table:
     .byte ACTC_OVERLAY_PASS_BODY_COLLECT
     .byte ACTC_OVERLAY_REU_BASE_LO, ACTC_OVERLAY_REU_BASE_HI, ACTC_OVERLAY_REU_BASE_BANK
     .word actc_overlay_body_collect_path
+    .byte ACTC_OVERLAY_PASS_BODY_PREALLOCATE
+    .byte ACTC_OVERLAY_REU_BASE_LO, ACTC_OVERLAY_REU_BASE_HI, ACTC_OVERLAY_REU_BASE_BANK
+    .word actc_overlay_body_preallocate_path
     .byte ACTC_OVERLAY_PASS_END
 actc_overlay_noop_path:
     .asciiz "!ACTC_OVL0.BIN"
@@ -10335,12 +14191,22 @@ actc_overlay_emit_object_path:
     .asciiz "!ACTC_OVL5.BIN"
 actc_overlay_body_collect_path:
     .asciiz "!ACTC_OVL6.BIN"
+actc_overlay_body_preallocate_path:
+    .asciiz "!ACTC_OVL7.BIN"
 
 source_buffer:
 .if ACTC_REU_SOURCE_CACHE
+.if (SOURCE_READ_LIMIT + 1) > OUTPUT_CHUNK_SIZE
     .res SOURCE_READ_LIMIT+1
 .else
+    .res OUTPUT_CHUNK_SIZE
+.endif
+.else
+.if (SOURCE_LIMIT + 1) > OUTPUT_CHUNK_SIZE
     .res SOURCE_LIMIT+1
+.else
+    .res OUTPUT_CHUNK_SIZE
+.endif
 .endif
 ; Reuse the source window storage for path assembly. The source path is only
 ; needed before the source reader loads the first window, and the object path is
@@ -10489,6 +14355,14 @@ expr_runtime_post_zero:
     .res 1
 expr_saved_y_data:
     .res 1
+preallocate_condition_start_y_data:
+    .res 1
+preallocate_call_arg_scan_depth_data:
+    .res 1
+preallocate_bool_primary_start_y_data:
+    .res 1
+preallocate_print_start_y_data:
+    .res 1
 expr_term_lo:
     .res 1
 expr_term_hi:
@@ -10563,6 +14437,30 @@ condition_scan_ptr_hi_data:
 condition_window_start_data:
     .res 3
 .endif
+reader_scan_y_data:
+    .res 1
+reader_start_y_data:
+    .res 1
+reader_pattern_index_data:
+    .res 1
+reader_saved_x_data:
+    .res 1
+reader_prev_symbol_data:
+    .res 1
+reader_probe_scan_ptr_lo_data:
+    .res 1
+reader_probe_scan_ptr_hi_data:
+    .res 1
+.if ACTC_REU_SOURCE_CACHE
+reader_probe_window_start_data:
+    .res 3
+.endif
+reader_token_ptr_lo_data:
+    .res 1
+reader_token_ptr_hi_data:
+    .res 1
+reader_token_buffer:
+    .res 25
 hex_work:
     .res 1
 .if ACTC_REU_EXPORT_NAMES
@@ -10596,12 +14494,15 @@ body_window_dirty_data:
 .if ACTC_REU_BODY_DEBUG
 body_debug_count_data:
     .res EXPORT_MAX
+.if !ACTC_REU_PROC_DEBUG
 body_debug_current_offset_data:
     .res 3
 .endif
+.endif
 .if ACTC_REU_STRING_LITERALS
-string_literal_window:
-    .res 24
+; String literal load/store staging does not overlap symbol token parsing, so
+; reuse the token buffer and avoid another resident 24-byte scratch window.
+string_literal_window = reader_token_buffer
 .endif
 .if ACTC_REU_VAR_NAMES
 var_name_window:
@@ -10610,12 +14511,17 @@ var_name_window:
 var_names:
     .res 25 * VAR_MAX
 .endif
+.if (ACTC_REU_INT_LITERALS + ACTC_REU_LAYOUT_META + ACTC_REU_STRING_OFFSETS) > 0
+; These REU table load/store windows are single-call staging buffers. Reuse one
+; four-byte slot for literal/layout/string-offset records only; var/proc meta
+; stay independent because debug emission observes both lifetimes.
+actc_reu_table_scratch_window:
+    .res 4
+.endif
 .if ACTC_REU_INT_LITERALS
-int_literal_window:
-int_literal_lo_data:
-    .res 1
-int_literal_hi_data:
-    .res 1
+int_literal_window = actc_reu_table_scratch_window
+int_literal_lo_data = actc_reu_table_scratch_window
+int_literal_hi_data = actc_reu_table_scratch_window+1
 .endif
 .if ACTC_REU_VAR_META
 var_meta_window:
@@ -10656,24 +14562,27 @@ proc_debug_col_data:
     .res 2
 proc_debug_prev_cr:
     .res 1
-proc_debug_scan_buffer:
-    .res PROC_DEBUG_SCAN_CHUNK_SIZE
+; Debug line/column scanning runs after token parsing, so reuse the token
+; scratch window instead of growing ACTC's resident BSS footprint.
+proc_debug_scan_buffer = reader_token_buffer
+.endif
+.if ACTC_REU_BODY_DEBUG
+.if ACTC_REU_PROC_DEBUG
+; Body debug marks snapshot the same three-byte source offset used by proc
+; debug, so both names can share the one resident scratch slot.
+body_debug_current_offset_data = proc_debug_offset_data
+.endif
 .endif
 .if ACTC_REU_LAYOUT_META
-layout_window:
-layout_offset_lo_data:
-    .res 1
-layout_offset_hi_data:
-    .res 1
-layout_size_lo_data:
-    .res 1
-layout_size_hi_data:
-    .res 1
+layout_window = actc_reu_table_scratch_window
+layout_offset_lo_data = actc_reu_table_scratch_window
+layout_offset_hi_data = actc_reu_table_scratch_window+1
+layout_size_lo_data = actc_reu_table_scratch_window+2
+layout_size_hi_data = actc_reu_table_scratch_window+3
 .endif
 .if ACTC_REU_STRING_OFFSETS
-string_offset_window:
-string_offset_data:
-    .res 1
+string_offset_window = actc_reu_table_scratch_window
+string_offset_data = actc_reu_table_scratch_window
 .endif
 actc_overlay_loaded_len:
     .res 2
@@ -10681,6 +14590,8 @@ actc_overlay_requested_pass:
     .res 1
 actc_overlay_context:
     .res ACTC_OVERLAY_CTX_SIZE
+body_marker_visit_mask_data:
+    .res 1
 actc_overlay_service_status:
     .res 1
 actc_overlay_status:

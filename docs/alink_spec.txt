@@ -31,6 +31,7 @@ Object Code Records
 
 - `m <hex bytes>`
 - `r <offset> u<index>`
+- `r <offset> x <symbol>`
 
 For the first code-section slice, ALINK accepts a root export whose body marker
 is `b M`, validates the decoded `m` byte count against the export size, prefixes
@@ -40,11 +41,26 @@ PRG.
 For the multi-module machine-code slice, a body marker ending in `M` may contain
 one or more import tokens such as `b u0M` or `b u0u1M`. ALINK places the root
 `m` bytes first, then places every resolved dependency object's `m` bytes in
-dependency-queue order. Each `r <offset> u<index>` record patches a 16-bit
-little-endian operand in the current object's `m` bytes to the placed address
-of the imported symbol. Multiple relocation records and transitive object-code
-dependencies are supported for this slice. Symbol-relative data relocations and
-section layout beyond the single `m` code stream are later extensions.
+dependency-queue order. Consecutive `m` records in one object are treated as
+one concatenated machine-code byte stream, so emitters may chunk large machine
+payloads without changing export offsets. Each `r <offset> u<index>` record
+patches a 16-bit little-endian operand in the current object's concatenated `m`
+bytes to the placed address of the imported symbol; `r <offset> x <symbol>`
+patches the operand to the placed address of an already reachable import, a
+placed root-local export, or a placed local export inside the current selected
+object-code range. The operand may cross an `m` record boundary. Export offsets,
+export sizes, and relocation offsets are parsed as 16-bit values, so a single
+OBJ module may exceed one 256-byte page. Multiple relocation records and
+transitive object-code dependencies are supported for this slice. In selected
+object-code exports, named relocation targets also form dependency edges when
+the symbol is not local to the object, so the body marker does not need a
+duplicate `u<index>` token for that target. Data section layout beyond the
+concatenated `m` code stream is a later extension.
+
+For objects with multiple exports, ALINK treats dependency reachability as
+export-body-specific. Imports referenced only by an unused export are not loaded,
+while imports referenced by the selected export are followed even when that
+selected export is not the first export in the object.
 
 Runtime Contract
 

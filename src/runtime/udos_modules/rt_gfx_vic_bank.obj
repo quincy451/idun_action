@@ -1,5 +1,5 @@
 OBJ1
-x rt_gfx_vic_bank 0 4
-b Z0r
-k 0
+x rt_gfx_vic_bank 0 25
+b M
+m 29 03 49 03 85 02 AD 02 DD 09 03 8D 02 DD AD 00 DD 29 FC 05 02 8D 00 DD 60
 n rt_gfx_vic_bank

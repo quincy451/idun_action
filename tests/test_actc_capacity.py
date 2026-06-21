@@ -7,6 +7,9 @@ import tempfile
 import unittest
 
 
+ACTC_MIN_RESIDENT_HEADROOM = 8
+
+
 def count_body_ops(body: str) -> int:
     match = re.search(r"^b ([^\n]*)$", body, re.MULTILINE)
     if match is None:
@@ -75,6 +78,16 @@ class TestActcCapacity(unittest.TestCase):
             resident_floor,
             msg=f"ACTC BSS end ${bss_end:04X} overlaps UDOS resident floor ${resident_floor:04X}\n{map_text}",
         )
+        headroom = resident_floor - bss_end
+        self.assertGreaterEqual(
+            headroom,
+            ACTC_MIN_RESIDENT_HEADROOM,
+            msg=(
+                f"ACTC has only {headroom} bytes below UDOS resident floor "
+                f"${resident_floor:04X}; keep at least {ACTC_MIN_RESIDENT_HEADROOM} bytes for safe library growth\n"
+                f"{map_text}"
+            ),
+        )
 
     def find_resident_floor(self) -> int:
         udos_dir = self.root.parent / "udos"
@@ -91,7 +104,13 @@ class TestActcCapacity(unittest.TestCase):
                     return int(parts[1], 16)
         return 0x4AFE
 
-    def test_production_actc_loads_and_compiles_48k_reu_source(self) -> None:
+    def assert_production_actc_loads_and_compiles_reu_source(
+        self,
+        source_len: int,
+        min_proc_offset: int,
+        max_steps: str,
+        timeout: int,
+    ) -> dict:
         self.require_toolchain()
         self.run_checked([str(self.root / "tools" / "build_tool_abi_harness.sh")])
         self.run_checked([str(self.root / "tools" / "build_actc_udos.sh")])
@@ -107,12 +126,11 @@ class TestActcCapacity(unittest.TestCase):
             (project_root / "ACTION.PROJ").write_text("ACTION PROJECT\rMAIN.ACT\r", encoding="ascii")
 
             header = "MODULE MAIN\r"
-            body = 'PROC MAIN()\rPrintE("OK")\rRETURN\r'
-            source_len = 48 * 1024
+            body = '\rPROC MAIN()\rPrintE("OK")\rRETURN\r'
             filler_len = source_len - len(header) - len(body)
             self.assertGreaterEqual(filler_len, 0)
-            source = header + ("\r" * filler_len) + body
-            self.assertGreaterEqual(source.index("PROC MAIN"), 40960)
+            source = header + (" " * filler_len) + body
+            self.assertGreaterEqual(source.index("PROC MAIN"), min_proc_offset)
             source_path = source_dir / "main.act"
             source_path.write_text(source, encoding="ascii")
 
@@ -130,8 +148,15 @@ class TestActcCapacity(unittest.TestCase):
                     "--labels",
                     str(self.build_dir / "actc.current.labels"),
                     "--max-steps",
-                    "40000000",
-                ]
+                    max_steps,
+                    "--dump",
+                    "source_total_len:3",
+                    "--dump",
+                    "source_window_next_offset:3",
+                    "--dump",
+                    "source_window_len:2",
+                ],
+                timeout=timeout,
             )
 
             summary = json.loads(result.stdout)
@@ -143,68 +168,119 @@ class TestActcCapacity(unittest.TestCase):
                 self,
                 output_path.read_text(encoding="ascii"),
                 "x main 0 7\nb e0r\ns OK\nk 2\nn main\n",
-                min_line=40962,
+                min_line=3,
             )
             reu_stage = next(op for op in summary["ops"] if op["kind"] == "rsta")
             reu_reads = [op for op in summary["ops"] if op["kind"] == "rrd"]
-            reu_writes = [op for op in summary["ops"] if op["kind"] == "rwr"]
             self.assertEqual(reu_stage["path"], "SRC/MAIN.ACT")
             self.assertEqual(reu_stage["actual_len"], source_len)
             self.assertEqual(reu_stage["status"], 1)
             self.assertTrue(reu_reads, msg=result.stdout)
             self.assertTrue(all(op["status"] == 1 for op in reu_reads), msg=result.stdout)
-            self.assertTrue(
-                any(
-                    op["params"][2] == 1
-                    and ((op["params"][1] << 8) | op["params"][0]) >= 0x9000
-                    for op in reu_reads
-                ),
-                msg=result.stdout,
-            )
-            self.assertTrue(
-                any(op["params"][0:3] == [0, 0xD0, 0] and op["actual_len"] == 255 for op in reu_writes),
-                msg=result.stdout,
-            )
-            self.assertTrue(
-                any(op["params"][0:3] == [0, 0xD0, 0] and op["actual_len"] == 255 for op in reu_reads),
-                msg=result.stdout,
-            )
-            self.assertTrue(
-                any(op["params"][0:3] == [0, 0xE0, 0] and op["actual_len"] == 24 for op in reu_writes),
-                msg=result.stdout,
-            )
-            self.assertTrue(
-                any(op["params"][0:3] == [0, 0xE0, 0] and op["actual_len"] == 24 for op in reu_reads),
-                msg=result.stdout,
-            )
-            self.assertTrue(
-                any(op["params"][0:3] == [0, 0xE6, 0] and op["actual_len"] == 25 for op in reu_writes),
-                msg=result.stdout,
-            )
-            self.assertTrue(
-                any(op["params"][0:3] == [0, 0xE6, 0] and op["actual_len"] == 25 for op in reu_reads),
-                msg=result.stdout,
-            )
-            self.assertTrue(
-                any(op["params"][0:3] == [0, 0xEB, 0] and op["actual_len"] == 4 for op in reu_writes),
-                msg=result.stdout,
-            )
-            self.assertTrue(
-                any(op["params"][0:3] == [0, 0xED, 0] and op["actual_len"] == 3 for op in reu_writes),
-                msg=result.stdout,
-            )
-            self.assertTrue(
-                any(op["params"][0:3] == [0, 0xED, 0] and op["actual_len"] == 3 for op in reu_reads),
-                msg=result.stdout,
-            )
-            self.assertTrue(
-                any(op["params"][0:3] == [0, 0xEE, 0] and op["actual_len"] == 3 for op in reu_writes),
-                msg=result.stdout,
-            )
-            self.assertTrue(
-                any(op["params"][0:3] == [0, 0xEC, 0] and op["actual_len"] == 1 for op in reu_writes),
-                msg=result.stdout,
-            )
+            source_total_dump = summary["dumps"]["source_total_len"]
+            source_next_dump = summary["dumps"]["source_window_next_offset"]
+            source_window_len_dump = summary["dumps"]["source_window_len"]
+            source_total = source_total_dump[0] | (source_total_dump[1] << 8) | (source_total_dump[2] << 16)
+            source_next = source_next_dump[0] | (source_next_dump[1] << 8) | (source_next_dump[2] << 16)
+            source_window_len = source_window_len_dump[0] | (source_window_len_dump[1] << 8)
+            self.assertEqual(source_total, source_len, msg=result.stdout)
+            self.assertEqual(source_next, source_len, msg=result.stdout)
+            self.assertEqual(source_window_len, 0, msg=result.stdout)
+            return summary
+
+    def test_production_actc_loads_and_compiles_256k_reu_source(self) -> None:
+        summary = self.assert_production_actc_loads_and_compiles_reu_source(
+            256 * 1024,
+            240000,
+            "240000000",
+            300,
+        )
+        reu_reads = [op for op in summary["ops"] if op["kind"] == "rrd"]
+        reu_writes = [op for op in summary["ops"] if op["kind"] == "rwr"]
+        self.assertTrue(
+            any(
+                op["params"][2] == 1
+                and ((op["params"][1] << 8) | op["params"][0]) >= 0x9000
+                for op in reu_reads
+            ),
+            msg=json.dumps(summary),
+        )
+        self.assertTrue(
+            any(op["params"][0:3] == [0, 0xD0, 0] and op["actual_len"] == 255 for op in reu_writes),
+            msg=json.dumps(summary),
+        )
+        self.assertTrue(
+            any(op["params"][0:3] == [0, 0xD0, 0] and op["actual_len"] == 255 for op in reu_reads),
+            msg=json.dumps(summary),
+        )
+        self.assertTrue(
+            any(op["params"][0:3] == [0, 0xE0, 0] and op["actual_len"] == 24 for op in reu_writes),
+            msg=json.dumps(summary),
+        )
+        self.assertTrue(
+            any(op["params"][0:3] == [0, 0xE0, 0] and op["actual_len"] == 24 for op in reu_reads),
+            msg=json.dumps(summary),
+        )
+        self.assertTrue(
+            any(op["params"][0:3] == [0, 0xE6, 0] and op["actual_len"] == 25 for op in reu_writes),
+            msg=json.dumps(summary),
+        )
+        self.assertTrue(
+            any(op["params"][0:3] == [0, 0xE6, 0] and op["actual_len"] == 25 for op in reu_reads),
+            msg=json.dumps(summary),
+        )
+        self.assertTrue(
+            any(op["params"][0:3] == [0, 0xEB, 0] and op["actual_len"] == 4 for op in reu_writes),
+            msg=json.dumps(summary),
+        )
+        self.assertTrue(
+            any(op["params"][0:3] == [0, 0xED, 0] and op["actual_len"] == 3 for op in reu_writes),
+            msg=json.dumps(summary),
+        )
+        self.assertTrue(
+            any(op["params"][0:3] == [0, 0xED, 0] and op["actual_len"] == 3 for op in reu_reads),
+            msg=json.dumps(summary),
+        )
+        self.assertTrue(
+            any(op["params"][0:3] == [0, 0xEE, 0] and op["actual_len"] == 3 for op in reu_writes),
+            msg=json.dumps(summary),
+        )
+        self.assertTrue(
+            any(op["params"][0:3] == [0, 0xEC, 0] and op["actual_len"] == 1 for op in reu_writes),
+            msg=json.dumps(summary),
+        )
+
+    def test_production_actc_loads_and_compiles_2mib_reu_source(self) -> None:
+        self.assert_production_actc_loads_and_compiles_reu_source(
+            2 * 1024 * 1024,
+            2000000,
+            "2000000000",
+            900,
+        )
+
+    def test_production_actc_loads_and_compiles_4mib_reu_source(self) -> None:
+        self.assert_production_actc_loads_and_compiles_reu_source(
+            4 * 1024 * 1024,
+            4000000,
+            "4000000000",
+            1800,
+        )
+
+    def test_production_actc_loads_and_compiles_8mib_reu_source(self) -> None:
+        self.assert_production_actc_loads_and_compiles_reu_source(
+            8 * 1024 * 1024,
+            8000000,
+            "8000000000",
+            3600,
+        )
+
+    def test_production_actc_loads_and_compiles_near_16mib_reu_source(self) -> None:
+        self.assert_production_actc_loads_and_compiles_reu_source(
+            0xFE0000,
+            16600000,
+            "16600000000",
+            7200,
+        )
 
     def test_production_actc_streams_object_larger_than_legacy_content_buffer(self) -> None:
         self.require_toolchain()

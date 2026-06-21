@@ -1,0 +1,24 @@
+MODULE main
+CARD filename
+BYTE handle
+BYTE fields
+BYTE fieldlen
+BYTE moved
+BYTE deleted
+BYTE headerlen
+BYTE recordlen
+BYTE total
+BYTE recno
+PROC main()
+filename=12288
+handle=DbfOpen(filename)
+fields=DbfFieldCount(handle)
+fieldlen=DbfFieldLen(handle,1)
+moved=DbfGo(handle,2)
+deleted=DbfDeleted(handle)
+headerlen=DbfHeaderLen(handle)
+recordlen=DbfRecordLen(handle)
+total=DbfTotalRecs(handle)
+recno=DbfCurrRecNo(handle)
+DbfClose(handle)
+RETURN

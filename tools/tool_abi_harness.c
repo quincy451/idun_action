@@ -29,6 +29,10 @@
 #define KERNAL_CLRCHN 0xFFCC
 #define KERNAL_CHRIN 0xFFCF
 #define KERNAL_CHROUT 0xFFD2
+#define TOOL_ABI_FILE_NAME_LO 0xCDC6
+#define TOOL_ABI_FILE_NAME_HI 0xCDC7
+#define VICE_LFN_FILE 2
+#define VICE_SA_READ 2
 #define MAX_OPS 1024
 #define MAX_REU_TRACE_OPS 400
 #define MAX_PATH_LEN 1024
@@ -59,6 +63,7 @@ typedef struct {
     uint16_t svc_file_stage_reu_sc0;
     uint16_t svc_reu_read_sc0;
     uint16_t svc_reu_write_sc0;
+    uint16_t svc_open_program_read_path_preserved;
     uint8_t tool_file_status_fail;
     uint8_t tool_file_status_ok;
     uint8_t tool_file_status_too_large;
@@ -283,6 +288,15 @@ static void set_zn_flags(M6502* cpu, uint8_t value)
     }
 }
 
+static void set_carry_flag(M6502* cpu, bool carry)
+{
+    if (carry) {
+        cpu->registers->p |= 0x01u;
+    } else {
+        cpu->registers->p &= (uint8_t)~0x01u;
+    }
+}
+
 static void record_kernal_op(Harness* h, const char* kind, M6502* cpu, const char* name, const char* path)
 {
     if (h->kernal_op_count >= MAX_KERNAL_OPS) {
@@ -402,6 +416,8 @@ static void load_services_inc(ServiceAbi* abi, const char* path)
             parse_u16_value(value, &abi->svc_reu_read_sc0);
         } else if (strcmp(name, "svc_reu_write_sc0") == 0) {
             parse_u16_value(value, &abi->svc_reu_write_sc0);
+        } else if (strcmp(name, "svc_open_program_read_path_preserved") == 0) {
+            parse_u16_value(value, &abi->svc_open_program_read_path_preserved);
         } else if (strcmp(name, "tool_file_status_fail") == 0) {
             parse_u8_value(value, &abi->tool_file_status_fail);
         } else if (strcmp(name, "tool_file_status_ok") == 0) {
@@ -416,6 +432,9 @@ static void load_services_inc(ServiceAbi* abi, const char* path)
     }
     fclose(fp);
 }
+
+static void copy_truncated(char* out, size_t out_size, const char* in);
+static bool join_path_components(char* out, size_t out_size, const char* left, const char* right);
 
 static void load_ld65_labels(Harness* h, const char* path)
 {
@@ -439,7 +458,7 @@ static void load_ld65_labels(Harness* h, const char* path)
         }
         uint16_t addr = (uint16_t)raw;
         LabelEntry* e = &h->labels[h->label_count++];
-        snprintf(e->name, sizeof(e->name), "%s", col2[0] == '.' ? col2 + 1 : col2);
+        copy_truncated(e->name, sizeof(e->name), col2[0] == '.' ? col2 + 1 : col2);
         e->addr = addr;
     }
     fclose(fp);
@@ -488,6 +507,36 @@ static void read_cstr_mem(Harness* h, uint16_t addr, char* out, size_t out_size)
         out[i++] = (char)c;
     }
     out[i] = 0;
+}
+
+static void copy_truncated(char* out, size_t out_size, const char* in)
+{
+    if (!out_size) {
+        return;
+    }
+    size_t len = strlen(in);
+    if (len >= out_size) {
+        len = out_size - 1;
+    }
+    memcpy(out, in, len);
+    out[len] = 0;
+}
+
+static bool join_path_components(char* out, size_t out_size, const char* left, const char* right)
+{
+    if (!out_size) {
+        return false;
+    }
+    size_t left_len = strlen(left);
+    size_t right_len = strlen(right);
+    if (left_len > (SIZE_MAX - right_len - 2) || left_len + right_len + 2 > out_size) {
+        out[0] = 0;
+        return false;
+    }
+    memcpy(out, left, left_len);
+    out[left_len] = '/';
+    memcpy(out + left_len + 1, right, right_len + 1);
+    return true;
 }
 
 static uint8_t ascii_to_screen_code(uint8_t c)
@@ -553,9 +602,9 @@ static void ensure_dir_exists(const char* path)
 static bool resolve_workspace_path(Harness* h, const char* rel, bool create_parents, char* out, size_t out_size)
 {
     char current[MAX_PATH_LEN];
-    snprintf(current, sizeof(current), "%s", h->workspace);
+    copy_truncated(current, sizeof(current), h->workspace);
     char rel_copy[MAX_PATH_LEN];
-    snprintf(rel_copy, sizeof(rel_copy), "%s", rel);
+    copy_truncated(rel_copy, sizeof(rel_copy), rel);
     char* save = NULL;
     char* part = strtok_r(rel_copy, "/\\", &save);
     while (part) {
@@ -564,17 +613,21 @@ static bool resolve_workspace_path(Harness* h, const char* rel, bool create_pare
         char* upcoming = strtok_r(NULL, "/\\", &save);
         bool is_last = (upcoming == NULL);
         if (find_existing_component(current, part, actual, sizeof(actual))) {
-            snprintf(next, sizeof(next), "%s/%s", current, actual);
+            if (!join_path_components(next, sizeof(next), current, actual)) {
+                return false;
+            }
         } else {
-            snprintf(next, sizeof(next), "%s/%s", current, part);
+            if (!join_path_components(next, sizeof(next), current, part)) {
+                return false;
+            }
             if (!is_last && create_parents) {
                 ensure_dir_exists(next);
             }
         }
-        snprintf(current, sizeof(current), "%s", next);
+        copy_truncated(current, sizeof(current), next);
         part = upcoming;
     }
-    snprintf(out, out_size, "%s", current);
+    copy_truncated(out, out_size, current);
     return true;
 }
 
@@ -949,8 +1002,8 @@ static int kernal_open(M6502* cpu, uint16_t address, uint8_t data)
     ch->sa = h->pending_sa;
     ch->is_write = is_write;
     ch->is_cmd = is_cmd;
-    snprintf(ch->raw_name, sizeof(ch->raw_name), "%s", h->pending_name);
-    snprintf(ch->host_path, sizeof(ch->host_path), "%s", host_path);
+    copy_truncated(ch->raw_name, sizeof(ch->raw_name), h->pending_name);
+    copy_truncated(ch->host_path, sizeof(ch->host_path), host_path);
     if (is_cmd) {
         if (strncmp(h->pending_name, "S:", 2) == 0) {
             if (unlink(host_path) != 0 && errno != ENOENT) {
@@ -1015,6 +1068,92 @@ static int kernal_open(M6502* cpu, uint16_t address, uint8_t data)
     ch->pos = 0;
     h->kernal_status = 0;
     record_kernal_op(h, "OPEN", cpu, h->pending_name, host_path);
+    return RTS_STUB_ADDR;
+}
+
+static int service_open_program_read_path_preserved(M6502* cpu, uint16_t address, uint8_t data)
+{
+    (void)address;
+    (void)data;
+    Harness* h = G;
+    uint16_t name_ptr = (uint16_t)h->mem[TOOL_ABI_FILE_NAME_LO] |
+                        ((uint16_t)h->mem[TOOL_ABI_FILE_NAME_HI] << 8);
+    char rel[MAX_PATH_LEN];
+    char host_path[MAX_PATH_LEN];
+    bool is_write = false;
+    bool is_cmd = false;
+    read_cstr_mem(h, name_ptr, rel, sizeof(rel));
+    FileOp* op = record_op(h, "load");
+    HostChannel* ch = find_channel(h, VICE_LFN_FILE, true);
+    if (!resolve_kernal_path(h, rel, false, host_path, sizeof(host_path), &is_write, &is_cmd) ||
+        is_write || is_cmd) {
+        h->kernal_status = 0x04;
+        if (op) {
+            fill_op_common(h, op, cpu, 0xE2, rel, "", 0, 0);
+            op->status = h->abi.tool_file_status_nofile;
+        }
+        record_kernal_op(h, "OPEN", cpu, rel, NULL);
+        set_carry_flag(cpu, true);
+        return RTS_STUB_ADDR;
+    }
+
+    close_channel(ch);
+    memset(ch, 0, sizeof(*ch));
+    ch->open = true;
+    ch->lfn = VICE_LFN_FILE;
+    ch->sa = VICE_SA_READ;
+    ch->is_write = false;
+    ch->is_cmd = false;
+    copy_truncated(ch->raw_name, sizeof(ch->raw_name), rel);
+    copy_truncated(ch->host_path, sizeof(ch->host_path), host_path);
+
+    FILE* fp = fopen(host_path, "rb");
+    if (!fp) {
+        h->kernal_status = 0x04;
+        if (op) {
+            fill_op_common(h, op, cpu, 0xE2, rel, host_path, 0, 0);
+            op->status = h->abi.tool_file_status_nofile;
+        }
+        record_kernal_op(h, "OPEN", cpu, rel, host_path);
+        set_carry_flag(cpu, true);
+        return RTS_STUB_ADDR;
+    }
+    if (fseek(fp, 0, SEEK_END) != 0) {
+        fclose(fp);
+        die_errno("fseek preserved open failed");
+    }
+    long end = ftell(fp);
+    if (end < 0) {
+        fclose(fp);
+        die_errno("ftell preserved open failed");
+    }
+    if (fseek(fp, 0, SEEK_SET) != 0) {
+        fclose(fp);
+        die_errno("fseek rewind preserved open failed");
+    }
+    ch->cap = (size_t)end;
+    ch->len = (size_t)end;
+    ch->data = malloc(ch->cap ? ch->cap : 1);
+    if (!ch->data) {
+        fclose(fp);
+        die("malloc failed for preserved read channel");
+    }
+    if (ch->len && fread(ch->data, 1, ch->len, fp) != ch->len) {
+        fclose(fp);
+        die_errno("fread preserved open failed");
+    }
+    fclose(fp);
+    ch->pos = 0;
+    h->current_input_lfn = VICE_LFN_FILE;
+    h->kernal_status = 0;
+    if (op) {
+        fill_op_common(h, op, cpu, 0xE2, rel, host_path, 0, 0);
+        op->actual_len = (uint16_t)(ch->len > 0xFFFFu ? 0xFFFFu : ch->len);
+        op->status = h->abi.tool_file_status_ok;
+        fill_op_head_from_buf(op, ch->data, op->actual_len);
+    }
+    record_kernal_op(h, "OPEN", cpu, rel, host_path);
+    set_carry_flag(cpu, false);
     return RTS_STUB_ADDR;
 }
 
@@ -1661,6 +1800,13 @@ static void install_callbacks(Harness* h)
     }
     if (h->abi.svc_reu_write_sc0) {
         M6502_setCallback(h->cpu, call, h->abi.svc_reu_write_sc0, service_reu_write);
+    }
+    if (h->abi.svc_open_program_read_path_preserved) {
+        M6502_setCallback(
+            h->cpu,
+            call,
+            h->abi.svc_open_program_read_path_preserved,
+            service_open_program_read_path_preserved);
     }
 }
 

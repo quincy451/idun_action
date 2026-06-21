@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 import unittest
 
 
@@ -16,31 +17,33 @@ class TestRepoLayout(unittest.TestCase):
             "docs/architecture.md",
             "docs/active_direction.md",
             "src/runtime",
+            "src/runtime/libmods",
+            "src/runtime/libmods/libpstr.mod",
+            "src/runtime/libmods/libplin.mod",
             "src/runtime/modules",
             "src/runtime/udos_modules",
             "src/tools_udos/actc",
             "src/tools_udos/alink/alink.asm",
             "src/tools_udos/alink/direct_prg.inc",
             "src/tools_udos/common",
-            "src/tools_cpm/libmods",
-            "src/tools_cpm/libmods/libpstr.mod",
-            "src/tools_cpm/libmods/libplin.mod",
             "tools/object_format.py",
             "tools/vice_harness.py",
             "tools/export_udos_workspace.py",
-            "tools/build_actc.sh",
             "tools/build_actc_udos.sh",
             "tools/build_alink_udos.sh",
-            "tools/build_vmrun.sh",
             "tools/build_tool_abi_harness.sh",
             "tools/generate_udos_service_inc.py",
             "pytest/__main__.py",
             "examples/hello.act",
             "examples/if.act",
+            "examples/input1_demo.act",
             "examples/math.act",
+            "examples/math1_demo.act",
             "examples/real_demo.act",
             "examples/reu_demo.act",
             "examples/ovl_demo.act",
+            "lib/input1.act",
+            "lib/math1.act",
             "tests/test_actc_capacity.py",
             "tests/test_actc_overlay.py",
             "tests/test_layout.py",
@@ -54,15 +57,25 @@ class TestRepoLayout(unittest.TestCase):
             f"src/tools_udos/{legacy_tool}run",
             f"src/tools_udos/{legacy_tool}info",
             "src/tools_udos/actdbg",
+            "src/tools_cpm",
             "src/tools_cpm/actc",
             "src/tools_cpm/alink",
             "src/tools_cpm/actmon",
+            "src/tools_cpm/hello",
+            "docs/cpm65_abi.md",
+            "docs/cpmemu.md",
             "tools/actionc64u_compile.py",
             "tools/actionc64u_link.py",
             f"tools/{legacy_tool}_pack.py",
+            "tools/build_actc.sh",
+            "tools/build_cpm65_notes.sh",
+            "tools/build_hello.sh",
             "tools/build_vmhello.sh",
+            "tools/build_vmrun.sh",
             "tools/build_alink.sh",
             "tools/build_actmon.sh",
+            "tools/cpmemu_runner.py",
+            "tools/find_llvm_mos.sh",
             "tools/install_to_image.py",
             "tools/verify_release.py",
             f"examples/hello.{legacy_ext}",
@@ -74,6 +87,123 @@ class TestRepoLayout(unittest.TestCase):
         present_removed = [path for path in removed_legacy_paths if (root / path).exists()]
         self.assertFalse(missing, f"Missing required project paths: {missing}")
         self.assertFalse(present_removed, f"Removed VM-era paths are still present: {present_removed}")
+
+    def test_runtime_machine_obj_export_sizes_match_machine_records(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        runtime_root = root / "src" / "runtime" / "udos_modules"
+        mismatches = []
+
+        for path in sorted(runtime_root.glob("*.obj")):
+            lines = path.read_text(encoding="ascii").splitlines()
+            body_lines = [line for line in lines if line.startswith("b ")]
+            if not any("M" in line[2:] for line in body_lines):
+                continue
+
+            export_lines = [line for line in lines if line.startswith("x ")]
+            machine_lines = [line for line in lines if line.startswith("m ")]
+            self.assertEqual(len(export_lines), 1, f"{path} must have one export line")
+            self.assertGreaterEqual(len(machine_lines), 1, f"{path} must have at least one machine record")
+
+            declared_size = int(export_lines[0].split()[3])
+            machine_hex = "".join("".join(line.split()[1:]) for line in machine_lines)
+            self.assertEqual(len(machine_hex) % 2, 0, f"{path} has an incomplete machine byte")
+            self.assertRegex(machine_hex, r"^[0-9A-Fa-f]*$", f"{path} has non-hex machine bytes")
+            machine_bytes = [machine_hex[index : index + 2] for index in range(0, len(machine_hex), 2)]
+            for byte_text in machine_bytes:
+                value = int(byte_text, 16)
+                self.assertGreaterEqual(value, 0, f"{path} has invalid byte {byte_text}")
+                self.assertLessEqual(value, 0xFF, f"{path} has invalid byte {byte_text}")
+            actual_size = len(machine_bytes)
+            if actual_size != declared_size:
+                mismatches.append(f"{path.name}: export={declared_size} machine={actual_size}")
+
+        self.assertFalse(mismatches, "Runtime OBJ machine sizes mismatch: " + ", ".join(mismatches))
+
+    def test_runtime_modules_use_object_code_bodies(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        runtime_root = root / "src" / "runtime" / "udos_modules"
+        offenders = []
+
+        for path in sorted(runtime_root.glob("*.obj")):
+            lines = path.read_text(encoding="ascii").splitlines()
+            for line in lines:
+                if not line.startswith("b "):
+                    continue
+                body = line[2:]
+                if not re.fullmatch(r"(?:u[0-9]+)*M", body):
+                    offenders.append(f"{path.name}: {line}")
+
+        self.assertFalse(offenders, "Runtime OBJ modules must use object-code bodies: " + ", ".join(offenders))
+
+    def test_runtime_modules_are_documented(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        runtime_root = root / "src" / "runtime" / "udos_modules"
+        readme = (runtime_root / "README.md").read_text(encoding="utf-8").lower()
+        missing = [
+            path.name
+            for path in sorted(runtime_root.glob("rt_*.obj"))
+            if f"`{path.name.lower()}`" not in readme
+        ]
+
+        self.assertFalse(missing, "Runtime OBJ modules missing from README.md: " + ", ".join(missing))
+
+    def test_real32_docs_use_linker_runtime_symbol_names(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        docs = (root / "docs" / "real32.md").read_text(encoding="utf-8")
+        expected = {
+            "rt_f_add",
+            "rt_f_sub",
+            "rt_f_mul",
+            "rt_f_div",
+            "rt_f_cmp",
+            "rt_f_abs",
+            "rt_f_sqrt",
+            "rt_i_to_f",
+            "rt_s_to_f",
+            "rt_f_to_i",
+            "rt_print_f",
+        }
+
+        dotted = sorted(set(re.findall(r"`(rt\.[A-Za-z0-9_]+)`", docs)))
+        documented = set(re.findall(r"`(rt_[A-Za-z0-9_]+)`", docs))
+        runtime_modules = {
+            path.stem for path in (root / "src" / "runtime" / "udos_modules").glob("rt_*.obj")
+        }
+
+        self.assertFalse(
+            dotted,
+            "REAL32 docs must use linker rt_* symbols, not dotted names: " + ", ".join(dotted),
+        )
+        self.assertTrue(
+            expected <= documented,
+            "REAL32 docs missing helper symbols: " + ", ".join(sorted(expected - documented)),
+        )
+        self.assertTrue(
+            expected <= runtime_modules,
+            "REAL32 documented helpers missing runtime OBJ modules: "
+            + ", ".join(sorted(expected - runtime_modules)),
+        )
+
+    def test_sid_sprite_active_docs_are_c64_native(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        active_docs = [
+            root / "docs" / "sidspr1_bindings_draft.act",
+            root / "docs" / "sid_and_sprite_ideas.txt",
+        ]
+        rejected_tokens = ["Sound(", "SndRst", "Sound/SndRst"]
+        offenders = []
+
+        for path in active_docs:
+            text = path.read_text(encoding="utf-8")
+            for token in rejected_tokens:
+                if token in text:
+                    offenders.append(f"{path.relative_to(root)}: {token}")
+
+        self.assertFalse(
+            offenders,
+            "Active C64 SID/sprite docs must not reintroduce Atari-style sound API names: "
+            + ", ".join(offenders),
+        )
 
 
 if __name__ == "__main__":

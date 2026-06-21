@@ -13,7 +13,7 @@ class TestReleaseImageBuild(unittest.TestCase):
         self.listing = self.root / "build" / "actionc64u_c64.dir.txt"
 
     def test_build_release_image_contains_expected_files(self) -> None:
-        for tool in ["cpmcp", "cpmls", "cpmchattr", "cpmrm"]:
+        for tool in ["make", "c1541"]:
             if not shutil.which(tool):
                 self.skipTest(f"{tool} not found")
 
@@ -31,19 +31,20 @@ class TestReleaseImageBuild(unittest.TestCase):
 
         self.assertTrue(self.output.is_file(), msg=output)
         self.assertTrue(self.listing.is_file(), msg=output)
-        listing = self.listing.read_text(encoding="ascii")
-        for required in [
-            "alink.com",
-            "actmon.com",
-            "actc.com",
-            "vm.com",
-            "ccp.sys",
-            "bdos.sys",
-            "hello.act",
-            "realdemo.act",
-            "reu_demo.act",
-            "ovl_demo.act",
-        ]:
+        listing = self.listing.read_text(encoding="ascii").lower()
+        required_entries = [
+            "udosboot",
+            "udoscore",
+            "actc.prg",
+            "actsave.prg",
+            "alink.prg",
+            "actmon.prg",
+            "actinfo.prg",
+            "actcopy.prg",
+        ]
+        required_entries.extend(f"actc_ovl{index}.bin" for index in range(8))
+
+        for required in required_entries:
             self.assertIn(required, listing, msg=listing)
 
 

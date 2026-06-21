@@ -1,0 +1,5 @@
+MODULE MAIN
+PROC MAIN()
+ScreenCell(5,2,65)
+ColorCell(6,3,10)
+RETURN

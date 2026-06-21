@@ -1,0 +1,52 @@
+; SIDSPR1 C64 SID/sprite binding reference.
+; ACTC recognizes these builtin helper names directly. ALINK includes only the
+; referenced RT_*.OBJ modules in the final PRG.
+;
+; Sprite helpers use C64 VIC-II hardware semantics. SpriteData accepts a CARD
+; address pointing at sprite data and derives the default-screen sprite pointer.
+; SID helpers expose SID-native waveform, envelope, filter, and gate controls.
+
+MODULE SIDSPR1
+
+BYTE CONST SID_TRI=$10
+BYTE CONST SID_SAW=$20
+BYTE CONST SID_PULSE=$40
+BYTE CONST SID_NOISE=$80
+
+BYTE CONST SID_LOW=$10
+BYTE CONST SID_BAND=$20
+BYTE CONST SID_HIGH=$40
+
+BYTE CONST SPR_FRONT=0
+BYTE CONST SPR_BACK=1
+
+BYTE FUNC SpriteHit()
+BYTE FUNC SpriteHitBg()
+BYTE FUNC SidOsc3()
+BYTE FUNC SidEnv3()
+
+PROC SpriteOn(BYTE n)
+PROC SpriteOff(BYTE n)
+PROC SpritePos(BYTE n,CARD x,BYTE y)
+PROC SpritePtr(BYTE n,BYTE ptr)
+PROC SpriteData(BYTE n,CARD addr)
+PROC SpriteColor(BYTE n,BYTE col)
+PROC SpriteMC(BYTE n,BYTE on)
+PROC SpriteXExp(BYTE n,BYTE on)
+PROC SpriteYExp(BYTE n,BYTE on)
+PROC SpritePrio(BYTE n,BYTE behind)
+PROC SetSpriteMC(BYTE c0,BYTE c1)
+
+PROC SidFreq(BYTE v,CARD freq)
+PROC SidPulse(BYTE v,CARD width)
+PROC SidWave(BYTE v,BYTE wave)
+PROC SidAD(BYTE v,BYTE ad)
+PROC SidSR(BYTE v,BYTE sr)
+PROC SidOn(BYTE v)
+PROC SidOff(BYTE v)
+PROC SidVol(BYTE vol)
+PROC SidCutoff(CARD cutoff)
+PROC SidRes(BYTE res)
+PROC SidMode(BYTE mode)
+PROC SidRoute(BYTE mask)
+PROC SidRst()

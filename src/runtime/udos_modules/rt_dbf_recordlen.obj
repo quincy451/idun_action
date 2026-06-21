@@ -1,0 +1,8 @@
+OBJ1
+x rt_dbf_recordlen 0 18
+b u0M
+u rt_dbf_state
+m F0 0D A2 00 DD 00 00 D0 06 A2 07 BD 00 00 60 A9 00 60
+r 5 u0
+r 12 u0
+n rt_dbf_recordlen
