@@ -6427,6 +6427,58 @@ class TestActcReuSourceCache(unittest.TestCase):
                         msg=result.stdout,
                     )
 
+    def test_reu_source_cache_long_builtin_helper_name_spans_tiny_window_without_lookahead(self) -> None:
+        self.require_toolchain()
+        self.run_checked([str(self.root / "tools" / "build_tool_abi_harness.sh")])
+        self.run_checked(
+            [str(self.root / "tools" / "build_actc_reu_cache_harness_udos.sh")],
+            env={"ACTC_SOURCE_WINDOW": "16", "ACTC_SOURCE_LOOKAHEAD": "0"},
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            workspace = Path(tmpdir) / "actc-reu-long-helper-name-tiny-window-no-lookahead"
+            project_root = workspace / "IMAGES" / "ACTION.DNP" / "PROJ3"
+            source_dir = project_root / "src"
+            object_dir = project_root / "obj"
+            source_dir.mkdir(parents=True)
+            object_dir.mkdir()
+            (project_root / "ACTION.PROJ").write_text("ACTION PROJECT\rMAIN.ACT\r", encoding="ascii")
+
+            prefix = "MODULE MAIN\rBYTE H\rPROC MAIN()\rH="
+            helper_offset = 62
+            filler_len = helper_offset - len(prefix)
+            self.assertGreaterEqual(filler_len, 0)
+            source = prefix + (" " * filler_len) + "DbfWriteFieldByte(1,1,0,90)\rRETURN\r"
+            (source_dir / "main.act").write_text(source, encoding="ascii")
+
+            result = self.run_checked(
+                [
+                    str(self.build_dir / "tool_abi_harness"),
+                    "--prg",
+                    str(self.build_dir / "ACTC_REU.PRG"),
+                    "--workspace",
+                    str(project_root),
+                    "--cmdline",
+                    "MAIN",
+                    "--services-inc",
+                    str(self.build_dir / "udos_services.inc"),
+                    "--labels",
+                    str(self.build_dir / "actc.reu.current.labels"),
+                    "--max-steps",
+                    "26000000",
+                ]
+            )
+            summary = json.loads(result.stdout)
+            self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
+            self.assertFalse(summary["hit_limit"], msg=result.stdout)
+            obj = (object_dir / "MAIN.OBJ").read_text(encoding="ascii")
+            self.assertIn("u rt_dbf_writefieldbyte\n", obj)
+            self.assertNotIn("u dbfwritefieldbyte\n", obj)
+            self.assertTrue(
+                any(op["kind"] == "rrd" and op["params"][0:3] == [16, 0, 1] for op in summary["ops"]),
+                msg=result.stdout,
+            )
+
     def test_reu_source_cache_builtin_constants_cross_page_aligned_window_without_lookahead(self) -> None:
         self.require_toolchain()
         self.run_checked([str(self.root / "tools" / "build_tool_abi_harness.sh")])

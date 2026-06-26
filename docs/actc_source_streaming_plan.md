@@ -10,7 +10,7 @@ image size minus REU space already reserved by UDOS/runtime services, not an
 arbitrary 256 KiB source cap.
 
 The current compiler only partially does this. It stages source into REU and can
-refill `source_buffer` as direct scans advance, so it can now compile a narrow
+refill `source_buffer` through SourceReader-managed scans, so it can now compile a narrow
 line-oriented proof where the `PROC MAIN` name, a `PrintE` string literal, or
 long inline spaces before a `PrintIE` literal cross the first 20 KiB window
 boundary. Small-window proofs also verify the declaration-count overlay can skip
@@ -39,9 +39,10 @@ helper-family builtin constants, semicolon comment-line, multi-window semicolon
 comment-line, and CR/LF crossings,
 constant-expression, and `IF`/`WHILE`/`UNTIL` control-flow condition paths, and
 the first parameter-list punctuation proof where `(` appears at `Y=$FF`. It still
-performs several full-source scans and still uses raw
-`(scan_ptr),y` lookahead, so long tokens or long lines beyond the bounded
-lookahead are not yet a supported general parser model.
+performs several full-source scans, and parts of the parser are still
+character-driven rather than token-driven, but maintained resident source reads
+now route through SourceReader peek/consume helpers. Long tokens and long lines
+still need broader parser ownership before they are a fully general model.
 
 ## Required File ABI Work
 
@@ -71,7 +72,7 @@ from the filesystem for every pass.
 The current production ACTC build uses `ACTC_REU_SOURCE_CACHE=1`. It stages
 `SRC/<MODULE>.ACT` at REU base `$010000`, pages a 1280-byte default
 `SOURCE_LIMIT` back into `source_buffer`, loads an additional
-`SOURCE_LOOKAHEAD=255` bytes for bounded direct lookahead, and refills the
+`SOURCE_LOOKAHEAD=255` bytes for bounded compatibility lookahead, and refills the
 window when the scanner reaches the window end. The production window is kept
 page-aligned to avoid per-byte boundary code in the resident tool window; larger
 or smaller harness builds can still override `ACTC_SOURCE_WINDOW`. This is not
@@ -79,16 +80,17 @@ the final parser architecture yet. The production UDOS resident now exports the
 matching REU stage/read service entries, while the automated proof uses the host
 harness' simulated REU.
 
-The current refill hook is pointer based, not token based. It is enough for
-line-oriented source where keywords, identifiers, strings, and expressions fit
-inside the current window plus bounded lookahead. The next correctness step is a
-real `SourceReader` that owns lookahead and carry buffers for longer tokens or
-line endings that cross a window boundary.
+The current refill hook remains anchored to the legacy scanner pointer, while
+SourceReader now owns source byte peeks, consumes, selected token buffers, and
+window reloads. It is enough for the proven line-oriented cases and legal-length
+symbols/literals that cross tiny zero-lookahead windows, but the next
+correctness step is broader token ownership so parser decisions do not depend on
+legacy scan pointer shape.
 
 The first helper beyond raw pointer refill is
 `source_reader_commit_256_from_scan_ptr`, used when 8-bit `Y` lookahead wraps.
-`source_reader_peek_scan_y` and `source_reader_peek_scan_ptr` own the remaining
-direct `(scan_ptr),y` reads for indexed scans and moving-base `scan_ptr` scans.
+`source_reader_peek_scan_y` and `source_reader_peek_scan_ptr` own the resident
+source reads for indexed scans and moving-base `scan_ptr` scans.
 `source_reader_consume_scan_y` and `source_reader_consume_scan_ptr` are now the
 parser-visible byte-consume boundaries for both forms. `advance_scan_y` and
 `advance_scan_ptr` remain only as low-level implementation details used by
@@ -390,8 +392,9 @@ ALINK.
 ## Current Status
 
 The current production compiler now stages source through REU, refills the scan
-window as the raw pointer advances, keeps 255 bytes of bounded lookahead, and
-streams object output. It is useful for proving source, symbols, long inline
+window through SourceReader-managed peek/consume paths, keeps 255 bytes of
+bounded compatibility lookahead, and streams object output. It is useful for
+proving source, symbols, long inline
 spaces, one long expression, fixed-pattern page-boundary return expressions,
 page-boundary statement terminators, page-boundary comparison operators, boolean
 operator wraps in print, assignment, and return paths, local declaration
@@ -412,5 +415,6 @@ source window. The compiler also proves objects beyond the old RAM output
 buffer and REU-backed compiler metadata tables, but it is not the final
 architecture for large Action programs.
 The next
-compiler-capacity breakthrough is the parser refactor described here: replace
-direct `source_buffer` lookahead with a token-boundary safe `SourceReader`.
+compiler-capacity breakthrough is the parser refactor described here: make the
+token-boundary safe `SourceReader` the parser's owner of token lookahead instead
+of a compatibility layer under legacy scan-pointer parser code.
