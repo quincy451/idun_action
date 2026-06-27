@@ -2954,28 +2954,17 @@ preallocate_require_then_or_line_end_at_scan_y:
     beq preallocate_require_then_or_line_end_at_scan_y_ok
     cmp #13
     beq preallocate_require_then_or_line_end_at_scan_y_ok
-    jsr uppercase_ascii
-    cmp #'T'
-    bne preallocate_require_then_or_line_end_at_scan_y_fail
-    jsr source_reader_consume_scan_y
+    lda #'T'
+    jsr source_reader_consume_uppercase_char_from_scan_y
     bcs preallocate_require_then_or_line_end_at_scan_y_fail
-    jsr source_reader_peek_scan_y
-    jsr uppercase_ascii
-    cmp #'H'
-    bne preallocate_require_then_or_line_end_at_scan_y_fail
-    jsr source_reader_consume_scan_y
+    lda #'H'
+    jsr source_reader_consume_uppercase_char_from_scan_y
     bcs preallocate_require_then_or_line_end_at_scan_y_fail
-    jsr source_reader_peek_scan_y
-    jsr uppercase_ascii
-    cmp #'E'
-    bne preallocate_require_then_or_line_end_at_scan_y_fail
-    jsr source_reader_consume_scan_y
+    lda #'E'
+    jsr source_reader_consume_uppercase_char_from_scan_y
     bcs preallocate_require_then_or_line_end_at_scan_y_fail
-    jsr source_reader_peek_scan_y
-    jsr uppercase_ascii
-    cmp #'N'
-    bne preallocate_require_then_or_line_end_at_scan_y_fail
-    jsr source_reader_consume_scan_y
+    lda #'N'
+    jsr source_reader_consume_uppercase_char_from_scan_y
     bcs preallocate_require_then_or_line_end_at_scan_y_fail
     jsr skip_inline_spaces_at_scan_y
     jsr source_reader_peek_scan_y
@@ -2999,16 +2988,11 @@ preallocate_require_do_or_line_end_at_scan_y:
     beq preallocate_require_do_or_line_end_at_scan_y_ok
     cmp #13
     beq preallocate_require_do_or_line_end_at_scan_y_ok
-    jsr uppercase_ascii
-    cmp #'D'
-    bne preallocate_require_do_or_line_end_at_scan_y_fail
-    jsr source_reader_consume_scan_y
+    lda #'D'
+    jsr source_reader_consume_uppercase_char_from_scan_y
     bcs preallocate_require_do_or_line_end_at_scan_y_fail
-    jsr source_reader_peek_scan_y
-    jsr uppercase_ascii
-    cmp #'O'
-    bne preallocate_require_do_or_line_end_at_scan_y_fail
-    jsr source_reader_consume_scan_y
+    lda #'O'
+    jsr source_reader_consume_uppercase_char_from_scan_y
     bcs preallocate_require_do_or_line_end_at_scan_y_fail
     jsr skip_inline_spaces_at_scan_y
     jsr source_reader_peek_scan_y
@@ -5017,28 +5001,17 @@ require_then_or_line_end_at_scan_y:
     beq require_then_or_line_end_at_scan_y_ok
     cmp #13
     beq require_then_or_line_end_at_scan_y_ok
-    jsr uppercase_ascii
-    cmp #'T'
-    bne require_then_or_line_end_at_scan_y_fail
-    jsr source_reader_consume_scan_y
+    lda #'T'
+    jsr source_reader_consume_uppercase_char_from_scan_y
     bcs require_then_or_line_end_at_scan_y_fail
-    jsr source_reader_peek_scan_y
-    jsr uppercase_ascii
-    cmp #'H'
-    bne require_then_or_line_end_at_scan_y_fail
-    jsr source_reader_consume_scan_y
+    lda #'H'
+    jsr source_reader_consume_uppercase_char_from_scan_y
     bcs require_then_or_line_end_at_scan_y_fail
-    jsr source_reader_peek_scan_y
-    jsr uppercase_ascii
-    cmp #'E'
-    bne require_then_or_line_end_at_scan_y_fail
-    jsr source_reader_consume_scan_y
+    lda #'E'
+    jsr source_reader_consume_uppercase_char_from_scan_y
     bcs require_then_or_line_end_at_scan_y_fail
-    jsr source_reader_peek_scan_y
-    jsr uppercase_ascii
-    cmp #'N'
-    bne require_then_or_line_end_at_scan_y_fail
-    jsr source_reader_consume_scan_y
+    lda #'N'
+    jsr source_reader_consume_uppercase_char_from_scan_y
     bcs require_then_or_line_end_at_scan_y_fail
     jsr skip_inline_spaces_at_scan_y
     jsr source_reader_peek_scan_y
@@ -5062,16 +5035,11 @@ require_do_or_line_end_at_scan_y:
     beq require_do_or_line_end_at_scan_y_ok
     cmp #13
     beq require_do_or_line_end_at_scan_y_ok
-    jsr uppercase_ascii
-    cmp #'D'
-    bne require_do_or_line_end_at_scan_y_fail
-    jsr source_reader_consume_scan_y
+    lda #'D'
+    jsr source_reader_consume_uppercase_char_from_scan_y
     bcs require_do_or_line_end_at_scan_y_fail
-    jsr source_reader_peek_scan_y
-    jsr uppercase_ascii
-    cmp #'O'
-    bne require_do_or_line_end_at_scan_y_fail
-    jsr source_reader_consume_scan_y
+    lda #'O'
+    jsr source_reader_consume_uppercase_char_from_scan_y
     bcs require_do_or_line_end_at_scan_y_fail
     jsr skip_inline_spaces_at_scan_y
     jsr source_reader_peek_scan_y
@@ -10454,6 +10422,20 @@ store_reader_prev_symbol_from_a:
 store_reader_prev_symbol_yes:
     lda #$01
     sta reader_prev_symbol_data
+    rts
+
+source_reader_consume_uppercase_char_from_scan_y:
+    sta compare_char
+    jsr source_reader_peek_scan_y
+    jsr uppercase_ascii
+    cmp compare_char
+    bne source_reader_consume_uppercase_char_from_scan_y_fail
+    jsr source_reader_consume_scan_y
+    bcs source_reader_consume_uppercase_char_from_scan_y_fail
+    clc
+    rts
+source_reader_consume_uppercase_char_from_scan_y_fail:
+    sec
     rts
 
 source_reader_consume_pattern_char_from_scan_y:

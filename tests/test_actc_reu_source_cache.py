@@ -1558,20 +1558,54 @@ class TestActcReuSourceCache(unittest.TestCase):
         actc_path = self.root / "src" / "tools_udos" / "actc" / "actc.asm"
         actc_text = actc_path.read_text(encoding="ascii")
         terminator_ranges = {
-            "require_then_or_line_end_at_scan_y": "require_do_or_line_end_at_scan_y:",
-            "require_do_or_line_end_at_scan_y": ".endif",
+            "preallocate_require_then_or_line_end_at_scan_y": (
+                "preallocate_require_do_or_line_end_at_scan_y:",
+                "lda #'T'",
+            ),
+            "preallocate_require_do_or_line_end_at_scan_y": (
+                "preallocate_declared_symbol_is_print_statement:",
+                "lda #'D'",
+            ),
+            "require_then_or_line_end_at_scan_y": (
+                "require_do_or_line_end_at_scan_y:",
+                "lda #'T'",
+            ),
+            "require_do_or_line_end_at_scan_y": (
+                ".endif",
+                "lda #'D'",
+            ),
         }
 
-        for label, next_label in terminator_ranges.items():
+        for label, (next_label, expected_first_char) in terminator_ranges.items():
             match = re.search(
-                rf"{label}:\n(?P<body>.*?)\n{re.escape(next_label)}",
+                rf"^{re.escape(label)}:\n(?P<body>.*?)\n^{re.escape(next_label)}",
                 actc_text,
-                re.DOTALL,
+                re.DOTALL | re.MULTILINE,
             )
             self.assertIsNotNone(match, msg=label)
             assert match is not None
-            self.assertIn("jsr source_reader_consume_scan_y", match.group("body"), msg=label)
-            self.assertNotIn("jsr advance_scan_y", match.group("body"), msg=label)
+            body = match.group("body")
+            self.assertIn("jsr source_reader_consume_uppercase_char_from_scan_y", body, msg=label)
+            self.assertIn(expected_first_char, body, msg=label)
+            self.assertNotIn("jsr source_reader_consume_scan_y", body, msg=label)
+            self.assertNotIn("jsr uppercase_ascii", body, msg=label)
+            self.assertNotIn("jsr advance_scan_y", body, msg=label)
+
+        helper_match = re.search(
+            r"source_reader_consume_uppercase_char_from_scan_y:\n(?P<body>.*?)\n"
+            r"source_reader_consume_pattern_char_from_scan_y:",
+            actc_text,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(helper_match)
+        assert helper_match is not None
+        helper_body = helper_match.group("body")
+        self.assertIn("sta compare_char", helper_body)
+        self.assertIn("jsr source_reader_peek_scan_y", helper_body)
+        self.assertIn("jsr uppercase_ascii", helper_body)
+        self.assertIn("cmp compare_char", helper_body)
+        self.assertIn("jsr source_reader_consume_scan_y", helper_body)
+        self.assertNotIn("jsr advance_scan_y", helper_body)
 
     def test_call_and_runtime_group_punctuation_consumes_through_source_reader(self) -> None:
         actc_path = self.root / "src" / "tools_udos" / "actc" / "actc.asm"
