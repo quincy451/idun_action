@@ -190,6 +190,8 @@ class TestActcReuSourceCache(unittest.TestCase):
             body = match.group("body")
             if label == "scan_keyword_token_from_scan_y":
                 self.assertIn("jsr source_reader_consume_pattern_char_from_scan_y", body, msg=label)
+            elif label == "copy_symbol_from_scan_y":
+                self.assertIn("jsr source_reader_try_store_symbol_token_x_from_scan_y", body, msg=label)
             else:
                 self.assertIn("jsr source_reader_consume_scan_y", body, msg=label)
             self.assertNotIn("jsr advance_scan_y", match.group("body"), msg=label)
@@ -421,13 +423,26 @@ class TestActcReuSourceCache(unittest.TestCase):
         self.assertIn("sty reader_scan_y_data", body)
         self.assertIn("jsr source_reader_begin_symbol_token", body)
         self.assertIn("reader_token_buffer", body)
-        self.assertIn("jsr source_reader_store_symbol_token_x", body)
+        self.assertIn("jsr source_reader_try_store_symbol_token_x_from_scan_y", body)
         self.assertIn("jsr source_reader_terminate_symbol_token_x", body)
-        self.assertIn("jsr source_reader_symbol_token_char_valid_x", body)
         self.assertNotIn("sta (body_ptr),y", body)
-        self.assertIn("jsr source_reader_consume_scan_y", body)
         self.assertIn("jsr source_reader_publish_symbol_token", body)
         self.assertNotIn("sta declared_module_name,x", body)
+
+        helper_match = re.search(
+            r"source_reader_try_store_symbol_token_x_from_scan_y:\n(?P<body>.*?)\n"
+            r"copy_symbol_from_scan_ptr:",
+            actc_text,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(helper_match)
+        assert helper_match is not None
+        helper_body = helper_match.group("body")
+        self.assertIn("jsr source_reader_peek_scan_y", helper_body)
+        self.assertIn("jsr source_reader_symbol_token_char_valid_x", helper_body)
+        self.assertIn("jsr source_reader_store_symbol_token_x", helper_body)
+        self.assertIn("jsr source_reader_consume_scan_y", helper_body)
+        self.assertIn("sty reader_scan_y_data", helper_body)
 
     def test_symbol_token_helpers_centralize_compatibility_publishing(self) -> None:
         actc_path = self.root / "src" / "tools_udos" / "actc" / "actc.asm"
@@ -534,7 +549,7 @@ class TestActcReuSourceCache(unittest.TestCase):
                 "cpy #$00",
             ),
             "source_reader_symbol_token_char_valid_x": (
-                "copy_symbol_from_scan_ptr:",
+                "source_reader_try_store_symbol_token_x_from_scan_y:",
                 "cpx #$00",
             ),
         }
@@ -559,12 +574,12 @@ class TestActcReuSourceCache(unittest.TestCase):
                 "jsr source_reader_symbol_token_char_valid_y",
             ),
             "copy_symbol_from_scan_ptr_stream_loop": (
-                "copy_symbol_from_scan_ptr_stream_store:",
-                "jsr source_reader_symbol_token_char_valid_x",
+                "copy_symbol_from_scan_ptr_stream_stored:",
+                "jsr source_reader_try_store_symbol_token_x_from_scan_y",
             ),
             "copy_symbol_from_scan_y_loop": (
-                "copy_symbol_from_scan_y_store:",
-                "jsr source_reader_symbol_token_char_valid_x",
+                "copy_symbol_from_scan_y_stored:",
+                "jsr source_reader_try_store_symbol_token_x_from_scan_y",
             ),
             "store_proc_export_from_scan_ptr_or_fail_loop": (
                 "store_proc_export_from_scan_ptr_or_fail_store:",
@@ -606,11 +621,8 @@ class TestActcReuSourceCache(unittest.TestCase):
         self.assertNotIn("(SOURCE_LIMIT & $ff)", match.group("body"))
         self.assertIn("sta reader_scan_y_data", body)
         self.assertIn("jsr source_reader_begin_symbol_token", body)
-        self.assertIn("jsr source_reader_consume_scan_y", body)
-        self.assertIn("sty reader_scan_y_data", body)
-        self.assertIn("jsr source_reader_store_symbol_token_x", body)
+        self.assertIn("jsr source_reader_try_store_symbol_token_x_from_scan_y", body)
         self.assertIn("jsr source_reader_terminate_symbol_token_x", body)
-        self.assertIn("jsr source_reader_symbol_token_char_valid_x", body)
         self.assertIn("jsr source_reader_publish_symbol_token", body)
         self.assertIn("reader_token_buffer:", actc_text)
         self.assertIn("reader_token_buffer", actc_text)
@@ -644,12 +656,9 @@ class TestActcReuSourceCache(unittest.TestCase):
         self.assertIn("jsr source_reader_symbol_token_char_valid_y", full_body)
         self.assertIn("jsr source_reader_publish_symbol_token", full_body)
         self.assertIn("sta reader_scan_y_data", body)
-        self.assertIn("jsr source_reader_consume_scan_y", body)
-        self.assertIn("sty reader_scan_y_data", body)
         self.assertIn("jsr source_reader_begin_symbol_token", body)
-        self.assertIn("jsr source_reader_store_symbol_token_x", body)
+        self.assertIn("jsr source_reader_try_store_symbol_token_x_from_scan_y", body)
         self.assertIn("jsr source_reader_terminate_symbol_token_x", body)
-        self.assertIn("jsr source_reader_symbol_token_char_valid_x", body)
         self.assertIn("jsr source_reader_publish_symbol_token", body)
         self.assertNotIn("sta (body_ptr),y", full_body)
         self.assertNotIn("jsr uppercase_symbol_start_valid", full_body)

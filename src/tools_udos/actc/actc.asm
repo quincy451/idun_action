@@ -1457,19 +1457,12 @@ copy_declared_module_or_fail_stream:
     sta reader_scan_y_data
     ldx #$00
 copy_declared_module_or_fail_stream_loop:
-    ldy reader_scan_y_data
-    jsr source_reader_peek_scan_y
-    beq copy_declared_module_or_fail_stream_bad
-    jsr source_reader_symbol_token_char_valid_x
-    bcc copy_declared_module_or_fail_stream_store
-    jmp copy_declared_module_or_fail_stream_done
-copy_declared_module_or_fail_stream_store:
-    jsr source_reader_store_symbol_token_x
-    ldy reader_scan_y_data
-    jsr source_reader_consume_scan_y
-    bcs copy_declared_module_or_fail_stream_bad
-    sty reader_scan_y_data
-    jsr source_reader_begin_symbol_token
+    jsr source_reader_try_store_symbol_token_x_from_scan_y
+    bcc copy_declared_module_or_fail_stream_stored
+    cmp #$01
+    beq copy_declared_module_or_fail_stream_done
+    jmp copy_declared_module_or_fail_stream_bad
+copy_declared_module_or_fail_stream_stored:
     inx
     cpx #24
     bcc copy_declared_module_or_fail_stream_loop
@@ -10203,6 +10196,33 @@ source_reader_symbol_token_char_valid_x:
 source_reader_symbol_token_char_valid_x_body:
     jmp uppercase_symbol_body_valid
 
+source_reader_try_store_symbol_token_x_from_scan_y:
+    ldy reader_scan_y_data
+    jsr source_reader_peek_scan_y
+    beq source_reader_try_store_symbol_token_x_from_scan_y_eof
+    jsr source_reader_symbol_token_char_valid_x
+    bcs source_reader_try_store_symbol_token_x_from_scan_y_delimiter
+    jsr source_reader_store_symbol_token_x
+    ldy reader_scan_y_data
+    jsr source_reader_consume_scan_y
+    bcs source_reader_try_store_symbol_token_x_from_scan_y_fail
+    sty reader_scan_y_data
+    jsr source_reader_begin_symbol_token
+    clc
+    rts
+source_reader_try_store_symbol_token_x_from_scan_y_eof:
+    lda #$00
+    sec
+    rts
+source_reader_try_store_symbol_token_x_from_scan_y_delimiter:
+    lda #$01
+    sec
+    rts
+source_reader_try_store_symbol_token_x_from_scan_y_fail:
+    lda #$ff
+    sec
+    rts
+
 copy_symbol_from_scan_ptr:
 .if ACTC_REU_SOURCE_CACHE
 .if SOURCE_READER_STREAM_SYMBOL_COPY
@@ -10248,19 +10268,12 @@ copy_symbol_from_scan_ptr_stream:
     sta reader_scan_y_data
     ldx #$00
 copy_symbol_from_scan_ptr_stream_loop:
-    ldy reader_scan_y_data
-    jsr source_reader_peek_scan_y
-    beq copy_symbol_from_scan_ptr_stream_done
-    jsr source_reader_symbol_token_char_valid_x
-    bcc copy_symbol_from_scan_ptr_stream_store
+    jsr source_reader_try_store_symbol_token_x_from_scan_y
+    bcc copy_symbol_from_scan_ptr_stream_stored
+    cmp #$ff
+    beq copy_symbol_from_scan_ptr_stream_fail
     jmp copy_symbol_from_scan_ptr_stream_done
-copy_symbol_from_scan_ptr_stream_store:
-    jsr source_reader_store_symbol_token_x
-    ldy reader_scan_y_data
-    jsr source_reader_consume_scan_y
-    bcs copy_symbol_from_scan_ptr_stream_fail
-    sty reader_scan_y_data
-    jsr source_reader_begin_symbol_token
+copy_symbol_from_scan_ptr_stream_stored:
     inx
     cpx #24
     bcc copy_symbol_from_scan_ptr_stream_loop
@@ -10294,19 +10307,12 @@ copy_symbol_from_scan_y:
     jsr source_reader_begin_symbol_token
     ldx #$00
 copy_symbol_from_scan_y_loop:
-    ldy reader_scan_y_data
-    jsr source_reader_peek_scan_y
-    beq copy_symbol_from_scan_y_done_check
-    jsr source_reader_symbol_token_char_valid_x
-    bcc copy_symbol_from_scan_y_store
+    jsr source_reader_try_store_symbol_token_x_from_scan_y
+    bcc copy_symbol_from_scan_y_stored
+    cmp #$ff
+    beq copy_symbol_from_scan_y_fail
     jmp copy_symbol_from_scan_y_done_check
-copy_symbol_from_scan_y_store:
-    jsr source_reader_store_symbol_token_x
-    ldy reader_scan_y_data
-    jsr source_reader_consume_scan_y
-    bcs copy_symbol_from_scan_y_fail
-    sty reader_scan_y_data
-    jsr source_reader_begin_symbol_token
+copy_symbol_from_scan_y_stored:
     inx
     cpx #24
     bcc copy_symbol_from_scan_y_loop

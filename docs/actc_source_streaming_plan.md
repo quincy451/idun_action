@@ -127,8 +127,9 @@ preserving the existing returned-`Y` scanner ABI. The resident module-header
 copy helper uses the same carry-buffer publish path for `declared_module_name`.
 Parser-side symbol helpers now store and terminate token bytes through
 SourceReader token helpers rather than writing the token buffer directly, and
-resident symbol-copy plus module-header copy loops now classify uppercase
-start/body characters through SourceReader token helpers. Procedure export
+resident streaming symbol-copy plus module-header copy loops now share one
+SourceReader token-byte helper that peeks, classifies, stores, consumes, and
+updates the scanner offset. Procedure export
 name copies now stage through the same SourceReader token buffer before
 publishing to the export table. The source-header
 overlay module-name comparator and declaration-count overlay var/export symbol
