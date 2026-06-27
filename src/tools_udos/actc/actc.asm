@@ -4611,15 +4611,13 @@ store_string_literal_from_scan_ptr_loop:
     jsr source_reader_try_store_string_literal_byte_from_scan_ptr
     bcc store_string_literal_from_scan_ptr_loop
     cmp #$01
-    beq store_string_literal_from_scan_ptr_done
+    bne store_string_literal_from_scan_ptr_fail
+    jsr source_reader_finish_string_literal_from_scan_ptr
+    bcc store_string_literal_from_scan_ptr_done
 store_string_literal_from_scan_ptr_fail:
     sec
     rts
 store_string_literal_from_scan_ptr_done:
-    ldy reader_pattern_index_data
-    lda #$00
-    sta (body_ptr),y
-    jsr source_reader_consume_scan_ptr
     ldx string_count_data
 .if ACTC_REU_STRING_LITERALS
     jsr store_string_literal_to_reu_x
@@ -4656,6 +4654,22 @@ source_reader_try_store_string_literal_byte_from_scan_ptr_done:
     rts
 source_reader_try_store_string_literal_byte_from_scan_ptr_fail:
     lda #$ff
+    sec
+    rts
+
+source_reader_finish_string_literal_from_scan_ptr:
+    ldy reader_pattern_index_data
+    lda #$00
+    sta (body_ptr),y
+    jsr source_reader_consume_scan_ptr
+    bcs source_reader_finish_string_literal_from_scan_ptr_fail
+    lda reader_token_ptr_lo_data
+    sta body_ptr
+    lda reader_token_ptr_hi_data
+    sta body_ptr+1
+    clc
+    rts
+source_reader_finish_string_literal_from_scan_ptr_fail:
     sec
     rts
 

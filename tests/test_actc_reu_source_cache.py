@@ -389,6 +389,18 @@ class TestActcReuSourceCache(unittest.TestCase):
         assert match is not None
         body = match.group("body")
         self.assertIn("jsr source_reader_try_store_string_literal_byte_from_scan_ptr", body)
+        self.assertIn("jsr source_reader_finish_string_literal_from_scan_ptr", body)
+        caller_match = re.search(
+            r"store_string_literal_from_scan_ptr:\n(?P<body>.*?)\n"
+            r"source_reader_try_store_string_literal_byte_from_scan_ptr:",
+            actc_text,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(caller_match)
+        assert caller_match is not None
+        caller_body = caller_match.group("body")
+        self.assertNotIn("sta (body_ptr),y", caller_body)
+        self.assertNotIn("jsr source_reader_consume_scan_ptr", caller_body)
         loop_match = re.search(
             r"store_string_literal_from_scan_ptr_loop:\n(?P<body>.*?)\n"
             r"store_string_literal_from_scan_ptr_fail:",
@@ -403,7 +415,7 @@ class TestActcReuSourceCache(unittest.TestCase):
 
         helper_match = re.search(
             r"source_reader_try_store_string_literal_byte_from_scan_ptr:\n(?P<body>.*?)\n"
-            r"store_small_decimal_literal_from_scan_ptr:",
+            r"source_reader_finish_string_literal_from_scan_ptr:",
             actc_text,
             re.DOTALL,
         )
@@ -418,6 +430,21 @@ class TestActcReuSourceCache(unittest.TestCase):
         self.assertIn("lda #$01", helper_body)
         self.assertIn("lda #$ff", helper_body)
         self.assertNotIn("jsr source_reader_peek_scan_y", body)
+
+        finish_match = re.search(
+            r"source_reader_finish_string_literal_from_scan_ptr:\n(?P<body>.*?)\n"
+            r"store_small_decimal_literal_from_scan_ptr:",
+            actc_text,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(finish_match)
+        assert finish_match is not None
+        finish_body = finish_match.group("body")
+        self.assertIn("ldy reader_pattern_index_data", finish_body)
+        self.assertIn("sta (body_ptr),y", finish_body)
+        self.assertIn("jsr source_reader_consume_scan_ptr", finish_body)
+        self.assertIn("reader_token_ptr_lo_data", finish_body)
+        self.assertIn("reader_token_ptr_hi_data", finish_body)
 
     def test_stream_output_buffer_covers_tiny_source_window_builds(self) -> None:
         actc_path = self.root / "src" / "tools_udos" / "actc" / "actc.asm"
