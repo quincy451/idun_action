@@ -130,8 +130,9 @@ SourceReader token helpers rather than writing the token buffer directly, and
 resident streaming symbol-copy plus module-header copy loops now share one
 SourceReader token-byte helper that peeks, classifies, stores, consumes, and
 updates the scanner offset. Procedure export
-name copies now stage through the same SourceReader token buffer before
-publishing to the export table. The source-header
+name copies now use a matching non-consuming SourceReader token-byte helper so
+the legacy returned-`Y` parameter-list ABI is preserved while token storage is
+centralized before publishing to the export table. The source-header
 overlay module-name comparator and declaration-count overlay var/export symbol
 copies use the same local token-helper shape. Declaration initializer body
 character checks also route through a local helper before falling back to

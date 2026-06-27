@@ -506,7 +506,7 @@ class TestActcReuSourceCache(unittest.TestCase):
         assert match is not None
         body = match.group("body")
         self.assertIn("jsr source_reader_begin_symbol_token", body)
-        self.assertIn("jsr source_reader_store_symbol_token_y", body)
+        self.assertIn("jsr source_reader_try_store_proc_export_token_y", body)
         self.assertIn("jsr source_reader_terminate_symbol_token_y", body)
         self.assertIn("jsr source_reader_publish_symbol_token_to_export_ptr", body)
         self.assertIn("sty reader_scan_y_data", body)
@@ -526,7 +526,25 @@ class TestActcReuSourceCache(unittest.TestCase):
         )
         self.assertIsNotNone(loop_match)
         assert loop_match is not None
-        self.assertNotIn("sta (export_ptr),y", loop_match.group("body"))
+        loop_body = loop_match.group("body")
+        self.assertIn("jsr source_reader_try_store_proc_export_token_y", loop_body)
+        self.assertNotIn("sta (export_ptr),y", loop_body)
+        self.assertNotIn("jsr source_reader_store_symbol_token_y", loop_body)
+
+        helper_match = re.search(
+            r"source_reader_try_store_proc_export_token_y:\n(?P<body>.*?)\n"
+            r"source_reader_try_store_symbol_token_x_from_scan_y:",
+            actc_text,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(helper_match)
+        assert helper_match is not None
+        helper_body = helper_match.group("body")
+        self.assertIn("jsr source_reader_peek_scan_y", helper_body)
+        self.assertIn("jsr source_reader_symbol_token_char_valid_y", helper_body)
+        self.assertIn("jsr source_reader_store_symbol_token_y", helper_body)
+        self.assertIn("iny", helper_body)
+        self.assertNotIn("jsr source_reader_consume_scan_y", helper_body)
 
         publish_match = re.search(
             r"source_reader_publish_symbol_token_to_export_ptr:\n(?P<body>.*?)\n"
@@ -549,7 +567,7 @@ class TestActcReuSourceCache(unittest.TestCase):
                 "cpy #$00",
             ),
             "source_reader_symbol_token_char_valid_x": (
-                "source_reader_try_store_symbol_token_x_from_scan_y:",
+                "source_reader_try_store_proc_export_token_y:",
                 "cpx #$00",
             ),
         }
@@ -582,8 +600,8 @@ class TestActcReuSourceCache(unittest.TestCase):
                 "jsr source_reader_try_store_symbol_token_x_from_scan_y",
             ),
             "store_proc_export_from_scan_ptr_or_fail_loop": (
-                "store_proc_export_from_scan_ptr_or_fail_store:",
-                "jsr source_reader_symbol_token_char_valid_y",
+                "store_proc_export_from_scan_ptr_or_fail_stored:",
+                "jsr source_reader_try_store_proc_export_token_y",
             ),
         }
 

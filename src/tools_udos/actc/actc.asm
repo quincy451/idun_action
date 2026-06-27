@@ -8749,26 +8749,12 @@ store_proc_export_from_scan_ptr_or_fail:
     jsr source_reader_begin_symbol_token
     ldy #$00
 store_proc_export_from_scan_ptr_or_fail_loop:
-    jsr source_reader_peek_scan_y
+    jsr source_reader_try_store_proc_export_token_y
+    bcc store_proc_export_from_scan_ptr_or_fail_stored
+    cmp #$01
     beq store_proc_export_from_scan_ptr_or_fail_done
-    cmp #'('
-    beq store_proc_export_from_scan_ptr_or_fail_done
-    cmp #'='
-    beq store_proc_export_from_scan_ptr_or_fail_done
-    cmp #' '
-    beq store_proc_export_from_scan_ptr_or_fail_done
-    cmp #9
-    beq store_proc_export_from_scan_ptr_or_fail_done
-    cmp #10
-    beq store_proc_export_from_scan_ptr_or_fail_done
-    cmp #13
-    beq store_proc_export_from_scan_ptr_or_fail_done
-    jsr source_reader_symbol_token_char_valid_y
-    bcc store_proc_export_from_scan_ptr_or_fail_store
     jmp store_proc_export_from_scan_ptr_or_fail_bad
-store_proc_export_from_scan_ptr_or_fail_store:
-    jsr source_reader_store_symbol_token_y
-    iny
+store_proc_export_from_scan_ptr_or_fail_stored:
     cpy #24
     bcc store_proc_export_from_scan_ptr_or_fail_loop
 store_proc_export_from_scan_ptr_or_fail_bad:
@@ -10195,6 +10181,36 @@ source_reader_symbol_token_char_valid_x:
     jmp uppercase_symbol_start_valid
 source_reader_symbol_token_char_valid_x_body:
     jmp uppercase_symbol_body_valid
+
+source_reader_try_store_proc_export_token_y:
+    jsr source_reader_peek_scan_y
+    beq source_reader_try_store_proc_export_token_y_delimiter
+    cmp #'('
+    beq source_reader_try_store_proc_export_token_y_delimiter
+    cmp #'='
+    beq source_reader_try_store_proc_export_token_y_delimiter
+    cmp #' '
+    beq source_reader_try_store_proc_export_token_y_delimiter
+    cmp #9
+    beq source_reader_try_store_proc_export_token_y_delimiter
+    cmp #10
+    beq source_reader_try_store_proc_export_token_y_delimiter
+    cmp #13
+    beq source_reader_try_store_proc_export_token_y_delimiter
+    jsr source_reader_symbol_token_char_valid_y
+    bcs source_reader_try_store_proc_export_token_y_bad
+    jsr source_reader_store_symbol_token_y
+    iny
+    clc
+    rts
+source_reader_try_store_proc_export_token_y_delimiter:
+    lda #$01
+    sec
+    rts
+source_reader_try_store_proc_export_token_y_bad:
+    lda #$ff
+    sec
+    rts
 
 source_reader_try_store_symbol_token_x_from_scan_y:
     ldy reader_scan_y_data
