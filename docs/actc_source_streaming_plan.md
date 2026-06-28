@@ -143,6 +143,8 @@ Runtime grouped value term `(` and `)` delimiters now use the same exact helper,
 keeping group punctuation ownership with SourceReader.
 Runtime call-argument `(`, `,`, and `)` delimiters also route through the exact
 helper while leaving the argument scan and separator-choice peeks unchanged.
+Runtime value optional `=`, group-open `[`, and group-close `]` delimiters use
+the exact helper after their existing match peeks.
 Parser-side symbol helpers now store and terminate token bytes through
 SourceReader token helpers rather than writing the token buffer directly, and
 resident streaming symbol-copy plus module-header copy loops now share one

@@ -6046,7 +6046,8 @@ emit_runtime_value_from_scan_y_or_fail:
     jsr source_reader_peek_scan_y
     cmp #'='
     bne emit_runtime_value_from_scan_y_or_fail_after_equals
-    jsr source_reader_consume_scan_y
+    lda #'='
+    jsr source_reader_consume_char_from_scan_y
     bcc emit_runtime_value_from_scan_y_or_fail_after_equals
     jmp emit_runtime_expr_push_fail
 emit_runtime_value_from_scan_y_or_fail_after_equals:
@@ -6059,7 +6060,8 @@ emit_runtime_value_from_scan_y_or_fail_after_equals:
     jsr source_reader_peek_scan_y
     cmp #'['
     bne emit_runtime_value_from_scan_y_or_fail_after_group
-    jsr source_reader_consume_scan_y
+    lda #'['
+    jsr source_reader_consume_char_from_scan_y
     bcc :+
     jmp emit_runtime_expr_push_fail
 :   jsr emit_runtime_value_from_scan_y_or_fail
@@ -6070,7 +6072,8 @@ emit_runtime_value_from_scan_y_or_fail_after_equals:
     cmp #']'
     beq :+
     jmp emit_runtime_expr_push_fail
-:   jsr source_reader_consume_scan_y
+:   lda #']'
+    jsr source_reader_consume_char_from_scan_y
     bcc :+
     jmp emit_runtime_expr_push_fail
 :   clc
