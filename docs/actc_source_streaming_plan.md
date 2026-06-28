@@ -169,6 +169,8 @@ Runtime `REAL(var)` bridge close-paren matching uses the normal
 expected-character helper after the bridge argument has matched.
 Runtime explicit `REAL(...)` value parsing uses the helper for close parens and
 the signed `0-` prefix bytes.
+Runtime REAL condition comparison operators `=`, `<`, `>`, `<>`, `<=`, and
+`>=` use the expected-character helper for each matched byte.
 Parser-side symbol helpers now store and terminate token bytes through
 SourceReader token helpers rather than writing the token buffer directly, and
 resident streaming symbol-copy plus module-header copy loops now share one

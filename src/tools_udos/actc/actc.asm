@@ -6832,11 +6832,13 @@ emit_runtime_real_condition_clause_eq:
     sta expr_runtime_op
     lda #$01
     sta expr_value_lo
-    jsr source_reader_consume_scan_y
+    lda #'='
+    jsr source_reader_consume_char_from_scan_y
     bcs emit_runtime_real_condition_clause_fail
     jmp emit_runtime_real_condition_clause_rhs
 emit_runtime_real_condition_clause_lt_entry:
-    jsr source_reader_consume_scan_y
+    lda #'<'
+    jsr source_reader_consume_char_from_scan_y
     bcs emit_runtime_real_condition_clause_fail
     jsr source_reader_peek_scan_y
     cmp #'>'
@@ -6849,7 +6851,8 @@ emit_runtime_real_condition_clause_lt_entry:
     sta expr_value_lo
     jmp emit_runtime_real_condition_clause_rhs
 emit_runtime_real_condition_clause_gt_entry:
-    jsr source_reader_consume_scan_y
+    lda #'>'
+    jsr source_reader_consume_char_from_scan_y
     bcs emit_runtime_real_condition_clause_fail
     jsr source_reader_peek_scan_y
     cmp #'='
@@ -6864,7 +6867,8 @@ emit_runtime_real_condition_clause_ne:
     sta expr_runtime_op
     lda #$01
     sta expr_value_lo
-    jsr source_reader_consume_scan_y
+    lda #'>'
+    jsr source_reader_consume_char_from_scan_y
     bcs emit_runtime_real_condition_clause_fail
     jmp emit_runtime_real_condition_clause_rhs
 emit_runtime_real_condition_clause_le:
@@ -6872,7 +6876,8 @@ emit_runtime_real_condition_clause_le:
     sta expr_runtime_op
     lda #$02
     sta expr_value_lo
-    jsr source_reader_consume_scan_y
+    lda #'='
+    jsr source_reader_consume_char_from_scan_y
     bcs emit_runtime_real_condition_clause_fail
     jmp emit_runtime_real_condition_clause_rhs
 emit_runtime_real_condition_clause_ge:
@@ -6880,7 +6885,8 @@ emit_runtime_real_condition_clause_ge:
     sta expr_runtime_op
     lda #$00
     sta expr_value_lo
-    jsr source_reader_consume_scan_y
+    lda #'='
+    jsr source_reader_consume_char_from_scan_y
     bcc emit_runtime_real_condition_clause_rhs
 emit_runtime_real_condition_clause_fail:
     sec
