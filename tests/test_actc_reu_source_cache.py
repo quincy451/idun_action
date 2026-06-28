@@ -1994,6 +1994,24 @@ class TestActcReuSourceCache(unittest.TestCase):
         self.assertNotIn("jsr source_reader_consume_scan_y", body)
         self.assertNotIn("jsr advance_scan_y", body)
 
+    def test_runtime_real_explicit_value_delimiters_use_expected_char_helper(self) -> None:
+        actc_path = self.root / "src" / "tools_udos" / "actc" / "actc.asm"
+        actc_text = actc_path.read_text(encoding="ascii")
+        match = re.search(
+            r"emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail:\n(?P<body>.*?)\n"
+            r"emit_runtime_real_value_from_scan_y_or_fail:",
+            actc_text,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(match)
+        assert match is not None
+        body = match.group("body")
+        for expected in ("lda #')'", "lda #'0'", "lda #'-'"):
+            self.assertIn(expected, body)
+        self.assertIn("jsr source_reader_consume_char_from_scan_y", body)
+        self.assertNotIn("jsr source_reader_consume_scan_y", body)
+        self.assertNotIn("jsr advance_scan_y", body)
+
     def test_runtime_call_arg_punctuation_uses_expected_char_helper(self) -> None:
         actc_path = self.root / "src" / "tools_udos" / "actc" / "actc.asm"
         actc_text = actc_path.read_text(encoding="ascii")
@@ -2183,7 +2201,6 @@ class TestActcReuSourceCache(unittest.TestCase):
             "emit_real_wide_signed_int_assignment_from_scan_y_or_fail": "emit_real_bridge_assignment_from_var_index_ok:",
             "emit_real_add_assignment_after_copy_check": "emit_real_copy_assignment_from_scan_y_ok:",
             "emit_real_fabs_assignment_after_open_from_scan_y_or_fail": "resolve_call_target_from_declared_or_fail:",
-            "emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail": "emit_runtime_real_value_from_scan_y_or_fail:",
             "emit_runtime_real_condition_clause_from_scan_y_or_fail": "emit_runtime_condition_clause_from_scan_y_or_fail:",
         }
 
