@@ -3044,7 +3044,8 @@ preallocate_real_print_statement_external_from_scan_y:
     jsr source_reader_peek_scan_y
     cmp #'('
     bne preallocate_real_print_statement_external_miss
-    jsr source_reader_consume_scan_y
+    lda #'('
+    jsr source_reader_consume_char_from_scan_y
     bcs preallocate_real_print_statement_external_miss
     jsr skip_inline_spaces_at_scan_y
     jsr preallocate_real_bridge_conversion_external_from_scan_y
@@ -3068,7 +3069,8 @@ preallocate_real_print_statement_external_after_value:
     jsr source_reader_peek_scan_y
     cmp #')'
     bne preallocate_real_print_statement_external_miss
-    jsr source_reader_consume_scan_y
+    lda #')'
+    jsr source_reader_consume_char_from_scan_y
     bcs preallocate_real_print_statement_external_miss
     jsr skip_inline_spaces_at_scan_y
     jsr require_line_end_at_scan_y
@@ -3089,7 +3091,8 @@ preallocate_int_print_statement_call_external_from_scan_y:
     jsr source_reader_peek_scan_y
     cmp #'('
     bne preallocate_int_print_statement_call_external_miss
-    jsr source_reader_consume_scan_y
+    lda #'('
+    jsr source_reader_consume_char_from_scan_y
     bcs preallocate_int_print_statement_call_external_miss
     jsr skip_inline_spaces_at_scan_y
     jsr preallocate_call_with_arg_externals_from_scan_y
@@ -3098,7 +3101,8 @@ preallocate_int_print_statement_call_external_from_scan_y:
     jsr source_reader_peek_scan_y
     cmp #')'
     bne preallocate_int_print_statement_call_external_try_arg_scan
-    jsr source_reader_consume_scan_y
+    lda #')'
+    jsr source_reader_consume_char_from_scan_y
     bcs preallocate_int_print_statement_call_external_miss_restore
     jsr skip_inline_spaces_at_scan_y
     jsr require_line_end_at_scan_y
@@ -3113,7 +3117,8 @@ preallocate_int_print_statement_call_external_try_arg_scan:
     jsr source_reader_peek_scan_y
     cmp #'('
     bne preallocate_int_print_statement_call_external_miss_restore
-    jsr source_reader_consume_scan_y
+    lda #'('
+    jsr source_reader_consume_char_from_scan_y
     bcs preallocate_int_print_statement_call_external_miss_restore
     jsr skip_inline_spaces_at_scan_y
     jsr preallocate_scan_plain_call_arg_for_externals_from_scan_y
@@ -3122,7 +3127,8 @@ preallocate_int_print_statement_call_external_try_arg_scan:
     jsr source_reader_peek_scan_y
     cmp #')'
     bne preallocate_int_print_statement_call_external_miss_restore
-    jsr source_reader_consume_scan_y
+    lda #')'
+    jsr source_reader_consume_char_from_scan_y
     bcs preallocate_int_print_statement_call_external_miss_restore
     jsr skip_inline_spaces_at_scan_y
     jsr require_line_end_at_scan_y
