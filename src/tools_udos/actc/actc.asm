@@ -7054,7 +7054,8 @@ emit_runtime_sum_from_scan_y_loop:
     clc
     rts
 emit_runtime_sum_from_scan_y_add:
-    jsr source_reader_consume_scan_y
+    lda #'+'
+    jsr source_reader_consume_char_from_scan_y
     jsr emit_runtime_term_push_from_scan_y_or_fail
     bcc :+
     jmp emit_runtime_expr_push_fail
@@ -7063,7 +7064,8 @@ emit_runtime_sum_from_scan_y_add:
     jsr append_body_op_no_arg_for_current_proc
     jmp emit_runtime_sum_from_scan_y_loop
 emit_runtime_sum_from_scan_y_sub:
-    jsr source_reader_consume_scan_y
+    lda #'-'
+    jsr source_reader_consume_char_from_scan_y
     jsr emit_runtime_term_push_from_scan_y_or_fail
     bcc :+
     jmp emit_runtime_expr_push_fail
