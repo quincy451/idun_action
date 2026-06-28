@@ -7845,7 +7845,8 @@ parse_positive_word_sum_loop:
     rts
 
 parse_positive_word_sum_add:
-    jsr source_reader_consume_scan_y
+    lda #'+'
+    jsr source_reader_consume_char_from_scan_y
     jsr parse_positive_word_term_at_scan_y
     bcc :+
     sec
@@ -7862,7 +7863,8 @@ parse_positive_word_sum_add:
     rts
 
 parse_positive_word_sum_sub:
-    jsr source_reader_consume_scan_y
+    lda #'-'
+    jsr source_reader_consume_char_from_scan_y
     jsr parse_positive_word_term_at_scan_y
     bcc :+
     sec
@@ -7915,7 +7917,8 @@ parse_positive_word_term_mul:
     sta expr_compare_lo
     lda expr_term_hi
     sta expr_compare_hi
-    jsr source_reader_consume_scan_y
+    lda #'*'
+    jsr source_reader_consume_char_from_scan_y
     jsr parse_positive_word_factor_at_scan_y
     bcc :+
     sec
@@ -7954,7 +7957,8 @@ parse_positive_word_term_div:
     sta expr_compare_lo
     lda expr_term_hi
     sta expr_compare_hi
-    jsr source_reader_consume_scan_y
+    lda #'/'
+    jsr source_reader_consume_char_from_scan_y
     jsr parse_positive_word_factor_at_scan_y
     bcc :+
     sec
