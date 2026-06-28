@@ -165,6 +165,8 @@ Preallocation positive-word grouping punctuation `(` and `)` uses the helper in
 both factor and optional grouped-sum parsing.
 Runtime `REAL(` opener matching uses uppercase expected-character helpers for
 the keyword bytes and the normal expected-character helper for the open paren.
+Runtime `REAL(var)` bridge close-paren matching uses the normal
+expected-character helper after the bridge argument has matched.
 Parser-side symbol helpers now store and terminate token bytes through
 SourceReader token helpers rather than writing the token buffer directly, and
 resident streaming symbol-copy plus module-header copy loops now share one

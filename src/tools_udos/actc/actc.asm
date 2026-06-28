@@ -6598,7 +6598,8 @@ emit_runtime_real_explicit_bridge_value_from_scan_y_or_fail:
     jsr source_reader_peek_scan_y
     cmp #')'
     bne emit_runtime_real_explicit_bridge_value_from_scan_y_or_fail_fail
-    jsr source_reader_consume_scan_y
+    lda #')'
+    jsr source_reader_consume_char_from_scan_y
     bcs emit_runtime_real_explicit_bridge_value_from_scan_y_or_fail_fail
     ldx real_lhs_index_data
     lda #'L'
