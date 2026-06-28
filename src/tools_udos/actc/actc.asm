@@ -5784,7 +5784,7 @@ emit_real_add_assignment_after_copy_check:
     beq :+
     jmp emit_real_add_assignment_from_scan_y_or_fail_fail
 :   sta real_operator_data
-    jsr source_reader_consume_scan_y
+    jsr source_reader_consume_char_from_scan_y
     bcc :+
     jmp emit_real_add_assignment_from_scan_y_or_fail_fail
 :
@@ -5867,7 +5867,8 @@ emit_real_fabs_assignment_after_open_from_scan_y_or_fail:
     cmp #')'
     beq :+
     jmp emit_real_add_assignment_from_scan_y_or_fail_fail
-:   jsr source_reader_consume_scan_y
+:   lda #')'
+    jsr source_reader_consume_char_from_scan_y
     bcc :+
     jmp emit_real_add_assignment_from_scan_y_or_fail_fail
 :   jsr skip_inline_spaces_at_scan_y

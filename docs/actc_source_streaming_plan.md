@@ -169,6 +169,9 @@ Runtime `REAL(var)` bridge close-paren matching uses the normal
 expected-character helper after the bridge argument has matched.
 Runtime explicit `REAL(...)` value parsing uses the helper for close parens and
 the signed `0-` prefix bytes.
+Runtime REAL assignment binary operators `+`, `-`, `*`, and `/`, plus unary
+`FABS(...)`/`FSQRT(...)` close parens, use the same helper after their matched
+bytes have been selected.
 Runtime REAL condition comparison operators `=`, `<`, `>`, `<>`, `<=`, and
 `>=` use the expected-character helper for each matched byte.
 Runtime integer condition comparison operators use the same helper for their
