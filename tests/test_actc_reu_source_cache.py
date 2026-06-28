@@ -1750,7 +1750,6 @@ class TestActcReuSourceCache(unittest.TestCase):
         actc_path = self.root / "src" / "tools_udos" / "actc" / "actc.asm"
         actc_text = actc_path.read_text(encoding="ascii")
         punctuation_ranges = {
-            "emit_runtime_group_value_term_from_scan_y_or_fail": "emit_runtime_call_term_from_scan_y_or_fail:",
             "emit_call_args_from_scan_y_or_fail": "emit_runtime_value_from_scan_y_or_fail:",
             "emit_runtime_value_from_scan_y_or_fail": "emit_small_constant_sum_from_scan_y_or_fail:",
         }
@@ -1765,6 +1764,24 @@ class TestActcReuSourceCache(unittest.TestCase):
             assert match is not None
             self.assertIn("jsr source_reader_consume_scan_y", match.group("body"), msg=label)
             self.assertNotIn("jsr advance_scan_y", match.group("body"), msg=label)
+
+    def test_runtime_group_punctuation_uses_expected_char_helper(self) -> None:
+        actc_path = self.root / "src" / "tools_udos" / "actc" / "actc.asm"
+        actc_text = actc_path.read_text(encoding="ascii")
+        match = re.search(
+            r"emit_runtime_group_value_term_from_scan_y_or_fail:\n(?P<body>.*?)\n"
+            r"emit_runtime_call_term_from_scan_y_or_fail:",
+            actc_text,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(match)
+        assert match is not None
+        body = match.group("body")
+        self.assertIn("lda #'('", body)
+        self.assertIn("lda #')'", body)
+        self.assertIn("jsr source_reader_consume_char_from_scan_y", body)
+        self.assertNotIn("jsr source_reader_consume_scan_y", body)
+        self.assertNotIn("jsr advance_scan_y", body)
 
     def test_preallocate_call_arg_punctuation_uses_expected_char_helper(self) -> None:
         actc_path = self.root / "src" / "tools_udos" / "actc" / "actc.asm"

@@ -5139,18 +5139,14 @@ emit_runtime_term_push_word_literal_decimal:
 
 emit_runtime_group_value_term_from_scan_y_or_fail:
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #'('
-    bne emit_runtime_group_value_term_from_scan_y_or_fail_fail
-    jsr source_reader_consume_scan_y
+    lda #'('
+    jsr source_reader_consume_char_from_scan_y
     bcs emit_runtime_group_value_term_from_scan_y_or_fail_fail
     jsr emit_runtime_value_from_scan_y_or_fail
     bcs emit_runtime_group_value_term_from_scan_y_or_fail_fail
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #')'
-    bne emit_runtime_group_value_term_from_scan_y_or_fail_fail
-    jsr source_reader_consume_scan_y
+    lda #')'
+    jsr source_reader_consume_char_from_scan_y
     bcs emit_runtime_group_value_term_from_scan_y_or_fail_fail
     rts
 emit_runtime_group_value_term_from_scan_y_or_fail_fail:
