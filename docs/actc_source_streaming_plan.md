@@ -139,6 +139,8 @@ Resident preallocation conversion/operator `)` delimiters also use the exact
 helper rather than open-coded peek/cmp/consume sequences.
 Preallocation REAL unary print close parens and binary assignment/print
 operators also use the helper after the matched byte is selected.
+Preallocation condition comparison operators and boolean primary grouping now
+use the helper for matched `=`, `<`, `>`, `<>`, `<=`, `>=`, `(`, and `)` bytes.
 Signed word prefix preallocation now uses the exact helper for the literal `0`
 and `-` tokens.
 Runtime grouped value term `(` and `)` delimiters now use the same exact helper,

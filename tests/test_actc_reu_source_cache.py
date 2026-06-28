@@ -2258,6 +2258,39 @@ class TestActcReuSourceCache(unittest.TestCase):
             self.assertNotIn("jsr source_reader_consume_scan_y", body, msg=label)
             self.assertNotIn("jsr advance_scan_y", body, msg=label)
 
+    def test_preallocate_condition_operators_use_expected_char_helper(self) -> None:
+        actc_path = self.root / "src" / "tools_udos" / "actc" / "actc.asm"
+        actc_text = actc_path.read_text(encoding="ascii")
+        exact_ranges = {
+            "preallocate_real_condition_cmp_external_from_scan_y": (
+                "preallocate_declared_symbol_is_return_statement:",
+                ["lda #'='", "lda #'<'", "lda #'>'"],
+            ),
+            "preallocate_call_bool_primary_external_from_scan_y": (
+                "preallocate_consume_comparison_operator_at_scan_y:",
+                ["lda #'('", "lda #')'"],
+            ),
+            "preallocate_consume_comparison_operator_at_scan_y": (
+                "preallocate_save_declared_module_name:",
+                ["lda #'='", "lda #'<'", "lda #'>'"],
+            ),
+        }
+
+        for label, (next_label, expected_lines) in exact_ranges.items():
+            match = re.search(
+                rf"{label}:\n(?P<body>.*?)\n{re.escape(next_label)}",
+                actc_text,
+                re.DOTALL,
+            )
+            self.assertIsNotNone(match, msg=label)
+            assert match is not None
+            body = match.group("body")
+            for expected in expected_lines:
+                self.assertIn(expected, body, msg=label)
+            self.assertIn("jsr source_reader_consume_char_from_scan_y", body, msg=label)
+            self.assertNotIn("jsr source_reader_consume_scan_y", body, msg=label)
+            self.assertNotIn("jsr advance_scan_y", body, msg=label)
+
     def test_preallocate_signed_word_prefix_uses_expected_char_helper(self) -> None:
         actc_path = self.root / "src" / "tools_udos" / "actc" / "actc.asm"
         actc_text = actc_path.read_text(encoding="ascii")

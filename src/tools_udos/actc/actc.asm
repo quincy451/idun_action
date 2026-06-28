@@ -2654,11 +2654,13 @@ preallocate_real_condition_cmp_external_from_scan_y:
     beq preallocate_real_condition_cmp_external_consume_gt
     jmp preallocate_real_condition_cmp_external_miss
 preallocate_real_condition_cmp_external_consume_single:
-    jsr source_reader_consume_scan_y
+    lda #'='
+    jsr source_reader_consume_char_from_scan_y
     bcs preallocate_real_condition_cmp_external_miss
     jmp preallocate_real_condition_cmp_external_rhs
 preallocate_real_condition_cmp_external_consume_lt:
-    jsr source_reader_consume_scan_y
+    lda #'<'
+    jsr source_reader_consume_char_from_scan_y
     bcs preallocate_real_condition_cmp_external_miss
     jsr source_reader_peek_scan_y
     cmp #'>'
@@ -2667,13 +2669,14 @@ preallocate_real_condition_cmp_external_consume_lt:
     beq preallocate_real_condition_cmp_external_consume_second
     jmp preallocate_real_condition_cmp_external_rhs
 preallocate_real_condition_cmp_external_consume_gt:
-    jsr source_reader_consume_scan_y
+    lda #'>'
+    jsr source_reader_consume_char_from_scan_y
     bcs preallocate_real_condition_cmp_external_miss
     jsr source_reader_peek_scan_y
     cmp #'='
     bne preallocate_real_condition_cmp_external_rhs
 preallocate_real_condition_cmp_external_consume_second:
-    jsr source_reader_consume_scan_y
+    jsr source_reader_consume_char_from_scan_y
     bcs preallocate_real_condition_cmp_external_miss
 preallocate_real_condition_cmp_external_rhs:
     jsr skip_inline_spaces_at_scan_y
@@ -2823,7 +2826,8 @@ preallocate_call_bool_primary_external_from_scan_y:
     ldy preallocate_bool_primary_start_y_data
     jmp preallocate_call_with_arg_externals_from_scan_y
 preallocate_call_bool_primary_external_group:
-    jsr source_reader_consume_scan_y
+    lda #'('
+    jsr source_reader_consume_char_from_scan_y
     bcs preallocate_call_bool_primary_external_fail
     jsr preallocate_call_bool_or_external_from_scan_y
     bcs preallocate_call_bool_primary_external_fail
@@ -2831,7 +2835,8 @@ preallocate_call_bool_primary_external_group:
     jsr source_reader_peek_scan_y
     cmp #')'
     bne preallocate_call_bool_primary_external_fail
-    jsr source_reader_consume_scan_y
+    lda #')'
+    jsr source_reader_consume_char_from_scan_y
     bcs preallocate_call_bool_primary_external_fail
 preallocate_call_bool_primary_external_done:
     clc
@@ -2852,12 +2857,14 @@ preallocate_consume_comparison_operator_at_scan_y:
     sec
     rts
 preallocate_consume_comparison_operator_single:
-    jsr source_reader_consume_scan_y
+    lda #'='
+    jsr source_reader_consume_char_from_scan_y
     bcs preallocate_consume_comparison_operator_fail
     clc
     rts
 preallocate_consume_comparison_operator_lt:
-    jsr source_reader_consume_scan_y
+    lda #'<'
+    jsr source_reader_consume_char_from_scan_y
     bcs preallocate_consume_comparison_operator_fail
     jsr source_reader_peek_scan_y
     cmp #'>'
@@ -2867,13 +2874,14 @@ preallocate_consume_comparison_operator_lt:
     clc
     rts
 preallocate_consume_comparison_operator_gt:
-    jsr source_reader_consume_scan_y
+    lda #'>'
+    jsr source_reader_consume_char_from_scan_y
     bcs preallocate_consume_comparison_operator_fail
     jsr source_reader_peek_scan_y
     cmp #'='
     bne preallocate_consume_comparison_operator_done
 preallocate_consume_comparison_operator_second:
-    jsr source_reader_consume_scan_y
+    jsr source_reader_consume_char_from_scan_y
     bcs preallocate_consume_comparison_operator_fail
 preallocate_consume_comparison_operator_done:
     clc
