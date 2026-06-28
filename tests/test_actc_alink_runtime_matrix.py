@@ -383,6 +383,23 @@ class TestActcAlinkRuntimeMatrix(unittest.TestCase):
             self.assertIn(module_name, staged_modules)
             self.assertIn(f"LIB/{module_name.upper()}.OBJ", case["unexpected_alink_loads"])
 
+    def test_object_code_graph_matrix_covers_lettered_library_dependency_helper(self) -> None:
+        sys.path.insert(0, str(self.workspace / "udos" / "tools"))
+        import run_action_alink_prg_probe as probe
+
+        shape = "object_code_library_dependency_lettered_import_library_helper"
+        graph_shapes = self._makefile_shape_group(
+            self.make_text,
+            "ACTION_ALINK_PRG_OBJECT_CODE_GRAPH_SHAPES",
+        )
+        case = probe.DIRECT_PRG_CASES[shape]
+
+        self.assertIn(shape, graph_shapes)
+        self.assertEqual(case["expected_alink_loads"], ["LIB/A.OBJ", "LIB/HELPER.OBJ"])
+        self.assertNotIn("extra_objects", case)
+        for dummy_name in ("D0", "D9"):
+            self.assertIn(f"LIB/{dummy_name}.OBJ", case["unexpected_alink_loads"])
+
     def test_runtime_matrix_targets_wrap_each_shape_with_timeout_and_retry(self) -> None:
         aggregate_targets = self._makefile_target_submakes(
             self.make_text,
