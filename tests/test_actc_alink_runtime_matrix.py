@@ -64,6 +64,32 @@ class TestActcAlinkRuntimeMatrix(unittest.TestCase):
             ),
         )
 
+    def test_all_alink_object_code_probe_shapes_are_listed_in_makefile_matrices(self) -> None:
+        sys.path.insert(0, str(self.workspace / "udos" / "tools"))
+        import run_action_alink_prg_probe as probe
+
+        probe_shapes = {shape for shape in probe.DIRECT_PRG_CASES if shape.startswith("object_code_")}
+        matrix_shapes = set().union(
+            self._makefile_shape_group(
+                self.make_text,
+                "ACTION_ALINK_PRG_OBJECT_CODE_GRAPH_SHAPES",
+            ),
+            self._makefile_shape_group(
+                self.make_text,
+                "ACTION_ALINK_PRG_OBJECT_CODE_CORE_SHAPES",
+            ),
+            self._makefile_shape_group(
+                self.make_text,
+                "ACTION_ALINK_PRG_OBJECT_CODE_REJECTION_CASES",
+            ),
+        )
+
+        missing = sorted(probe_shapes - matrix_shapes)
+        stale = sorted(matrix_shapes - probe_shapes)
+
+        self.assertFalse(missing, "ALINK object-code probe shapes missing from Makefile matrices: " + ", ".join(missing))
+        self.assertFalse(stale, "Makefile object-code matrices reference missing probe cases: " + ", ".join(stale))
+
     def test_actc_object_emission_launch_matrix_covers_focused_source_shapes(self) -> None:
         sys.path.insert(0, str(self.workspace / "udos" / "tools"))
         import run_action_alink_prg_probe as probe
