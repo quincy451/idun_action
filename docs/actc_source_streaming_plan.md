@@ -137,6 +137,8 @@ Declared real/word assignment `=` preallocation uses the same helper so the
 delimiter consume remains bound to the SourceReader boundary.
 Resident preallocation conversion/operator `)` delimiters also use the exact
 helper rather than open-coded peek/cmp/consume sequences.
+Preallocation REAL unary print close parens and binary assignment/print
+operators also use the helper after the matched byte is selected.
 Signed word prefix preallocation now uses the exact helper for the literal `0`
 and `-` tokens.
 Runtime grouped value term `(` and `)` delimiters now use the same exact helper,

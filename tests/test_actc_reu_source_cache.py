@@ -2211,6 +2211,9 @@ class TestActcReuSourceCache(unittest.TestCase):
             "preallocate_real_unary_operator_assignment_external_from_scan_y": (
                 "preallocate_real_unary_operator_assignment_external_miss:",
             ),
+            "preallocate_real_unary_print_external_from_scan_y": (
+                "preallocate_real_unary_print_external_miss_restore:",
+            ),
         }
 
         for label, (next_label,) in close_paren_ranges.items():
@@ -2223,6 +2226,34 @@ class TestActcReuSourceCache(unittest.TestCase):
             assert match is not None
             body = match.group("body")
             self.assertIn("lda #')'", body, msg=label)
+            self.assertIn("jsr source_reader_consume_char_from_scan_y", body, msg=label)
+            self.assertNotIn("jsr source_reader_consume_scan_y", body, msg=label)
+            self.assertNotIn("jsr advance_scan_y", body, msg=label)
+
+    def test_preallocate_real_binary_operators_use_expected_char_helper(self) -> None:
+        actc_path = self.root / "src" / "tools_udos" / "actc" / "actc.asm"
+        actc_text = actc_path.read_text(encoding="ascii")
+        operator_ranges = {
+            "preallocate_real_binary_operator_assignment_external_from_scan_y": (
+                "preallocate_real_binary_operator_assignment_external_miss:",
+            ),
+            "preallocate_real_binary_print_external_from_scan_y": (
+                "preallocate_real_binary_print_external_miss_restore:",
+            ),
+        }
+
+        for label, (next_label,) in operator_ranges.items():
+            match = re.search(
+                rf"{label}:\n(?P<body>.*?)\n{re.escape(next_label)}",
+                actc_text,
+                re.DOTALL,
+            )
+            self.assertIsNotNone(match, msg=label)
+            assert match is not None
+            body = match.group("body")
+            for expected in ("cmp #'+'", "cmp #'-'", "cmp #'*'", "cmp #'/'"):
+                self.assertIn(expected, body, msg=label)
+            self.assertIn("sta real_operator_data", body, msg=label)
             self.assertIn("jsr source_reader_consume_char_from_scan_y", body, msg=label)
             self.assertNotIn("jsr source_reader_consume_scan_y", body, msg=label)
             self.assertNotIn("jsr advance_scan_y", body, msg=label)

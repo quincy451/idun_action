@@ -2475,7 +2475,8 @@ preallocate_real_unary_print_external_parse:
     jsr source_reader_peek_scan_y
     cmp #')'
     bne preallocate_real_unary_print_external_miss_restore
-    jsr source_reader_consume_scan_y
+    lda #')'
+    jsr source_reader_consume_char_from_scan_y
     bcs preallocate_real_unary_print_external_miss_restore
     lda real_operator_data
     jsr find_or_store_real_operator_external_from_a
@@ -2531,7 +2532,7 @@ preallocate_real_binary_operator_assignment_external_from_scan_y:
     bne preallocate_real_binary_operator_assignment_external_miss
 preallocate_real_binary_operator_assignment_external_operator:
     sta real_operator_data
-    jsr source_reader_consume_scan_y
+    jsr source_reader_consume_char_from_scan_y
     bcs preallocate_real_binary_operator_assignment_external_miss
     jsr skip_inline_spaces_at_scan_y
     jsr find_var_index_from_scan_y
@@ -2568,7 +2569,7 @@ preallocate_real_binary_print_external_from_scan_y:
     bne preallocate_real_binary_print_external_miss_restore
 preallocate_real_binary_print_external_operator:
     sta real_operator_data
-    jsr source_reader_consume_scan_y
+    jsr source_reader_consume_char_from_scan_y
     bcs preallocate_real_binary_print_external_miss_restore
     jsr skip_inline_spaces_at_scan_y
     jsr find_var_index_from_scan_y
