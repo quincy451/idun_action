@@ -6959,10 +6959,12 @@ emit_runtime_condition_clause_compare_entry:
 emit_runtime_condition_clause_eq:
     lda #'q'
     sta expr_runtime_op
-    jsr source_reader_consume_scan_y
+    lda #'='
+    jsr source_reader_consume_char_from_scan_y
     jmp emit_runtime_condition_clause_rhs
 emit_runtime_condition_clause_lt_entry:
-    jsr source_reader_consume_scan_y
+    lda #'<'
+    jsr source_reader_consume_char_from_scan_y
     jsr source_reader_peek_scan_y
     cmp #'>'
     beq emit_runtime_condition_clause_ne
@@ -6972,7 +6974,8 @@ emit_runtime_condition_clause_lt_entry:
     sta expr_runtime_op
     jmp emit_runtime_condition_clause_rhs
 emit_runtime_condition_clause_gt_entry:
-    jsr source_reader_consume_scan_y
+    lda #'>'
+    jsr source_reader_consume_char_from_scan_y
     jsr source_reader_peek_scan_y
     cmp #'='
     beq emit_runtime_condition_clause_ge
@@ -6984,19 +6987,22 @@ emit_runtime_condition_clause_le:
     sta expr_runtime_op
     lda #$01
     sta expr_runtime_post_zero
-    jsr source_reader_consume_scan_y
+    lda #'='
+    jsr source_reader_consume_char_from_scan_y
     jmp emit_runtime_condition_clause_rhs
 emit_runtime_condition_clause_ge:
     lda #'l'
     sta expr_runtime_op
     lda #$01
     sta expr_runtime_post_zero
-    jsr source_reader_consume_scan_y
+    lda #'='
+    jsr source_reader_consume_char_from_scan_y
     jmp emit_runtime_condition_clause_rhs
 emit_runtime_condition_clause_ne:
     lda #'n'
     sta expr_runtime_op
-    jsr source_reader_consume_scan_y
+    lda #'>'
+    jsr source_reader_consume_char_from_scan_y
 emit_runtime_condition_clause_rhs:
     jsr emit_runtime_sum_from_scan_y_or_fail
     bcc :+

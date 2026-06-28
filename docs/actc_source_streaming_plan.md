@@ -171,6 +171,8 @@ Runtime explicit `REAL(...)` value parsing uses the helper for close parens and
 the signed `0-` prefix bytes.
 Runtime REAL condition comparison operators `=`, `<`, `>`, `<>`, `<=`, and
 `>=` use the expected-character helper for each matched byte.
+Runtime integer condition comparison operators use the same helper for their
+matched `=`, `<`, `>`, `<>`, `<=`, and `>=` bytes.
 Parser-side symbol helpers now store and terminate token bytes through
 SourceReader token helpers rather than writing the token buffer directly, and
 resident streaming symbol-copy plus module-header copy loops now share one
