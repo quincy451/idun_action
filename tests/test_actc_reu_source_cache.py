@@ -610,6 +610,24 @@ class TestActcReuSourceCache(unittest.TestCase):
         self.assertIn("reader_token_buffer", publish_body)
         self.assertIn("sta (export_ptr),y", publish_body)
 
+    def test_proc_param_punctuation_uses_expected_char_helper(self) -> None:
+        actc_path = self.root / "src" / "tools_udos" / "actc" / "actc.asm"
+        actc_text = actc_path.read_text(encoding="ascii")
+        match = re.search(
+            r"store_proc_params_from_scan_y_for_current_export_or_fail:\n(?P<body>.*?)\n"
+            r"\.endif\n\nset_export_ptr_from_x:",
+            actc_text,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(match)
+        assert match is not None
+        body = match.group("body")
+        for expected in ("lda #'('", "lda #','"):
+            self.assertIn(expected, body)
+        self.assertIn("jsr source_reader_consume_char_from_scan_y", body)
+        self.assertNotIn("jsr source_reader_consume_scan_y", body)
+        self.assertNotIn("jsr advance_scan_y", body)
+
     def test_symbol_token_classification_uses_source_reader_helpers(self) -> None:
         actc_path = self.root / "src" / "tools_udos" / "actc" / "actc.asm"
         actc_text = actc_path.read_text(encoding="ascii")

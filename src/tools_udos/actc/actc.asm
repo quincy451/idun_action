@@ -8809,7 +8809,8 @@ store_proc_params_from_scan_y_for_current_export_or_fail:
     beq :+
     clc
     rts
-:   jsr source_reader_consume_scan_y
+:   lda #'('
+    jsr source_reader_consume_char_from_scan_y
     bcc :+
     jmp store_proc_export_from_scan_ptr_or_fail_bad
 :
@@ -8889,7 +8890,8 @@ store_proc_params_from_scan_y_for_current_export_copy_done:
     beq store_proc_params_from_scan_y_for_current_export_done
     jmp store_proc_export_from_scan_ptr_or_fail_bad
 store_proc_params_from_scan_y_for_current_export_next:
-    jsr source_reader_consume_scan_y
+    lda #','
+    jsr source_reader_consume_char_from_scan_y
     bcc :+
     jmp store_proc_export_from_scan_ptr_or_fail_bad
 :
