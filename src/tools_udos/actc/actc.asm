@@ -7398,7 +7398,8 @@ parse_small_decimal_expr_lhs_ok:
     rts
 
 parse_small_decimal_expr_eq:
-    jsr source_reader_consume_scan_y
+    lda #'='
+    jsr source_reader_consume_char_from_scan_y
     jsr parse_small_decimal_sum_at_scan_y
     bcc parse_small_decimal_expr_eq_ok
     jmp parse_small_decimal_expr_at_scan_y_fail
@@ -7411,7 +7412,8 @@ parse_small_decimal_expr_eq_true:
     jmp parse_small_decimal_expr_true
 
 parse_small_decimal_expr_lt_entry:
-    jsr source_reader_consume_scan_y
+    lda #'<'
+    jsr source_reader_consume_char_from_scan_y
     jsr source_reader_peek_scan_y
     cmp #'='
     beq parse_small_decimal_expr_le
@@ -7429,7 +7431,8 @@ parse_small_decimal_expr_lt_true:
     jmp parse_small_decimal_expr_true
 
 parse_small_decimal_expr_gt_entry:
-    jsr source_reader_consume_scan_y
+    lda #'>'
+    jsr source_reader_consume_char_from_scan_y
     jsr source_reader_peek_scan_y
     cmp #'='
     beq parse_small_decimal_expr_ge
@@ -7448,7 +7451,8 @@ parse_small_decimal_expr_gt_false:
     jmp parse_small_decimal_expr_false
 
 parse_small_decimal_expr_le:
-    jsr source_reader_consume_scan_y
+    lda #'='
+    jsr source_reader_consume_char_from_scan_y
     jsr parse_small_decimal_sum_at_scan_y
     bcc parse_small_decimal_expr_le_ok
     jmp parse_small_decimal_expr_at_scan_y_fail
@@ -7462,7 +7466,8 @@ parse_small_decimal_expr_le_true:
     jmp parse_small_decimal_expr_true
 
 parse_small_decimal_expr_ge:
-    jsr source_reader_consume_scan_y
+    lda #'='
+    jsr source_reader_consume_char_from_scan_y
     jsr parse_small_decimal_sum_at_scan_y
     bcc parse_small_decimal_expr_ge_ok
     jmp parse_small_decimal_expr_at_scan_y_fail
@@ -7476,7 +7481,8 @@ parse_small_decimal_expr_ge_true:
     jmp parse_small_decimal_expr_true
 
 parse_small_decimal_expr_ne:
-    jsr source_reader_consume_scan_y
+    lda #'>'
+    jsr source_reader_consume_char_from_scan_y
     jsr parse_small_decimal_sum_at_scan_y
     bcc parse_small_decimal_expr_ne_ok
     jmp parse_small_decimal_expr_at_scan_y_fail
