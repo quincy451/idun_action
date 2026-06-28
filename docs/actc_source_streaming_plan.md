@@ -175,6 +175,8 @@ Runtime integer condition comparison operators use the same helper for their
 matched `=`, `<`, `>`, `<>`, `<=`, and `>=` bytes.
 Procedure export parameter-list open parens and comma separators also consume
 through the expected-character helper after the parser has matched them.
+Shared keyword-open parsing now consumes the matched `(` through the same helper
+after keyword-pattern matching succeeds.
 Parser-side symbol helpers now store and terminate token bytes through
 SourceReader token helpers rather than writing the token buffer directly, and
 resident streaming symbol-copy plus module-header copy loops now share one

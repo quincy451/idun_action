@@ -10602,7 +10602,8 @@ consume_keyword_open_from_scan_y_open:
     jsr source_reader_peek_scan_y
     cmp #'('
     bne consume_keyword_open_from_scan_y_fail
-    jsr source_reader_consume_scan_y
+    lda #'('
+    jsr source_reader_consume_char_from_scan_y
     bcs consume_keyword_open_from_scan_y_fail
     jsr skip_inline_spaces_at_scan_y
     ldx reader_saved_x_data

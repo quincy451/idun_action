@@ -193,7 +193,9 @@ class TestActcReuSourceCache(unittest.TestCase):
             elif label == "copy_symbol_from_scan_y":
                 self.assertIn("jsr source_reader_try_store_symbol_token_x_from_scan_y", body, msg=label)
             else:
-                self.assertIn("jsr source_reader_consume_scan_y", body, msg=label)
+                self.assertIn("lda #'('", body, msg=label)
+                self.assertIn("jsr source_reader_consume_char_from_scan_y", body, msg=label)
+                self.assertNotIn("jsr source_reader_consume_scan_y", body, msg=label)
             self.assertNotIn("jsr advance_scan_y", match.group("body"), msg=label)
 
     def test_keyword_pattern_char_matching_uses_source_reader_helper(self) -> None:
