@@ -146,6 +146,45 @@ class TestActcReuSourceCache(unittest.TestCase):
         self.assertIn("jsr source_reader_consume_scan_y", match.group("body"))
         self.assertNotIn("jsr advance_scan_y", match.group("body"))
 
+    def test_remaining_raw_scan_y_consumes_are_intentional(self) -> None:
+        actc_path = self.root / "src" / "tools_udos" / "actc" / "actc.asm"
+        allowed_prefixes = {
+            "preallocate_scan_plain_call_arg_for_externals",
+            "preallocate_skip_string_in_plain_call_arg",
+            "preallocate_scan_line_call_externals",
+            "preallocate_consume_flat_call_args_from_scan_y",
+            "scan_value_expr_for_top_level_arith_from_scan_y",
+            "scan_print_expr_for_bool_keywords_from_scan_y",
+            "scan_value_expr_for_bool_tokens_from_scan_y",
+            "parse_small_decimal_at_scan_y",
+            "parse_plain_word_decimal_at_scan_y",
+            "parse_positive_word_decimal_at_scan_y",
+            "skip_inline_spaces_at_scan_y",
+            "source_reader_try_store_symbol_token_x_from_scan_y",
+            "source_reader_consume_char_from_scan_y",
+            "source_reader_consume_uppercase_char_from_scan_y",
+            "source_reader_consume_pattern_char_from_scan_y",
+        }
+        current_label = ""
+        offenders: list[str] = []
+
+        for line_number, line in enumerate(actc_path.read_text(encoding="ascii").splitlines(), 1):
+            stripped = line.strip()
+            if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*:", stripped):
+                current_label = stripped[:-1]
+
+            allowed = any(
+                current_label == prefix or current_label.startswith(f"{prefix}_")
+                for prefix in allowed_prefixes
+            )
+            if stripped == "jsr source_reader_consume_scan_y" and not allowed:
+                offenders.append(
+                    f"{actc_path.relative_to(self.root)}:{line_number}: "
+                    f"{stripped} under {current_label}"
+                )
+
+        self.assertEqual(offenders, [])
+
     def test_line_skipping_consumes_through_source_reader(self) -> None:
         actc_path = self.root / "src" / "tools_udos" / "actc" / "actc.asm"
         actc_text = actc_path.read_text(encoding="ascii")

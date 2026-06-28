@@ -491,3 +491,6 @@ The next
 compiler-capacity breakthrough is the parser refactor described here: make the
 token-boundary safe `SourceReader` the parser's owner of token lookahead instead
 of a compatibility layer under legacy scan-pointer parser code.
+Remaining raw Scan-Y byte consumes in `ACTC` are now restricted by test to
+broad scanners, numeric parsers, whitespace/token helpers, and SourceReader
+helper internals.
