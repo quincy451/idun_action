@@ -204,7 +204,8 @@ class TestActcOverlay(unittest.TestCase):
             "    jsr source_reader_peek_scan_y\n"
             "    cmp #'('\n"
             "    bne preallocate_int_print_statement_call_external_miss_restore\n"
-            "    jsr source_reader_consume_scan_y\n"
+            "    lda #'('\n"
+            "    jsr source_reader_consume_char_from_scan_y\n"
             "    bcs preallocate_int_print_statement_call_external_miss_restore\n"
             "    jsr skip_inline_spaces_at_scan_y\n"
             "    jsr preallocate_scan_plain_call_arg_for_externals_from_scan_y",
