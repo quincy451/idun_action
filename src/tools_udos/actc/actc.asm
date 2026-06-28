@@ -6560,34 +6560,20 @@ emit_runtime_real_push_literal_from_saved_indexes:
 try_consume_real_open_for_runtime_condition_from_scan_y:
     sty symbol_start_y_data
     jsr save_source_reader_mark
-    jsr source_reader_peek_scan_y
-    jsr uppercase_ascii
-    cmp #'R'
-    bne try_consume_real_open_for_runtime_condition_from_scan_y_fail_restore
-    jsr source_reader_consume_scan_y
+    lda #'R'
+    jsr source_reader_consume_uppercase_char_from_scan_y
     bcs try_consume_real_open_for_runtime_condition_from_scan_y_fail_restore
-    jsr source_reader_peek_scan_y
-    jsr uppercase_ascii
-    cmp #'E'
-    bne try_consume_real_open_for_runtime_condition_from_scan_y_fail_restore
-    jsr source_reader_consume_scan_y
+    lda #'E'
+    jsr source_reader_consume_uppercase_char_from_scan_y
     bcs try_consume_real_open_for_runtime_condition_from_scan_y_fail_restore
-    jsr source_reader_peek_scan_y
-    jsr uppercase_ascii
-    cmp #'A'
-    bne try_consume_real_open_for_runtime_condition_from_scan_y_fail_restore
-    jsr source_reader_consume_scan_y
+    lda #'A'
+    jsr source_reader_consume_uppercase_char_from_scan_y
     bcs try_consume_real_open_for_runtime_condition_from_scan_y_fail_restore
-    jsr source_reader_peek_scan_y
-    jsr uppercase_ascii
-    cmp #'L'
-    bne try_consume_real_open_for_runtime_condition_from_scan_y_fail_restore
-    jsr source_reader_consume_scan_y
+    lda #'L'
+    jsr source_reader_consume_uppercase_char_from_scan_y
     bcs try_consume_real_open_for_runtime_condition_from_scan_y_fail_restore
-    jsr source_reader_peek_scan_y
-    cmp #'('
-    bne try_consume_real_open_for_runtime_condition_from_scan_y_fail_restore
-    jsr source_reader_consume_scan_y
+    lda #'('
+    jsr source_reader_consume_char_from_scan_y
     bcs try_consume_real_open_for_runtime_condition_from_scan_y_fail_restore
     jsr skip_inline_spaces_at_scan_y
     clc
