@@ -103,8 +103,9 @@ constants, arithmetic, `REAL`, `FABS`, `FSQRT`, infinity, and NaN with binary32
 nearest-even semantics and no target arithmetic imports. Native pass K also
 proves one finite two-REAL-parameter comparison/select function through OBJ1,
 generic ALINK closure, and live VICE. Native ACTC now lowers `FSign`, `FMin`,
-and `FMax` for named REAL operands and an exact `FClamp` ternary root through
-synchronized, independently selected target modules with complete MATH1
+and `FMax` for named REAL operands and a bounded, storage-capturing `FClamp`
+ternary root through synchronized, independently selected target modules with
+complete MATH1
 NaN/signed-zero/bound-order semantics. The finite
 function source remains a shared fixture and also compiles, links, and executes
 with Linux ACTC/ALINK. General native REAL expressions/functions, the rest of

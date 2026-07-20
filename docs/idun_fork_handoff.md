@@ -230,13 +230,19 @@ available to direct OBJ consumers and guarded by the manifest and standalone
 link tests.
 
 The following native `FClamp` slice adds the shared 199-byte
-`RT_F_CLAMP.OBJ`, the exact constrained native assignment/print root, an exact
+`RT_F_CLAMP.OBJ`, a bounded native assignment/print root, an exact
 three-input oracle, and a focused direct-PRG closure launch. Any NaN or inverted
 bounds produce canonical quiet NaN; valid bounds preserve the selected operand
 through `FMin(FMax(value,lower),upper)`. Idun's general portable MATH1 source
 remains unchanged, while generator, manifest, export, and standalone-link tests
 guard the synchronized module. This hardware-independent refresh has not been
-accepted on an attached cartridge/C64.
+accepted on an attached cartridge/C64. The follow-up native-only compiler
+widening captures all initializer, argument, destination, and print storage
+roles in that fixed root. Its permuted source-backed PRG prints 5.0 through
+generic ALINK closure. No Idun compiler or target-runtime change is required;
+Linux ACTC already compiles the general portable call. Current native
+inventories are 1,332 broad, 171 non-runtime source-backed, and 291
+compiled-runtime relocation-oracle cases.
 
 For a two-checkout release, run:
 

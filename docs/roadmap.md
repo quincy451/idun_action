@@ -1009,3 +1009,18 @@ Retired roadmap items for CP/M-era runner flows are no longer maintained.
   oracle cases. The remaining cross-product work is general native REAL
   lowering, 35 public MATH1 routines, and the later type/resource/workflow
   items in `docs/udos_feature_parity.md`.
+
+## 2026-07-20 Native MATH1 Clamp Storage Mapping
+
+- Native pass K now captures all three initializer destinations, three clamp
+  arguments, the result destination, and the printed value in its bounded
+  four-REAL root instead of assuming fixed `A/B/C/X` storage order.
+- Exact object checks and a source-backed direct VICE launch initialize slots
+  1/3/2, clamp slots 3/2/1 into slot 0, print slot 0, and produce 5.0 while
+  preserving generic reachable-only ALINK closure.
+- Current native inventories are 1,332 broad direct-PRG shapes, 171 non-runtime
+  source-backed object-emission shapes, and 291 compiled-runtime relocation
+  oracle cases. Native pass K is 4,359 bytes with 3,833 bytes free.
+- Idun requires no implementation change because Linux ACTC already supports
+  general portable `FClamp` calls. Shared runtime modules are unchanged; the
+  next parity dependency remains general native REAL lowering.
