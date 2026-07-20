@@ -973,7 +973,22 @@ Retired roadmap items for CP/M-era runner flows are no longer maintained.
 - Linux ACTC retains the general portable MATH1 implementation; it does not
   need to replace that source with compiler-specific selector lowering. Idun
   export and standalone-ALINK tests explicitly cover both synchronized modules.
-- Current native inventories are 1,329 broad direct-PRG shapes, 171
-  source-backed object-emission shapes, and 288 compiled-runtime relocation
+- Current native inventories are 1,330 broad direct-PRG shapes, 171
+  source-backed object-emission shapes, and 289 compiled-runtime relocation
   oracle cases. General native REAL expressions/calls/returns and the remaining
   dependency-sized MATH1 implementation remain the next cross-product work.
+
+## 2026-07-20 Shared MATH1 Sign Refresh
+
+- Synchronized native-authoritative `RT_F_SIGN.OBJ` into the Idun target module
+  set. The dependency-free helper is 123 bytes and remains independently
+  selected by generic ALINK closure.
+- Matched portable MATH1 behavior exactly: every NaN becomes canonical quiet
+  NaN, positive and negative zero retain their bits, and all other negative or
+  positive finite/infinite values become `-1.0` or `1.0`.
+- Native ACTC now lowers bounded named-REAL `FSign(A)` in assignment, print,
+  and condition positions. Its focused direct PRG proves sibling pruning, and
+  the exact host oracle passes 2,304 edge/random cases.
+- Idun keeps compiling the general portable `FSign` function body. The shared
+  module is available for direct OBJ consumers and is guarded by generator,
+  manifest, export, and standalone-link checks.

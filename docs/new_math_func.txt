@@ -9,9 +9,10 @@ Implementation status: complete in the Idun/Alpine fork. The source has 8
 public constants, 43 public routines, and 1 private helper. The resulting 51
 public help features are compiled and linked by the Linux ACTC/ALINK path and
 have generated-PRG VICE coverage. The native UDOS compiler currently exposes
-FAbs, FSqrt, FMin, FMax, PrintR, and PrintRE. Its FMin/FMax selector semantics
-match this source, while general REAL source lowering and the remaining library
-work are tracked in docs/udos_feature_parity.md.
+FAbs, FSqrt, FSign, FMin, FMax, PrintR, and PrintRE. Its dependency-free FSign
+helper and FMin/FMax selector semantics match this source, while general REAL
+source lowering and the remaining library work are tracked in
+docs/udos_feature_parity.md.
 
 The constants and routines below are public after INCLUDE "MATH1".  The
 transcendental routines are portable Action implementations over the binary32

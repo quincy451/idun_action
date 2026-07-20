@@ -121,11 +121,13 @@ RAM-backed `/tmp`, and executable replacement is atomic.
   invoking the resident evaluator through overlay ABI v5.
 - `REAL` now uses full-domain IEEE-754 binary32 helpers for signed arithmetic,
   gradual underflow, infinities, NaNs, ordered comparison, integer conversion,
-  correctly rounded square root, exact minimum/maximum selection, and exact
+  correctly rounded square root, exact sign/minimum/maximum selection, and exact
   decimal output. ACTC recognizes `INF`/`INFINITY` and `NAN` and folds every
   operation at binary32 precision. The synchronized `RT_F_MIN.OBJ` and
   `RT_F_MAX.OBJ` helpers preserve MATH1's one-NaN, two-NaN, equal-value, and
-  signed-zero selection policy for native direct-link consumers.
+  signed-zero selection policy for native direct-link consumers. The
+  dependency-free `RT_F_SIGN.OBJ` canonicalizes NaN, preserves signed zero, and
+  returns signed one without selecting sibling math helpers.
 - MATH1 supplies the completed portable utility, exponential/logarithmic,
   trigonometric, inverse, hyperbolic, and conversion families. GFX1 supplies
   tracked VIC setup, pixels, shapes, bitmap-resource operations, and staged
@@ -205,14 +207,21 @@ The 2026-07-20 shared selector refresh adds byte-identical 77-byte
 recognizes their bounded source forms, while Linux ACTC continues to compile
 the general portable MATH1 bodies. Exact 2,304-pair host checks, focused native
 VICE launches, the 32-shape native MATH1 source matrix, and its eight full-range
-helper probes pass. The broad native link inventory is 1,329 shapes and its
-compiled-runtime object/relocation oracle covers 288 cases. The shared manifest
+helper probes pass. The broad native link inventory is 1,330 shapes and its
+compiled-runtime object/relocation oracle covers 289 cases. The shared manifest
 and Idun export/standalone-link tests guard this snapshot. The current Idun
 host suite passes 151 tests, the sanitizer suite passes 136, and the 21-test
 direct-PRG gate passes with only the documented VICE 3.7 DBF/REU skip. Both
 host and static Alpine/AArch64 exports verify 31 commands and 260 help topics.
 This refresh is hardware-independent and has not yet been redeployed to the Pi;
 attached cartridge/C64 acceptance remains a release gate.
+
+The subsequent native `FSign` slice adds the shared 123-byte
+`RT_F_SIGN.OBJ`, native named-REAL assignment/print/condition lowering, 2,304
+exact edge/random oracle cases, and a direct-PRG sibling-pruning launch. Idun's
+general portable MATH1 source remains unchanged; the synchronized module is
+available to direct OBJ consumers and guarded by the manifest and standalone
+link tests.
 
 For a two-checkout release, run:
 

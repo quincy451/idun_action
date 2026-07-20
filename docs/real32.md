@@ -26,7 +26,7 @@ The limits that remain are the intrinsic binary32 limits:
 
 Source forms include decimal and exponent literals, `INF`/`INFINITY`, `NAN`,
 `+`, `-`, `*`, `/`, comparisons, `REAL(integer)`, `INT(real)`, `FAbs`,
-`FSqrt`, `FMin`, `FMax`, `PrintR`, and `PrintRE`.
+`FSqrt`, `FSign`, `FMin`, `FMax`, `PrintR`, and `PrintRE`.
 
 Rules:
 
@@ -39,6 +39,8 @@ Rules:
 - `0.0/0.0`, `INF-INF`, `0.0*INF`, and square root of a negative nonzero value
   produce NaN
 - `FSqrt(-0.0)` preserves negative zero
+- `FSign` returns canonical NaN for NaN, preserves either signed zero, and
+  returns `-1.0` or `1.0` for every other negative or positive value
 - ordered comparisons with NaN are false; `NAN<>value` is true, including
   `NAN<>NAN`
 - positive and negative zero compare equal
@@ -63,6 +65,7 @@ ALINK resolves the following standalone helper symbols:
 - `rt_f_mul`
 - `rt_f_div`
 - `rt_f_cmp`
+- `rt_f_sign`
 - `rt_f_min`
 - `rt_f_max`
 - `rt_f_abs`
@@ -86,6 +89,9 @@ Specific return conventions are:
 
 - `rt_f_cmp` returns `-1`, `0`, or `1` in `A`/`X`, and returns `2` for unordered
   NaN comparisons
+- `rt_f_sign` writes canonical quiet NaN for NaN input, copies signed zero
+  exactly, and writes signed one for every other finite or infinite input; it
+  has no imported helper dependency
 - `rt_f_min` and `rt_f_max` write through `$06/$07`, ignore one NaN, select the
   right operand when both inputs are NaN, and preserve the left operand's exact
   bits when ordered values compare equal; both import `rt_f_cmp`
@@ -127,7 +133,9 @@ source:
 - comparisons import `rt_f_cmp`
 - `REAL(x)` imports the matching signed or unsigned integer bridge
 - `INT(r)` imports `rt_f_to_i`
-- `FAbs(r)` and `FSqrt(r)` import their respective unary helpers
+- `FAbs(r)`, `FSqrt(r)`, and direct `FSign(r)` runtime imports use only their
+  respective unary helpers; the portable MATH1 body may instead compile into
+  ordinary reachable code
 - `FMin(a,b)` and `FMax(a,b)` import only the selected helper plus its comparison
   closure
 - `PrintR` and `PrintRE` import `rt_print_f`
@@ -143,7 +151,8 @@ the generated compact OBJ1 core. `tools/generate_real_runtime.py --check`
 remains a compatibility entry point and delegates to that generator plus the
 shared 6502 manifest check. The native manifest verifies that all checked-in OBJ1
 modules match their reviewed generator. Headless VICE tests execute raw binary32
-edge vectors and deterministic random vectors for arithmetic, minimum/maximum,
-square root, comparison, conversion, signed zero, subnormal, infinity, NaN, and
-ties-to-even behavior. A separate target test compares exact printed decimals at both finite
-extremes and across normal, subnormal, signed-zero, and special values.
+edge vectors and deterministic random vectors for arithmetic, sign,
+minimum/maximum, square root, comparison, conversion, signed zero, subnormal,
+infinity, NaN, and ties-to-even behavior. A separate target test compares exact
+printed decimals at both finite extremes and across normal, subnormal,
+signed-zero, and special values.
