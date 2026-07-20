@@ -26,7 +26,7 @@ The limits that remain are the intrinsic binary32 limits:
 
 Source forms include decimal and exponent literals, `INF`/`INFINITY`, `NAN`,
 `+`, `-`, `*`, `/`, comparisons, `REAL(integer)`, `INT(real)`, `FAbs`,
-`FSqrt`, `FSign`, `FTrunc`, `FMin`, `FMax`, `FClamp`, `PrintR`, and `PrintRE`.
+`FSqrt`, `FSign`, `FTrunc`, `FFloor`, `FMin`, `FMax`, `FClamp`, `PrintR`, and `PrintRE`.
 
 Rules:
 
@@ -43,6 +43,8 @@ Rules:
   returns `-1.0` or `1.0` for every other negative or positive value
 - `FTrunc` truncates finite values toward zero, preserves signed zero,
   infinities, NaN payloads, and values that are already integral
+- `FFloor` rounds finite nonintegers toward negative infinity and preserves
+  signed zero, infinities, NaN payloads, and integral values
 - `FClamp(value,lower,upper)` returns canonical quiet NaN if any argument is
   NaN or if `lower>upper`; otherwise it returns
   `FMin(FMax(value,lower),upper)` with selected operand bits preserved
@@ -150,6 +152,7 @@ source:
 - `FAbs(r)`, `FSqrt(r)`, direct `FSign(r)`, and `FTrunc(r)` runtime imports use
   only their respective unary helpers; portable MATH1 bodies may instead
   compile into ordinary reachable code where they remain source-defined
+- `FFloor(r)` imports `rt_f_floor` plus its transitive `rt_f_trunc` dependency
 - `FMin(a,b)` and `FMax(a,b)` import only the selected helper plus its comparison
   closure
 - direct `FClamp(value,lower,upper)` imports `rt_f_clamp` plus its

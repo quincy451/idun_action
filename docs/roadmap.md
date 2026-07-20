@@ -1090,3 +1090,20 @@ Retired roadmap items for CP/M-era runner flows are no longer maintained.
   pruning. Idun still emits all remaining implementation bodies from a MATH1
   include, and native UDOS still lacks 34 public MATH1 routines plus general
   REAL source lowering.
+
+## 2026-07-20 Shared MATH1 Floor
+
+- Added the 135-byte `RT_F_FLOOR.OBJ` to the shared manifest. It imports only
+  `RT_F_TRUNC.OBJ`, supports aliased source/destination pointers, preserves NaN
+  payloads, infinities, signed zero, and integral values, and rounds finite
+  nonintegers toward negative infinity.
+- Linux ACTC parses and constant-folds `FFloor`, emits `RT_F_FLOOR` for dynamic
+  expressions, and no longer compiles the portable MATH1 floor body. Native
+  ACTC recognizes assignment, direct-print, and REAL-condition forms.
+- Exact host checks and 116 Idun VICE vectors cover the complete binary32
+  domain. A focused native VICE PRG proves transitive `floor -> trunc` ALINK
+  closure and sibling pruning.
+- Current native inventories are 1,336 broad and 293 compiled-runtime cases;
+  pass 6 is 8,082 bytes with 110 bytes free. Idun still needs reachable-only
+  packaging for the remaining MATH1 bodies, and native UDOS lacks 33 public
+  routines plus general REAL source lowering.

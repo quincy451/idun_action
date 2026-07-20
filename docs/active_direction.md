@@ -123,7 +123,7 @@ Remaining product work:
    routine-address expressions with checked signed addends on either side. It
    also folds bounded `REAL CONST` expressions with exact decimal conversion
    and binary32 round-to-nearest, ties-to-even after every operation.
-   Native named-REAL `FSign`, `FTrunc`, `FMin`, and `FMax` calls plus its bounded
+   Native named-REAL `FSign`, `FTrunc`, `FFloor`, `FMin`, and `FMax` calls plus its bounded
    storage-capturing `FClamp` ternary root now use synchronized, independently
    selected target helpers with complete portable call semantics. The root can
    permute initializer, argument, destination, and print slots but remains a
@@ -134,8 +134,8 @@ Remaining product work:
    Pass A's bounded identity form now captures its named return independently
    and can return either REAL parameter; the reordered shared fixture executes
    identically in both products.
-   Linux ACTC now lowers `FTrunc` to the same dependency-free shared object
-   instead of embedding that MATH1 body. Remaining MATH1 source bodies still
+   Linux ACTC now lowers `FTrunc` and `FFloor` to the same shared objects
+   instead of embedding those MATH1 bodies. Remaining MATH1 source bodies still
    require reachable-only packaging. Linked external symbol expressions inside unchecked
    raw `[...]` bodies, general REAL/function
    behavior, full MATH1/GFX1, resources, and workflow parity remain explicit

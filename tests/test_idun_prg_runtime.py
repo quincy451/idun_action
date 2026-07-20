@@ -498,6 +498,7 @@ class TestIdunPrgRuntime(unittest.TestCase):
             "rt_f_add.obj",
             "rt_f_cmp.obj",
             "rt_f_div.obj",
+            "rt_f_floor.obj",
             "rt_f_mul.obj",
             "rt_f_sqrt.obj",
             "rt_f_sub.obj",
@@ -539,6 +540,7 @@ class TestIdunPrgRuntime(unittest.TestCase):
                 "INT intinput=$C032\n"
                 "BYTE done=$C034\n"
                 "REAL truncresult=$C035\n"
+                "REAL floorresult=$C039\n"
                 "PROC MAIN()\n"
                 "addresult=a+b\n"
                 "subresult=a-b\n"
@@ -550,6 +552,7 @@ class TestIdunPrgRuntime(unittest.TestCase):
                 "fromint=REAL(intinput)\n"
                 "intresult=INT(a)\n"
                 "truncresult=FTrunc(a)\n"
+                "floorresult=FFloor(a)\n"
                 "eqresult=0\n"
                 "neresult=0\n"
                 "ltresult=0\n"
@@ -657,7 +660,7 @@ class TestIdunPrgRuntime(unittest.TestCase):
                         right = float32_from_bits(right_bits)
                         card_input = (index * 997) & 0xFFFF
                         int_input = ((index * 613) & 0xFFFF) - 32768
-                        memory = bytearray(0x39)
+                        memory = bytearray(0x3D)
                         struct.pack_into("<II", memory, 0, left_bits, right_bits)
                         struct.pack_into("<Hh", memory, 0x30, card_input, int_input)
                         vice_context.load_prg(project / "BIN" / "MAIN.PRG")
@@ -673,7 +676,7 @@ class TestIdunPrgRuntime(unittest.TestCase):
                             1,
                             "generated IEEE runtime probe did not finish",
                         )
-                        output = vice_context.monitor.memory_get(0xC008, 0xC038)
+                        output = vice_context.monitor.memory_get(0xC008, 0xC03C)
                         actual_reals = [
                             struct.unpack_from("<I", output, offset)[0]
                             for offset in range(0, 32, 4)
@@ -734,6 +737,18 @@ class TestIdunPrgRuntime(unittest.TestCase):
                         self.assertEqual(
                             struct.unpack_from("<I", output, 0x2D)[0],
                             expected_trunc,
+                        )
+                        expected_floor = expected_trunc
+                        if (
+                            (left_bits & 0x80000000)
+                            and not binary32_is_nan(left_bits)
+                            and not math.isinf(left)
+                            and expected_trunc != left_bits
+                        ):
+                            expected_floor = float32_bits(float(math.floor(left)))
+                        self.assertEqual(
+                            struct.unpack_from("<I", output, 0x31)[0],
+                            expected_floor,
                         )
             finally:
                 vice_context.stop()

@@ -267,10 +267,21 @@ to both products. Native ACTC handles its bounded named-REAL assignment,
 direct-print, and condition positions. Linux ACTC now parses and constant-folds
 the intrinsic, emits `RT_F_TRUNC` for dynamic values, and no longer emits a
 portable FTrunc function body from MATH1. Exact host and Idun VICE vectors cover
-all binary32 exponent classes and deterministic random inputs. Current native
+all binary32 exponent classes and deterministic random inputs. At that checkpoint native
 inventories are 1,335 broad, 173 non-runtime source-backed, and 292
 compiled-runtime relocation-oracle cases. The other MATH1 implementation bodies
 still require call-graph pruning or dependency-sized object generation.
+
+The following shared `FFloor` slice adds a 135-byte OBJ1 module that imports
+only `RT_F_TRUNC.OBJ`. Linux ACTC parses, constant-folds, and emits the
+intrinsic, and MATH1 no longer emits its portable floor body. Native ACTC owns
+bounded assignment, direct-print, and REAL-condition forms. Exact host checks,
+116 Idun VICE vectors, and a focused native direct-PRG launch prove binary32
+semantics, aliased-pointer safety, transitive dependency closure, and sibling
+pruning. Current native inventories are 1,336 broad, 173 non-runtime
+source-backed, and 293 compiled-runtime relocation-oracle cases. The native
+MATH1 gap is 33 public routines; remaining Idun source bodies still need
+reachable-only packaging.
 
 For a two-checkout release, run:
 
