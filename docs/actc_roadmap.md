@@ -1,19 +1,15 @@
 # ACTC Roadmap
 
-Current target: widen `ACTC.PRG` object emission while keeping the direct
-`ACTC.PRG -> ALINK.PRG -> BIN/MAIN.PRG` path green under UDOS/VICE.
+The 6502-resident compiler conversion is complete for the documented Idun
+language surface. Linux `actc` owns parsing, semantic checks, native 6502
+lowering, object metadata, and source diagnostics.
 
-Near-term work:
+Further work is feature expansion rather than process porting:
 
-- keep source parsing and object emission deterministic
-- continue moving large source and lookup data toward REU-backed streaming
-- preserve object records needed by ALINK for dead-strip and helper selection
-- avoid adding launch-time runtime responsibilities to ACTC
-- keep focused UDOS VICE gates green after each compiler widening step
+- add deliberately specified Action source forms as tests and examples require
+- keep recursive frame size and C64 object/address limits explicit
+- preserve deterministic OBJ1 output and source/debug records
+- preserve the completed IEEE-754 REAL helpers and broaden REU helpers independently of the Linux compiler
 
-Proof gates:
-
-- `make -C ../udos vice-action-actc`
-- `make -C ../udos vice-action-actc-alink-launch`
-- `make -C ../udos vice-action-actc-alink-launch-runtime-matrices`
-- shape-specific launch gates such as the print/math direct PRG probes
+The active gates are `tests.test_linux_workspace_tools` and
+`tests.test_idun_prg_runtime`.

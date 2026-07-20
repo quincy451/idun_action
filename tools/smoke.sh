@@ -2,17 +2,12 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-
 cd "$ROOT_DIR"
 
-./tools/env_check.sh
+bash tools/env_check.sh --strict
+python3 tools/path_probe.py
+bash tools/build_linux_tools.sh
 python3 -m pytest -q
-python3 ./tools/build_release_image.py
+python3 tools/export_idun_workspace.py
 
-if command -v x64sc >/dev/null 2>&1; then
-  (cd "$ROOT_DIR/../udos" && make vice-release)
-else
-  echo "Skipping VICE verification: x64sc not found on PATH"
-fi
-
-echo "Smoke pass completed."
+echo "Idun/Linux smoke pass completed."

@@ -270,20 +270,16 @@ write_proc_local_var_decl_fail:
 
 parse_proc_params:
     jsr skip_inline_spaces
-    ldy #$00
-    jsr overlay_source_peek_scan_y
-    cmp #'('
-    beq parse_proc_params_open
+    lda #'('
+    jsr overlay_source_consume_expected_char
+    bcc parse_proc_params_open
     jsr require_line_end
     rts
 parse_proc_params_open:
-    jsr overlay_source_consume_scan_ptr
-    bcs parse_proc_params_fail
     jsr skip_inline_spaces
-    ldy #$00
-    jsr overlay_source_peek_scan_y
-    cmp #')'
-    bne parse_proc_params_loop
+    lda #')'
+    jsr overlay_source_match_expected_char
+    bcs parse_proc_params_loop
     clc
     rts
 parse_proc_params_loop:
@@ -317,44 +313,43 @@ parse_proc_params_loop:
     inc var_total_count
     inc proc_param_count_current
     jsr skip_inline_spaces
-    ldy #$00
-    jsr overlay_source_peek_scan_y
-    cmp #','
-    beq parse_proc_params_next
-    cmp #')'
-    beq parse_proc_params_done
+    lda #','
+    jsr overlay_source_match_expected_char
+    bcc parse_proc_params_next
+    lda #')'
+    jsr overlay_source_match_expected_char
+    bcc parse_proc_params_done
 parse_proc_params_fail:
     sec
     rts
 parse_proc_params_next:
-    jsr overlay_source_consume_scan_ptr
+    lda #','
+    jsr overlay_source_consume_expected_char
     bcs parse_proc_params_fail
     jsr skip_inline_spaces
     jmp parse_proc_params_loop
 parse_proc_params_done:
-    jsr overlay_source_consume_scan_ptr
+    lda #')'
+    jsr overlay_source_consume_expected_char
     bcs parse_proc_params_fail
     jsr require_line_end
     rts
 
 validate_decl_tail:
     jsr skip_inline_spaces
-    ldy #$00
-    jsr overlay_source_peek_scan_y
-    beq validate_decl_tail_ok
-    cmp #10
-    beq validate_decl_tail_ok
-    cmp #13
-    beq validate_decl_tail_ok
-    cmp #'='
-    beq validate_decl_tail_initializer
+    jsr overlay_source_match_line_end_from_scan_y
+    bcc validate_decl_tail_ok
+    lda #'='
+    jsr overlay_source_match_expected_char
+    bcc validate_decl_tail_initializer
     sec
     rts
 validate_decl_tail_initializer:
     lda decl_width_current
     cmp #$02
     bne validate_decl_tail_fail
-    jsr overlay_source_consume_scan_ptr
+    lda #'='
+    jsr overlay_source_consume_expected_char
     bcs validate_decl_tail_fail
     jsr skip_inline_spaces
     jsr validate_initializer_expr
@@ -368,15 +363,11 @@ validate_decl_tail_ok:
 
 validate_module_decl_tail:
     jsr skip_inline_spaces
-    ldy #$00
-    jsr overlay_source_peek_scan_y
-    beq validate_module_decl_tail_ok
-    cmp #10
-    beq validate_module_decl_tail_ok
-    cmp #13
-    beq validate_module_decl_tail_ok
-    cmp #'='
-    beq validate_module_decl_tail_initializer
+    jsr overlay_source_match_line_end_from_scan_y
+    bcc validate_module_decl_tail_ok
+    lda #'='
+    jsr overlay_source_match_expected_char
+    bcc validate_module_decl_tail_initializer
     sec
     rts
 validate_module_decl_tail_initializer:
@@ -388,7 +379,8 @@ validate_module_decl_tail_initializer:
     lda decl_type_current
     cmp #'r'
     bne validate_module_decl_tail_fail
-    jsr overlay_source_consume_scan_ptr
+    lda #'='
+    jsr overlay_source_consume_expected_char
     bcs validate_module_decl_tail_fail
     jsr skip_inline_spaces
     lda ACTC_OVERLAY_SCAN_ZP
@@ -401,7 +393,8 @@ validate_module_decl_tail_initializer:
     bcs validate_module_decl_tail_fail
     jmp validate_module_decl_tail_ok
 validate_module_decl_tail_initializer_word:
-    jsr overlay_source_consume_scan_ptr
+    lda #'='
+    jsr overlay_source_consume_expected_char
     bcs validate_module_decl_tail_fail
     jsr skip_inline_spaces
     lda ACTC_OVERLAY_SCAN_ZP
@@ -419,67 +412,48 @@ validate_module_decl_tail_fail:
     rts
 
 validate_initializer_expr:
-    ldy #$00
-    jsr overlay_source_peek_scan_y
-    bne :+
+    jsr overlay_source_match_line_end_from_scan_y
+    bcs :+
     jmp validate_initializer_expr_fail
 :
-    cmp #10
-    bne :+
-    jmp validate_initializer_expr_fail
-:
-    cmp #13
-    bne :+
-    jmp validate_initializer_expr_fail
-:
-    pha
     jsr init_capture_reset
-    pla
-    cmp #'['
-    beq validate_bracket_initializer_expr
+    lda #'['
+    jsr overlay_source_match_expected_char
+    bcc validate_bracket_initializer_expr
     jmp validate_line_initializer_expr
 
 validate_bracket_initializer_expr:
+    lda #'['
     jsr init_capture_char
-    jsr overlay_source_consume_scan_ptr
+    lda #'['
+    jsr overlay_source_consume_expected_char
     bcc :+
     jmp validate_initializer_expr_fail
 :
     jsr init_expr_state
 validate_bracket_initializer_expr_loop:
-    ldy #$00
-    jsr overlay_source_peek_scan_y
-    bne :+
+    jsr overlay_source_match_line_end_from_scan_y
+    bcs :+
     jmp validate_initializer_expr_fail
 :
-    cmp #10
-    bne :+
-    jmp validate_initializer_expr_fail
-:
-    cmp #13
-    bne :+
-    jmp validate_initializer_expr_fail
-:
-    cmp #']'
-    beq validate_bracket_initializer_expr_done
-    jsr init_capture_char
-    jsr validate_initializer_expr_char
-    bcc :+
-    jmp validate_initializer_expr_fail
-:
-    jsr overlay_source_consume_scan_ptr
+    lda #']'
+    jsr overlay_source_match_expected_char
+    bcc validate_bracket_initializer_expr_done
+    jsr overlay_source_consume_initializer_body_char
     bcc :+
     jmp validate_initializer_expr_fail
 :
     jmp validate_bracket_initializer_expr_loop
 validate_bracket_initializer_expr_done:
+    lda #']'
     jsr init_capture_char
     jsr init_capture_terminate
     jsr validate_initializer_expr_done
     bcc :+
     jmp validate_initializer_expr_fail
 :
-    jsr overlay_source_consume_scan_ptr
+    lda #']'
+    jsr overlay_source_consume_expected_char
     bcc :+
     jmp validate_initializer_expr_fail
 :
@@ -489,23 +463,14 @@ validate_bracket_initializer_expr_done:
 validate_line_initializer_expr:
     jsr init_expr_state
 validate_line_initializer_expr_loop:
-    ldy #$00
-    jsr overlay_source_peek_scan_y
-    beq validate_line_initializer_expr_done
-    cmp #10
-    beq validate_line_initializer_expr_done
-    cmp #13
-    beq validate_line_initializer_expr_done
-    cmp #']'
-    bne :+
+    jsr overlay_source_match_line_end_from_scan_y
+    bcc validate_line_initializer_expr_done
+    lda #']'
+    jsr overlay_source_match_expected_char
+    bcs :+
     jmp validate_initializer_expr_fail
 :
-    jsr init_capture_char
-    jsr validate_initializer_expr_char
-    bcc :+
-    jmp validate_initializer_expr_fail
-:
-    jsr overlay_source_consume_scan_ptr
+    jsr overlay_source_consume_initializer_body_char
     bcc :+
     jmp validate_initializer_expr_fail
 :
@@ -524,6 +489,18 @@ init_expr_state:
 overlay_symbol_body_char_valid:
     jsr uppercase_ascii
     jmp uppercase_symbol_body_valid
+
+overlay_source_consume_initializer_body_char:
+    ldy #$00
+    jsr overlay_source_peek_scan_y
+    jsr init_capture_char
+    jsr validate_initializer_expr_char
+    bcs overlay_source_consume_initializer_body_char_fail
+    jsr overlay_source_consume_scan_ptr
+    rts
+overlay_source_consume_initializer_body_char_fail:
+    sec
+    rts
 
 validate_initializer_expr_char:
     cmp #' '
@@ -832,7 +809,7 @@ init_value_parse_condition_work:
     jmp init_value_parse_condition_work_fail
 :
     lda init_parse_value
-    sta init_parse_left
+    pha
     jsr init_value_skip_spaces_work
     jsr init_value_peek_char_work
     cmp #'='
@@ -841,15 +818,17 @@ init_value_parse_condition_work:
     beq init_value_parse_condition_work_lt_entry
     cmp #'>'
     beq init_value_parse_condition_work_gt_entry
+    pla
+    sta init_parse_value
     clc
     rts
 init_value_parse_condition_work_eq:
     jsr init_value_advance_work
     jsr init_value_parse_expr_work
     bcc :+
-    jmp init_value_parse_condition_work_fail
+    jmp init_value_parse_condition_work_pop_fail
 :
-    lda init_parse_left
+    pla
     cmp init_parse_value
     bne :+
     jmp init_value_parse_condition_work_true
@@ -864,9 +843,9 @@ init_value_parse_condition_work_lt_entry:
     beq init_value_parse_condition_work_ne
     jsr init_value_parse_expr_work
     bcc :+
-    jmp init_value_parse_condition_work_fail
+    jmp init_value_parse_condition_work_pop_fail
 :
-    lda init_parse_left
+    pla
     cmp init_parse_value
     bcs :+
     jmp init_value_parse_condition_work_true
@@ -879,9 +858,9 @@ init_value_parse_condition_work_gt_entry:
     beq init_value_parse_condition_work_ge
     jsr init_value_parse_expr_work
     bcc :+
-    jmp init_value_parse_condition_work_fail
+    jmp init_value_parse_condition_work_pop_fail
 :
-    lda init_parse_left
+    pla
     cmp init_parse_value
     bne :+
     jmp init_value_parse_condition_work_false
@@ -893,9 +872,9 @@ init_value_parse_condition_work_le:
     jsr init_value_advance_work
     jsr init_value_parse_expr_work
     bcc :+
-    jmp init_value_parse_condition_work_fail
+    jmp init_value_parse_condition_work_pop_fail
 :
-    lda init_parse_left
+    pla
     cmp init_parse_value
     bcs :+
     jmp init_value_parse_condition_work_true
@@ -906,9 +885,9 @@ init_value_parse_condition_work_ge:
     jsr init_value_advance_work
     jsr init_value_parse_expr_work
     bcc :+
-    jmp init_value_parse_condition_work_fail
+    jmp init_value_parse_condition_work_pop_fail
 :
-    lda init_parse_left
+    pla
     cmp init_parse_value
     bcc :+
     jmp init_value_parse_condition_work_true
@@ -919,9 +898,9 @@ init_value_parse_condition_work_ne:
     jsr init_value_advance_work
     jsr init_value_parse_expr_work
     bcc :+
-    jmp init_value_parse_condition_work_fail
+    jmp init_value_parse_condition_work_pop_fail
 :
-    lda init_parse_left
+    pla
     cmp init_parse_value
     bne :+
     jmp init_value_parse_condition_work_false
@@ -937,6 +916,8 @@ init_value_parse_condition_work_false:
     sta init_parse_value
     clc
     rts
+init_value_parse_condition_work_pop_fail:
+    pla
 init_value_parse_condition_work_fail:
     sec
     rts
@@ -1090,11 +1071,14 @@ init_value_parse_builtin_constant_work:
     ldx #$00
 init_value_parse_builtin_constant_work_loop:
     lda init_builtin_constant_table,x
-    beq init_value_parse_builtin_constant_work_fail_restore
-    sta init_value_builtin_symbol_load+1
+    sta init_parse_tmp
     inx
     lda init_builtin_constant_table,x
     sta init_value_builtin_symbol_load+2
+    ora init_parse_tmp
+    beq init_value_parse_builtin_constant_work_fail_restore
+    lda init_parse_tmp
+    sta init_value_builtin_symbol_load+1
     inx
     lda init_builtin_constant_table,x
     sta init_parse_term
@@ -1358,13 +1342,8 @@ clear_decl_init_current:
 
 require_line_end:
     jsr skip_inline_spaces
-    ldy #$00
-    jsr overlay_source_peek_scan_y
-    beq require_line_end_ok
-    cmp #10
-    beq require_line_end_ok
-    cmp #13
-    beq require_line_end_ok
+    jsr overlay_source_match_line_end_from_scan_y
+    bcc require_line_end_ok
     sec
     rts
 require_line_end_ok:
@@ -1372,17 +1351,107 @@ require_line_end_ok:
     rts
 
 skip_inline_spaces:
-    ldy #$00
 skip_inline_spaces_loop:
+    jsr overlay_source_consume_inline_space_char
+    bcs skip_inline_spaces_done
+    jmp skip_inline_spaces_loop
+skip_inline_spaces_done:
+    rts
+
+overlay_source_match_line_end_from_scan_y:
+    ldy #$00
+    jsr overlay_source_peek_scan_y
+    beq overlay_source_match_line_end_from_scan_y_ok
+    cmp #10
+    beq overlay_source_match_line_end_from_scan_y_ok
+    cmp #13
+    beq overlay_source_match_line_end_from_scan_y_ok
+    sec
+    rts
+overlay_source_match_line_end_from_scan_y_ok:
+    clc
+    rts
+
+overlay_source_match_expected_char:
+    sta expected_char
+    ldy #$00
+    jsr overlay_source_peek_scan_y
+    cmp expected_char
+    beq overlay_source_match_expected_char_ok
+    sec
+    rts
+overlay_source_match_expected_char_ok:
+    clc
+    rts
+
+overlay_source_consume_expected_char:
+    jsr overlay_source_match_expected_char
+    bcs overlay_source_consume_expected_char_fail
+    jsr overlay_source_consume_scan_ptr
+    rts
+overlay_source_consume_expected_char_fail:
+    sec
+    rts
+
+overlay_source_consume_inline_space_char:
+    ldy #$00
     jsr overlay_source_peek_scan_y
     cmp #' '
-    beq skip_inline_spaces_advance
+    beq overlay_source_consume_inline_space_char_consume
     cmp #9
-    beq skip_inline_spaces_advance
+    beq overlay_source_consume_inline_space_char_consume
+    sec
     rts
-skip_inline_spaces_advance:
+overlay_source_consume_inline_space_char_consume:
     jsr overlay_source_consume_scan_ptr
-    jmp skip_inline_spaces_loop
+    rts
+
+overlay_source_consume_whitespace_char:
+    ldy #$00
+    jsr overlay_source_peek_scan_y
+    cmp #' '
+    beq overlay_source_consume_whitespace_char_consume
+    cmp #9
+    beq overlay_source_consume_whitespace_char_consume
+    cmp #10
+    beq overlay_source_consume_whitespace_char_consume
+    cmp #13
+    beq overlay_source_consume_whitespace_char_consume
+    sec
+    rts
+overlay_source_consume_whitespace_char_consume:
+    jsr overlay_source_consume_scan_ptr
+    rts
+
+overlay_source_consume_line_char:
+    jsr ensure_source_window_available
+    lda source_page_failed
+    bne overlay_source_consume_line_char_done
+    ldy #$00
+    jsr overlay_source_peek_scan_y
+    beq overlay_source_consume_line_char_done
+    cmp #10
+    beq overlay_source_consume_line_char_eol
+    cmp #13
+    beq overlay_source_consume_line_char_eol
+    jsr overlay_source_consume_scan_ptr
+    bcs overlay_source_consume_line_char_done
+    clc
+    rts
+overlay_source_consume_line_char_eol:
+    jsr overlay_source_consume_scan_ptr
+    bcs overlay_source_consume_line_char_done
+    jsr ensure_source_window_available
+    lda source_page_failed
+    bne overlay_source_consume_line_char_done
+    ldy #$00
+    jsr overlay_source_peek_scan_y
+    cmp #10
+    bne overlay_source_consume_line_char_done
+    jsr overlay_source_consume_scan_ptr
+overlay_source_consume_line_char_done:
+    sec
+    rts
 
 clear_var_name_window:
     ldy #ACTC_OVERLAY_CTX_VAR_NAME_WINDOW_PTR_LO
@@ -1427,33 +1496,9 @@ copy_symbol_to_var_name_window:
     lda #$00
     sta symbol_len_current
 copy_symbol_to_var_name_window_loop:
-    ldy #$00
-    jsr overlay_source_peek_scan_y
-    beq copy_symbol_to_var_name_window_done
-    cmp #' '
-    beq copy_symbol_to_var_name_window_done
-    cmp #9
-    beq copy_symbol_to_var_name_window_done
-    cmp #'='
-    beq copy_symbol_to_var_name_window_done
-    cmp #','
-    beq copy_symbol_to_var_name_window_done
-    cmp #'('
-    beq copy_symbol_to_var_name_window_done
-    cmp #')'
-    beq copy_symbol_to_var_name_window_done
-    cmp #10
-    beq copy_symbol_to_var_name_window_done
-    cmp #13
-    beq copy_symbol_to_var_name_window_done
-    jsr overlay_symbol_token_char_valid_current
+    jsr overlay_source_consume_var_name_token_char
     bcs copy_symbol_to_var_name_window_fail
-copy_symbol_to_var_name_window_store:
-    ldy symbol_len_current
-    sta (ACTC_OVERLAY_WORK_ZP),y
-    inc symbol_len_current
-    jsr overlay_source_consume_scan_ptr
-    bcs copy_symbol_to_var_name_window_fail
+    beq copy_symbol_to_var_name_window_done
     lda symbol_len_current
     cmp #24
     bcc copy_symbol_to_var_name_window_loop
@@ -1475,29 +1520,9 @@ copy_symbol_to_export_name_window:
     lda #$00
     sta symbol_len_current
 copy_symbol_to_export_name_window_loop:
-    ldy #$00
-    jsr overlay_source_peek_scan_y
-    beq copy_symbol_to_export_name_window_done
-    cmp #' '
-    beq copy_symbol_to_export_name_window_done
-    cmp #9
-    beq copy_symbol_to_export_name_window_done
-    cmp #'('
-    beq copy_symbol_to_export_name_window_done
-    cmp #'='
-    beq copy_symbol_to_export_name_window_done
-    cmp #10
-    beq copy_symbol_to_export_name_window_done
-    cmp #13
-    beq copy_symbol_to_export_name_window_done
-    jsr overlay_symbol_token_char_valid_current
+    jsr overlay_source_consume_export_name_token_char
     bcs copy_symbol_to_export_name_window_fail
-copy_symbol_to_export_name_window_store:
-    ldy symbol_len_current
-    sta (ACTC_OVERLAY_WORK_ZP),y
-    inc symbol_len_current
-    jsr overlay_source_consume_scan_ptr
-    bcs copy_symbol_to_export_name_window_fail
+    beq copy_symbol_to_export_name_window_done
     lda symbol_len_current
     cmp #24
     bcc copy_symbol_to_export_name_window_loop
@@ -1511,6 +1536,80 @@ copy_symbol_to_export_name_window_done:
     clc
     rts
 copy_symbol_to_export_name_window_fail:
+    sec
+    rts
+
+overlay_source_consume_var_name_token_char:
+    ldy #$00
+    jsr overlay_source_peek_scan_y
+    beq overlay_source_consume_var_name_token_char_done
+    cmp #' '
+    beq overlay_source_consume_var_name_token_char_done
+    cmp #9
+    beq overlay_source_consume_var_name_token_char_done
+    cmp #'='
+    beq overlay_source_consume_var_name_token_char_done
+    cmp #','
+    beq overlay_source_consume_var_name_token_char_done
+    cmp #'('
+    beq overlay_source_consume_var_name_token_char_done
+    cmp #')'
+    beq overlay_source_consume_var_name_token_char_done
+    cmp #10
+    beq overlay_source_consume_var_name_token_char_done
+    cmp #13
+    beq overlay_source_consume_var_name_token_char_done
+    jsr overlay_source_consume_symbol_token_body_char
+    bcs overlay_source_consume_var_name_token_char_fail
+    lda #$01
+    clc
+    rts
+overlay_source_consume_var_name_token_char_done:
+    lda #$00
+    clc
+    rts
+overlay_source_consume_var_name_token_char_fail:
+    sec
+    rts
+
+overlay_source_consume_export_name_token_char:
+    ldy #$00
+    jsr overlay_source_peek_scan_y
+    beq overlay_source_consume_export_name_token_char_done
+    cmp #' '
+    beq overlay_source_consume_export_name_token_char_done
+    cmp #9
+    beq overlay_source_consume_export_name_token_char_done
+    cmp #'('
+    beq overlay_source_consume_export_name_token_char_done
+    cmp #'='
+    beq overlay_source_consume_export_name_token_char_done
+    cmp #10
+    beq overlay_source_consume_export_name_token_char_done
+    cmp #13
+    beq overlay_source_consume_export_name_token_char_done
+    jsr overlay_source_consume_symbol_token_body_char
+    bcs overlay_source_consume_export_name_token_char_fail
+    lda #$01
+    clc
+    rts
+overlay_source_consume_export_name_token_char_done:
+    lda #$00
+    clc
+    rts
+overlay_source_consume_export_name_token_char_fail:
+    sec
+    rts
+
+overlay_source_consume_symbol_token_body_char:
+    jsr overlay_symbol_token_char_valid_current
+    bcs overlay_source_consume_symbol_token_body_char_fail
+    ldy symbol_len_current
+    sta (ACTC_OVERLAY_WORK_ZP),y
+    inc symbol_len_current
+    jsr overlay_source_consume_scan_ptr
+    rts
+overlay_source_consume_symbol_token_body_char_fail:
     sec
     rts
 
@@ -1901,55 +2000,21 @@ call_target_address:
     rts
 
 skip_source_whitespace:
-    ldy #$00
 skip_source_whitespace_loop:
-    ldy #$00
-    jsr overlay_source_peek_scan_y
-    cmp #' '
-    beq skip_source_whitespace_advance
-    cmp #9
-    beq skip_source_whitespace_advance
-    cmp #10
-    beq skip_source_whitespace_advance
-    cmp #13
-    beq skip_source_whitespace_advance
-skip_source_whitespace_done:
-    rts
-skip_source_whitespace_advance:
-    jsr overlay_source_consume_scan_ptr
+    jsr overlay_source_consume_whitespace_char
     bcs skip_source_whitespace_done
     jmp skip_source_whitespace_loop
+skip_source_whitespace_done:
+    rts
 
 skip_blank_lines_and_spaces:
     jmp skip_source_whitespace
 
 skip_source_line:
-    ldy #$00
 skip_source_line_loop:
-    jsr ensure_source_window_available
-    lda source_page_failed
-    bne skip_source_line_done
-    ldy #$00
-    jsr overlay_source_peek_scan_y
-    beq skip_source_line_done
-    cmp #10
-    beq skip_source_line_eol
-    cmp #13
-    beq skip_source_line_eol
-    jsr overlay_source_consume_scan_ptr
+    jsr overlay_source_consume_line_char
     bcs skip_source_line_done
     jmp skip_source_line_loop
-skip_source_line_eol:
-    jsr overlay_source_consume_scan_ptr
-    bcs skip_source_line_done
-    jsr ensure_source_window_available
-    lda source_page_failed
-    bne skip_source_line_done
-    ldy #$00
-    jsr overlay_source_peek_scan_y
-    cmp #10
-    bne skip_source_line_done
-    jsr overlay_source_consume_scan_ptr
 skip_source_line_done:
     rts
 
@@ -2117,21 +2182,41 @@ match_keyword_at_scan_delimiter_width4:
     rts
 
 match_keyword_at_scan_delimiter:
+    jsr overlay_source_match_keyword_delimiter
+    bcc match_keyword_at_scan_ok
+match_keyword_at_scan_fail:
+    jsr overlay_source_rewind_keyword_match
+    sec
+    rts
+match_keyword_at_scan_ok:
+    clc
+    rts
+
+overlay_source_match_keyword_delimiter:
     ldy #$00
     jsr overlay_source_peek_scan_y
-    beq match_keyword_at_scan_ok
+    jmp overlay_source_keyword_delimiter_from_a
+
+overlay_source_keyword_delimiter_from_a:
+    beq overlay_source_keyword_delimiter_ok
     cmp #' '
-    beq match_keyword_at_scan_ok
+    beq overlay_source_keyword_delimiter_ok
     cmp #9
-    beq match_keyword_at_scan_ok
+    beq overlay_source_keyword_delimiter_ok
     cmp #10
-    beq match_keyword_at_scan_ok
+    beq overlay_source_keyword_delimiter_ok
     cmp #13
-    beq match_keyword_at_scan_ok
-match_keyword_at_scan_fail:
+    beq overlay_source_keyword_delimiter_ok
+    sec
+    rts
+overlay_source_keyword_delimiter_ok:
+    clc
+    rts
+
+overlay_source_rewind_keyword_match:
     txa
-    beq match_keyword_at_scan_fail_done
-match_keyword_at_scan_rewind:
+    beq overlay_source_rewind_keyword_match_done
+overlay_source_rewind_keyword_match_loop:
     dec ACTC_OVERLAY_SCAN_ZP
     lda ACTC_OVERLAY_SCAN_ZP
     cmp #$FF
@@ -2153,12 +2238,8 @@ match_keyword_at_scan_rewind:
     inc source_window_remaining+1
 :
     dex
-    bne match_keyword_at_scan_rewind
-match_keyword_at_scan_fail_done:
-    sec
-    rts
-match_keyword_at_scan_ok:
-    clc
+    bne overlay_source_rewind_keyword_match_loop
+overlay_source_rewind_keyword_match_done:
     rts
 
 uppercase_ascii:

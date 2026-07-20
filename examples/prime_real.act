@@ -1,0 +1,53 @@
+; PRIME_REAL demonstrates REAL arithmetic in a useful integer algorithm.
+; FSqrt(REAL(candidate)) limits trial division to the square root. The sample
+; stops at 120 for compact C64 output; the IEEE-754 REAL runtime does not impose
+; that bound.
+
+MODULE PRIME_REAL
+
+BYTE primeCount
+
+BYTE FUNC IsPrime(CARD candidate)
+    REAL root
+    CARD limit
+    CARD divisor
+
+    IF candidate<2 THEN
+        RETURN(0)
+    FI
+    IF candidate=2 THEN
+        RETURN(1)
+    FI
+    IF (candidate MOD 2)=0 THEN
+        RETURN(0)
+    FI
+    root=FSqrt(REAL(candidate))
+    limit=INT(root)
+    IF limit<3 THEN
+        RETURN(1)
+    FI
+    FOR divisor=3 TO limit STEP 2
+    DO
+        IF (candidate MOD divisor)=0 THEN
+            RETURN(0)
+        FI
+    OD
+    RETURN(1)
+ENDFUNC
+
+PROC main()
+    CARD candidate
+
+    primeCount=0
+    PrintE("PRIMES FROM 2 THROUGH 120")
+    FOR candidate=2 TO 120
+    DO
+        IF IsPrime(candidate)<>0 THEN
+            PrintIE(candidate)
+            primeCount=primeCount+1
+        FI
+    OD
+    PrintE("TOTAL PRIMES")
+    PrintIE(primeCount)
+    RETURN
+ENDPROC

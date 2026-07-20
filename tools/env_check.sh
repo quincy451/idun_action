@@ -8,7 +8,7 @@ usage() {
   cat <<'USAGE'
 Usage: ./tools/env_check.sh [--strict]
 
-Advisory environment check for ActionC64U.
+Advisory environment check for the ActionC64U Idun/Linux fork.
   --strict   exit non-zero when any required dependency is missing
 USAGE
 }
@@ -142,27 +142,36 @@ PY
   record_result "yes" "pytest" "FAIL" "install with: python3 -m pip install --user pytest"
 }
 
+check_pkg_config_module() {
+  local label="$1"
+  local required_flag="$2"
+  local module="$3"
+  local install_hint="$4"
+  if command -v pkg-config >/dev/null 2>&1 && pkg-config --exists "$module"; then
+    record_result "$required_flag" "$label" "PASS" "$(pkg-config --modversion "$module")"
+  else
+    record_result "$required_flag" "$label" "FAIL" "$install_hint"
+  fi
+}
+
 print_header
-check_command "git" "yes" "git" "install package: git"
 check_command "make" "yes" "make" "install package: make"
 check_command "python3" "yes" "python3" "install package: python3"
-check_command "pip3" "yes" "pip3" "install package: python3-pip"
-check_any_command "C compiler" "yes" "install build-essential or clang" gcc clang
-check_any_command "C++ compiler" "yes" "install build-essential or clang" g++ clang++
-check_command "cmake" "no" "cmake" "install package: cmake"
+check_any_command "C++ compiler" "yes" "install build-essential or clang" \
+  g++ clang++ clang++-20 clang++-19 clang++-18 clang++-17 clang++-16
+check_command "pkg-config" "yes" "pkg-config" "install package: pkg-config"
+check_pkg_config_module "SQLite 3 headers/libs" "yes" "sqlite3" "install package: sqlite-dev (Alpine) or libsqlite3-dev (Debian/Ubuntu)"
 check_pytest
-check_command "pdftotext" "no" "pdftotext" "install package: poppler-utils"
-check_command "cc1541" "no" "cc1541" "install distro package if available, otherwise build and add to PATH"
-check_command "java" "no" "java" "install package: default-jre-headless"
-check_any_command "VICE" "no" "install package: vice (needs x64sc for later C64 validation)" x64sc vice
-check_any_command "automation helper" "no" "install one of: expect, socat, netcat-openbsd" expect socat nc
+check_command "git" "no" "git" "install package: git"
+check_command "pip3" "no" "pip3" "install package: py3-pip or python3-pip"
+check_command "VICE x64sc" "no" "x64sc" "install VICE for direct generated-PRG validation"
 
 printf '\nSummary: %d required missing, %d optional missing.\n' "$required_missing" "$optional_missing"
 if (( required_missing > 0 )); then
-  echo "Required dependencies are missing. Run ./tools/setup_wsl.sh for install guidance."
+  echo "Required dependencies are missing. Run ./tools/setup_linux.sh for install guidance."
 fi
 if (( optional_missing > 0 )); then
-  echo "Optional dependencies are missing. These are not blocking bootstrap, but later prompts may need them."
+  echo "Optional dependencies are missing. They are not required for the Linux tool build."
 fi
 
 if (( STRICT == 1 && required_missing > 0 )); then

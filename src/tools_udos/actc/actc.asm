@@ -147,6 +147,7 @@ ACTC_KEEP_BODY_RESIDENT_FALLBACK = 1
 .endif
 .endif
 ACTC_USE_RESIDENT_BODY_PREALLOCATE = ACTC_PREALLOCATE_BODY_EXTERNALS * ((ACTC_PREALLOCATE_BODY_EXTERNALS_IN_OVERLAY = 0) + (ACTC_USE_BODY_OVERLAY = 0) + ACTC_KEEP_BODY_RESIDENT_FALLBACK)
+ACTC_USE_RESIDENT_POSITIVE_WORD_PARSER = ACTC_KEEP_BODY_RESIDENT_FALLBACK + ACTC_USE_RESIDENT_BODY_PREALLOCATE
 .ifndef ACTC_TABLE_REU_BASE_LO
 ACTC_TABLE_REU_BASE_LO = $00
 .endif
@@ -297,7 +298,7 @@ SOURCE_READER_STREAM_SYMBOL_COPY = 0
 .endif
 PROC_DEBUG_SCAN_CHUNK_SIZE = 24
 .ifndef BODY_OPS_STRIDE
-BODY_OPS_STRIDE = 48
+BODY_OPS_STRIDE = ACTC_OVERLAY_BODY_OP_LIMIT
 .endif
 .ifndef INT_LITERAL_MAX
 INT_LITERAL_MAX = 10
@@ -340,6 +341,15 @@ IMPORT_PRINT_STR  = $01
 IMPORT_PRINT_LINE = $02
 IMPORT_FORMAT_INT = $04
 ACTC_PERSIST_TRACE = $03E7
+ACTC_CHAIN_NONE = $00
+ACTC_CHAIN_LINK = $01
+ACTC_CHAIN_DEBUG = $02
+ACTC_CHAIN_SUCCESS_MASK = $03
+ACTC_CHAIN_RETURN_EDITOR = $80
+ACTC_WORKFLOW_SUCCESS = $00
+ACTC_WORKFLOW_FAILURE = $01
+ACTC_ACCEPT_EDITOR_RETURN_SUFFIX = 1
+ACTC_CAPTURE_WORKFLOW_SUFFIX = 1
 
 .segment "ZPTEMP": zeropage
 svc_retptr:
@@ -384,6 +394,10 @@ set_actc_trace:
     rts
 
 actc_start_main:
+    lda #$00
+    sta actc_chain_mode
+    sta actc_source_location_valid
+    jsr source_reader_initialize
     lda #$10
     jsr set_actc_trace
     jsr init_module_name
@@ -414,6 +428,8 @@ source_missing:
     ldy #>msg_no_file
     jmp fail_with_ptr
 source_loaded:
+    lda #$01
+    sta actc_source_location_valid
     lda #$16
     jsr set_actc_trace
     jsr parse_module_header_or_fail
@@ -491,6 +507,8 @@ preallocate_body_externals_with_overlay_fail:
     jsr compute_payload_layout
     lda #$1B
     jsr set_actc_trace
+    lda #$00
+    sta actc_source_location_valid
     jsr build_object_target_path
     lda #$1C
     jsr set_actc_trace
@@ -523,6 +541,15 @@ preallocate_body_externals_with_overlay_fail:
 save_ok:
     lda #$21
     jsr set_actc_trace
+    lda #<msg_ok
+    ldy #>msg_ok
+    jsr print_line_ptr
+    jsr queue_actc_successor
+    bcc :+
+    lda #<msg_chain_fail
+    ldy #>msg_chain_fail
+    jmp fail_with_ptr
+:
     lda #$00
     sta svc_retptr
     sta svc_retptr+1
@@ -921,12 +948,18 @@ actc_overlay_init_context_loop:
     sta actc_overlay_context+ACTC_OVERLAY_CTX_RESTORE_SOURCE_MARK_FN_LO
     lda #>restore_source_reader_mark
     sta actc_overlay_context+ACTC_OVERLAY_CTX_RESTORE_SOURCE_MARK_FN_HI
-.if ACTC_KEEP_BODY_RESIDENT_FALLBACK + ACTC_PREALLOCATE_BODY_EXTERNALS
-    lda #<parse_positive_word_sum_at_scan_y
-    sta actc_overlay_context+ACTC_OVERLAY_CTX_PARSE_POSITIVE_WORD_SUM_FN_LO
-    lda #>parse_positive_word_sum_at_scan_y
-    sta actc_overlay_context+ACTC_OVERLAY_CTX_PARSE_POSITIVE_WORD_SUM_FN_HI
-.endif
+    lda #<source_reader_peek_token_from_scan_y
+    sta actc_overlay_context+ACTC_OVERLAY_CTX_SOURCE_READER_PEEK_TOKEN_FN_LO
+    lda #>source_reader_peek_token_from_scan_y
+    sta actc_overlay_context+ACTC_OVERLAY_CTX_SOURCE_READER_PEEK_TOKEN_FN_HI
+    lda #<source_reader_consume_token_from_scan_y
+    sta actc_overlay_context+ACTC_OVERLAY_CTX_SOURCE_READER_CONSUME_TOKEN_FN_LO
+    lda #>source_reader_consume_token_from_scan_y
+    sta actc_overlay_context+ACTC_OVERLAY_CTX_SOURCE_READER_CONSUME_TOKEN_FN_HI
+    lda #<reader_lookahead_value_lo_data
+    sta actc_overlay_context+ACTC_OVERLAY_CTX_SOURCE_READER_TOKEN_VALUE_PTR_LO
+    lda #>reader_lookahead_value_lo_data
+    sta actc_overlay_context+ACTC_OVERLAY_CTX_SOURCE_READER_TOKEN_VALUE_PTR_HI
     lda #<store_word_literal_from_ay
     sta actc_overlay_context+ACTC_OVERLAY_CTX_STORE_WORD_LITERAL_FN_LO
     lda #>store_word_literal_from_ay
@@ -1090,26 +1123,12 @@ actc_overlay_load_next_source_window_fail:
 .endif
 
 actc_overlay_find_pass_descriptor:
-    lda #<actc_overlay_pass_table
-    sta const_ptr
-    lda #>actc_overlay_pass_table
-    sta const_ptr+1
-actc_overlay_find_pass_descriptor_loop:
-    ldy #ACTC_OVERLAY_DESC_PASS_ID
-    lda (const_ptr),y
-    cmp #ACTC_OVERLAY_PASS_END
-    beq actc_overlay_find_pass_descriptor_fail
-    cmp actc_overlay_requested_pass
-    beq actc_overlay_find_pass_descriptor_ok
+    lda actc_overlay_requested_pass
+    cmp #ACTC_OVERLAY_PASS_COUNT
+    bcs actc_overlay_find_pass_descriptor_fail
     clc
-    lda const_ptr
-    adc #ACTC_OVERLAY_DESC_STRIDE
-    sta const_ptr
-    lda const_ptr+1
-    adc #$00
-    sta const_ptr+1
-    jmp actc_overlay_find_pass_descriptor_loop
-actc_overlay_find_pass_descriptor_ok:
+    adc #'0'
+    sta actc_overlay_path+9
     clc
     rts
 actc_overlay_find_pass_descriptor_fail:
@@ -1117,20 +1136,15 @@ actc_overlay_find_pass_descriptor_fail:
     rts
 
 actc_overlay_stage_selected_to_reu:
-    ldy #ACTC_OVERLAY_DESC_PATH_LO
-    lda (const_ptr),y
+    lda #<actc_overlay_path
     sta file_params+0
-    ldy #ACTC_OVERLAY_DESC_PATH_HI
-    lda (const_ptr),y
+    lda #>actc_overlay_path
     sta file_params+1
-    ldy #ACTC_OVERLAY_DESC_REU_LO
-    lda (const_ptr),y
+    lda #ACTC_OVERLAY_REU_BASE_LO
     sta file_params+2
-    ldy #ACTC_OVERLAY_DESC_REU_HI
-    lda (const_ptr),y
+    lda #ACTC_OVERLAY_REU_BASE_HI
     sta file_params+3
-    ldy #ACTC_OVERLAY_DESC_REU_BANK
-    lda (const_ptr),y
+    lda #ACTC_OVERLAY_REU_BASE_BANK
     sta file_params+4
     lda #$00
     sta file_params+5
@@ -1177,14 +1191,11 @@ actc_overlay_stage_selected_to_reu_ok:
     rts
 
 actc_overlay_copy_staged_to_exec:
-    ldy #ACTC_OVERLAY_DESC_REU_LO
-    lda (const_ptr),y
+    lda #ACTC_OVERLAY_REU_BASE_LO
     sta file_params+0
-    ldy #ACTC_OVERLAY_DESC_REU_HI
-    lda (const_ptr),y
+    lda #ACTC_OVERLAY_REU_BASE_HI
     sta file_params+1
-    ldy #ACTC_OVERLAY_DESC_REU_BANK
-    lda (const_ptr),y
+    lda #ACTC_OVERLAY_REU_BASE_BANK
     sta file_params+2
     lda #<ACTC_OVERLAY_EXEC_BASE
     sta file_params+3
@@ -1308,6 +1319,39 @@ init_module_name_default_loop:
 init_module_name_done:
     rts
 
+queue_actc_successor:
+    lda actc_chain_mode
+    and #ACTC_CHAIN_SUCCESS_MASK
+    beq queue_actc_successor_done
+    lda #ACTC_WORKFLOW_SUCCESS
+    jmp run_actc_workflow_overlay
+queue_actc_successor_done:
+    clc
+    rts
+
+run_actc_workflow_overlay:
+    pha
+    lda #ACTC_OVERLAY_PASS_NOOP
+    sta actc_overlay_requested_pass
+    jsr actc_overlay_init_context
+    pla
+    sta actc_overlay_context+ACTC_OVERLAY_CTX_DECL_VAR_COUNT
+    lda actc_chain_mode
+    sta actc_overlay_context+ACTC_OVERLAY_CTX_BODY_MODE
+    jsr actc_overlay_run_pass_with_context
+    bcs run_actc_workflow_overlay_fail
+    jmp queue_actc_target_path
+run_actc_workflow_overlay_fail:
+    rts
+
+queue_actc_target_path:
+    lda #<target_path
+    sta svc_retptr
+    lda #>target_path
+    sta svc_retptr+1
+    ldx #svc_retptr
+    jmp svc_program_chain_sc0
+
 parse_module_header_or_fail:
 .if ACTC_USE_SOURCE_HEADER_OVERLAY
     .if ACTC_REU_SOURCE_CACHE
@@ -1333,13 +1377,7 @@ parse_module_header_or_fail:
     lda #<msg_bad_module
     ldy #>msg_bad_module
     jmp fail_with_ptr
-:   ldy #$00
-parse_module_header_keyword_advance:
-    lda (const_ptr),y
-    beq parse_module_header_keyword_done
-    jsr source_reader_consume_scan_ptr
-    iny
-    bne parse_module_header_keyword_advance
+:   jsr source_reader_consume_const_ptr_at_scan_ptr
 parse_module_header_keyword_done:
     jsr skip_source_spaces
     jsr copy_declared_module_or_fail
@@ -1362,7 +1400,7 @@ skip_source_whitespace_loop:
     beq skip_source_whitespace_advance
     rts
 skip_source_whitespace_advance:
-    jsr source_reader_consume_scan_ptr
+    jsr source_reader_consume_whitespace_from_scan_ptr
     jmp skip_source_whitespace_loop
 
 skip_source_spaces:
@@ -1375,7 +1413,7 @@ skip_source_spaces_loop:
     beq skip_source_spaces_advance
     rts
 skip_source_spaces_advance:
-    jsr source_reader_consume_scan_ptr
+    jsr source_reader_consume_inline_space_from_scan_ptr
     jmp skip_source_spaces_loop
 
 .if ACTC_USE_SOURCE_HEADER_OVERLAY
@@ -1452,9 +1490,7 @@ copy_declared_module_or_fail_done:
 copy_declared_module_or_fail_stream:
     txa
     pha
-    jsr source_reader_begin_symbol_token
-    lda #$00
-    sta reader_scan_y_data
+    jsr source_reader_begin_symbol_token_from_scan_ptr
     ldx #$00
 copy_declared_module_or_fail_stream_loop:
     jsr source_reader_try_store_symbol_token_x_from_scan_y
@@ -1640,7 +1676,7 @@ preallocate_body_externals_skip_line:
     jsr skip_source_line
     jmp preallocate_body_externals_loop
 preallocate_body_externals_advance_blank:
-    jsr source_reader_consume_scan_ptr
+    jsr source_reader_consume_line_break_from_scan_ptr
     jmp preallocate_body_externals_loop
 preallocate_body_externals_bad_proc:
     lda #<msg_bad_proc
@@ -1950,9 +1986,8 @@ preallocate_call_with_arg_externals_from_scan_y:
     bcc preallocate_call_with_arg_externals_fail
     ldy symbol_end_y_data
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #'('
-    bne preallocate_call_with_arg_externals_fail
+    jsr source_reader_match_open_paren_from_scan_y
+    bcs preallocate_call_with_arg_externals_fail
     jsr resolve_call_target_from_declared_or_fail
     bcs preallocate_call_with_arg_externals_fail
     ldy symbol_end_y_data
@@ -1986,29 +2021,23 @@ preallocate_plain_call_externals_fail:
 
 preallocate_plain_call_arg_externals_from_scan_y:
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #')'
-    beq preallocate_plain_call_arg_externals_consume_done
+    lda #')'
+    jsr source_reader_consume_char_from_scan_y
+    bcc preallocate_plain_call_arg_externals_done
 preallocate_plain_call_arg_externals_loop:
     jsr skip_inline_spaces_at_scan_y
     jsr preallocate_scan_plain_call_arg_for_externals_from_scan_y
     bcs preallocate_plain_call_arg_externals_done
 preallocate_plain_call_arg_externals_after_arg:
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #','
-    beq preallocate_plain_call_arg_externals_next
-    cmp #')'
-    beq preallocate_plain_call_arg_externals_consume_done
-    jmp preallocate_plain_call_arg_externals_done
-preallocate_plain_call_arg_externals_next:
     lda #','
     jsr source_reader_consume_char_from_scan_y
-    bcs preallocate_plain_call_arg_externals_done
-    jmp preallocate_plain_call_arg_externals_loop
-preallocate_plain_call_arg_externals_consume_done:
+    bcc preallocate_plain_call_arg_externals_next
     lda #')'
     jsr source_reader_consume_char_from_scan_y
+    jmp preallocate_plain_call_arg_externals_done
+preallocate_plain_call_arg_externals_next:
+    jmp preallocate_plain_call_arg_externals_loop
 preallocate_plain_call_arg_externals_done:
     clc
     rts
@@ -2027,10 +2056,12 @@ preallocate_scan_plain_call_arg_for_externals_loop:
     beq preallocate_scan_plain_call_arg_for_externals_string
     cmp #'('
     beq preallocate_scan_plain_call_arg_for_externals_lparen
-    cmp #')'
-    beq preallocate_scan_plain_call_arg_for_externals_rparen
-    cmp #','
-    beq preallocate_scan_plain_call_arg_for_externals_comma
+    lda #')'
+    jsr source_reader_match_char_from_scan_y
+    bcc preallocate_scan_plain_call_arg_for_externals_rparen
+    lda #','
+    jsr source_reader_match_char_from_scan_y
+    bcc preallocate_scan_plain_call_arg_for_externals_comma
     jsr preallocate_int_conversion_external_from_scan_y
     bcc preallocate_scan_plain_call_arg_for_externals_loop
     jsr preallocate_call_name_external_from_scan_y
@@ -2040,25 +2071,28 @@ preallocate_scan_plain_call_arg_for_externals_loop:
     ldy expr_saved_y_data
     jmp preallocate_scan_plain_call_arg_for_externals_loop
 preallocate_scan_plain_call_arg_for_externals_consume_one:
-    jsr source_reader_consume_scan_y
+    jsr source_reader_consume_plain_call_arg_scan_byte_from_scan_y
     bcs preallocate_scan_plain_call_arg_for_externals_fail
     jmp preallocate_scan_plain_call_arg_for_externals_loop
 preallocate_scan_plain_call_arg_for_externals_lparen:
     inc preallocate_call_arg_scan_depth_data
-    jsr source_reader_consume_scan_y
+    lda #'('
+    jsr source_reader_consume_char_from_scan_y
     bcs preallocate_scan_plain_call_arg_for_externals_fail
     jmp preallocate_scan_plain_call_arg_for_externals_loop
 preallocate_scan_plain_call_arg_for_externals_rparen:
     lda preallocate_call_arg_scan_depth_data
     beq preallocate_scan_plain_call_arg_for_externals_done
     dec preallocate_call_arg_scan_depth_data
-    jsr source_reader_consume_scan_y
+    lda #')'
+    jsr source_reader_consume_char_from_scan_y
     bcs preallocate_scan_plain_call_arg_for_externals_fail
     jmp preallocate_scan_plain_call_arg_for_externals_loop
 preallocate_scan_plain_call_arg_for_externals_comma:
     lda preallocate_call_arg_scan_depth_data
     beq preallocate_scan_plain_call_arg_for_externals_done
-    jsr source_reader_consume_scan_y
+    lda #','
+    jsr source_reader_consume_char_from_scan_y
     bcs preallocate_scan_plain_call_arg_for_externals_fail
     jmp preallocate_scan_plain_call_arg_for_externals_loop
 preallocate_scan_plain_call_arg_for_externals_string:
@@ -2073,7 +2107,8 @@ preallocate_scan_plain_call_arg_for_externals_fail:
     rts
 
 preallocate_skip_string_in_plain_call_arg_from_scan_y:
-    jsr source_reader_consume_scan_y
+    lda #'"'
+    jsr source_reader_consume_char_from_scan_y
     bcs preallocate_skip_string_in_plain_call_arg_fail
 preallocate_skip_string_in_plain_call_arg_loop:
     jsr source_reader_peek_scan_y
@@ -2084,11 +2119,12 @@ preallocate_skip_string_in_plain_call_arg_loop:
     beq preallocate_skip_string_in_plain_call_arg_done
     cmp #'"'
     beq preallocate_skip_string_in_plain_call_arg_close
-    jsr source_reader_consume_scan_y
+    jsr source_reader_consume_plain_call_arg_string_byte_from_scan_y
     bcs preallocate_skip_string_in_plain_call_arg_fail
     jmp preallocate_skip_string_in_plain_call_arg_loop
 preallocate_skip_string_in_plain_call_arg_close:
-    jsr source_reader_consume_scan_y
+    lda #'"'
+    jsr source_reader_consume_char_from_scan_y
     bcs preallocate_skip_string_in_plain_call_arg_fail
 preallocate_skip_string_in_plain_call_arg_done:
     clc
@@ -2124,7 +2160,7 @@ preallocate_scan_line_call_externals_try_call:
     ldy expr_saved_y_data
     jmp preallocate_scan_line_call_externals_loop
 preallocate_scan_line_call_externals_consume_one:
-    jsr source_reader_consume_scan_y
+    jsr source_reader_consume_line_call_scan_byte_from_scan_y
     bcs preallocate_scan_line_call_externals_fail
     jmp preallocate_scan_line_call_externals_loop
 preallocate_scan_line_call_externals_string:
@@ -2150,9 +2186,8 @@ preallocate_call_name_external_from_scan_y:
     bcc preallocate_call_name_external_miss_restore
     ldy symbol_end_y_data
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #'('
-    bne preallocate_call_name_external_miss_restore
+    jsr source_reader_match_open_paren_from_scan_y
+    bcs preallocate_call_name_external_miss_restore
     clc
     rts
 preallocate_call_name_external_miss_restore:
@@ -2253,9 +2288,10 @@ preallocate_consume_flat_call_args_from_scan_y_loop:
     beq preallocate_consume_flat_call_args_from_scan_y_fail
     cmp #'('
     beq preallocate_consume_flat_call_args_from_scan_y_fail
-    cmp #')'
-    beq preallocate_consume_flat_call_args_from_scan_y_done
-    jsr source_reader_consume_scan_y
+    lda #')'
+    jsr source_reader_match_char_from_scan_y
+    bcc preallocate_consume_flat_call_args_from_scan_y_done
+    jsr source_reader_consume_flat_call_arg_scan_byte_from_scan_y
     bcs preallocate_consume_flat_call_args_from_scan_y_fail
     jmp preallocate_consume_flat_call_args_from_scan_y_loop
 preallocate_consume_flat_call_args_from_scan_y_done:
@@ -2472,9 +2508,6 @@ preallocate_real_unary_print_external_parse:
     jsr require_var_index_real_or_fail
     bcs preallocate_real_unary_print_external_miss_restore
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #')'
-    bne preallocate_real_unary_print_external_miss_restore
     lda #')'
     jsr source_reader_consume_char_from_scan_y
     bcs preallocate_real_unary_print_external_miss_restore
@@ -2521,16 +2554,8 @@ preallocate_real_binary_operator_assignment_external_from_scan_y:
     jsr require_var_index_real_or_fail
     bcs preallocate_real_binary_operator_assignment_external_miss
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #'+'
-    beq preallocate_real_binary_operator_assignment_external_operator
-    cmp #'-'
-    beq preallocate_real_binary_operator_assignment_external_operator
-    cmp #'*'
-    beq preallocate_real_binary_operator_assignment_external_operator
-    cmp #'/'
-    bne preallocate_real_binary_operator_assignment_external_miss
-preallocate_real_binary_operator_assignment_external_operator:
+    jsr source_reader_match_real_binary_operator_from_scan_y
+    bcs preallocate_real_binary_operator_assignment_external_miss
     sta real_operator_data
     jsr source_reader_consume_char_from_scan_y
     bcs preallocate_real_binary_operator_assignment_external_miss
@@ -2558,16 +2583,8 @@ preallocate_real_binary_print_external_from_scan_y:
     jsr require_var_index_real_or_fail
     bcs preallocate_real_binary_print_external_miss_restore
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #'+'
-    beq preallocate_real_binary_print_external_operator
-    cmp #'-'
-    beq preallocate_real_binary_print_external_operator
-    cmp #'*'
-    beq preallocate_real_binary_print_external_operator
-    cmp #'/'
-    bne preallocate_real_binary_print_external_miss_restore
-preallocate_real_binary_print_external_operator:
+    jsr source_reader_match_real_binary_operator_from_scan_y
+    bcs preallocate_real_binary_print_external_miss_restore
     sta real_operator_data
     jsr source_reader_consume_char_from_scan_y
     bcs preallocate_real_binary_print_external_miss_restore
@@ -2577,9 +2594,9 @@ preallocate_real_binary_print_external_operator:
     jsr require_var_index_real_or_fail
     bcs preallocate_real_binary_print_external_miss_restore
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #')'
-    bne preallocate_real_binary_print_external_miss_restore
+    lda #')'
+    jsr source_reader_match_char_from_scan_y
+    bcs preallocate_real_binary_print_external_miss_restore
     lda real_operator_data
     jsr find_or_store_real_operator_external_from_a
     bcs preallocate_real_binary_print_external_miss_restore
@@ -2645,14 +2662,14 @@ preallocate_real_condition_cmp_external_from_scan_y:
     jsr require_var_index_real_or_fail
     bcs preallocate_real_condition_cmp_external_miss
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
+    jsr source_reader_match_comparison_operator_from_scan_y
+    bcs preallocate_real_condition_cmp_external_miss
+preallocate_real_condition_cmp_external_compare_entry:
     cmp #'='
     beq preallocate_real_condition_cmp_external_consume_single
     cmp #'<'
     beq preallocate_real_condition_cmp_external_consume_lt
-    cmp #'>'
-    beq preallocate_real_condition_cmp_external_consume_gt
-    jmp preallocate_real_condition_cmp_external_miss
+    bne preallocate_real_condition_cmp_external_consume_gt
 preallocate_real_condition_cmp_external_consume_single:
     lda #'='
     jsr source_reader_consume_char_from_scan_y
@@ -2662,19 +2679,16 @@ preallocate_real_condition_cmp_external_consume_lt:
     lda #'<'
     jsr source_reader_consume_char_from_scan_y
     bcs preallocate_real_condition_cmp_external_miss
-    jsr source_reader_peek_scan_y
-    cmp #'>'
-    beq preallocate_real_condition_cmp_external_consume_second
-    cmp #'='
-    beq preallocate_real_condition_cmp_external_consume_second
-    jmp preallocate_real_condition_cmp_external_rhs
+    jsr source_reader_match_comparison_suffix_from_scan_y
+    bcc preallocate_real_condition_cmp_external_consume_second
+    bcs preallocate_real_condition_cmp_external_rhs
 preallocate_real_condition_cmp_external_consume_gt:
     lda #'>'
     jsr source_reader_consume_char_from_scan_y
     bcs preallocate_real_condition_cmp_external_miss
-    jsr source_reader_peek_scan_y
-    cmp #'='
-    bne preallocate_real_condition_cmp_external_rhs
+    lda #'='
+    jsr source_reader_match_char_from_scan_y
+    bcs preallocate_real_condition_cmp_external_rhs
 preallocate_real_condition_cmp_external_consume_second:
     jsr source_reader_consume_char_from_scan_y
     bcs preallocate_real_condition_cmp_external_miss
@@ -2703,12 +2717,8 @@ preallocate_declared_symbol_is_return_statement:
     bcs preallocate_declared_symbol_is_return_statement_miss
     ldy symbol_end_y_data
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    beq preallocate_declared_symbol_is_return_statement_done
-    cmp #10
-    beq preallocate_declared_symbol_is_return_statement_done
-    cmp #13
-    beq preallocate_declared_symbol_is_return_statement_done
+    jsr source_reader_match_line_end_from_scan_y
+    bcc preallocate_declared_symbol_is_return_statement_done
     jsr preallocate_call_expression_external_from_scan_y
 preallocate_declared_symbol_is_return_statement_done:
     clc
@@ -2815,9 +2825,8 @@ preallocate_call_bool_not_external_fail:
 
 preallocate_call_bool_primary_external_from_scan_y:
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #'('
-    beq preallocate_call_bool_primary_external_group
+    jsr source_reader_match_open_paren_from_scan_y
+    bcc preallocate_call_bool_primary_external_group
     sty preallocate_bool_primary_start_y_data
     jsr save_group_reader_mark
     jsr preallocate_call_comparison_clause_external_from_scan_y
@@ -2832,9 +2841,6 @@ preallocate_call_bool_primary_external_group:
     jsr preallocate_call_bool_or_external_from_scan_y
     bcs preallocate_call_bool_primary_external_fail
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #')'
-    bne preallocate_call_bool_primary_external_fail
     lda #')'
     jsr source_reader_consume_char_from_scan_y
     bcs preallocate_call_bool_primary_external_fail
@@ -2847,15 +2853,14 @@ preallocate_call_bool_primary_external_fail:
 
 preallocate_consume_comparison_operator_at_scan_y:
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
+    jsr source_reader_match_comparison_operator_from_scan_y
+    bcs preallocate_consume_comparison_operator_fail
+preallocate_consume_comparison_operator_compare_entry:
     cmp #'='
     beq preallocate_consume_comparison_operator_single
     cmp #'<'
     beq preallocate_consume_comparison_operator_lt
-    cmp #'>'
-    beq preallocate_consume_comparison_operator_gt
-    sec
-    rts
+    bne preallocate_consume_comparison_operator_gt
 preallocate_consume_comparison_operator_single:
     lda #'='
     jsr source_reader_consume_char_from_scan_y
@@ -2866,20 +2871,17 @@ preallocate_consume_comparison_operator_lt:
     lda #'<'
     jsr source_reader_consume_char_from_scan_y
     bcs preallocate_consume_comparison_operator_fail
-    jsr source_reader_peek_scan_y
-    cmp #'>'
-    beq preallocate_consume_comparison_operator_second
-    cmp #'='
-    beq preallocate_consume_comparison_operator_second
+    jsr source_reader_match_comparison_suffix_from_scan_y
+    bcc preallocate_consume_comparison_operator_second
     clc
     rts
 preallocate_consume_comparison_operator_gt:
     lda #'>'
     jsr source_reader_consume_char_from_scan_y
     bcs preallocate_consume_comparison_operator_fail
-    jsr source_reader_peek_scan_y
-    cmp #'='
-    bne preallocate_consume_comparison_operator_done
+    lda #'='
+    jsr source_reader_match_char_from_scan_y
+    bcs preallocate_consume_comparison_operator_done
 preallocate_consume_comparison_operator_second:
     jsr source_reader_consume_char_from_scan_y
     bcs preallocate_consume_comparison_operator_fail
@@ -2930,12 +2932,8 @@ preallocate_require_condition_terminator_at_scan_y:
 
 preallocate_require_then_or_line_end_at_scan_y:
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    beq preallocate_require_then_or_line_end_at_scan_y_ok
-    cmp #10
-    beq preallocate_require_then_or_line_end_at_scan_y_ok
-    cmp #13
-    beq preallocate_require_then_or_line_end_at_scan_y_ok
+    jsr source_reader_match_line_end_from_scan_y
+    bcc preallocate_require_then_or_line_end_at_scan_y_ok
     lda #'T'
     jsr source_reader_consume_uppercase_char_from_scan_y
     bcs preallocate_require_then_or_line_end_at_scan_y_fail
@@ -2949,12 +2947,8 @@ preallocate_require_then_or_line_end_at_scan_y:
     jsr source_reader_consume_uppercase_char_from_scan_y
     bcs preallocate_require_then_or_line_end_at_scan_y_fail
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    beq preallocate_require_then_or_line_end_at_scan_y_ok
-    cmp #10
-    beq preallocate_require_then_or_line_end_at_scan_y_ok
-    cmp #13
-    beq preallocate_require_then_or_line_end_at_scan_y_ok
+    jsr source_reader_match_line_end_from_scan_y
+    bcc preallocate_require_then_or_line_end_at_scan_y_ok
 preallocate_require_then_or_line_end_at_scan_y_fail:
     sec
     rts
@@ -2964,12 +2958,8 @@ preallocate_require_then_or_line_end_at_scan_y_ok:
 
 preallocate_require_do_or_line_end_at_scan_y:
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    beq preallocate_require_do_or_line_end_at_scan_y_ok
-    cmp #10
-    beq preallocate_require_do_or_line_end_at_scan_y_ok
-    cmp #13
-    beq preallocate_require_do_or_line_end_at_scan_y_ok
+    jsr source_reader_match_line_end_from_scan_y
+    bcc preallocate_require_do_or_line_end_at_scan_y_ok
     lda #'D'
     jsr source_reader_consume_uppercase_char_from_scan_y
     bcs preallocate_require_do_or_line_end_at_scan_y_fail
@@ -2977,12 +2967,8 @@ preallocate_require_do_or_line_end_at_scan_y:
     jsr source_reader_consume_uppercase_char_from_scan_y
     bcs preallocate_require_do_or_line_end_at_scan_y_fail
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    beq preallocate_require_do_or_line_end_at_scan_y_ok
-    cmp #10
-    beq preallocate_require_do_or_line_end_at_scan_y_ok
-    cmp #13
-    beq preallocate_require_do_or_line_end_at_scan_y_ok
+    jsr source_reader_match_line_end_from_scan_y
+    bcc preallocate_require_do_or_line_end_at_scan_y_ok
 preallocate_require_do_or_line_end_at_scan_y_fail:
     sec
     rts
@@ -3041,9 +3027,8 @@ preallocate_declared_symbol_is_print_statement_done:
 preallocate_real_print_statement_external_from_scan_y:
     ldy symbol_end_y_data
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #'('
-    bne preallocate_real_print_statement_external_miss
+    jsr source_reader_match_open_paren_from_scan_y
+    bcs preallocate_real_print_statement_external_miss
     lda #'('
     jsr source_reader_consume_char_from_scan_y
     bcs preallocate_real_print_statement_external_miss
@@ -3066,9 +3051,6 @@ preallocate_real_print_statement_external_from_scan_y:
     ldy symbol_start_y_data
 preallocate_real_print_statement_external_after_value:
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #')'
-    bne preallocate_real_print_statement_external_miss
     lda #')'
     jsr source_reader_consume_char_from_scan_y
     bcs preallocate_real_print_statement_external_miss
@@ -3088,9 +3070,8 @@ preallocate_int_print_statement_call_external_from_scan_y:
     sty preallocate_print_start_y_data
     jsr save_condition_reader_mark
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #'('
-    bne preallocate_int_print_statement_call_external_miss
+    jsr source_reader_match_open_paren_from_scan_y
+    bcs preallocate_int_print_statement_call_external_miss
     lda #'('
     jsr source_reader_consume_char_from_scan_y
     bcs preallocate_int_print_statement_call_external_miss
@@ -3098,12 +3079,9 @@ preallocate_int_print_statement_call_external_from_scan_y:
     jsr preallocate_call_with_arg_externals_from_scan_y
     bcs preallocate_int_print_statement_call_external_try_arg_scan
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #')'
-    bne preallocate_int_print_statement_call_external_try_arg_scan
     lda #')'
     jsr source_reader_consume_char_from_scan_y
-    bcs preallocate_int_print_statement_call_external_miss_restore
+    bcs preallocate_int_print_statement_call_external_try_arg_scan
     jsr skip_inline_spaces_at_scan_y
     jsr require_line_end_at_scan_y
     bcs preallocate_int_print_statement_call_external_miss_restore
@@ -3114,9 +3092,8 @@ preallocate_int_print_statement_call_external_try_arg_scan:
     ldy preallocate_print_start_y_data
     jsr save_condition_reader_mark
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #'('
-    bne preallocate_int_print_statement_call_external_miss_restore
+    jsr source_reader_match_open_paren_from_scan_y
+    bcs preallocate_int_print_statement_call_external_miss_restore
     lda #'('
     jsr source_reader_consume_char_from_scan_y
     bcs preallocate_int_print_statement_call_external_miss_restore
@@ -3124,9 +3101,6 @@ preallocate_int_print_statement_call_external_try_arg_scan:
     jsr preallocate_scan_plain_call_arg_for_externals_from_scan_y
     bcs preallocate_int_print_statement_call_external_miss_restore
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #')'
-    bne preallocate_int_print_statement_call_external_miss_restore
     lda #')'
     jsr source_reader_consume_char_from_scan_y
     bcs preallocate_int_print_statement_call_external_miss_restore
@@ -3195,7 +3169,7 @@ collect_module_vars_or_fail_loop:
     jsr skip_source_line
     jmp collect_module_vars_or_fail_loop
 collect_module_vars_or_fail_advance_blank:
-    jsr source_reader_consume_scan_ptr
+    jsr source_reader_consume_line_break_from_scan_ptr
     jmp collect_module_vars_or_fail_loop
 collect_module_vars_or_fail_bad:
     lda #<msg_bad_var
@@ -3240,13 +3214,13 @@ store_module_var_from_scan_ptr_or_fail_save_name_done:
     sta expr_term_lo
     ldy compare_char
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
+    jsr source_reader_peek_token_from_scan_y
+    bcs store_module_var_from_scan_ptr_or_fail_bad
+    cmp #SOURCE_TOKEN_EOF
     beq store_module_var_from_scan_ptr_or_fail_store
-    cmp #10
+    cmp #SOURCE_TOKEN_LINE_END
     beq store_module_var_from_scan_ptr_or_fail_store
-    cmp #13
-    beq store_module_var_from_scan_ptr_or_fail_store
-    cmp #'='
+    cmp #SOURCE_TOKEN_EQ
     beq :+
     jmp store_module_var_from_scan_ptr_or_fail_bad
 :
@@ -3259,28 +3233,20 @@ store_module_var_from_scan_ptr_or_fail_save_name_done:
     cmp #'r'
     bne store_module_var_from_scan_ptr_or_fail_bad
 :
-    lda #'='
-    jsr source_reader_consume_char_from_scan_y
+    lda #SOURCE_TOKEN_EQ
+    jsr source_reader_consume_expected_token_from_scan_y
     bcc :+
     jmp store_module_var_from_scan_ptr_or_fail_bad
 :
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #'['
-    bne store_module_var_from_scan_ptr_or_fail_parse_value
     lda #'['
-    jsr source_reader_consume_char_from_scan_y
-    bcc :+
-    jmp store_module_var_from_scan_ptr_or_fail_bad
-:
+    jsr source_reader_consume_expected_token_from_scan_y
+    bcs store_module_var_from_scan_ptr_or_fail_parse_value
     jsr parse_small_value_expr_at_scan_y
     bcs store_module_var_from_scan_ptr_or_fail_bad
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #']'
-    bne store_module_var_from_scan_ptr_or_fail_bad
     lda #']'
-    jsr source_reader_consume_char_from_scan_y
+    jsr source_reader_consume_expected_token_from_scan_y
     bcc :+
     jmp store_module_var_from_scan_ptr_or_fail_bad
 :
@@ -3401,7 +3367,7 @@ collect_proc_exports_or_fail_skip_line:
     jsr skip_source_line
     jmp collect_proc_exports_or_fail_loop
 collect_proc_exports_or_fail_advance_blank:
-    jsr source_reader_consume_scan_ptr
+    jsr source_reader_consume_line_break_from_scan_ptr
     jmp collect_proc_exports_or_fail_loop
 collect_proc_exports_or_fail_done_check:
     lda export_count_data
@@ -3501,7 +3467,7 @@ collect_proc_locals_or_fail_skip_line:
     jsr skip_source_line
     jmp collect_proc_locals_or_fail_loop
 collect_proc_locals_or_fail_advance_blank:
-    jsr source_reader_consume_scan_ptr
+    jsr source_reader_consume_line_break_from_scan_ptr
     jmp collect_proc_locals_or_fail_loop
 collect_proc_locals_or_fail_bad_proc:
     lda #<msg_bad_proc
@@ -3715,9 +3681,9 @@ collect_proc_body_ops_try_local_int_assignment:
         jmp collect_proc_body_ops_bad_literal
 :
         jsr skip_inline_spaces_at_scan_y
-        jsr source_reader_peek_scan_y
-        cmp #'='
-        bne :+
+        lda #'='
+        jsr source_reader_match_char_from_scan_y
+        bcs :+
         lda #'='
         jsr source_reader_consume_char_from_scan_y
         bcc :+
@@ -3739,11 +3705,6 @@ collect_proc_body_ops_try_local_int_assignment:
         jmp collect_proc_body_ops_bad_literal
 :
         jsr skip_inline_spaces_at_scan_y
-        jsr source_reader_peek_scan_y
-        cmp #']'
-        beq :+
-        jmp collect_proc_body_ops_bad_literal
-:
         lda #']'
         jsr source_reader_consume_char_from_scan_y
         bcc :+
@@ -3772,9 +3733,9 @@ collect_proc_body_ops_try_local_real_assignment:
         jmp collect_proc_body_ops_bad_literal
 :
         jsr skip_inline_spaces_at_scan_y
-        jsr source_reader_peek_scan_y
-        cmp #'='
-        bne :+
+        lda #'='
+        jsr source_reader_match_char_from_scan_y
+        bcs :+
         lda #'='
         jsr source_reader_consume_char_from_scan_y
         bcc :+
@@ -4016,12 +3977,8 @@ collect_proc_body_ops_try_return:
     jsr source_reader_consume_const_ptr_at_scan_ptr
     ldy #$00
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    beq collect_proc_body_ops_try_return_emit
-    cmp #10
-    beq collect_proc_body_ops_try_return_emit
-    cmp #13
-    beq collect_proc_body_ops_try_return_emit
+    jsr source_reader_match_line_end_from_scan_y
+    bcc collect_proc_body_ops_try_return_emit
     jsr emit_runtime_value_from_scan_y_or_fail
     bcc :+
     jmp collect_proc_body_ops_bad_literal
@@ -4042,9 +3999,9 @@ collect_proc_body_ops_try_assignment:
     sty hex_work
     ldy hex_work
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #'='
-    bne collect_proc_body_ops_try_local_call
+    lda #'='
+    jsr source_reader_match_char_from_scan_y
+    bcs collect_proc_body_ops_try_local_call
     sty symbol_end_y_data
     jsr find_var_index_from_declared
     bcc :+
@@ -4090,9 +4047,8 @@ collect_proc_body_ops_try_assignment_real:
 
 collect_proc_body_ops_try_local_call:
     ldy hex_work
-    jsr source_reader_peek_scan_y
-    cmp #'('
-    bne collect_proc_body_ops_skip_line
+    jsr source_reader_match_open_paren_from_scan_y
+    bcs collect_proc_body_ops_skip_line
     sty symbol_end_y_data
     jsr resolve_call_target_from_declared_or_fail
     bcs collect_proc_body_ops_bad_proc
@@ -4120,7 +4076,7 @@ collect_proc_body_ops_proc_decl:
     jsr skip_source_line
     jmp collect_proc_body_ops_loop
 collect_proc_body_ops_advance_blank:
-    jsr source_reader_consume_scan_ptr
+    jsr source_reader_consume_line_break_from_scan_ptr
     jmp collect_proc_body_ops_loop
 collect_proc_body_ops_bad_proc:
     lda #<msg_bad_proc
@@ -4589,6 +4545,17 @@ store_string_literal_to_reu_x_ok:
     rts
 .endif
 
+source_reader_begin_string_literal_from_scan_ptr:
+    lda #$00
+    sta reader_lookahead_valid_data
+    lda body_ptr
+    sta reader_token_ptr_lo_data
+    lda body_ptr+1
+    sta reader_token_ptr_hi_data
+    lda #$00
+    sta reader_pattern_index_data
+    rts
+
 store_string_literal_from_scan_ptr:
     ldx string_count_data
     cpx #STRING_LITERAL_MAX
@@ -4600,12 +4567,7 @@ store_string_literal_from_scan_ptr:
     jsr set_string_ptr_from_x
     pla
     tax
-    lda body_ptr
-    sta reader_token_ptr_lo_data
-    lda body_ptr+1
-    sta reader_token_ptr_hi_data
-    lda #$00
-    sta reader_pattern_index_data
+    jsr source_reader_begin_string_literal_from_scan_ptr
 store_string_literal_from_scan_ptr_loop:
     jsr source_reader_try_store_string_literal_byte_from_scan_ptr
     bcc store_string_literal_from_scan_ptr_loop
@@ -4679,6 +4641,7 @@ store_small_decimal_literal_from_scan_ptr:
     sec
     rts
 :   ldy #$00
+    jsr source_reader_save_literal_probe_mark
     txa
     pha
     jsr parse_small_value_expr_at_scan_y
@@ -4701,6 +4664,7 @@ store_small_decimal_literal_from_scan_ptr:
     clc
     rts
 store_small_decimal_literal_from_scan_ptr_fail:
+    jsr source_reader_restore_literal_probe_mark
     sec
     rts
 
@@ -4753,6 +4717,17 @@ store_word_literal_from_ay:
 .if ACTC_KEEP_BODY_RESIDENT_FALLBACK
 store_small_runtime_expr_from_scan_ptr:
     ldy #$00
+    jsr skip_inline_spaces_at_scan_y
+    lda #SOURCE_TOKEN_EQ
+    jsr source_reader_consume_expected_token_from_scan_y
+    jsr skip_inline_spaces_at_scan_y
+    lda #$00
+    sta expr_runtime_wrapped_data
+    lda #'['
+    jsr source_reader_consume_expected_token_from_scan_y
+    bcs :+
+    inc expr_runtime_wrapped_data
+:   jsr skip_inline_spaces_at_scan_y
     jsr scan_value_expr_for_top_level_arith_from_scan_y
     bcs :+
     jmp store_small_runtime_expr_sum_entry
@@ -4768,33 +4743,24 @@ store_small_runtime_expr_sum_entry:
     bcc :+
     sec
     rts
-:   jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    sta expr_compare_lo
-    cmp #')'
-    bne :+
+:   jsr store_small_runtime_expr_consume_close_from_scan_y
+    bcs :+
     jmp store_small_runtime_expr_print
 :
-    cmp #'='
-    beq store_small_runtime_expr_compare_entry
-    cmp #'<'
-    beq store_small_runtime_expr_compare_entry
-    cmp #'>'
-    beq store_small_runtime_expr_compare_entry
+    jsr source_reader_match_comparison_operator_from_scan_y
+    bcc store_small_runtime_expr_compare_entry
     sec
     rts
 store_small_runtime_expr_compare_entry:
+    tax
     lda #$00
     sta expr_runtime_post_zero
-    lda expr_compare_lo
+    txa
     cmp #'='
     beq store_small_runtime_expr_eq
     cmp #'<'
     beq store_small_runtime_expr_lt_entry
-    cmp #'>'
-    beq store_small_runtime_expr_gt_entry
-    sec
-    rts
+    bne store_small_runtime_expr_gt_entry
 store_small_runtime_expr_eq:
     lda #'q'
     sta expr_runtime_op
@@ -4806,11 +4772,8 @@ store_small_runtime_expr_lt_entry:
     lda #'<'
     jsr source_reader_consume_char_from_scan_y
     bcs store_small_runtime_expr_fail
-    jsr source_reader_peek_scan_y
-    cmp #'>'
-    beq store_small_runtime_expr_ne
-    cmp #'='
-    beq store_small_runtime_expr_le
+    jsr source_reader_match_comparison_suffix_from_scan_y
+    bcc store_small_runtime_expr_lt_suffix
     lda #'l'
     sta expr_runtime_op
     jmp store_small_runtime_expr_rhs
@@ -4818,12 +4781,15 @@ store_small_runtime_expr_gt_entry:
     lda #'>'
     jsr source_reader_consume_char_from_scan_y
     bcs store_small_runtime_expr_fail
-    jsr source_reader_peek_scan_y
-    cmp #'='
-    beq store_small_runtime_expr_ge
+    lda #'='
+    jsr source_reader_match_char_from_scan_y
+    bcc store_small_runtime_expr_ge
     lda #'g'
     sta expr_runtime_op
     jmp store_small_runtime_expr_rhs
+store_small_runtime_expr_lt_suffix:
+    cmp #'>'
+    beq store_small_runtime_expr_ne
 store_small_runtime_expr_le:
     lda #'g'
     sta expr_runtime_op
@@ -4854,10 +4820,8 @@ store_small_runtime_expr_rhs:
 store_small_runtime_expr_fail:
     sec
     rts
-:   jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #')'
-    bne store_small_runtime_expr_fail
+:   jsr store_small_runtime_expr_consume_close_from_scan_y
+    bcs store_small_runtime_expr_fail
     lda expr_runtime_op
     jsr append_body_op_no_arg_for_current_proc
     lda expr_runtime_post_zero
@@ -4881,11 +4845,24 @@ store_small_runtime_expr_bool_entry:
     sta bool_ops_used_data
     jsr emit_runtime_bool_or_from_scan_y_or_fail
     bcs store_small_runtime_expr_fail
-    jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #')'
-    bne store_small_runtime_expr_fail
+    jsr store_small_runtime_expr_consume_close_from_scan_y
+    bcs store_small_runtime_expr_fail
     jmp store_small_runtime_expr_print
+
+store_small_runtime_expr_consume_close_from_scan_y:
+    jsr skip_inline_spaces_at_scan_y
+    lda expr_runtime_wrapped_data
+    beq store_small_runtime_expr_consume_print_close_from_scan_y
+    lda #']'
+    jsr source_reader_consume_expected_token_from_scan_y
+    bcs store_small_runtime_expr_consume_close_from_scan_y_fail
+    jsr skip_inline_spaces_at_scan_y
+store_small_runtime_expr_consume_print_close_from_scan_y:
+    lda #')'
+    jmp source_reader_consume_expected_token_from_scan_y
+store_small_runtime_expr_consume_close_from_scan_y_fail:
+    sec
+    rts
 
 store_small_runtime_condition_with_a_from_scan_ptr:
     sta expr_print_op
@@ -4919,13 +4896,10 @@ store_small_runtime_printi_from_scan_ptr:
 store_runtime_real_print_with_newline_flag_from_scan_ptr:
     sta expr_runtime_post_zero
     jsr emit_runtime_real_value_from_scan_y_or_fail
-    bcs store_small_runtime_expr_fail
-    jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #')'
-    beq :+
+    bcc :+
     jmp store_small_runtime_expr_fail
 :
+    jsr skip_inline_spaces_at_scan_y
     lda #')'
     jsr source_reader_consume_char_from_scan_y
     bcc :+
@@ -5000,12 +4974,8 @@ store_small_runtime_condition_done_ok:
 
 require_line_end_at_scan_y:
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    beq require_line_end_at_scan_y_ok
-    cmp #10
-    beq require_line_end_at_scan_y_ok
-    cmp #13
-    beq require_line_end_at_scan_y_ok
+    jsr source_reader_match_line_end_from_scan_y
+    bcc require_line_end_at_scan_y_ok
     sec
     rts
 require_line_end_at_scan_y_ok:
@@ -5015,12 +4985,8 @@ require_line_end_at_scan_y_ok:
 .if ACTC_KEEP_BODY_RESIDENT_FALLBACK
 require_then_or_line_end_at_scan_y:
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    beq require_then_or_line_end_at_scan_y_ok
-    cmp #10
-    beq require_then_or_line_end_at_scan_y_ok
-    cmp #13
-    beq require_then_or_line_end_at_scan_y_ok
+    jsr source_reader_match_line_end_from_scan_y
+    bcc require_then_or_line_end_at_scan_y_ok
     lda #'T'
     jsr source_reader_consume_uppercase_char_from_scan_y
     bcs require_then_or_line_end_at_scan_y_fail
@@ -5034,12 +5000,8 @@ require_then_or_line_end_at_scan_y:
     jsr source_reader_consume_uppercase_char_from_scan_y
     bcs require_then_or_line_end_at_scan_y_fail
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    beq require_then_or_line_end_at_scan_y_ok
-    cmp #10
-    beq require_then_or_line_end_at_scan_y_ok
-    cmp #13
-    beq require_then_or_line_end_at_scan_y_ok
+    jsr source_reader_match_line_end_from_scan_y
+    bcc require_then_or_line_end_at_scan_y_ok
 require_then_or_line_end_at_scan_y_fail:
     sec
     rts
@@ -5049,12 +5011,8 @@ require_then_or_line_end_at_scan_y_ok:
 
 require_do_or_line_end_at_scan_y:
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    beq require_do_or_line_end_at_scan_y_ok
-    cmp #10
-    beq require_do_or_line_end_at_scan_y_ok
-    cmp #13
-    beq require_do_or_line_end_at_scan_y_ok
+    jsr source_reader_match_line_end_from_scan_y
+    bcc require_do_or_line_end_at_scan_y_ok
     lda #'D'
     jsr source_reader_consume_uppercase_char_from_scan_y
     bcs require_do_or_line_end_at_scan_y_fail
@@ -5062,12 +5020,8 @@ require_do_or_line_end_at_scan_y:
     jsr source_reader_consume_uppercase_char_from_scan_y
     bcs require_do_or_line_end_at_scan_y_fail
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    beq require_do_or_line_end_at_scan_y_ok
-    cmp #10
-    beq require_do_or_line_end_at_scan_y_ok
-    cmp #13
-    beq require_do_or_line_end_at_scan_y_ok
+    jsr source_reader_match_line_end_from_scan_y
+    bcc require_do_or_line_end_at_scan_y_ok
 require_do_or_line_end_at_scan_y_fail:
     sec
     rts
@@ -5172,15 +5126,22 @@ emit_runtime_term_push_word_literal_decimal:
 
 emit_runtime_group_value_term_from_scan_y_or_fail:
     jsr skip_inline_spaces_at_scan_y
-    lda #'('
-    jsr source_reader_consume_char_from_scan_y
+    jsr source_reader_peek_token_from_scan_y
+    bcs emit_runtime_group_value_term_from_scan_y_or_fail_fail
+    cmp #'('
+    bne emit_runtime_group_value_term_from_scan_y_or_fail_fail
+    jsr source_reader_consume_token_from_scan_y
     bcs emit_runtime_group_value_term_from_scan_y_or_fail_fail
     jsr emit_runtime_value_from_scan_y_or_fail
     bcs emit_runtime_group_value_term_from_scan_y_or_fail_fail
     jsr skip_inline_spaces_at_scan_y
-    lda #')'
-    jsr source_reader_consume_char_from_scan_y
+    jsr source_reader_peek_token_from_scan_y
     bcs emit_runtime_group_value_term_from_scan_y_or_fail_fail
+    cmp #')'
+    bne emit_runtime_group_value_term_from_scan_y_or_fail_fail
+    jsr source_reader_consume_token_from_scan_y
+    bcs emit_runtime_group_value_term_from_scan_y_or_fail_fail
+    clc
     rts
 emit_runtime_group_value_term_from_scan_y_or_fail_fail:
     sec
@@ -5234,9 +5195,6 @@ emit_runtime_int_explicit_value_from_scan_y_or_fail:
     bcs emit_runtime_int_explicit_value_from_scan_y_or_fail_fail
     ldy symbol_end_y_data
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #')'
-    bne emit_runtime_int_explicit_value_from_scan_y_or_fail_fail
     lda #')'
     jsr source_reader_consume_char_from_scan_y
     bcs emit_runtime_int_explicit_value_from_scan_y_or_fail_fail
@@ -5362,9 +5320,6 @@ emit_real_explicit_bridge_assignment_from_scan_y_or_fail:
     jsr require_var_index_real_bridge_word_or_fail
     bcs emit_real_explicit_bridge_assignment_from_scan_y_or_fail_fail
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #')'
-    bne emit_real_explicit_bridge_assignment_from_scan_y_or_fail_fail
     lda #')'
     jsr source_reader_consume_char_from_scan_y
     bcs emit_real_explicit_bridge_assignment_from_scan_y_or_fail_fail
@@ -5392,11 +5347,6 @@ emit_real_explicit_value_after_open_from_scan_y_or_fail:
     jmp emit_real_explicit_value_after_open_from_scan_y_or_fail_wide
 :
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #')'
-    beq :+
-    jmp emit_real_explicit_value_after_open_from_scan_y_or_fail_wide
-:
     lda #')'
     jsr source_reader_consume_char_from_scan_y
     bcc :+
@@ -5458,11 +5408,6 @@ emit_real_explicit_value_after_open_from_scan_y_or_fail_wide:
     jmp emit_real_explicit_value_after_open_from_scan_y_or_fail_signed
 :
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #')'
-    beq :+
-    jmp emit_real_explicit_value_after_open_from_scan_y_or_fail_signed
-:
     lda #')'
     jsr source_reader_consume_char_from_scan_y
     bcc :+
@@ -5507,22 +5452,12 @@ emit_real_explicit_value_after_open_from_scan_y_or_fail_signed:
     jsr restore_group_reader_mark
     ldy symbol_start_y_data
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #'0'
-    beq :+
-    jmp emit_real_explicit_value_after_open_from_scan_y_or_fail_fail
-:
     lda #'0'
     jsr source_reader_consume_char_from_scan_y
     bcc :+
     jmp emit_real_explicit_value_after_open_from_scan_y_or_fail_fail
 :
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #'-'
-    beq :+
-    jmp emit_real_explicit_value_after_open_from_scan_y_or_fail_fail
-:
     lda #'-'
     jsr source_reader_consume_char_from_scan_y
     bcc :+
@@ -5533,11 +5468,6 @@ emit_real_explicit_value_after_open_from_scan_y_or_fail_signed:
     jmp emit_real_explicit_value_after_open_from_scan_y_or_fail_fail
 :
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #')'
-    beq :+
-    jmp emit_real_explicit_value_after_open_from_scan_y_or_fail_fail
-:
     lda #')'
     jsr source_reader_consume_char_from_scan_y
     bcc :+
@@ -5686,16 +5616,10 @@ emit_real_wide_positive_int_assignment_from_scan_y_or_fail_fail:
 
 emit_real_wide_signed_int_assignment_from_scan_y_or_fail:
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #'0'
-    bne emit_real_wide_signed_int_assignment_from_scan_y_or_fail_fail
     lda #'0'
     jsr source_reader_consume_char_from_scan_y
     bcs emit_real_wide_signed_int_assignment_from_scan_y_or_fail_fail
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #'-'
-    bne emit_real_wide_signed_int_assignment_from_scan_y_or_fail_fail
     lda #'-'
     jsr source_reader_consume_char_from_scan_y
     bcs emit_real_wide_signed_int_assignment_from_scan_y_or_fail_fail
@@ -5763,14 +5687,11 @@ emit_real_bridge_assignment_from_var_index_ok_fail:
 
 emit_real_add_assignment_from_scan_y_or_fail:
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #'('
-    bne :+
+    jsr source_reader_match_open_paren_from_scan_y
+    bcs :+
     jmp emit_real_small_int_assignment_from_scan_y_or_fail
 :
-    cmp #'0'
-    bcc :+
-    cmp #'9'+1
+    jsr source_reader_peek_decimal_digit_value_from_scan_y
     bcs :+
     jmp emit_real_small_int_assignment_from_scan_y_or_fail
 :
@@ -5815,15 +5736,8 @@ emit_real_add_assignment_after_copy_check:
     jmp emit_real_add_assignment_from_scan_y_or_fail_fail
 :
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #'+'
-    beq :+
-    cmp #'-'
-    beq :+
-    cmp #'*'
-    beq :+
-    cmp #'/'
-    beq :+
+    jsr source_reader_match_real_binary_operator_from_scan_y
+    bcc :+
     jmp emit_real_add_assignment_from_scan_y_or_fail_fail
 :   sta real_operator_data
     jsr source_reader_consume_char_from_scan_y
@@ -5894,11 +5808,7 @@ emit_real_fabs_assignment_after_open_from_scan_y_or_fail:
     jmp emit_real_add_assignment_from_scan_y_or_fail_fail
 :   stx real_lhs_index_data
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #')'
-    beq :+
-    jmp emit_real_add_assignment_from_scan_y_or_fail_fail
-:   lda #')'
+    lda #')'
     jsr source_reader_consume_char_from_scan_y
     bcc :+
     jmp emit_real_add_assignment_from_scan_y_or_fail_fail
@@ -5993,7 +5903,7 @@ resolve_unresolved_external_call_target_from_declared_or_fail_fail:
 emit_call_args_from_scan_y_or_fail:
     jsr skip_inline_spaces_at_scan_y
     lda #'('
-    jsr source_reader_consume_char_from_scan_y
+    jsr source_reader_consume_expected_token_from_scan_y
     bcs :+
     jmp :++
 :
@@ -6003,9 +5913,9 @@ emit_call_args_from_scan_y_or_fail:
     lda #$00
     sta call_arg_count_data
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #')'
-    beq emit_call_args_from_scan_y_or_fail_done
+    lda #')'
+    jsr source_reader_consume_expected_token_from_scan_y
+    bcc emit_call_args_from_scan_y_or_fail_done
 emit_call_args_from_scan_y_or_fail_loop:
     lda call_arg_count_data
     pha
@@ -6039,27 +5949,18 @@ emit_call_args_from_scan_y_or_fail_restore_ok:
     sta call_arg_count_data
     inc call_arg_count_data
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #','
-    beq emit_call_args_from_scan_y_or_fail_next
-    cmp #')'
-    beq emit_call_args_from_scan_y_or_fail_done
+    lda #','
+    jsr source_reader_consume_expected_token_from_scan_y
+    bcc emit_call_args_from_scan_y_or_fail_next
+    lda #')'
+    jsr source_reader_consume_expected_token_from_scan_y
+    bcc emit_call_args_from_scan_y_or_fail_done
     sec
     rts
 emit_call_args_from_scan_y_or_fail_next:
-    lda #','
-    jsr source_reader_consume_char_from_scan_y
-    bcc :+
-    jmp emit_call_args_from_scan_y_or_fail_fail
-:
     jsr skip_inline_spaces_at_scan_y
     jmp emit_call_args_from_scan_y_or_fail_loop
 emit_call_args_from_scan_y_or_fail_done:
-    lda #')'
-    jsr source_reader_consume_char_from_scan_y
-    bcc :+
-    jmp emit_call_args_from_scan_y_or_fail_fail
-:
     lda call_expected_arg_count
     cmp #$FF
     beq emit_call_args_from_scan_y_or_fail_ok
@@ -6075,13 +5976,8 @@ emit_call_args_from_scan_y_or_fail_fail:
 
 emit_runtime_value_from_scan_y_or_fail:
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #'='
-    bne emit_runtime_value_from_scan_y_or_fail_after_equals
-    lda #'='
-    jsr source_reader_consume_char_from_scan_y
-    bcc emit_runtime_value_from_scan_y_or_fail_after_equals
-    jmp emit_runtime_expr_push_fail
+    lda #SOURCE_TOKEN_EQ
+    jsr source_reader_consume_expected_token_from_scan_y
 emit_runtime_value_from_scan_y_or_fail_after_equals:
     jsr skip_inline_spaces_at_scan_y
     jsr emit_small_constant_sum_from_scan_y_or_fail
@@ -6089,31 +5985,22 @@ emit_runtime_value_from_scan_y_or_fail_after_equals:
     clc
     rts
 :
-    jsr source_reader_peek_scan_y
-    cmp #'['
-    bne emit_runtime_value_from_scan_y_or_fail_after_group
     lda #'['
-    jsr source_reader_consume_char_from_scan_y
-    bcc :+
-    jmp emit_runtime_expr_push_fail
-:   jsr emit_runtime_value_from_scan_y_or_fail
+    jsr source_reader_consume_expected_token_from_scan_y
+    bcs emit_runtime_value_from_scan_y_or_fail_after_group
+    jsr emit_runtime_value_from_scan_y_or_fail
     bcc :+
     jmp emit_runtime_expr_push_fail
 :   jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #']'
-    beq :+
-    jmp emit_runtime_expr_push_fail
-:   lda #']'
-    jsr source_reader_consume_char_from_scan_y
+    lda #']'
+    jsr source_reader_consume_expected_token_from_scan_y
     bcc :+
     jmp emit_runtime_expr_push_fail
 :   clc
     rts
 emit_runtime_value_from_scan_y_or_fail_after_group:
-    jsr source_reader_peek_scan_y
-    cmp #'('
-    bne :+
+    jsr source_reader_match_open_paren_from_scan_y
+    bcs :+
     jsr scan_value_expr_for_top_level_arith_from_scan_y
     bcc emit_runtime_value_from_scan_y_or_fail_sum
 :
@@ -6134,18 +6021,17 @@ emit_small_constant_sum_from_scan_y_or_fail:
     jmp emit_small_constant_sum_from_scan_y_or_fail_restore
 :
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    beq emit_small_constant_sum_from_scan_y_or_fail_ok
-    cmp #10
-    beq emit_small_constant_sum_from_scan_y_or_fail_ok
-    cmp #13
-    beq emit_small_constant_sum_from_scan_y_or_fail_ok
-    cmp #','
-    beq emit_small_constant_sum_from_scan_y_or_fail_ok
-    cmp #')'
-    beq emit_small_constant_sum_from_scan_y_or_fail_ok
-    cmp #']'
-    beq emit_small_constant_sum_from_scan_y_or_fail_ok
+    jsr source_reader_match_line_end_from_scan_y
+    bcc emit_small_constant_sum_from_scan_y_or_fail_ok
+    lda #','
+    jsr source_reader_match_char_from_scan_y
+    bcc emit_small_constant_sum_from_scan_y_or_fail_ok
+    lda #')'
+    jsr source_reader_match_char_from_scan_y
+    bcc emit_small_constant_sum_from_scan_y_or_fail_ok
+    lda #']'
+    jsr source_reader_match_char_from_scan_y
+    bcc emit_small_constant_sum_from_scan_y_or_fail_ok
     jmp emit_small_constant_sum_from_scan_y_or_fail_restore
 emit_small_constant_sum_from_scan_y_or_fail_ok:
     jmp emit_current_expr_push_or_fail
@@ -6167,14 +6053,18 @@ scan_value_expr_for_top_level_arith_from_scan_y_loop:
     beq scan_value_expr_for_top_level_arith_from_scan_y_not_found
     cmp #13
     beq scan_value_expr_for_top_level_arith_from_scan_y_not_found
-    cmp #','
-    beq scan_value_expr_for_top_level_arith_from_scan_y_comma
-    cmp #']'
-    beq scan_value_expr_for_top_level_arith_from_scan_y_not_found
-    cmp #')'
-    beq scan_value_expr_for_top_level_arith_from_scan_y_rparen
-    cmp #'('
-    beq scan_value_expr_for_top_level_arith_from_scan_y_lparen
+    lda #','
+    jsr source_reader_match_char_from_scan_y
+    bcc scan_value_expr_for_top_level_arith_from_scan_y_comma
+    lda #']'
+    jsr source_reader_match_char_from_scan_y
+    bcc scan_value_expr_for_top_level_arith_from_scan_y_not_found
+    lda #')'
+    jsr source_reader_match_char_from_scan_y
+    bcc scan_value_expr_for_top_level_arith_from_scan_y_rparen
+    lda #'('
+    jsr source_reader_match_char_from_scan_y
+    bcc scan_value_expr_for_top_level_arith_from_scan_y_lparen
     ldx hex_work
     bne scan_value_expr_for_top_level_arith_from_scan_y_next
     cmp #'+'
@@ -6186,7 +6076,7 @@ scan_value_expr_for_top_level_arith_from_scan_y_loop:
     cmp #'/'
     beq scan_value_expr_for_top_level_arith_from_scan_y_found
 scan_value_expr_for_top_level_arith_from_scan_y_next:
-    jsr source_reader_consume_scan_y
+    jsr source_reader_consume_top_level_arith_scan_byte_from_scan_y
     bcc scan_value_expr_for_top_level_arith_from_scan_y_loop
 scan_value_expr_for_top_level_arith_from_scan_y_not_found:
     jsr restore_source_reader_mark
@@ -6196,7 +6086,8 @@ scan_value_expr_for_top_level_arith_from_scan_y_not_found:
 scan_value_expr_for_top_level_arith_from_scan_y_comma:
     lda hex_work
     beq scan_value_expr_for_top_level_arith_from_scan_y_not_found
-    jsr source_reader_consume_scan_y
+    lda #','
+    jsr source_reader_consume_char_from_scan_y
     bcc :+
     jmp scan_value_expr_for_top_level_arith_from_scan_y_not_found
 :
@@ -6205,14 +6096,16 @@ scan_value_expr_for_top_level_arith_from_scan_y_rparen:
     lda hex_work
     beq scan_value_expr_for_top_level_arith_from_scan_y_not_found
     dec hex_work
-    jsr source_reader_consume_scan_y
+    lda #')'
+    jsr source_reader_consume_char_from_scan_y
     bcc :+
     jmp scan_value_expr_for_top_level_arith_from_scan_y_not_found
 :
     jmp scan_value_expr_for_top_level_arith_from_scan_y_loop
 scan_value_expr_for_top_level_arith_from_scan_y_lparen:
     inc hex_work
-    jsr source_reader_consume_scan_y
+    lda #'('
+    jsr source_reader_consume_char_from_scan_y
     bcc :+
     jmp scan_value_expr_for_top_level_arith_from_scan_y_not_found
 :
@@ -6229,7 +6122,7 @@ scan_print_expr_for_bool_keywords_from_scan_y:
     jsr save_source_reader_mark
     lda #$00
     sta hex_work
-    sta reader_prev_symbol_data
+    jsr source_reader_reset_bool_scan_state
 scan_print_expr_for_bool_keywords_from_scan_y_loop:
     jsr source_reader_peek_scan_y
     beq scan_print_expr_for_bool_keywords_from_scan_y_not_found
@@ -6237,10 +6130,12 @@ scan_print_expr_for_bool_keywords_from_scan_y_loop:
     beq scan_print_expr_for_bool_keywords_from_scan_y_not_found
     cmp #13
     beq scan_print_expr_for_bool_keywords_from_scan_y_not_found
-    cmp #')'
-    beq scan_print_expr_for_bool_keywords_from_scan_y_rparen
-    cmp #'('
-    beq scan_print_expr_for_bool_keywords_from_scan_y_lparen
+    lda #')'
+    jsr source_reader_match_char_from_scan_y
+    bcc scan_print_expr_for_bool_keywords_from_scan_y_rparen
+    lda #'('
+    jsr source_reader_match_char_from_scan_y
+    bcc scan_print_expr_for_bool_keywords_from_scan_y_lparen
     jsr uppercase_ascii
     cmp #'A'
     beq scan_print_expr_for_bool_keywords_from_scan_y_try_and
@@ -6249,9 +6144,7 @@ scan_print_expr_for_bool_keywords_from_scan_y_loop:
     cmp #'N'
     beq scan_print_expr_for_bool_keywords_from_scan_y_try_not
 scan_print_expr_for_bool_keywords_from_scan_y_next:
-    jsr source_reader_peek_scan_y
-    jsr store_reader_prev_symbol_from_a
-    jsr source_reader_consume_scan_y
+    jsr source_reader_consume_bool_keyword_scan_byte_from_scan_y
     bcc scan_print_expr_for_bool_keywords_from_scan_y_loop
     jmp scan_print_expr_for_bool_keywords_from_scan_y_found
 scan_print_expr_for_bool_keywords_from_scan_y_not_found:
@@ -6263,18 +6156,16 @@ scan_print_expr_for_bool_keywords_from_scan_y_rparen:
     lda hex_work
     beq scan_print_expr_for_bool_keywords_from_scan_y_not_found
     dec hex_work
-    lda #$00
-    sta reader_prev_symbol_data
-    jsr source_reader_consume_scan_y
+    lda #')'
+    jsr source_reader_consume_bool_punctuation_from_scan_y
     bcc :+
     jmp scan_print_expr_for_bool_keywords_from_scan_y_found
 :
     jmp scan_print_expr_for_bool_keywords_from_scan_y_loop
 scan_print_expr_for_bool_keywords_from_scan_y_lparen:
     inc hex_work
-    lda #$00
-    sta reader_prev_symbol_data
-    jsr source_reader_consume_scan_y
+    lda #'('
+    jsr source_reader_consume_bool_punctuation_from_scan_y
     bcc :+
     jmp scan_print_expr_for_bool_keywords_from_scan_y_found
 :
@@ -6321,7 +6212,7 @@ scan_value_expr_for_bool_tokens_from_scan_y:
     jsr save_source_reader_mark
     lda #$00
     sta hex_work
-    sta reader_prev_symbol_data
+    jsr source_reader_reset_bool_scan_state
 scan_value_expr_for_bool_tokens_from_scan_y_loop:
     jsr source_reader_peek_scan_y
     beq scan_value_expr_for_bool_tokens_from_scan_y_not_found
@@ -6329,24 +6220,20 @@ scan_value_expr_for_bool_tokens_from_scan_y_loop:
     beq scan_value_expr_for_bool_tokens_from_scan_y_not_found
     cmp #13
     beq scan_value_expr_for_bool_tokens_from_scan_y_not_found
-    cmp #','
-    beq scan_value_expr_for_bool_tokens_from_scan_y_comma
-    cmp #']'
-    beq scan_value_expr_for_bool_tokens_from_scan_y_not_found
-    cmp #')'
-    beq scan_value_expr_for_bool_tokens_from_scan_y_rparen
-    cmp #'('
-    beq scan_value_expr_for_bool_tokens_from_scan_y_lparen
-    cmp #'='
-    bne :+
-    jmp scan_value_expr_for_bool_tokens_from_scan_y_found
-:
-    cmp #'<'
-    bne :+
-    jmp scan_value_expr_for_bool_tokens_from_scan_y_found
-:
-    cmp #'>'
-    bne :+
+    lda #','
+    jsr source_reader_match_char_from_scan_y
+    bcc scan_value_expr_for_bool_tokens_from_scan_y_comma
+    lda #']'
+    jsr source_reader_match_char_from_scan_y
+    bcc scan_value_expr_for_bool_tokens_from_scan_y_not_found
+    lda #')'
+    jsr source_reader_match_char_from_scan_y
+    bcc scan_value_expr_for_bool_tokens_from_scan_y_rparen
+    lda #'('
+    jsr source_reader_match_char_from_scan_y
+    bcc scan_value_expr_for_bool_tokens_from_scan_y_lparen
+    jsr source_reader_match_comparison_operator_from_scan_y
+    bcs :+
     jmp scan_value_expr_for_bool_tokens_from_scan_y_found
 :
     jsr uppercase_ascii
@@ -6359,9 +6246,7 @@ scan_value_expr_for_bool_tokens_from_scan_y_loop:
     jmp scan_value_expr_for_bool_tokens_from_scan_y_try_not
 :
 scan_value_expr_for_bool_tokens_from_scan_y_next:
-    jsr source_reader_peek_scan_y
-    jsr store_reader_prev_symbol_from_a
-    jsr source_reader_consume_scan_y
+    jsr source_reader_consume_bool_token_scan_byte_from_scan_y
     bcc scan_value_expr_for_bool_tokens_from_scan_y_loop
     jmp scan_value_expr_for_bool_tokens_from_scan_y_found
 scan_value_expr_for_bool_tokens_from_scan_y_not_found:
@@ -6372,9 +6257,8 @@ scan_value_expr_for_bool_tokens_from_scan_y_not_found:
 scan_value_expr_for_bool_tokens_from_scan_y_comma:
     lda hex_work
     beq scan_value_expr_for_bool_tokens_from_scan_y_not_found
-    lda #$00
-    sta reader_prev_symbol_data
-    jsr source_reader_consume_scan_y
+    lda #','
+    jsr source_reader_consume_bool_punctuation_from_scan_y
     bcc :+
     jmp scan_value_expr_for_bool_tokens_from_scan_y_found
 :
@@ -6383,18 +6267,16 @@ scan_value_expr_for_bool_tokens_from_scan_y_rparen:
     lda hex_work
     beq scan_value_expr_for_bool_tokens_from_scan_y_not_found
     dec hex_work
-    lda #$00
-    sta reader_prev_symbol_data
-    jsr source_reader_consume_scan_y
+    lda #')'
+    jsr source_reader_consume_bool_punctuation_from_scan_y
     bcc :+
     jmp scan_value_expr_for_bool_tokens_from_scan_y_found
 :
     jmp scan_value_expr_for_bool_tokens_from_scan_y_loop
 scan_value_expr_for_bool_tokens_from_scan_y_lparen:
     inc hex_work
-    lda #$00
-    sta reader_prev_symbol_data
-    jsr source_reader_consume_scan_y
+    lda #'('
+    jsr source_reader_consume_bool_punctuation_from_scan_y
     bcc :+
     jmp scan_value_expr_for_bool_tokens_from_scan_y_found
 :
@@ -6543,7 +6425,10 @@ emit_runtime_bool_not_from_scan_y_or_fail:
 
 emit_runtime_bool_primary_from_scan_y_or_fail:
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
+    jsr source_reader_peek_token_from_scan_y
+    bcc :+
+    jmp emit_runtime_condition_clause_from_scan_y_or_fail
+:
     cmp #'('
     beq :+
     jmp emit_runtime_condition_clause_from_scan_y_or_fail
@@ -6551,25 +6436,24 @@ emit_runtime_bool_primary_from_scan_y_or_fail:
     tya
     pha
     jsr save_group_reader_mark
-    lda #'('
-    jsr source_reader_consume_char_from_scan_y
+    jsr source_reader_consume_token_from_scan_y
+    bcs emit_runtime_bool_primary_restore_clause
     jsr emit_runtime_bool_or_from_scan_y_or_fail
     bcs emit_runtime_bool_primary_restore_clause
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
+    jsr source_reader_peek_token_from_scan_y
+    bcs emit_runtime_bool_primary_restore_clause
     cmp #')'
     bne emit_runtime_bool_primary_restore_clause
-    lda #')'
-    jsr source_reader_consume_char_from_scan_y
+    jsr source_reader_consume_token_from_scan_y
+    bcs emit_runtime_bool_primary_restore_clause
     sty compare_char
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #'='
-    beq emit_runtime_bool_primary_restore_clause
-    cmp #'<'
-    beq emit_runtime_bool_primary_restore_clause
-    cmp #'>'
-    beq emit_runtime_bool_primary_restore_clause
+    jsr source_reader_peek_token_from_scan_y
+    bcs emit_runtime_bool_primary_group_done
+    jsr source_reader_token_is_comparison_operator
+    bcc emit_runtime_bool_primary_restore_clause
+emit_runtime_bool_primary_group_done:
     ldy compare_char
     pla
     clc
@@ -6594,22 +6478,12 @@ emit_runtime_real_push_literal_from_saved_indexes:
 try_consume_real_open_for_runtime_condition_from_scan_y:
     sty symbol_start_y_data
     jsr save_source_reader_mark
-    lda #'R'
-    jsr source_reader_consume_uppercase_char_from_scan_y
+    lda #<pattern_real_decl
+    sta const_ptr
+    lda #>pattern_real_decl
+    sta const_ptr+1
+    jsr consume_keyword_open_from_scan_y
     bcs try_consume_real_open_for_runtime_condition_from_scan_y_fail_restore
-    lda #'E'
-    jsr source_reader_consume_uppercase_char_from_scan_y
-    bcs try_consume_real_open_for_runtime_condition_from_scan_y_fail_restore
-    lda #'A'
-    jsr source_reader_consume_uppercase_char_from_scan_y
-    bcs try_consume_real_open_for_runtime_condition_from_scan_y_fail_restore
-    lda #'L'
-    jsr source_reader_consume_uppercase_char_from_scan_y
-    bcs try_consume_real_open_for_runtime_condition_from_scan_y_fail_restore
-    lda #'('
-    jsr source_reader_consume_char_from_scan_y
-    bcs try_consume_real_open_for_runtime_condition_from_scan_y_fail_restore
-    jsr skip_inline_spaces_at_scan_y
     clc
     rts
 try_consume_real_open_for_runtime_condition_from_scan_y_fail_restore:
@@ -6629,11 +6503,8 @@ emit_runtime_real_explicit_bridge_value_from_scan_y_or_fail:
     bcs emit_runtime_real_explicit_bridge_value_from_scan_y_or_fail_fail
     ldy symbol_end_y_data
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #')'
-    bne emit_runtime_real_explicit_bridge_value_from_scan_y_or_fail_fail
     lda #')'
-    jsr source_reader_consume_char_from_scan_y
+    jsr source_reader_consume_expected_token_from_scan_y
     bcs emit_runtime_real_explicit_bridge_value_from_scan_y_or_fail_fail
     ldx real_lhs_index_data
     lda #'L'
@@ -6666,15 +6537,12 @@ emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail:
     bcc :+
     jmp emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail_wide
 :   jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #')'
-    beq :+
-    jmp emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail_wide
-:   lda #')'
-    jsr source_reader_consume_char_from_scan_y
+    lda #')'
+    jsr source_reader_consume_expected_token_from_scan_y
     bcc :+
     jmp emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail_wide
 :   jsr skip_inline_spaces_at_scan_y
+    sty symbol_end_y_data
     lda expr_value_hi
     bne emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail_wide
     lda expr_value_lo
@@ -6688,7 +6556,6 @@ emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail:
     bcc :+
     jmp emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail_fail
 :   stx keyword_scan_ptr_lo_data
-    sty symbol_end_y_data
     jsr find_or_store_rt_i_to_f_external
     bcc :+
     jmp emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail_fail
@@ -6718,15 +6585,12 @@ emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail_wide:
     bcc :+
     jmp emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail_signed
 :   jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #')'
-    beq :+
-    jmp emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail_signed
-:   lda #')'
-    jsr source_reader_consume_char_from_scan_y
+    lda #')'
+    jsr source_reader_consume_expected_token_from_scan_y
     bcc :+
     jmp emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail_signed
 :   jsr skip_inline_spaces_at_scan_y
+    sty symbol_end_y_data
     lda expr_value_lo
     ora expr_value_hi
     beq emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail_zero
@@ -6736,7 +6600,6 @@ emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail_wide:
     bcc :+
     jmp emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail_fail
 :   stx keyword_scan_ptr_lo_data
-    sty symbol_end_y_data
     jsr find_or_store_rt_i_to_f_external
     bcc :+
     jmp emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail_fail
@@ -6756,29 +6619,20 @@ emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail_signed:
     jsr restore_group_reader_mark
     ldy symbol_start_y_data
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #'0'
-    bne emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail_fail
-    lda #'0'
-    jsr source_reader_consume_char_from_scan_y
+    jsr source_reader_consume_single_zero_decimal_from_scan_y
     bcs emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail_fail
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #'-'
-    bne emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail_fail
     lda #'-'
-    jsr source_reader_consume_char_from_scan_y
+    jsr source_reader_consume_expected_token_from_scan_y
     bcs emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail_fail
     jsr parse_optional_grouped_positive_word_sum_at_scan_y
     bcs emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail_fail
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #')'
-    bne emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail_fail
     lda #')'
-    jsr source_reader_consume_char_from_scan_y
+    jsr source_reader_consume_expected_token_from_scan_y
     bcs emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail_fail
     jsr skip_inline_spaces_at_scan_y
+    sty symbol_end_y_data
     lda expr_value_lo
     ora expr_value_hi
     bne :+
@@ -6796,7 +6650,6 @@ emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail_signed:
     jsr store_word_literal_from_ay
     bcs emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail_fail
     stx keyword_scan_ptr_lo_data
-    sty symbol_end_y_data
     jsr find_or_store_rt_s_to_f_external
     bcs emit_runtime_real_explicit_value_after_open_from_scan_y_or_fail_fail
     stx keyword_scan_ptr_hi_data
@@ -6848,89 +6701,64 @@ emit_runtime_real_value_from_scan_y_or_fail_fail:
 
 emit_runtime_real_condition_clause_from_scan_y_or_fail:
     jsr emit_runtime_real_value_from_scan_y_or_fail
-    bcc :+
-    sec
-    rts
-:   jsr source_reader_peek_scan_y
-    sta expr_compare_lo
-    cmp #'='
+    bcs emit_runtime_real_condition_clause_fail
+    jsr source_reader_peek_token_from_scan_y
+    bcs emit_runtime_real_condition_clause_fail
+    jsr source_reader_token_is_comparison_operator
+    bcs emit_runtime_real_condition_clause_fail
+emit_runtime_real_condition_clause_compare_entry:
+    tax
+    lda #$01
+    sta expr_value_lo
+    cpx #SOURCE_TOKEN_EQ
     beq emit_runtime_real_condition_clause_eq
-    cmp #'<'
-    beq emit_runtime_real_condition_clause_lt_entry
-    cmp #'>'
-    beq emit_runtime_real_condition_clause_gt_entry
-    sec
-    rts
+    cpx #SOURCE_TOKEN_LT
+    beq emit_runtime_real_condition_clause_lt
+    cpx #SOURCE_TOKEN_GT
+    beq emit_runtime_real_condition_clause_gt
+    cpx #SOURCE_TOKEN_LE
+    beq emit_runtime_real_condition_clause_le
+    cpx #SOURCE_TOKEN_GE
+    beq emit_runtime_real_condition_clause_ge
+    lda #'n'
+    bne emit_runtime_real_condition_clause_store_op
 emit_runtime_real_condition_clause_eq:
     lda #'q'
-    sta expr_runtime_op
-    lda #$01
-    sta expr_value_lo
-    lda #'='
-    jsr source_reader_consume_char_from_scan_y
-    bcs emit_runtime_real_condition_clause_fail
-    jmp emit_runtime_real_condition_clause_rhs
-emit_runtime_real_condition_clause_lt_entry:
-    lda #'<'
-    jsr source_reader_consume_char_from_scan_y
-    bcs emit_runtime_real_condition_clause_fail
-    jsr source_reader_peek_scan_y
-    cmp #'>'
-    beq emit_runtime_real_condition_clause_ne
-    cmp #'='
-    beq emit_runtime_real_condition_clause_le
+    bne emit_runtime_real_condition_clause_store_op
+emit_runtime_real_condition_clause_lt:
     lda #'l'
-    sta expr_runtime_op
-    lda #$01
-    sta expr_value_lo
-    jmp emit_runtime_real_condition_clause_rhs
-emit_runtime_real_condition_clause_gt_entry:
-    lda #'>'
-    jsr source_reader_consume_char_from_scan_y
-    bcs emit_runtime_real_condition_clause_fail
-    jsr source_reader_peek_scan_y
-    cmp #'='
-    beq emit_runtime_real_condition_clause_ge
+    bne emit_runtime_real_condition_clause_store_op
+emit_runtime_real_condition_clause_gt:
     lda #'g'
-    sta expr_runtime_op
-    lda #$01
-    sta expr_value_lo
-    jmp emit_runtime_real_condition_clause_rhs
-emit_runtime_real_condition_clause_ne:
-    lda #'n'
-    sta expr_runtime_op
-    lda #$01
-    sta expr_value_lo
-    lda #'>'
-    jsr source_reader_consume_char_from_scan_y
-    bcs emit_runtime_real_condition_clause_fail
-    jmp emit_runtime_real_condition_clause_rhs
+    bne emit_runtime_real_condition_clause_store_op
 emit_runtime_real_condition_clause_le:
-    lda #'l'
-    sta expr_runtime_op
     lda #$02
     sta expr_value_lo
-    lda #'='
-    jsr source_reader_consume_char_from_scan_y
-    bcs emit_runtime_real_condition_clause_fail
-    jmp emit_runtime_real_condition_clause_rhs
+    lda #'l'
+    bne emit_runtime_real_condition_clause_store_op
 emit_runtime_real_condition_clause_ge:
-    lda #'g'
-    sta expr_runtime_op
     lda #$00
     sta expr_value_lo
-    lda #'='
-    jsr source_reader_consume_char_from_scan_y
+    lda #'g'
+emit_runtime_real_condition_clause_store_op:
+    sta expr_runtime_op
+    lda expr_value_lo
+    pha
+    jsr source_reader_consume_token_from_scan_y
     bcc emit_runtime_real_condition_clause_rhs
+    pla
 emit_runtime_real_condition_clause_fail:
     sec
     rts
 emit_runtime_real_condition_clause_rhs:
     jsr emit_runtime_real_value_from_scan_y_or_fail
     bcc :+
+    pla
     sec
     rts
-:   sty symbol_start_y_data
+:   pla
+    sta expr_value_lo
+    sty symbol_start_y_data
     jsr find_or_store_rt_f_cmp_external
     bcc :+
     sec
@@ -6969,74 +6797,51 @@ emit_runtime_condition_clause_from_scan_y_or_fail:
     sec
     rts
 :   jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    sta expr_compare_lo
-    cmp #'='
-    beq emit_runtime_condition_clause_compare_entry
-    cmp #'<'
-    beq emit_runtime_condition_clause_compare_entry
-    cmp #'>'
-    beq emit_runtime_condition_clause_compare_entry
+    jsr source_reader_peek_token_from_scan_y
+    bcs emit_runtime_condition_clause_done
+    jsr source_reader_token_is_comparison_operator
+    bcc emit_runtime_condition_clause_compare_entry
     jmp emit_runtime_condition_clause_done
 emit_runtime_condition_clause_compare_entry:
+    tax
     lda #$00
     sta expr_runtime_post_zero
-    lda expr_compare_lo
-    cmp #'='
+    cpx #SOURCE_TOKEN_EQ
     beq emit_runtime_condition_clause_eq
-    cmp #'<'
-    beq emit_runtime_condition_clause_lt_entry
-    cmp #'>'
-    beq emit_runtime_condition_clause_gt_entry
-    sec
-    rts
+    cpx #SOURCE_TOKEN_LT
+    beq emit_runtime_condition_clause_lt
+    cpx #SOURCE_TOKEN_GT
+    beq emit_runtime_condition_clause_gt
+    cpx #SOURCE_TOKEN_LE
+    beq emit_runtime_condition_clause_le
+    cpx #SOURCE_TOKEN_GE
+    beq emit_runtime_condition_clause_ge
+    lda #'n'
+    bne emit_runtime_condition_clause_store_op
 emit_runtime_condition_clause_eq:
     lda #'q'
-    sta expr_runtime_op
-    lda #'='
-    jsr source_reader_consume_char_from_scan_y
-    jmp emit_runtime_condition_clause_rhs
-emit_runtime_condition_clause_lt_entry:
-    lda #'<'
-    jsr source_reader_consume_char_from_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #'>'
-    beq emit_runtime_condition_clause_ne
-    cmp #'='
-    beq emit_runtime_condition_clause_le
+    bne emit_runtime_condition_clause_store_op
+emit_runtime_condition_clause_lt:
     lda #'l'
-    sta expr_runtime_op
-    jmp emit_runtime_condition_clause_rhs
-emit_runtime_condition_clause_gt_entry:
-    lda #'>'
-    jsr source_reader_consume_char_from_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #'='
-    beq emit_runtime_condition_clause_ge
+    bne emit_runtime_condition_clause_store_op
+emit_runtime_condition_clause_gt:
     lda #'g'
-    sta expr_runtime_op
-    jmp emit_runtime_condition_clause_rhs
+    bne emit_runtime_condition_clause_store_op
 emit_runtime_condition_clause_le:
     lda #'g'
-    sta expr_runtime_op
-    lda #$01
-    sta expr_runtime_post_zero
-    lda #'='
-    jsr source_reader_consume_char_from_scan_y
-    jmp emit_runtime_condition_clause_rhs
+    bne emit_runtime_condition_clause_store_inverted_op
 emit_runtime_condition_clause_ge:
     lda #'l'
+emit_runtime_condition_clause_store_inverted_op:
     sta expr_runtime_op
     lda #$01
     sta expr_runtime_post_zero
-    lda #'='
-    jsr source_reader_consume_char_from_scan_y
-    jmp emit_runtime_condition_clause_rhs
-emit_runtime_condition_clause_ne:
-    lda #'n'
+    bne emit_runtime_condition_clause_consume
+emit_runtime_condition_clause_store_op:
     sta expr_runtime_op
-    lda #'>'
-    jsr source_reader_consume_char_from_scan_y
+emit_runtime_condition_clause_consume:
+    jsr source_reader_consume_token_from_scan_y
+    bcs emit_runtime_condition_clause_fail
 emit_runtime_condition_clause_rhs:
     jsr emit_runtime_sum_from_scan_y_or_fail
     bcc :+
@@ -7062,6 +6867,9 @@ emit_runtime_condition_clause_done:
 emit_runtime_condition_clause_real_done:
     clc
     rts
+emit_runtime_condition_clause_fail:
+    sec
+    rts
 
 normalize_runtime_top_to_bool_or_fail:
     lda #$00
@@ -7078,13 +6886,14 @@ normalize_runtime_top_to_bool_or_fail:
     rts
 
 emit_runtime_sum_from_scan_y_or_fail:
-    jsr emit_runtime_term_push_from_scan_y_or_fail
+    jsr emit_runtime_product_from_scan_y_or_fail
     bcc :+
     jmp emit_runtime_expr_push_fail
 :
 emit_runtime_sum_from_scan_y_loop:
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
+    jsr source_reader_peek_token_from_scan_y
+    bcs emit_runtime_sum_from_scan_y_fail
     cmp #'+'
     beq emit_runtime_sum_from_scan_y_add
     cmp #'-'
@@ -7092,9 +6901,9 @@ emit_runtime_sum_from_scan_y_loop:
     clc
     rts
 emit_runtime_sum_from_scan_y_add:
-    lda #'+'
-    jsr source_reader_consume_char_from_scan_y
-    jsr emit_runtime_term_push_from_scan_y_or_fail
+    jsr source_reader_consume_token_from_scan_y
+    bcs emit_runtime_sum_from_scan_y_fail
+    jsr emit_runtime_product_from_scan_y_or_fail
     bcc :+
     jmp emit_runtime_expr_push_fail
 :
@@ -7102,15 +6911,51 @@ emit_runtime_sum_from_scan_y_add:
     jsr append_body_op_no_arg_for_current_proc
     jmp emit_runtime_sum_from_scan_y_loop
 emit_runtime_sum_from_scan_y_sub:
-    lda #'-'
-    jsr source_reader_consume_char_from_scan_y
-    jsr emit_runtime_term_push_from_scan_y_or_fail
+    jsr source_reader_consume_token_from_scan_y
+    bcs emit_runtime_sum_from_scan_y_fail
+    jsr emit_runtime_product_from_scan_y_or_fail
     bcc :+
     jmp emit_runtime_expr_push_fail
 :
     lda #'m'
     jsr append_body_op_no_arg_for_current_proc
     jmp emit_runtime_sum_from_scan_y_loop
+emit_runtime_sum_from_scan_y_fail:
+    sec
+    rts
+
+emit_runtime_product_from_scan_y_or_fail:
+    jsr emit_runtime_term_push_from_scan_y_or_fail
+    bcs emit_runtime_product_from_scan_y_fail
+emit_runtime_product_from_scan_y_loop:
+    jsr skip_inline_spaces_at_scan_y
+    jsr source_reader_peek_token_from_scan_y
+    bcs emit_runtime_product_from_scan_y_fail
+    cmp #'*'
+    beq emit_runtime_product_from_scan_y_mul
+    cmp #'/'
+    beq emit_runtime_product_from_scan_y_div
+    clc
+    rts
+emit_runtime_product_from_scan_y_mul:
+    jsr source_reader_consume_token_from_scan_y
+    bcs emit_runtime_product_from_scan_y_fail
+    jsr emit_runtime_term_push_from_scan_y_or_fail
+    bcs emit_runtime_product_from_scan_y_fail
+    lda #'*'
+    jsr append_body_op_no_arg_for_current_proc
+    jmp emit_runtime_product_from_scan_y_loop
+emit_runtime_product_from_scan_y_div:
+    jsr source_reader_consume_token_from_scan_y
+    bcs emit_runtime_product_from_scan_y_fail
+    jsr emit_runtime_term_push_from_scan_y_or_fail
+    bcs emit_runtime_product_from_scan_y_fail
+    lda #'/'
+    jsr append_body_op_no_arg_for_current_proc
+    jmp emit_runtime_product_from_scan_y_loop
+emit_runtime_product_from_scan_y_fail:
+    sec
+    rts
 
 store_expr_value_as_int_literal:
     ldx int_count_data
@@ -7136,35 +6981,24 @@ store_expr_value_as_int_literal:
 
 parse_small_value_expr_at_scan_y:
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #'='
-    bne parse_small_value_expr_at_scan_y_after_equals
-    lda #'='
-    jsr source_reader_consume_char_from_scan_y
-    bcs parse_small_value_expr_at_scan_y_fail
+    lda #SOURCE_TOKEN_EQ
+    jsr source_reader_consume_expected_token_from_scan_y
     jsr skip_inline_spaces_at_scan_y
 parse_small_value_expr_at_scan_y_after_equals:
-    jsr source_reader_peek_scan_y
-    cmp #'['
-    bne parse_small_value_expr_at_scan_y_after_group
     lda #'['
-    jsr source_reader_consume_char_from_scan_y
-    bcs parse_small_value_expr_at_scan_y_fail
+    jsr source_reader_consume_expected_token_from_scan_y
+    bcs parse_small_value_expr_at_scan_y_after_group
     jsr parse_small_value_expr_at_scan_y
     bcs parse_small_value_expr_at_scan_y_fail
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #']'
-    bne parse_small_value_expr_at_scan_y_fail
     lda #']'
-    jsr source_reader_consume_char_from_scan_y
+    jsr source_reader_consume_expected_token_from_scan_y
     bcs parse_small_value_expr_at_scan_y_fail
     clc
     rts
 parse_small_value_expr_at_scan_y_after_group:
-    jsr source_reader_peek_scan_y
-    cmp #'('
-    bne :+
+    jsr source_reader_match_open_paren_from_scan_y
+    bcs :+
     jsr scan_value_expr_for_top_level_arith_from_scan_y
     bcc parse_small_value_expr_at_scan_y_sum_entry
 :
@@ -7195,12 +7029,14 @@ parse_small_bool_or_at_scan_y_loop:
     bcs parse_small_bool_or_at_scan_y_done
     jsr normalize_small_expr_value_to_bool
     lda expr_value_lo
-    sta expr_saved_lo
+    pha
     jsr parse_small_bool_and_at_scan_y
-    bcs parse_small_bool_or_at_scan_y_fail
+    bcs parse_small_bool_or_at_scan_y_pop_fail
     jsr normalize_small_expr_value_to_bool
-    lda expr_saved_lo
-    ora expr_value_lo
+    lda expr_value_lo
+    sta compare_char
+    pla
+    ora compare_char
     beq parse_small_bool_or_at_scan_y_store
     lda #$01
 parse_small_bool_or_at_scan_y_store:
@@ -7209,6 +7045,8 @@ parse_small_bool_or_at_scan_y_store:
 parse_small_bool_or_at_scan_y_done:
     clc
     rts
+parse_small_bool_or_at_scan_y_pop_fail:
+    pla
 parse_small_bool_or_at_scan_y_fail:
     sec
     rts
@@ -7221,12 +7059,14 @@ parse_small_bool_and_at_scan_y_loop:
     bcs parse_small_bool_and_at_scan_y_done
     jsr normalize_small_expr_value_to_bool
     lda expr_value_lo
-    sta expr_saved_lo
+    pha
     jsr parse_small_bool_not_at_scan_y
-    bcs parse_small_bool_and_at_scan_y_fail
+    bcs parse_small_bool_and_at_scan_y_pop_fail
     jsr normalize_small_expr_value_to_bool
-    lda expr_saved_lo
-    and expr_value_lo
+    lda expr_value_lo
+    sta compare_char
+    pla
+    and compare_char
     beq parse_small_bool_and_at_scan_y_store
     lda #$01
 parse_small_bool_and_at_scan_y_store:
@@ -7235,6 +7075,8 @@ parse_small_bool_and_at_scan_y_store:
 parse_small_bool_and_at_scan_y_done:
     clc
     rts
+parse_small_bool_and_at_scan_y_pop_fail:
+    pla
 parse_small_bool_and_at_scan_y_fail:
     sec
     rts
@@ -7256,31 +7098,35 @@ parse_small_bool_not_at_scan_y_fail:
 
 parse_small_bool_primary_at_scan_y:
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
+    jsr source_reader_peek_token_from_scan_y
+    bcc :+
+    jmp parse_small_bool_condition_clause_at_scan_y
+:
     cmp #'('
-    bne parse_small_bool_condition_clause_at_scan_y
+    beq :+
+    jmp parse_small_bool_condition_clause_at_scan_y
+:
     tya
     pha
     jsr save_group_reader_mark
-    lda #'('
-    jsr source_reader_consume_char_from_scan_y
+    jsr source_reader_consume_token_from_scan_y
+    bcs parse_small_bool_primary_restore_clause
     jsr parse_small_bool_or_at_scan_y
     bcs parse_small_bool_primary_restore_clause
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
+    jsr source_reader_peek_token_from_scan_y
+    bcs parse_small_bool_primary_restore_clause
     cmp #')'
     bne parse_small_bool_primary_restore_clause
-    lda #')'
-    jsr source_reader_consume_char_from_scan_y
+    jsr source_reader_consume_token_from_scan_y
+    bcs parse_small_bool_primary_restore_clause
     sty compare_char
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #'='
-    beq parse_small_bool_primary_restore_clause
-    cmp #'<'
-    beq parse_small_bool_primary_restore_clause
-    cmp #'>'
-    beq parse_small_bool_primary_restore_clause
+    jsr source_reader_peek_token_from_scan_y
+    bcs parse_small_bool_primary_group_done
+    jsr source_reader_token_is_comparison_operator
+    bcc parse_small_bool_primary_restore_clause
+parse_small_bool_primary_group_done:
     ldy compare_char
     pla
     clc
@@ -7295,262 +7141,106 @@ parse_small_bool_condition_clause_at_scan_y:
 parse_small_condition_clause_at_scan_y:
     jsr skip_inline_spaces_at_scan_y
     jsr parse_small_decimal_sum_at_scan_y
-    bcc parse_small_condition_clause_lhs_ok
-    jmp parse_small_condition_clause_at_scan_y_fail
-parse_small_condition_clause_lhs_ok:
-    lda expr_value_lo
-    sta expr_compare_lo
-    jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #'='
-    beq parse_small_condition_clause_eq
-    cmp #'<'
-    beq parse_small_condition_clause_lt_entry
-    cmp #'>'
-    beq parse_small_condition_clause_gt_entry
-    lda expr_compare_lo
-    sta expr_value_lo
-    clc
-    rts
-
-parse_small_condition_clause_eq:
-    lda #'='
-    jsr source_reader_consume_char_from_scan_y
-    jsr parse_small_decimal_sum_at_scan_y
-    bcc parse_small_condition_clause_eq_ok
-    jmp parse_small_condition_clause_at_scan_y_fail
-parse_small_condition_clause_eq_ok:
-    lda expr_compare_lo
-    cmp expr_value_lo
-    bne :+
-    jmp parse_small_condition_clause_true
+    bcc :+
+    jmp parse_small_comparison_tail_at_scan_y_fail
 :
-    jmp parse_small_condition_clause_false
-
-parse_small_condition_clause_lt_entry:
-    lda #'<'
-    jsr source_reader_consume_char_from_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #'='
-    beq parse_small_condition_clause_le
-    cmp #'>'
-    beq parse_small_condition_clause_ne
-    jsr parse_small_decimal_sum_at_scan_y
-    bcc parse_small_condition_clause_lt_ok
-    jmp parse_small_condition_clause_at_scan_y_fail
-parse_small_condition_clause_lt_ok:
-    lda expr_compare_lo
-    cmp expr_value_lo
-    bcc parse_small_condition_clause_true
-    jmp parse_small_condition_clause_false
-
-parse_small_condition_clause_gt_entry:
-    lda #'>'
-    jsr source_reader_consume_char_from_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #'='
-    beq parse_small_condition_clause_ge
-    jsr parse_small_decimal_sum_at_scan_y
-    bcc parse_small_condition_clause_gt_ok
-    jmp parse_small_condition_clause_at_scan_y_fail
-parse_small_condition_clause_gt_ok:
-    lda expr_compare_lo
-    cmp expr_value_lo
-    beq parse_small_condition_clause_false
-    bcs parse_small_condition_clause_true
-    jmp parse_small_condition_clause_false
-
-parse_small_condition_clause_le:
-    lda #'='
-    jsr source_reader_consume_char_from_scan_y
-    jsr parse_small_decimal_sum_at_scan_y
-    bcc parse_small_condition_clause_le_ok
-    jmp parse_small_condition_clause_at_scan_y_fail
-parse_small_condition_clause_le_ok:
-    lda expr_compare_lo
-    cmp expr_value_lo
-    beq parse_small_condition_clause_true
-    bcc parse_small_condition_clause_true
-    jmp parse_small_condition_clause_false
-
-parse_small_condition_clause_ge:
-    lda #'='
-    jsr source_reader_consume_char_from_scan_y
-    jsr parse_small_decimal_sum_at_scan_y
-    bcc parse_small_condition_clause_ge_ok
-    jmp parse_small_condition_clause_at_scan_y_fail
-parse_small_condition_clause_ge_ok:
-    lda expr_compare_lo
-    cmp expr_value_lo
-    beq parse_small_condition_clause_true
-    bcs parse_small_condition_clause_true
-    jmp parse_small_condition_clause_false
-
-parse_small_condition_clause_ne:
-    lda #'>'
-    jsr source_reader_consume_char_from_scan_y
-    jsr parse_small_decimal_sum_at_scan_y
-    bcc parse_small_condition_clause_ne_ok
-    jmp parse_small_condition_clause_at_scan_y_fail
-parse_small_condition_clause_ne_ok:
-    lda expr_compare_lo
-    cmp expr_value_lo
-    beq parse_small_condition_clause_false
-    jmp parse_small_condition_clause_true
-
-parse_small_condition_clause_true:
-    lda #$01
-    sta expr_value_lo
-    clc
-    rts
-
-parse_small_condition_clause_false:
-    lda #$00
-    sta expr_value_lo
-    clc
-    rts
-
-parse_small_condition_clause_at_scan_y_fail:
-    sec
-    rts
+    jmp parse_small_comparison_tail_at_scan_y
 
 parse_small_decimal_expr_at_scan_y:
     jsr skip_inline_spaces_at_scan_y
     jsr parse_small_decimal_sum_at_scan_y
-    bcc parse_small_decimal_expr_lhs_ok
-    jmp parse_small_decimal_expr_at_scan_y_fail
-parse_small_decimal_expr_lhs_ok:
-    lda expr_value_lo
-    sta expr_compare_lo
+    bcc :+
+    jmp parse_small_comparison_tail_at_scan_y_fail
+:
+
+parse_small_comparison_tail_at_scan_y:
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #'='
-    beq parse_small_decimal_expr_eq
-    cmp #'<'
-    beq parse_small_decimal_expr_lt_entry
-    cmp #'>'
-    beq parse_small_decimal_expr_gt_entry
-    lda expr_compare_lo
-    sta expr_value_lo
+    jsr source_reader_peek_token_from_scan_y
+    bcc :+
+    jmp parse_small_comparison_tail_at_scan_y_fail
+:
+    jsr source_reader_token_is_comparison_operator
+    bcc parse_small_comparison_tail_at_scan_y_consume
     clc
     rts
 
-parse_small_decimal_expr_eq:
-    lda #'='
-    jsr source_reader_consume_char_from_scan_y
+parse_small_comparison_tail_at_scan_y_consume:
+    pha
+    lda expr_value_lo
+    pha
+    jsr source_reader_consume_token_from_scan_y
+    bcs parse_small_comparison_tail_at_scan_y_pop_fail
     jsr parse_small_decimal_sum_at_scan_y
-    bcc parse_small_decimal_expr_eq_ok
-    jmp parse_small_decimal_expr_at_scan_y_fail
-parse_small_decimal_expr_eq_ok:
+    bcs parse_small_comparison_tail_at_scan_y_pop_fail
+    pla
+    sta expr_compare_lo
+    pla
+    tax
+    cpx #SOURCE_TOKEN_EQ
+    beq parse_small_comparison_tail_at_scan_y_eq
+    cpx #SOURCE_TOKEN_LT
+    beq parse_small_comparison_tail_at_scan_y_lt
+    cpx #SOURCE_TOKEN_GT
+    beq parse_small_comparison_tail_at_scan_y_gt
+    cpx #SOURCE_TOKEN_LE
+    beq parse_small_comparison_tail_at_scan_y_le
+    cpx #SOURCE_TOKEN_GE
+    beq parse_small_comparison_tail_at_scan_y_ge
+
+parse_small_comparison_tail_at_scan_y_ne:
     lda expr_compare_lo
     cmp expr_value_lo
-    beq parse_small_decimal_expr_eq_true
-    jmp parse_small_decimal_expr_false
-parse_small_decimal_expr_eq_true:
-    jmp parse_small_decimal_expr_true
+    bne parse_small_comparison_tail_at_scan_y_true
+    jmp parse_small_comparison_tail_at_scan_y_false
 
-parse_small_decimal_expr_lt_entry:
-    lda #'<'
-    jsr source_reader_consume_char_from_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #'='
-    beq parse_small_decimal_expr_le
-    cmp #'>'
-    beq parse_small_decimal_expr_ne
-    jsr parse_small_decimal_sum_at_scan_y
-    bcc parse_small_decimal_expr_lt_ok
-    jmp parse_small_decimal_expr_at_scan_y_fail
-parse_small_decimal_expr_lt_ok:
+parse_small_comparison_tail_at_scan_y_eq:
     lda expr_compare_lo
     cmp expr_value_lo
-    bcc parse_small_decimal_expr_lt_true
-    jmp parse_small_decimal_expr_false
-parse_small_decimal_expr_lt_true:
-    jmp parse_small_decimal_expr_true
+    beq parse_small_comparison_tail_at_scan_y_true
+    jmp parse_small_comparison_tail_at_scan_y_false
 
-parse_small_decimal_expr_gt_entry:
-    lda #'>'
-    jsr source_reader_consume_char_from_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #'='
-    beq parse_small_decimal_expr_ge
-    jsr parse_small_decimal_sum_at_scan_y
-    bcc parse_small_decimal_expr_gt_ok
-    jmp parse_small_decimal_expr_at_scan_y_fail
-parse_small_decimal_expr_gt_ok:
+parse_small_comparison_tail_at_scan_y_lt:
     lda expr_compare_lo
     cmp expr_value_lo
-    beq parse_small_decimal_expr_gt_false
-    bcs parse_small_decimal_expr_gt_true
-    jmp parse_small_decimal_expr_false
-parse_small_decimal_expr_gt_true:
-    jmp parse_small_decimal_expr_true
-parse_small_decimal_expr_gt_false:
-    jmp parse_small_decimal_expr_false
+    bcc parse_small_comparison_tail_at_scan_y_true
+    jmp parse_small_comparison_tail_at_scan_y_false
 
-parse_small_decimal_expr_le:
-    lda #'='
-    jsr source_reader_consume_char_from_scan_y
-    jsr parse_small_decimal_sum_at_scan_y
-    bcc parse_small_decimal_expr_le_ok
-    jmp parse_small_decimal_expr_at_scan_y_fail
-parse_small_decimal_expr_le_ok:
+parse_small_comparison_tail_at_scan_y_gt:
     lda expr_compare_lo
     cmp expr_value_lo
-    beq parse_small_decimal_expr_le_true
-    bcc parse_small_decimal_expr_le_true
-    jmp parse_small_decimal_expr_false
-parse_small_decimal_expr_le_true:
-    jmp parse_small_decimal_expr_true
+    beq parse_small_comparison_tail_at_scan_y_false
+    bcs parse_small_comparison_tail_at_scan_y_true
+    jmp parse_small_comparison_tail_at_scan_y_false
 
-parse_small_decimal_expr_ge:
-    lda #'='
-    jsr source_reader_consume_char_from_scan_y
-    jsr parse_small_decimal_sum_at_scan_y
-    bcc parse_small_decimal_expr_ge_ok
-    jmp parse_small_decimal_expr_at_scan_y_fail
-parse_small_decimal_expr_ge_ok:
+parse_small_comparison_tail_at_scan_y_le:
     lda expr_compare_lo
     cmp expr_value_lo
-    beq parse_small_decimal_expr_ge_true
-    bcs parse_small_decimal_expr_ge_true
-    jmp parse_small_decimal_expr_false
-parse_small_decimal_expr_ge_true:
-    jmp parse_small_decimal_expr_true
+    beq parse_small_comparison_tail_at_scan_y_true
+    bcc parse_small_comparison_tail_at_scan_y_true
+    jmp parse_small_comparison_tail_at_scan_y_false
 
-parse_small_decimal_expr_ne:
-    lda #'>'
-    jsr source_reader_consume_char_from_scan_y
-    jsr parse_small_decimal_sum_at_scan_y
-    bcc parse_small_decimal_expr_ne_ok
-    jmp parse_small_decimal_expr_at_scan_y_fail
-parse_small_decimal_expr_ne_ok:
+parse_small_comparison_tail_at_scan_y_ge:
     lda expr_compare_lo
     cmp expr_value_lo
-    beq parse_small_decimal_expr_ne_false
-    jmp parse_small_decimal_expr_true
-parse_small_decimal_expr_ne_false:
-    jmp parse_small_decimal_expr_false
+    bcs parse_small_comparison_tail_at_scan_y_true
+    jmp parse_small_comparison_tail_at_scan_y_false
 
-parse_small_decimal_expr_done:
-    lda expr_compare_lo
-    sta expr_value_lo
-    clc
-    rts
-
-parse_small_decimal_expr_true:
+parse_small_comparison_tail_at_scan_y_true:
     lda #$01
     sta expr_value_lo
     clc
     rts
 
-parse_small_decimal_expr_false:
+parse_small_comparison_tail_at_scan_y_false:
     lda #$00
     sta expr_value_lo
     clc
     rts
 
-parse_small_decimal_expr_at_scan_y_fail:
+parse_small_comparison_tail_at_scan_y_pop_fail:
+    pla
+    pla
+parse_small_comparison_tail_at_scan_y_fail:
     sec
     rts
 
@@ -7563,42 +7253,39 @@ parse_small_decimal_sum_at_scan_y:
     sta expr_saved_lo
 parse_small_decimal_sum_loop:
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    beq :+
-    cmp #10
-    beq :+
-    cmp #13
-    beq :+
-    cmp #','
-    beq :+
+    jsr source_reader_peek_token_from_scan_y
+    bcc :+
+    jmp parse_small_decimal_sum_at_scan_y_fail
+:
+    jsr source_reader_token_is_numeric_sum_stop
+    bcc parse_small_decimal_sum_done_jump
     cmp #'+'
-    beq parse_small_decimal_sum_add
+    bne parse_small_decimal_sum_not_add
+    jmp parse_small_decimal_sum_add
+parse_small_decimal_sum_not_add:
     cmp #'-'
-    beq parse_small_decimal_sum_sub
-    cmp #')'
-    beq parse_small_decimal_sum_done
-    cmp #']'
-    beq parse_small_decimal_sum_done
-    cmp #'='
-    beq parse_small_decimal_sum_done
-    cmp #'<'
-    beq parse_small_decimal_sum_done
-    cmp #'>'
-    beq parse_small_decimal_sum_done
-    jsr uppercase_ascii
+    bne parse_small_decimal_sum_not_sub
+    jmp parse_small_decimal_sum_sub
+parse_small_decimal_sum_not_sub:
+    cmp #SOURCE_TOKEN_SYMBOL
+    beq :+
+    jmp parse_small_decimal_sum_at_scan_y_fail
+:
+    lda reader_token_buffer
     cmp #'A'
     beq parse_small_decimal_sum_try_and
     cmp #'O'
     beq parse_small_decimal_sum_try_or
     jmp parse_small_decimal_sum_at_scan_y_fail
-:   jmp parse_small_decimal_sum_done
+parse_small_decimal_sum_done_jump:
+    jmp parse_small_decimal_sum_done
 
 parse_small_decimal_sum_try_and:
     lda #<pattern_and
     sta const_ptr
     lda #>pattern_and
     sta const_ptr+1
-    jsr scan_keyword_token_from_scan_y
+    jsr source_reader_token_buffer_matches_const_ptr
     bcc parse_small_decimal_sum_done
     jmp parse_small_decimal_sum_at_scan_y_fail
 
@@ -7607,33 +7294,41 @@ parse_small_decimal_sum_try_or:
     sta const_ptr
     lda #>pattern_or
     sta const_ptr+1
-    jsr scan_keyword_token_from_scan_y
+    jsr source_reader_token_buffer_matches_const_ptr
     bcc parse_small_decimal_sum_done
     jmp parse_small_decimal_sum_at_scan_y_fail
 
 parse_small_decimal_sum_add:
-    lda #'+'
-    jsr source_reader_consume_char_from_scan_y
+    jsr source_reader_consume_token_from_scan_y
+    bcs parse_small_decimal_sum_at_scan_y_fail
+    lda expr_saved_lo
+    pha
     jsr parse_small_decimal_term_at_scan_y
     bcc :+
-    jmp parse_small_decimal_sum_at_scan_y_fail
-:   lda expr_saved_lo
+    jmp parse_small_decimal_sum_pop_fail
+:
+    sta compare_char
+    pla
     clc
-    adc expr_value_lo
+    adc compare_char
     bcc :+
     jmp parse_small_decimal_sum_at_scan_y_fail
 :   sta expr_saved_lo
     jmp parse_small_decimal_sum_loop
 
 parse_small_decimal_sum_sub:
-    lda #'-'
-    jsr source_reader_consume_char_from_scan_y
+    jsr source_reader_consume_token_from_scan_y
+    bcs parse_small_decimal_sum_at_scan_y_fail
+    lda expr_saved_lo
+    pha
     jsr parse_small_decimal_term_at_scan_y
     bcc :+
-    jmp parse_small_decimal_sum_at_scan_y_fail
-:   lda expr_saved_lo
+    jmp parse_small_decimal_sum_pop_fail
+:
+    sta compare_char
+    pla
     sec
-    sbc expr_value_lo
+    sbc compare_char
     bcs :+
     jmp parse_small_decimal_sum_at_scan_y_fail
 :   sta expr_saved_lo
@@ -7645,6 +7340,8 @@ parse_small_decimal_sum_done:
     clc
     rts
 
+parse_small_decimal_sum_pop_fail:
+    pla
 parse_small_decimal_sum_at_scan_y_fail:
     sec
     rts
@@ -7652,12 +7349,15 @@ parse_small_decimal_sum_at_scan_y_fail:
 parse_small_decimal_term_at_scan_y:
     jsr skip_inline_spaces_at_scan_y
     jsr parse_small_decimal_factor_at_scan_y
-    bcs parse_small_decimal_term_at_scan_y_fail
+    bcc :+
+    jmp parse_small_decimal_term_at_scan_y_fail
+:
     lda expr_value_lo
     sta expr_term_lo
 parse_small_decimal_term_loop:
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
+    jsr source_reader_peek_token_from_scan_y
+    bcs parse_small_decimal_term_at_scan_y_fail
     cmp #'*'
     beq parse_small_decimal_term_mul
     cmp #'/'
@@ -7668,14 +7368,16 @@ parse_small_decimal_term_loop:
     rts
 
 parse_small_decimal_term_mul:
-    lda #'*'
-    jsr source_reader_consume_char_from_scan_y
-    jsr parse_small_decimal_factor_at_scan_y
+    jsr source_reader_consume_token_from_scan_y
     bcs parse_small_decimal_term_at_scan_y_fail
     lda expr_term_lo
-    sta compare_char
+    pha
+    jsr parse_small_decimal_factor_at_scan_y
+    bcs parse_small_decimal_term_pop_fail
     lda expr_value_lo
     sta hex_work
+    pla
+    sta compare_char
     lda #$00
     sta expr_term_lo
 parse_small_decimal_term_mul_loop:
@@ -7690,14 +7392,16 @@ parse_small_decimal_term_mul_loop:
     jmp parse_small_decimal_term_mul_loop
 
 parse_small_decimal_term_div:
-    lda #'/'
-    jsr source_reader_consume_char_from_scan_y
-    jsr parse_small_decimal_factor_at_scan_y
+    jsr source_reader_consume_token_from_scan_y
     bcs parse_small_decimal_term_at_scan_y_fail
-    lda expr_value_lo
-    beq parse_small_decimal_term_at_scan_y_fail
-    sta hex_work
     lda expr_term_lo
+    pha
+    jsr parse_small_decimal_factor_at_scan_y
+    bcs parse_small_decimal_term_pop_fail
+    lda expr_value_lo
+    beq parse_small_decimal_term_pop_fail
+    sta hex_work
+    pla
     sta compare_char
     lda #$00
     sta expr_term_lo
@@ -7711,37 +7415,45 @@ parse_small_decimal_term_div_loop:
     inc expr_term_lo
     bne parse_small_decimal_term_div_loop
 
+parse_small_decimal_term_pop_fail:
+    pla
 parse_small_decimal_term_at_scan_y_fail:
     sec
     rts
 
 parse_small_decimal_factor_at_scan_y:
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
+    jsr source_reader_peek_token_from_scan_y
+    bcs parse_small_decimal_factor_at_scan_y_fail
     cmp #'('
     beq parse_small_decimal_factor_group
+    cmp #SOURCE_TOKEN_SYMBOL
+    bne parse_small_decimal_factor_not_symbol
     jsr find_builtin_constant_from_scan_y
-    bcs :+
+    bcs parse_small_decimal_factor_at_scan_y_fail
     lda expr_value_hi
     beq parse_small_decimal_factor_constant_ok
     jmp parse_small_decimal_factor_at_scan_y_fail
 parse_small_decimal_factor_constant_ok:
     clc
     rts
-:
+parse_small_decimal_factor_not_symbol:
+    cmp #SOURCE_TOKEN_DECIMAL
+    bne parse_small_decimal_factor_at_scan_y_fail
     jmp parse_small_decimal_at_scan_y
 
 parse_small_decimal_factor_group:
-    lda #'('
-    jsr source_reader_consume_char_from_scan_y
+    jsr source_reader_consume_token_from_scan_y
+    bcs parse_small_decimal_factor_at_scan_y_fail
     jsr parse_small_value_expr_at_scan_y
     bcs parse_small_decimal_factor_at_scan_y_fail
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
+    jsr source_reader_peek_token_from_scan_y
+    bcs parse_small_decimal_factor_at_scan_y_fail
     cmp #')'
     bne parse_small_decimal_factor_at_scan_y_fail
-    lda #')'
-    jsr source_reader_consume_char_from_scan_y
+    jsr source_reader_consume_token_from_scan_y
+    bcs parse_small_decimal_factor_at_scan_y_fail
     clc
     rts
 
@@ -7751,38 +7463,16 @@ parse_small_decimal_factor_at_scan_y_fail:
 
 parse_small_decimal_at_scan_y:
     jsr skip_inline_spaces_at_scan_y
-    lda #$00
-    sta expr_value_lo
-    sta expr_digit_count
-parse_small_decimal_at_scan_y_loop:
-    jsr source_reader_peek_scan_y
-    cmp #'0'
-    bcc parse_small_decimal_at_scan_y_done_check
-    cmp #'9'+1
-    bcs parse_small_decimal_at_scan_y_done_check
-    sec
-    sbc #'0'
-    sta compare_char
-    lda expr_value_lo
-    sta hex_work
-    asl a
-    sta truncated_flag
-    lda hex_work
-    asl a
-    asl a
-    asl a
-    clc
-    adc truncated_flag
+    jsr source_reader_peek_token_from_scan_y
     bcs parse_small_decimal_at_scan_y_fail
-    adc compare_char
-    bcs parse_small_decimal_at_scan_y_fail
+    cmp #SOURCE_TOKEN_DECIMAL
+    bne parse_small_decimal_at_scan_y_fail
+    lda reader_lookahead_value_hi_data
+    bne parse_small_decimal_at_scan_y_fail
+    lda reader_lookahead_value_lo_data
     sta expr_value_lo
-    jsr source_reader_consume_scan_y
-    inc expr_digit_count
-    bne parse_small_decimal_at_scan_y_loop
-parse_small_decimal_at_scan_y_done_check:
-    lda expr_digit_count
-    beq parse_small_decimal_at_scan_y_fail
+    jsr source_reader_consume_token_from_scan_y
+    bcs parse_small_decimal_at_scan_y_fail
     clc
     rts
 parse_small_decimal_at_scan_y_fail:
@@ -7793,14 +7483,9 @@ parse_plain_word_decimal_at_scan_y:
     lda #$00
     sta expr_value_lo
     sta expr_value_hi
-    jsr source_reader_peek_scan_y
-    cmp #'0'
-    bcc parse_plain_word_decimal_at_scan_y_fail
-    cmp #'9'+1
+    jsr source_reader_peek_decimal_digit_value_from_scan_y
     bcs parse_plain_word_decimal_at_scan_y_fail
 parse_plain_word_decimal_at_scan_y_digit:
-    sec
-    sbc #'0'
     pha
     lda expr_value_lo
     sta expr_saved_lo
@@ -7829,11 +7514,9 @@ parse_plain_word_decimal_at_scan_y_mul10_loop:
     adc #$00
     sta expr_value_hi
     bcs parse_plain_word_decimal_at_scan_y_fail
-    jsr source_reader_consume_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #'0'
-    bcc parse_plain_word_decimal_at_scan_y_done_check
-    cmp #'9'+1
+    jsr source_reader_consume_decimal_digit_from_scan_y
+    bcs parse_plain_word_decimal_at_scan_y_fail
+    jsr source_reader_peek_decimal_digit_value_from_scan_y
     bcc parse_plain_word_decimal_at_scan_y_digit
 parse_plain_word_decimal_at_scan_y_done_check:
     clc
@@ -7844,7 +7527,7 @@ parse_plain_word_decimal_at_scan_y_fail:
     sec
     rts
 
-.if ACTC_KEEP_BODY_RESIDENT_FALLBACK + ACTC_PREALLOCATE_BODY_EXTERNALS
+.if ACTC_USE_RESIDENT_POSITIVE_WORD_PARSER
 parse_positive_word_sum_at_scan_y:
     jsr skip_inline_spaces_at_scan_y
     jsr parse_positive_word_term_at_scan_y
@@ -7852,76 +7535,69 @@ parse_positive_word_sum_at_scan_y:
     sec
     rts
 :   lda expr_value_lo
-    sta expr_compare_lo
+    sta expr_word_sum_lo
     lda expr_value_hi
-    sta expr_compare_hi
+    sta expr_word_sum_hi
 parse_positive_word_sum_loop:
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    beq parse_positive_word_sum_done
-    cmp #10
-    beq parse_positive_word_sum_done
-    cmp #13
-    beq parse_positive_word_sum_done
-    cmp #','
-    beq parse_positive_word_sum_done
-    cmp #')'
-    beq parse_positive_word_sum_done
-    cmp #']'
-    beq parse_positive_word_sum_done
-    cmp #'='
-    beq parse_positive_word_sum_done
-    cmp #'<'
-    beq parse_positive_word_sum_done
-    cmp #'>'
-    beq parse_positive_word_sum_done
+    jsr source_reader_peek_token_from_scan_y
+    bcs parse_positive_word_sum_fail
+    jsr source_reader_token_is_numeric_sum_stop
+    bcc parse_positive_word_sum_done_jump
     cmp #'+'
-    beq parse_positive_word_sum_add
+    bne parse_positive_word_sum_not_add
+    jmp parse_positive_word_sum_add
+parse_positive_word_sum_not_add:
     cmp #'-'
-    beq parse_positive_word_sum_sub
+    bne parse_positive_word_sum_not_sub
+    jmp parse_positive_word_sum_sub
+parse_positive_word_sum_not_sub:
+parse_positive_word_sum_fail:
     sec
     rts
+parse_positive_word_sum_done_jump:
+    jmp parse_positive_word_sum_done
 
 parse_positive_word_sum_add:
-    lda #'+'
-    jsr source_reader_consume_char_from_scan_y
+    jsr source_reader_consume_token_from_scan_y
+    bcs parse_positive_word_sum_fail
     jsr parse_positive_word_term_at_scan_y
     bcc :+
     sec
     rts
 :   clc
-    lda expr_compare_lo
+    lda expr_word_sum_lo
     adc expr_value_lo
-    sta expr_compare_lo
-    lda expr_compare_hi
+    sta expr_word_sum_lo
+    lda expr_word_sum_hi
     adc expr_value_hi
-    sta expr_compare_hi
+    sta expr_word_sum_hi
     bcc parse_positive_word_sum_loop
     sec
     rts
 
 parse_positive_word_sum_sub:
-    lda #'-'
-    jsr source_reader_consume_char_from_scan_y
+    jsr source_reader_consume_token_from_scan_y
+    bcs parse_positive_word_sum_fail
     jsr parse_positive_word_term_at_scan_y
     bcc :+
     sec
     rts
-:   lda expr_compare_lo
+:   lda expr_word_sum_lo
     sec
     sbc expr_value_lo
-    sta expr_compare_lo
-    lda expr_compare_hi
+    sta expr_word_sum_lo
+    lda expr_word_sum_hi
     sbc expr_value_hi
-    sta expr_compare_hi
+    sta expr_word_sum_hi
     bcs parse_positive_word_sum_loop
     sec
     rts
 
 parse_positive_word_sum_done:
-    lda expr_compare_lo
+    lda expr_word_sum_lo
     sta expr_value_lo
-    lda expr_compare_hi
+    lda expr_word_sum_hi
     sta expr_value_hi
     clc
     rts
@@ -7938,7 +7614,10 @@ parse_positive_word_term_at_scan_y:
     sta expr_term_hi
 parse_positive_word_term_loop:
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
+    jsr source_reader_peek_token_from_scan_y
+    bcc :+
+    jmp parse_positive_word_term_at_scan_y_fail
+:
     cmp #'*'
     beq parse_positive_word_term_mul
     cmp #'/'
@@ -7955,8 +7634,10 @@ parse_positive_word_term_mul:
     sta expr_compare_lo
     lda expr_term_hi
     sta expr_compare_hi
-    lda #'*'
-    jsr source_reader_consume_char_from_scan_y
+    jsr source_reader_consume_token_from_scan_y
+    bcc :+
+    jmp parse_positive_word_term_at_scan_y_fail
+:
     jsr parse_positive_word_factor_at_scan_y
     bcc :+
     sec
@@ -7995,8 +7676,8 @@ parse_positive_word_term_div:
     sta expr_compare_lo
     lda expr_term_hi
     sta expr_compare_hi
-    lda #'/'
-    jsr source_reader_consume_char_from_scan_y
+    jsr source_reader_consume_token_from_scan_y
+    bcs parse_positive_word_term_at_scan_y_fail
     jsr parse_positive_word_factor_at_scan_y
     bcc :+
     sec
@@ -8040,43 +7721,57 @@ parse_positive_word_term_at_scan_y_fail:
 
 parse_positive_word_factor_at_scan_y:
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
+    jsr source_reader_peek_token_from_scan_y
+    bcs parse_positive_word_term_at_scan_y_fail
     cmp #'('
     beq parse_positive_word_factor_group
-    jsr find_builtin_constant_from_scan_y
-    bcs :+
+    cmp #SOURCE_TOKEN_SYMBOL
+    beq parse_positive_word_factor_symbol
+    cmp #SOURCE_TOKEN_DECIMAL
+    bne :+
+    jmp parse_positive_word_decimal_at_scan_y
+:
+    sec
+    rts
+
+parse_positive_word_factor_symbol:
+    jsr source_reader_publish_lookahead_symbol
+    jsr find_builtin_constant_from_declared
+    bcs parse_positive_word_term_at_scan_y_fail
+    ldy reader_lookahead_y_data
+    jsr source_reader_consume_token_from_scan_y
+    bcs parse_positive_word_term_at_scan_y_fail
     clc
     rts
-:
-    jmp parse_positive_word_decimal_at_scan_y
 
 parse_positive_word_factor_group:
-    lda expr_compare_lo
+    lda expr_word_sum_lo
     sta expr_group_saved_compare_lo
-    lda expr_compare_hi
+    lda expr_word_sum_hi
     sta expr_group_saved_compare_hi
     lda expr_saved_lo
     sta expr_group_saved_saved_lo
     lda expr_saved_hi
     sta expr_group_saved_saved_hi
-    lda #'('
-    jsr source_reader_consume_char_from_scan_y
+    jsr source_reader_consume_token_from_scan_y
+    bcs parse_positive_word_term_at_scan_y_fail
     jsr parse_positive_word_sum_at_scan_y
     bcc :+
     sec
     rts
 :   jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
+    jsr source_reader_peek_token_from_scan_y
+    bcs parse_positive_word_term_at_scan_y_fail
     cmp #')'
-    beq :+
-    jmp parse_positive_word_decimal_at_scan_y_fail
+    bne parse_positive_word_term_at_scan_y_fail
+    jsr source_reader_consume_token_from_scan_y
+    bcc :+
+    jmp parse_positive_word_term_at_scan_y_fail
 :
-    lda #')'
-    jsr source_reader_consume_char_from_scan_y
     lda expr_group_saved_compare_lo
-    sta expr_compare_lo
+    sta expr_word_sum_lo
     lda expr_group_saved_compare_hi
-    sta expr_compare_hi
+    sta expr_word_sum_hi
     lda expr_group_saved_saved_lo
     sta expr_saved_lo
     lda expr_group_saved_saved_hi
@@ -8086,73 +7781,36 @@ parse_positive_word_factor_group:
 
 parse_optional_grouped_positive_word_sum_at_scan_y:
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
+    jsr source_reader_peek_token_from_scan_y
+    bcs parse_optional_grouped_positive_word_sum_at_scan_y_fail
     cmp #'('
     beq :+
     jmp parse_positive_word_sum_at_scan_y
 :
-    lda #'('
-    jsr source_reader_consume_char_from_scan_y
-    bcs parse_positive_word_term_at_scan_y_fail
+    jsr source_reader_consume_token_from_scan_y
+    bcs parse_optional_grouped_positive_word_sum_at_scan_y_fail
     jsr parse_positive_word_sum_at_scan_y
-    bcs parse_positive_word_term_at_scan_y_fail
+    bcs parse_optional_grouped_positive_word_sum_at_scan_y_fail
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
+    jsr source_reader_peek_token_from_scan_y
+    bcs parse_optional_grouped_positive_word_sum_at_scan_y_fail
     cmp #')'
-    bne parse_positive_word_decimal_at_scan_y_fail
-    lda #')'
-    jsr source_reader_consume_char_from_scan_y
+    bne parse_optional_grouped_positive_word_sum_at_scan_y_fail
+    jsr source_reader_consume_token_from_scan_y
+    bcs parse_optional_grouped_positive_word_sum_at_scan_y_fail
     clc
+    rts
+parse_optional_grouped_positive_word_sum_at_scan_y_fail:
+    sec
     rts
 
 parse_positive_word_decimal_at_scan_y:
-    jsr skip_inline_spaces_at_scan_y
-    lda #$00
+    lda reader_lookahead_value_lo_data
     sta expr_value_lo
+    lda reader_lookahead_value_hi_data
     sta expr_value_hi
-    sta expr_digit_count
-parse_positive_word_decimal_at_scan_y_loop:
-    jsr source_reader_peek_scan_y
-    cmp #'0'
-    bcc parse_positive_word_decimal_at_scan_y_done_check
-    cmp #'9'+1
-    bcs parse_positive_word_decimal_at_scan_y_done_check
-    sec
-    sbc #'0'
-    sta compare_char
-    lda expr_value_lo
-    sta expr_saved_lo
-    lda expr_value_hi
-    sta expr_saved_hi
-    lda #$00
-    sta expr_term_lo
-    sta expr_term_hi
-    ldx #10
-parse_positive_word_decimal_at_scan_y_mul10_loop:
-    clc
-    lda expr_term_lo
-    adc expr_saved_lo
-    sta expr_term_lo
-    lda expr_term_hi
-    adc expr_saved_hi
-    sta expr_term_hi
+    jsr source_reader_consume_token_from_scan_y
     bcs parse_positive_word_decimal_at_scan_y_fail
-    dex
-    bne parse_positive_word_decimal_at_scan_y_mul10_loop
-    clc
-    lda expr_term_lo
-    adc compare_char
-    sta expr_value_lo
-    lda expr_term_hi
-    adc #$00
-    sta expr_value_hi
-    bcs parse_positive_word_decimal_at_scan_y_fail
-    jsr source_reader_consume_scan_y
-    inc expr_digit_count
-    bne parse_positive_word_decimal_at_scan_y_loop
-parse_positive_word_decimal_at_scan_y_done_check:
-    lda expr_digit_count
-    beq parse_positive_word_decimal_at_scan_y_fail
     clc
     rts
 parse_positive_word_decimal_at_scan_y_fail:
@@ -8168,7 +7826,7 @@ skip_inline_spaces_at_scan_y:
     beq skip_inline_spaces_at_scan_y_advance
     rts
 skip_inline_spaces_at_scan_y_advance:
-    jsr source_reader_consume_scan_y
+    jsr source_reader_consume_inline_space_from_scan_y
     bcc skip_inline_spaces_at_scan_y
     rts
 
@@ -8413,6 +8071,47 @@ restore_condition_reader_mark:
     sta scan_ptr+1
     rts
 
+source_reader_save_literal_probe_mark:
+    lda scan_ptr
+    sta literal_probe_scan_ptr_lo_data
+    lda scan_ptr+1
+    sta literal_probe_scan_ptr_hi_data
+.if ACTC_REU_SOURCE_CACHE
+    sec
+    lda source_window_next_offset
+    sbc source_window_len
+    sta literal_probe_window_start_data
+    lda source_window_next_offset+1
+    sbc source_window_len+1
+    sta literal_probe_window_start_data+1
+    lda source_window_next_offset+2
+    sbc #$00
+    sta literal_probe_window_start_data+2
+.endif
+    rts
+
+source_reader_restore_literal_probe_mark:
+.if ACTC_REU_SOURCE_CACHE
+    txa
+    pha
+    lda literal_probe_window_start_data
+    sta source_window_next_offset
+    lda literal_probe_window_start_data+1
+    sta source_window_next_offset+1
+    lda literal_probe_window_start_data+2
+    sta source_window_next_offset+2
+    jsr source_reader_load_next_window
+    pla
+    tax
+.endif
+    lda literal_probe_scan_ptr_lo_data
+    sta scan_ptr
+    lda literal_probe_scan_ptr_hi_data
+    sta scan_ptr+1
+    lda #$00
+    sta reader_lookahead_valid_data
+    rts
+
 save_reader_probe_mark:
     lda scan_ptr
     sta reader_probe_scan_ptr_lo_data
@@ -8569,6 +8268,10 @@ compute_payload_layout_body_loop:
 	    cmp #'a'
 	    beq compute_payload_layout_add_single
     cmp #'m'
+    beq compute_payload_layout_add_single
+    cmp #'*'
+    beq compute_payload_layout_add_single
+    cmp #'/'
     beq compute_payload_layout_add_single
     cmp #'q'
     beq compute_payload_layout_add_single
@@ -8766,7 +8469,8 @@ skip_source_line_loop:
     beq skip_source_line_done
     cmp #13
     beq skip_source_line_done
-    jsr source_reader_consume_scan_ptr
+    jsr source_reader_consume_non_line_end_from_scan_ptr
+    bcs skip_source_line_done
     jmp skip_source_line_loop
 skip_source_line_done:
     rts
@@ -8806,9 +8510,7 @@ store_proc_export_from_scan_ptr_or_fail_bad:
 store_proc_export_from_scan_ptr_or_fail_done:
     cpy #$00
     beq store_proc_export_from_scan_ptr_or_fail_bad
-    sty reader_scan_y_data
-    jsr source_reader_terminate_symbol_token_y
-    jsr source_reader_publish_symbol_token_to_export_ptr
+    jsr source_reader_finish_proc_export_token_y
 .if ACTC_REU_EXPORT_NAMES
     jsr store_export_name_to_reu_x
 .endif
@@ -8838,9 +8540,8 @@ store_proc_params_from_scan_y_for_current_export_or_fail:
     sta proc_param_var_base_data,x
 .endif
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #'('
-    beq :+
+    jsr source_reader_match_open_paren_from_scan_y
+    bcc :+
     clc
     rts
 :   lda #'('
@@ -8849,11 +8550,9 @@ store_proc_params_from_scan_y_for_current_export_or_fail:
     jmp store_proc_export_from_scan_ptr_or_fail_bad
 :
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #')'
-    bne :+
-    jmp store_proc_params_from_scan_y_for_current_export_done
-:
+    lda #')'
+    jsr source_reader_consume_char_from_scan_y
+    bcc store_proc_params_from_scan_y_for_current_export_done
 store_proc_params_from_scan_y_for_current_export_loop:
     jsr copy_symbol_from_scan_y
     bcc :+
@@ -8917,18 +8616,14 @@ store_proc_params_from_scan_y_for_current_export_copy_done:
 .endif
     ldy symbol_end_y_data
     jsr skip_inline_spaces_at_scan_y
-    jsr source_reader_peek_scan_y
-    cmp #','
-    beq store_proc_params_from_scan_y_for_current_export_next
-    cmp #')'
-    beq store_proc_params_from_scan_y_for_current_export_done
-    jmp store_proc_export_from_scan_ptr_or_fail_bad
-store_proc_params_from_scan_y_for_current_export_next:
     lda #','
     jsr source_reader_consume_char_from_scan_y
-    bcc :+
+    bcc store_proc_params_from_scan_y_for_current_export_next
+    lda #')'
+    jsr source_reader_consume_char_from_scan_y
+    bcc store_proc_params_from_scan_y_for_current_export_done
     jmp store_proc_export_from_scan_ptr_or_fail_bad
-:
+store_proc_params_from_scan_y_for_current_export_next:
     jsr skip_inline_spaces_at_scan_y
     jmp store_proc_params_from_scan_y_for_current_export_loop
 store_proc_params_from_scan_y_for_current_export_done:
@@ -10256,17 +9951,26 @@ source_reader_try_store_proc_export_token_y_bad:
     sec
     rts
 
+source_reader_consume_symbol_token_x_from_scan_y:
+    jsr source_reader_store_symbol_token_x
+    ldy reader_scan_y_data
+    jsr source_reader_consume_scan_y
+    bcs source_reader_consume_symbol_token_x_from_scan_y_fail
+    sty reader_scan_y_data
+    clc
+    rts
+source_reader_consume_symbol_token_x_from_scan_y_fail:
+    sec
+    rts
+
 source_reader_try_store_symbol_token_x_from_scan_y:
     ldy reader_scan_y_data
     jsr source_reader_peek_scan_y
     beq source_reader_try_store_symbol_token_x_from_scan_y_eof
     jsr source_reader_symbol_token_char_valid_x
     bcs source_reader_try_store_symbol_token_x_from_scan_y_delimiter
-    jsr source_reader_store_symbol_token_x
-    ldy reader_scan_y_data
-    jsr source_reader_consume_scan_y
+    jsr source_reader_consume_symbol_token_x_from_scan_y
     bcs source_reader_try_store_symbol_token_x_from_scan_y_fail
-    sty reader_scan_y_data
     jsr source_reader_begin_symbol_token
     clc
     rts
@@ -10323,9 +10027,7 @@ copy_symbol_from_scan_ptr_fail:
 copy_symbol_from_scan_ptr_stream:
     txa
     pha
-    jsr source_reader_begin_symbol_token
-    lda #$00
-    sta reader_scan_y_data
+    jsr source_reader_begin_symbol_token_from_scan_ptr
     ldx #$00
 copy_symbol_from_scan_ptr_stream_loop:
     jsr source_reader_try_store_symbol_token_x_from_scan_y
@@ -10363,8 +10065,7 @@ copy_symbol_from_scan_ptr_stream_fail:
 copy_symbol_from_scan_y:
     txa
     pha
-    sty reader_scan_y_data
-    jsr source_reader_begin_symbol_token
+    jsr source_reader_begin_symbol_token_from_scan_y
     ldx #$00
 copy_symbol_from_scan_y_loop:
     jsr source_reader_try_store_symbol_token_x_from_scan_y
@@ -10392,7 +10093,18 @@ copy_symbol_from_scan_y_done_check:
     clc
     rts
 
+source_reader_begin_symbol_token_from_scan_y:
+    sty reader_scan_y_data
+    jmp source_reader_begin_symbol_token
+
+source_reader_begin_symbol_token_from_scan_ptr:
+    lda #$00
+    sta reader_scan_y_data
+    jmp source_reader_begin_symbol_token
+
 source_reader_begin_symbol_token:
+    lda #$00
+    sta reader_lookahead_valid_data
     lda #<reader_token_buffer
     sta body_ptr
     lda #>reader_token_buffer
@@ -10422,6 +10134,11 @@ source_reader_terminate_symbol_token_x:
     lda #$00
     sta reader_token_buffer,y
     rts
+
+source_reader_finish_proc_export_token_y:
+    sty reader_scan_y_data
+    jsr source_reader_terminate_symbol_token_y
+    jmp source_reader_publish_symbol_token_to_export_ptr
 
 source_reader_publish_symbol_token:
     ldy #$00
@@ -10472,16 +10189,794 @@ consume_not_keyword_from_scan_y:
     sta const_ptr+1
     jmp consume_keyword_from_scan_y
 
-store_reader_prev_symbol_from_a:
+source_reader_note_bool_scan_byte_from_a:
     jsr uppercase_ascii
     jsr uppercase_symbol_body_valid
-    bcc store_reader_prev_symbol_yes
+    bcc source_reader_note_bool_scan_byte_from_a_yes
     lda #$00
     sta reader_prev_symbol_data
     rts
-store_reader_prev_symbol_yes:
+source_reader_note_bool_scan_byte_from_a_yes:
     lda #$01
     sta reader_prev_symbol_data
+    rts
+
+source_reader_reset_bool_scan_state:
+    lda #$00
+    sta reader_prev_symbol_data
+    rts
+
+source_reader_consume_bool_punctuation_from_scan_y:
+    pha
+    jsr source_reader_reset_bool_scan_state
+    pla
+    jmp source_reader_consume_char_from_scan_y
+
+source_reader_consume_whitespace_from_scan_ptr:
+    jsr source_reader_peek_scan_ptr
+    cmp #' '
+    beq source_reader_consume_whitespace_from_scan_ptr_consume
+    cmp #9
+    beq source_reader_consume_whitespace_from_scan_ptr_consume
+    cmp #10
+    beq source_reader_consume_whitespace_from_scan_ptr_consume
+    cmp #13
+    beq source_reader_consume_whitespace_from_scan_ptr_consume
+    sec
+    rts
+source_reader_consume_whitespace_from_scan_ptr_consume:
+    jsr source_reader_consume_scan_ptr
+    bcs source_reader_consume_whitespace_from_scan_ptr_fail
+    clc
+    rts
+source_reader_consume_whitespace_from_scan_ptr_fail:
+    sec
+    rts
+
+source_reader_consume_inline_space_from_scan_ptr:
+    jsr source_reader_peek_scan_ptr
+    cmp #' '
+    beq source_reader_consume_inline_space_from_scan_ptr_consume
+    cmp #9
+    beq source_reader_consume_inline_space_from_scan_ptr_consume
+    sec
+    rts
+source_reader_consume_inline_space_from_scan_ptr_consume:
+    jsr source_reader_consume_scan_ptr
+    bcs source_reader_consume_inline_space_from_scan_ptr_fail
+    clc
+    rts
+source_reader_consume_inline_space_from_scan_ptr_fail:
+    sec
+    rts
+
+source_reader_consume_line_break_from_scan_ptr:
+    jsr source_reader_peek_scan_ptr
+    cmp #10
+    beq source_reader_consume_line_break_from_scan_ptr_consume
+    cmp #13
+    beq source_reader_consume_line_break_from_scan_ptr_consume
+    sec
+    rts
+source_reader_consume_line_break_from_scan_ptr_consume:
+    jsr source_reader_consume_scan_ptr
+    bcs source_reader_consume_line_break_from_scan_ptr_fail
+    clc
+    rts
+source_reader_consume_line_break_from_scan_ptr_fail:
+    sec
+    rts
+
+source_reader_consume_non_line_end_from_scan_ptr:
+    jsr source_reader_peek_scan_ptr
+    beq source_reader_consume_non_line_end_from_scan_ptr_fail
+    cmp #10
+    beq source_reader_consume_non_line_end_from_scan_ptr_fail
+    cmp #13
+    beq source_reader_consume_non_line_end_from_scan_ptr_fail
+    jsr source_reader_consume_scan_ptr
+    bcs source_reader_consume_non_line_end_from_scan_ptr_fail
+    clc
+    rts
+source_reader_consume_non_line_end_from_scan_ptr_fail:
+    sec
+    rts
+
+source_reader_consume_search_byte_from_scan_ptr:
+    jsr source_reader_peek_scan_ptr
+    beq source_reader_consume_search_byte_from_scan_ptr_fail
+    jsr source_reader_consume_scan_ptr
+    bcs source_reader_consume_search_byte_from_scan_ptr_fail
+    clc
+    rts
+source_reader_consume_search_byte_from_scan_ptr_fail:
+    sec
+    rts
+
+source_reader_peek_decimal_digit_value_from_scan_y:
+    jsr source_reader_peek_scan_y
+    cmp #'0'
+    bcc source_reader_peek_decimal_digit_value_from_scan_y_fail
+    cmp #'9'+1
+    bcs source_reader_peek_decimal_digit_value_from_scan_y_fail
+    sec
+    sbc #'0'
+    clc
+    rts
+source_reader_peek_decimal_digit_value_from_scan_y_fail:
+    sec
+    rts
+
+source_reader_consume_decimal_digit_from_scan_y:
+    jsr source_reader_peek_decimal_digit_value_from_scan_y
+    bcs source_reader_consume_decimal_digit_from_scan_y_fail
+    jsr source_reader_consume_scan_y
+    bcs source_reader_consume_decimal_digit_from_scan_y_fail
+    clc
+    rts
+source_reader_consume_decimal_digit_from_scan_y_fail:
+    sec
+    rts
+
+source_reader_consume_inline_space_from_scan_y:
+    jsr source_reader_peek_scan_y
+    cmp #' '
+    beq source_reader_consume_inline_space_from_scan_y_consume
+    cmp #9
+    beq source_reader_consume_inline_space_from_scan_y_consume
+    sec
+    rts
+source_reader_consume_inline_space_from_scan_y_consume:
+    jsr source_reader_consume_scan_y
+    bcs source_reader_consume_inline_space_from_scan_y_fail
+    clc
+    rts
+source_reader_consume_inline_space_from_scan_y_fail:
+    sec
+    rts
+
+source_reader_consume_plain_call_arg_string_byte_from_scan_y:
+    jsr source_reader_peek_scan_y
+    beq source_reader_consume_plain_call_arg_string_byte_from_scan_y_fail
+    cmp #10
+    beq source_reader_consume_plain_call_arg_string_byte_from_scan_y_fail
+    cmp #13
+    beq source_reader_consume_plain_call_arg_string_byte_from_scan_y_fail
+    cmp #'"'
+    beq source_reader_consume_plain_call_arg_string_byte_from_scan_y_fail
+    jsr source_reader_consume_scan_y
+    bcs source_reader_consume_plain_call_arg_string_byte_from_scan_y_fail
+    clc
+    rts
+source_reader_consume_plain_call_arg_string_byte_from_scan_y_fail:
+    sec
+    rts
+
+source_reader_consume_plain_call_arg_scan_byte_from_scan_y:
+    jsr source_reader_peek_scan_y
+    beq source_reader_consume_plain_call_arg_scan_byte_from_scan_y_fail
+    cmp #10
+    beq source_reader_consume_plain_call_arg_scan_byte_from_scan_y_fail
+    cmp #13
+    beq source_reader_consume_plain_call_arg_scan_byte_from_scan_y_fail
+    cmp #'"'
+    beq source_reader_consume_plain_call_arg_scan_byte_from_scan_y_fail
+    cmp #'('
+    beq source_reader_consume_plain_call_arg_scan_byte_from_scan_y_fail
+    cmp #')'
+    beq source_reader_consume_plain_call_arg_scan_byte_from_scan_y_fail
+    cmp #','
+    beq source_reader_consume_plain_call_arg_scan_byte_from_scan_y_fail
+    jsr source_reader_consume_scan_y
+    bcs source_reader_consume_plain_call_arg_scan_byte_from_scan_y_fail
+    clc
+    rts
+source_reader_consume_plain_call_arg_scan_byte_from_scan_y_fail:
+    sec
+    rts
+
+source_reader_consume_line_call_scan_byte_from_scan_y:
+    jmp source_reader_consume_plain_call_arg_string_byte_from_scan_y
+
+source_reader_consume_flat_call_arg_scan_byte_from_scan_y:
+    jsr source_reader_peek_scan_y
+    beq source_reader_consume_flat_call_arg_scan_byte_from_scan_y_fail
+    cmp #10
+    beq source_reader_consume_flat_call_arg_scan_byte_from_scan_y_fail
+    cmp #13
+    beq source_reader_consume_flat_call_arg_scan_byte_from_scan_y_fail
+    cmp #'"'
+    beq source_reader_consume_flat_call_arg_scan_byte_from_scan_y_fail
+    cmp #'('
+    beq source_reader_consume_flat_call_arg_scan_byte_from_scan_y_fail
+    cmp #')'
+    beq source_reader_consume_flat_call_arg_scan_byte_from_scan_y_fail
+    jsr source_reader_consume_scan_y
+    bcs source_reader_consume_flat_call_arg_scan_byte_from_scan_y_fail
+    clc
+    rts
+source_reader_consume_flat_call_arg_scan_byte_from_scan_y_fail:
+    sec
+    rts
+
+source_reader_consume_top_level_arith_scan_byte_from_scan_y:
+    jsr source_reader_peek_scan_y
+    beq source_reader_consume_top_level_arith_scan_byte_from_scan_y_fail
+    cmp #10
+    beq source_reader_consume_top_level_arith_scan_byte_from_scan_y_fail
+    cmp #13
+    beq source_reader_consume_top_level_arith_scan_byte_from_scan_y_fail
+    cmp #','
+    beq source_reader_consume_top_level_arith_scan_byte_from_scan_y_fail
+    cmp #']'
+    beq source_reader_consume_top_level_arith_scan_byte_from_scan_y_fail
+    cmp #')'
+    beq source_reader_consume_top_level_arith_scan_byte_from_scan_y_fail
+    cmp #'('
+    beq source_reader_consume_top_level_arith_scan_byte_from_scan_y_fail
+    jsr source_reader_consume_scan_y
+    bcs source_reader_consume_top_level_arith_scan_byte_from_scan_y_fail
+    clc
+    rts
+source_reader_consume_top_level_arith_scan_byte_from_scan_y_fail:
+    sec
+    rts
+
+source_reader_consume_bool_keyword_scan_byte_from_scan_y:
+    jsr source_reader_peek_scan_y
+    beq source_reader_consume_bool_keyword_scan_byte_from_scan_y_fail
+    cmp #10
+    beq source_reader_consume_bool_keyword_scan_byte_from_scan_y_fail
+    cmp #13
+    beq source_reader_consume_bool_keyword_scan_byte_from_scan_y_fail
+    cmp #')'
+    beq source_reader_consume_bool_keyword_scan_byte_from_scan_y_fail
+    cmp #'('
+    beq source_reader_consume_bool_keyword_scan_byte_from_scan_y_fail
+    jsr source_reader_note_bool_scan_byte_from_a
+    jsr source_reader_consume_scan_y
+    bcs source_reader_consume_bool_keyword_scan_byte_from_scan_y_fail
+    clc
+    rts
+source_reader_consume_bool_keyword_scan_byte_from_scan_y_fail:
+    sec
+    rts
+
+source_reader_consume_bool_token_scan_byte_from_scan_y:
+    jsr source_reader_peek_scan_y
+    beq source_reader_consume_bool_token_scan_byte_from_scan_y_fail
+    cmp #10
+    beq source_reader_consume_bool_token_scan_byte_from_scan_y_fail
+    cmp #13
+    beq source_reader_consume_bool_token_scan_byte_from_scan_y_fail
+    cmp #','
+    beq source_reader_consume_bool_token_scan_byte_from_scan_y_fail
+    cmp #']'
+    beq source_reader_consume_bool_token_scan_byte_from_scan_y_fail
+    cmp #')'
+    beq source_reader_consume_bool_token_scan_byte_from_scan_y_fail
+    cmp #'('
+    beq source_reader_consume_bool_token_scan_byte_from_scan_y_fail
+    cmp #'='
+    beq source_reader_consume_bool_token_scan_byte_from_scan_y_fail
+    cmp #'<'
+    beq source_reader_consume_bool_token_scan_byte_from_scan_y_fail
+    cmp #'>'
+    beq source_reader_consume_bool_token_scan_byte_from_scan_y_fail
+    jsr source_reader_note_bool_scan_byte_from_a
+    jsr source_reader_consume_scan_y
+    bcs source_reader_consume_bool_token_scan_byte_from_scan_y_fail
+    clc
+    rts
+source_reader_consume_bool_token_scan_byte_from_scan_y_fail:
+    sec
+    rts
+
+source_reader_initialize:
+    lda #$00
+    sta reader_lookahead_valid_data
+    rts
+
+source_reader_token_cache_matches_scan_y:
+    lda reader_lookahead_valid_data
+    beq source_reader_token_cache_matches_scan_y_miss
+    cpy reader_lookahead_y_data
+    bne source_reader_token_cache_matches_scan_y_miss
+    lda scan_ptr
+    cmp reader_lookahead_scan_ptr_lo_data
+    bne source_reader_token_cache_matches_scan_y_miss
+    lda scan_ptr+1
+    cmp reader_lookahead_scan_ptr_hi_data
+    bne source_reader_token_cache_matches_scan_y_miss
+.if ACTC_REU_SOURCE_CACHE
+    lda source_window_next_offset
+    cmp reader_lookahead_window_next_data
+    bne source_reader_token_cache_matches_scan_y_miss
+    lda source_window_next_offset+1
+    cmp reader_lookahead_window_next_data+1
+    bne source_reader_token_cache_matches_scan_y_miss
+    lda source_window_next_offset+2
+    cmp reader_lookahead_window_next_data+2
+    bne source_reader_token_cache_matches_scan_y_miss
+.endif
+    clc
+    rts
+source_reader_token_cache_matches_scan_y_miss:
+    sec
+    rts
+
+source_reader_store_token_cache_key_from_scan_y:
+    sty reader_lookahead_y_data
+    lda scan_ptr
+    sta reader_lookahead_scan_ptr_lo_data
+    lda scan_ptr+1
+    sta reader_lookahead_scan_ptr_hi_data
+.if ACTC_REU_SOURCE_CACHE
+    lda source_window_next_offset
+    sta reader_lookahead_window_next_data
+    lda source_window_next_offset+1
+    sta reader_lookahead_window_next_data+1
+    lda source_window_next_offset+2
+    sta reader_lookahead_window_next_data+2
+.endif
+    rts
+
+; Build and cache one lexical token while leaving the physical source cursor at
+; the token start. The positive-word parser is the first complete consumer.
+source_reader_peek_token_from_scan_y:
+    jsr source_reader_token_cache_matches_scan_y
+    bcs source_reader_peek_token_from_scan_y_build
+    lda reader_lookahead_kind_data
+    cmp #SOURCE_TOKEN_INVALID
+    bne :+
+    jmp source_reader_peek_token_from_scan_y_fail
+:
+    clc
+    rts
+
+source_reader_peek_token_from_scan_y_build:
+    txa
+    pha
+    jsr source_reader_store_token_cache_key_from_scan_y
+    lda #$01
+    sta reader_lookahead_length_data
+    jsr source_reader_peek_scan_y
+    bcc :+
+    jmp source_reader_peek_token_from_scan_y_invalid
+:
+    beq source_reader_peek_token_from_scan_y_eof
+    cmp #10
+    beq source_reader_peek_token_from_scan_y_line_end
+    cmp #13
+    beq source_reader_peek_token_from_scan_y_line_end
+    cmp #'='
+    beq source_reader_peek_token_from_scan_y_eq
+    cmp #'<'
+    beq source_reader_peek_token_from_scan_y_lt
+    cmp #'>'
+    beq source_reader_peek_token_from_scan_y_gt
+    cmp #'0'
+    bcc source_reader_peek_token_from_scan_y_try_symbol
+    cmp #'9'+1
+    bcs source_reader_peek_token_from_scan_y_try_symbol
+    jmp source_reader_scan_decimal_lookahead
+source_reader_peek_token_from_scan_y_try_symbol:
+    pha
+    jsr uppercase_ascii
+    jsr uppercase_symbol_start_valid
+    pla
+    bcs :+
+    jmp source_reader_scan_symbol_lookahead
+:
+    jmp source_reader_peek_token_from_scan_y_build_done
+
+source_reader_peek_token_from_scan_y_eof:
+    lda #$00
+    sta reader_lookahead_length_data
+    lda #SOURCE_TOKEN_EOF
+    jmp source_reader_peek_token_from_scan_y_build_done
+source_reader_peek_token_from_scan_y_line_end:
+    lda #SOURCE_TOKEN_LINE_END
+    jmp source_reader_peek_token_from_scan_y_build_done
+source_reader_peek_token_from_scan_y_eq:
+    lda #SOURCE_TOKEN_EQ
+    jmp source_reader_peek_token_from_scan_y_build_done
+source_reader_peek_token_from_scan_y_lt:
+    lda #SOURCE_TOKEN_LT
+    sta reader_lookahead_candidate_data
+    jsr save_reader_probe_mark
+    jsr source_reader_consume_scan_y
+    bcs source_reader_peek_token_from_scan_y_restore_invalid
+    jsr source_reader_peek_scan_y
+    cmp #'='
+    beq source_reader_peek_token_from_scan_y_le
+    cmp #'>'
+    beq source_reader_peek_token_from_scan_y_ne
+    jmp source_reader_peek_token_from_scan_y_restore_candidate
+source_reader_peek_token_from_scan_y_le:
+    lda #SOURCE_TOKEN_LE
+    bne source_reader_peek_token_from_scan_y_two_byte_candidate
+source_reader_peek_token_from_scan_y_ne:
+    lda #SOURCE_TOKEN_NE
+source_reader_peek_token_from_scan_y_two_byte_candidate:
+    sta reader_lookahead_candidate_data
+    lda #$02
+    sta reader_lookahead_length_data
+    jmp source_reader_peek_token_from_scan_y_restore_candidate
+source_reader_peek_token_from_scan_y_gt:
+    lda #SOURCE_TOKEN_GT
+    sta reader_lookahead_candidate_data
+    jsr save_reader_probe_mark
+    jsr source_reader_consume_scan_y
+    bcs source_reader_peek_token_from_scan_y_restore_invalid
+    jsr source_reader_peek_scan_y
+    cmp #'='
+    bne source_reader_peek_token_from_scan_y_restore_candidate
+    lda #SOURCE_TOKEN_GE
+    sta reader_lookahead_candidate_data
+    lda #$02
+    sta reader_lookahead_length_data
+source_reader_peek_token_from_scan_y_restore_candidate:
+    jsr restore_reader_probe_mark
+    ldy reader_lookahead_y_data
+    lda reader_lookahead_candidate_data
+    jmp source_reader_peek_token_from_scan_y_build_done
+source_reader_peek_token_from_scan_y_restore_invalid:
+    jsr restore_reader_probe_mark
+    ldy reader_lookahead_y_data
+source_reader_peek_token_from_scan_y_invalid:
+    lda #SOURCE_TOKEN_INVALID
+source_reader_peek_token_from_scan_y_build_done:
+    sta reader_lookahead_kind_data
+    lda #$01
+    sta reader_lookahead_valid_data
+    pla
+    tax
+    lda reader_lookahead_kind_data
+    cmp #SOURCE_TOKEN_INVALID
+    beq source_reader_peek_token_from_scan_y_fail
+    clc
+    rts
+source_reader_peek_token_from_scan_y_fail:
+    sec
+    rts
+
+source_reader_scan_symbol_lookahead:
+    jsr save_reader_probe_mark
+    ldx #$00
+source_reader_scan_symbol_lookahead_loop:
+    jsr source_reader_peek_scan_y
+    beq source_reader_scan_symbol_lookahead_done
+    jsr uppercase_ascii
+    cpx #$00
+    bne source_reader_scan_symbol_lookahead_body
+    jsr uppercase_symbol_start_valid
+    bcs source_reader_scan_symbol_lookahead_invalid
+    jmp source_reader_scan_symbol_lookahead_store
+source_reader_scan_symbol_lookahead_body:
+    jsr uppercase_symbol_body_valid
+    bcs source_reader_scan_symbol_lookahead_done
+source_reader_scan_symbol_lookahead_store:
+    cpx #SYMBOL_TEXT_LIMIT
+    bcs source_reader_scan_symbol_lookahead_invalid
+    sta reader_token_buffer,x
+    jsr source_reader_consume_scan_y
+    bcs source_reader_scan_symbol_lookahead_invalid
+    inx
+    bne source_reader_scan_symbol_lookahead_loop
+source_reader_scan_symbol_lookahead_invalid:
+    lda #SOURCE_TOKEN_INVALID
+    sta reader_lookahead_candidate_data
+    jmp source_reader_scan_symbol_lookahead_restore
+source_reader_scan_symbol_lookahead_done:
+    cpx #$00
+    beq source_reader_scan_symbol_lookahead_invalid
+    stx reader_lookahead_length_data
+    lda #$00
+    sta reader_token_buffer,x
+    lda #SOURCE_TOKEN_SYMBOL
+    sta reader_lookahead_candidate_data
+source_reader_scan_symbol_lookahead_restore:
+    jsr restore_reader_probe_mark
+    ldy reader_lookahead_y_data
+    lda reader_lookahead_candidate_data
+    jmp source_reader_peek_token_from_scan_y_build_done
+
+source_reader_scan_decimal_lookahead:
+    jsr save_reader_probe_mark
+    lda #$00
+    sta reader_lookahead_length_data
+    sta reader_lookahead_value_lo_data
+    sta reader_lookahead_value_hi_data
+source_reader_scan_decimal_lookahead_loop:
+    jsr source_reader_peek_scan_y
+    cmp #'0'
+    bcc source_reader_scan_decimal_lookahead_done
+    cmp #'9'+1
+    bcs source_reader_scan_decimal_lookahead_done
+    sec
+    sbc #'0'
+    sta reader_lookahead_digit_data
+    jsr source_reader_accumulate_decimal_lookahead
+    bcs source_reader_scan_decimal_lookahead_invalid
+    jsr source_reader_consume_scan_y
+    bcs source_reader_scan_decimal_lookahead_invalid
+    inc reader_lookahead_length_data
+    beq source_reader_scan_decimal_lookahead_invalid
+    jmp source_reader_scan_decimal_lookahead_loop
+source_reader_scan_decimal_lookahead_done:
+    lda reader_lookahead_length_data
+    beq source_reader_scan_decimal_lookahead_invalid
+    lda #SOURCE_TOKEN_DECIMAL
+    sta reader_lookahead_candidate_data
+    jmp source_reader_scan_decimal_lookahead_restore
+source_reader_scan_decimal_lookahead_invalid:
+    lda #SOURCE_TOKEN_INVALID
+    sta reader_lookahead_candidate_data
+source_reader_scan_decimal_lookahead_restore:
+    jsr restore_reader_probe_mark
+    ldy reader_lookahead_y_data
+    lda reader_lookahead_candidate_data
+    jmp source_reader_peek_token_from_scan_y_build_done
+
+source_reader_accumulate_decimal_lookahead:
+    asl reader_lookahead_value_lo_data
+    rol reader_lookahead_value_hi_data
+    bcs source_reader_accumulate_decimal_lookahead_fail
+    lda reader_lookahead_value_lo_data
+    sta reader_lookahead_work_lo_data
+    lda reader_lookahead_value_hi_data
+    sta reader_lookahead_work_hi_data
+    asl reader_lookahead_value_lo_data
+    rol reader_lookahead_value_hi_data
+    bcs source_reader_accumulate_decimal_lookahead_fail
+    asl reader_lookahead_value_lo_data
+    rol reader_lookahead_value_hi_data
+    bcs source_reader_accumulate_decimal_lookahead_fail
+    clc
+    lda reader_lookahead_value_lo_data
+    adc reader_lookahead_work_lo_data
+    sta reader_lookahead_value_lo_data
+    lda reader_lookahead_value_hi_data
+    adc reader_lookahead_work_hi_data
+    sta reader_lookahead_value_hi_data
+    bcs source_reader_accumulate_decimal_lookahead_fail
+    clc
+    lda reader_lookahead_value_lo_data
+    adc reader_lookahead_digit_data
+    sta reader_lookahead_value_lo_data
+    lda reader_lookahead_value_hi_data
+    adc #$00
+    sta reader_lookahead_value_hi_data
+    bcs source_reader_accumulate_decimal_lookahead_fail
+    clc
+    rts
+source_reader_accumulate_decimal_lookahead_fail:
+    sec
+    rts
+
+.if ACTC_USE_RESIDENT_POSITIVE_WORD_PARSER
+source_reader_publish_lookahead_symbol:
+    tya
+    pha
+    ldy #$00
+source_reader_publish_lookahead_symbol_loop:
+    cpy reader_lookahead_length_data
+    beq source_reader_publish_lookahead_symbol_done
+    lda reader_token_buffer,y
+    sta declared_module_name,y
+    iny
+    bne source_reader_publish_lookahead_symbol_loop
+source_reader_publish_lookahead_symbol_done:
+    lda #$00
+    sta declared_module_name,y
+    pla
+    tay
+    rts
+.endif
+
+source_reader_consume_expected_token_from_scan_y:
+    sta compare_char
+    jsr source_reader_peek_token_from_scan_y
+    bcs source_reader_consume_token_from_scan_y_fail
+    cmp compare_char
+    bne source_reader_consume_token_from_scan_y_fail
+    jmp source_reader_consume_token_from_scan_y
+
+.if ACTC_KEEP_BODY_RESIDENT_FALLBACK
+source_reader_consume_single_zero_decimal_from_scan_y:
+    jsr source_reader_peek_token_from_scan_y
+    bcs source_reader_consume_single_zero_decimal_from_scan_y_fail
+    cmp #SOURCE_TOKEN_DECIMAL
+    bne source_reader_consume_single_zero_decimal_from_scan_y_fail
+    lda reader_lookahead_length_data
+    cmp #$01
+    bne source_reader_consume_single_zero_decimal_from_scan_y_fail
+    lda reader_lookahead_value_lo_data
+    ora reader_lookahead_value_hi_data
+    bne source_reader_consume_single_zero_decimal_from_scan_y_fail
+    jmp source_reader_consume_token_from_scan_y
+source_reader_consume_single_zero_decimal_from_scan_y_fail:
+    sec
+    rts
+.endif
+
+source_reader_consume_token_from_scan_y:
+    jsr source_reader_peek_token_from_scan_y
+    bcs source_reader_consume_token_from_scan_y_fail
+    pha
+    lda reader_lookahead_length_data
+    beq source_reader_consume_token_from_scan_y_fail_pop
+    sta reader_lookahead_remaining_data
+source_reader_consume_token_from_scan_y_loop:
+    jsr source_reader_consume_scan_y
+    bcs source_reader_consume_token_from_scan_y_fail_pop
+    dec reader_lookahead_remaining_data
+    bne source_reader_consume_token_from_scan_y_loop
+    lda #$00
+    sta reader_lookahead_valid_data
+    pla
+    clc
+    rts
+source_reader_consume_token_from_scan_y_fail_pop:
+    lda #$00
+    sta reader_lookahead_valid_data
+    pla
+source_reader_consume_token_from_scan_y_fail:
+    sec
+    rts
+
+source_reader_token_buffer_matches_const_ptr:
+    tya
+    pha
+    ldy #$00
+source_reader_token_buffer_matches_const_ptr_loop:
+    lda (const_ptr),y
+    cmp reader_token_buffer,y
+    bne source_reader_token_buffer_matches_const_ptr_fail
+    lda (const_ptr),y
+    beq source_reader_token_buffer_matches_const_ptr_ok
+    iny
+    cpy #25
+    bcc source_reader_token_buffer_matches_const_ptr_loop
+source_reader_token_buffer_matches_const_ptr_fail:
+    pla
+    tay
+    sec
+    rts
+source_reader_token_buffer_matches_const_ptr_ok:
+    pla
+    tay
+    clc
+    rts
+
+source_reader_token_is_numeric_sum_stop:
+    cmp #SOURCE_TOKEN_EOF
+    beq source_reader_token_is_numeric_sum_stop_yes
+    cmp #SOURCE_TOKEN_LINE_END
+    beq source_reader_token_is_numeric_sum_stop_yes
+    cmp #','
+    beq source_reader_token_is_numeric_sum_stop_yes
+    cmp #')'
+    beq source_reader_token_is_numeric_sum_stop_yes
+    cmp #']'
+    beq source_reader_token_is_numeric_sum_stop_yes
+    jmp source_reader_token_is_comparison_operator
+source_reader_token_is_numeric_sum_stop_yes:
+    clc
+    rts
+
+source_reader_token_is_comparison_operator:
+    cmp #SOURCE_TOKEN_EQ
+    beq source_reader_token_is_comparison_operator_yes
+    cmp #SOURCE_TOKEN_LT
+    beq source_reader_token_is_comparison_operator_yes
+    cmp #SOURCE_TOKEN_GT
+    beq source_reader_token_is_comparison_operator_yes
+    cmp #SOURCE_TOKEN_LE
+    beq source_reader_token_is_comparison_operator_yes
+    cmp #SOURCE_TOKEN_GE
+    beq source_reader_token_is_comparison_operator_yes
+    cmp #SOURCE_TOKEN_NE
+    beq source_reader_token_is_comparison_operator_yes
+    sec
+    rts
+source_reader_token_is_comparison_operator_yes:
+    clc
+    rts
+
+source_reader_match_open_paren_from_scan_y:
+    jsr source_reader_peek_scan_y
+    cmp #'('
+    bne source_reader_match_open_paren_from_scan_y_fail
+    clc
+    rts
+source_reader_match_open_paren_from_scan_y_fail:
+    sec
+    rts
+
+source_reader_match_char_from_scan_y:
+    sta compare_char
+    jsr source_reader_peek_scan_y
+    cmp compare_char
+    bne source_reader_match_char_from_scan_y_fail
+    clc
+    rts
+source_reader_match_char_from_scan_y_fail:
+    sec
+    rts
+
+.if ACTC_USE_RESIDENT_BODY_PREALLOCATE + ACTC_KEEP_BODY_RESIDENT_FALLBACK
+source_reader_match_real_binary_operator_from_scan_y:
+    jsr source_reader_peek_scan_y
+    cmp #'+'
+    beq source_reader_match_comparison_operator_from_scan_y_match
+    cmp #'-'
+    beq source_reader_match_comparison_operator_from_scan_y_match
+    cmp #'*'
+    beq source_reader_match_comparison_operator_from_scan_y_match
+    cmp #'/'
+    beq source_reader_match_comparison_operator_from_scan_y_match
+    sec
+    rts
+.endif
+
+source_reader_match_comparison_operator_from_scan_y:
+    jsr source_reader_peek_scan_y
+    cmp #'='
+    beq source_reader_match_comparison_operator_from_scan_y_match
+    cmp #'<'
+    beq source_reader_match_comparison_operator_from_scan_y_match
+    cmp #'>'
+    beq source_reader_match_comparison_operator_from_scan_y_match
+    sec
+    rts
+source_reader_match_comparison_operator_from_scan_y_match:
+    clc
+    rts
+
+source_reader_match_comparison_suffix_from_scan_y:
+    jsr source_reader_peek_scan_y
+    cmp #'='
+    beq source_reader_match_comparison_operator_from_scan_y_match
+    cmp #'>'
+    beq source_reader_match_comparison_operator_from_scan_y_match
+    sec
+    rts
+
+source_reader_match_line_end_from_scan_y:
+    jsr source_reader_peek_scan_y
+    beq source_reader_match_numeric_sum_stop_from_scan_y_match
+    cmp #10
+    beq source_reader_match_numeric_sum_stop_from_scan_y_match
+    cmp #13
+    beq source_reader_match_numeric_sum_stop_from_scan_y_match
+    sec
+    rts
+
+source_reader_match_numeric_sum_stop_from_scan_y:
+    jsr source_reader_peek_scan_y
+    beq source_reader_match_numeric_sum_stop_from_scan_y_match
+    cmp #10
+    beq source_reader_match_numeric_sum_stop_from_scan_y_match
+    cmp #13
+    beq source_reader_match_numeric_sum_stop_from_scan_y_match
+    cmp #','
+    beq source_reader_match_numeric_sum_stop_from_scan_y_match
+    cmp #')'
+    beq source_reader_match_numeric_sum_stop_from_scan_y_match
+    cmp #']'
+    beq source_reader_match_numeric_sum_stop_from_scan_y_match
+    cmp #'='
+    beq source_reader_match_numeric_sum_stop_from_scan_y_match
+    cmp #'<'
+    beq source_reader_match_numeric_sum_stop_from_scan_y_match
+    cmp #'>'
+    beq source_reader_match_numeric_sum_stop_from_scan_y_match
+    sec
+    rts
+source_reader_match_numeric_sum_stop_from_scan_y_match:
+    clc
     rts
 
 source_reader_consume_char_from_scan_y:
@@ -10510,6 +11005,38 @@ source_reader_consume_uppercase_char_from_scan_y:
 source_reader_consume_uppercase_char_from_scan_y_fail:
     sec
     rts
+
+source_reader_begin_pattern:
+    lda #$00
+    sta reader_pattern_index_data
+    rts
+
+source_reader_save_pattern_index_and_begin:
+    lda reader_pattern_index_data
+    sta reader_saved_pattern_index_data
+    jmp source_reader_begin_pattern
+
+source_reader_restore_pattern_index_success:
+    lda reader_saved_pattern_index_data
+    sta reader_pattern_index_data
+    clc
+    rts
+
+source_reader_restore_pattern_index_fail:
+    lda reader_saved_pattern_index_data
+    sta reader_pattern_index_data
+    sec
+    rts
+
+source_reader_begin_pattern_from_scan_y:
+    sty reader_scan_y_data
+    jmp source_reader_begin_pattern
+
+source_reader_begin_keyword_probe_from_scan_y:
+    stx reader_saved_x_data
+    sty reader_start_y_data
+    jsr save_reader_probe_mark
+    jmp source_reader_begin_pattern_from_scan_y
 
 source_reader_consume_pattern_char_from_scan_y:
     ldy reader_pattern_index_data
@@ -10586,12 +11113,7 @@ source_reader_peek_keyword_token_boundary_from_scan_y_fail:
     rts
 
 scan_keyword_token_from_scan_y:
-    stx reader_saved_x_data
-    sty reader_start_y_data
-    sty reader_scan_y_data
-    jsr save_reader_probe_mark
-    lda #$00
-    sta reader_pattern_index_data
+    jsr source_reader_begin_keyword_probe_from_scan_y
 scan_keyword_token_from_scan_y_loop:
     ldy reader_pattern_index_data
     lda (const_ptr),y
@@ -10615,52 +11137,53 @@ scan_keyword_token_from_scan_y_delimiter:
     rts
 
 consume_keyword_open_from_scan_y:
-    stx reader_saved_x_data
-    sty reader_scan_y_data
-    lda #$00
-    sta reader_pattern_index_data
-consume_keyword_open_from_scan_y_loop:
-    ldy reader_pattern_index_data
-    lda (const_ptr),y
-    beq consume_keyword_open_from_scan_y_open
-    jsr source_reader_consume_pattern_char_from_scan_y
+    txa
+    pha
+    jsr source_reader_consume_keyword_token_from_scan_y
     bcs consume_keyword_open_from_scan_y_fail
-    bne consume_keyword_open_from_scan_y_loop
-consume_keyword_open_from_scan_y_fail:
-    ldx reader_saved_x_data
-    ldy reader_scan_y_data
-    sec
-    rts
-consume_keyword_open_from_scan_y_open:
-    ldy reader_scan_y_data
-    jsr source_reader_peek_scan_y
-    cmp #'('
-    bne consume_keyword_open_from_scan_y_fail
     lda #'('
-    jsr source_reader_consume_char_from_scan_y
+    jsr source_reader_consume_expected_token_from_scan_y
     bcs consume_keyword_open_from_scan_y_fail
     jsr skip_inline_spaces_at_scan_y
-    ldx reader_saved_x_data
+    pla
+    tax
     clc
+    rts
+consume_keyword_open_from_scan_y_fail:
+    pla
+    tax
+    sec
     rts
 
 consume_keyword_from_scan_y:
-    sty hex_work
+    tya
+    pha
     jsr save_source_reader_mark
     jsr skip_inline_spaces_at_scan_y
-    jsr copy_symbol_from_scan_y
-    bcc :+
-    jmp consume_keyword_from_scan_y_fail_restore
-:   sty compare_char
-    jsr symbol_buffer_matches_const_ptr
-    bcc :+
-    jmp consume_keyword_from_scan_y_fail_restore
-:   ldy compare_char
+    jsr source_reader_consume_keyword_token_from_scan_y
+    bcs consume_keyword_from_scan_y_fail_restore
+    pla
     clc
     rts
 consume_keyword_from_scan_y_fail_restore:
     jsr restore_source_reader_mark
-    ldy hex_work
+    pla
+    tay
+    sec
+    rts
+
+source_reader_consume_keyword_token_from_scan_y:
+    jsr source_reader_peek_token_from_scan_y
+    bcs source_reader_consume_keyword_token_from_scan_y_fail
+    cmp #SOURCE_TOKEN_SYMBOL
+    bne source_reader_consume_keyword_token_from_scan_y_fail
+    jsr source_reader_token_buffer_matches_const_ptr
+    bcs source_reader_consume_keyword_token_from_scan_y_fail
+    jsr source_reader_consume_token_from_scan_y
+    bcs source_reader_consume_keyword_token_from_scan_y_fail
+    clc
+    rts
+source_reader_consume_keyword_token_from_scan_y_fail:
     sec
     rts
 
@@ -10951,6 +11474,35 @@ find_or_store_rt_f_add_external:
     sta const_ptr+1
     jsr copy_const_ptr_to_declared_module_name
     jmp find_or_store_external_from_declared
+
+find_or_store_rt_i_mul_external:
+    lda #<runtime_symbol_rt_i_mul
+    ldx #>runtime_symbol_rt_i_mul
+    jmp find_or_store_integer_body_external
+
+find_or_store_rt_i_div_external:
+    lda #<runtime_symbol_rt_i_div
+    ldx #>runtime_symbol_rt_i_div
+    jmp find_or_store_integer_body_external
+
+find_or_store_rt_print_i_external:
+    lda #<runtime_symbol_rt_print_i
+    ldx #>runtime_symbol_rt_print_i
+find_or_store_integer_body_external:
+    sta const_ptr
+    txa
+    sta const_ptr+1
+    tya
+    pha
+    jsr copy_const_ptr_to_declared_module_name
+    jsr find_or_store_external_from_declared
+    php
+    ldx proc_index
+    jsr set_body_ptr_from_x
+    plp
+    pla
+    tay
+    rts
 
 find_or_store_rt_f_sub_external:
     lda #<runtime_symbol_rt_f_sub
@@ -11469,6 +12021,71 @@ detect_runtime_imports:
 :
 .endif
 detect_runtime_imports_done:
+    jsr detect_integer_body_runtime_imports
+    rts
+
+detect_integer_body_runtime_imports:
+    lda #$00
+    sta proc_index
+detect_integer_body_runtime_imports_proc_loop:
+    ldx proc_index
+    cpx export_count_data
+    beq detect_integer_body_runtime_imports_done
+    jsr set_body_ptr_from_x
+    ldy #$00
+detect_integer_body_runtime_imports_probe_loop:
+    lda (body_ptr),y
+    beq detect_integer_body_runtime_imports_next_proc
+    cmp #'*'
+    beq detect_integer_body_runtime_imports_body_start
+    cmp #'/'
+    beq detect_integer_body_runtime_imports_body_start
+    cmp #'a'
+    beq detect_integer_body_runtime_imports_body_start
+    cmp #'m'
+    beq detect_integer_body_runtime_imports_body_start
+    iny
+    bne detect_integer_body_runtime_imports_probe_loop
+    sec
+    rts
+detect_integer_body_runtime_imports_body_start:
+    ldy #$00
+detect_integer_body_runtime_imports_body_loop:
+    lda (body_ptr),y
+    beq detect_integer_body_runtime_imports_next_proc
+    cmp #'*'
+    beq detect_integer_body_runtime_imports_mul
+    cmp #'/'
+    beq detect_integer_body_runtime_imports_div
+    cmp #'y'
+    beq detect_integer_body_runtime_imports_print
+    cmp #'z'
+    beq detect_integer_body_runtime_imports_print
+detect_integer_body_runtime_imports_next_op:
+    iny
+    bne detect_integer_body_runtime_imports_body_loop
+    sec
+    rts
+detect_integer_body_runtime_imports_mul:
+    jsr find_or_store_rt_i_mul_external
+    bcs detect_integer_body_runtime_imports_fail
+    jmp detect_integer_body_runtime_imports_next_op
+detect_integer_body_runtime_imports_div:
+    jsr find_or_store_rt_i_div_external
+    bcs detect_integer_body_runtime_imports_fail
+    jmp detect_integer_body_runtime_imports_next_op
+detect_integer_body_runtime_imports_print:
+    jsr find_or_store_rt_print_i_external
+    bcs detect_integer_body_runtime_imports_fail
+    jmp detect_integer_body_runtime_imports_next_op
+detect_integer_body_runtime_imports_next_proc:
+    inc proc_index
+    jmp detect_integer_body_runtime_imports_proc_loop
+detect_integer_body_runtime_imports_fail:
+    sec
+    rts
+detect_integer_body_runtime_imports_done:
+    clc
     rts
 
 .if ACTC_USE_IMPORT_OVERLAY
@@ -11503,7 +12120,8 @@ find_pattern_at_const_ptr_loop:
     beq find_pattern_at_const_ptr_fail
     jsr pattern_matches_scan_ptr
     bcc find_pattern_at_const_ptr_ok
-    jsr source_reader_consume_scan_ptr
+    jsr source_reader_consume_search_byte_from_scan_ptr
+    bcs find_pattern_at_const_ptr_fail
     jmp find_pattern_at_const_ptr_loop
 find_pattern_at_const_ptr_ok:
     clc
@@ -11534,8 +12152,7 @@ pattern_matches_scan_ptr_ok:
     rts
 pattern_matches_scan_ptr_slow:
     jsr save_reader_probe_mark
-    lda #$00
-    sta reader_pattern_index_data
+    jsr source_reader_begin_pattern
 pattern_matches_scan_ptr_slow_loop:
     ldy reader_pattern_index_data
     lda (const_ptr),y
@@ -11615,8 +12232,7 @@ pattern_matches_scan_ptr_keyword_ok:
     rts
 pattern_matches_scan_ptr_keyword_slow:
     jsr save_reader_probe_mark
-    lda #$00
-    sta reader_pattern_index_data
+    jsr source_reader_begin_pattern
 pattern_matches_scan_ptr_keyword_slow_loop:
     ldy reader_pattern_index_data
     lda (const_ptr),y
@@ -11715,15 +12331,18 @@ match_scalar_decl_at_scan_ptr_width4:
 
 source_reader_consume_const_ptr_at_scan_ptr:
 advance_scan_ptr_by_const_ptr:
-    ldy #$00
+    jsr source_reader_save_pattern_index_and_begin
 source_reader_consume_const_ptr_at_scan_ptr_loop:
+    ldy reader_pattern_index_data
     lda (const_ptr),y
     beq source_reader_consume_const_ptr_at_scan_ptr_done
-    jsr source_reader_consume_scan_ptr
-    iny
-    bne source_reader_consume_const_ptr_at_scan_ptr_loop
+    jsr source_reader_consume_pattern_char_from_scan_ptr
+    bcs source_reader_consume_const_ptr_at_scan_ptr_fail
+    jmp source_reader_consume_const_ptr_at_scan_ptr_loop
 source_reader_consume_const_ptr_at_scan_ptr_done:
-    rts
+    jmp source_reader_restore_pattern_index_success
+source_reader_consume_const_ptr_at_scan_ptr_fail:
+    jmp source_reader_restore_pattern_index_fail
 
 uppercase_ascii:
     cmp #'a'
@@ -11779,9 +12398,24 @@ build_object_content:
 
 .if ACTC_USE_EMIT_OVERLAY
 build_object_content_with_overlay_if_possible:
+    lda #ACTC_OVERLAY_PASS_EMIT_NATIVE_LOCAL_OBJECT
+    jsr actc_overlay_run_pass
+    bcs build_object_content_with_overlay_failure
+    cmp #ACTC_OVERLAY_STATUS_OK
+    beq build_object_content_with_overlay_ok
+    cmp #ACTC_OVERLAY_STATUS_NOT_APPLICABLE
+    bne build_object_content_with_overlay_fallback
+    lda #ACTC_OVERLAY_PASS_EMIT_NATIVE_OBJECT
+    jsr actc_overlay_run_pass
+    bcs build_object_content_with_overlay_failure
+    cmp #ACTC_OVERLAY_STATUS_OK
+    beq build_object_content_with_overlay_ok
+    cmp #ACTC_OVERLAY_STATUS_NOT_APPLICABLE
+    bne build_object_content_with_overlay_fallback
     lda #ACTC_OVERLAY_PASS_EMIT_OBJECT
     jsr actc_overlay_run_pass
     bcc build_object_content_with_overlay_ok
+build_object_content_with_overlay_failure:
     lda actc_overlay_context+ACTC_OVERLAY_CTX_DIAG_PTR_LO
     ora actc_overlay_context+ACTC_OVERLAY_CTX_DIAG_PTR_HI
     beq build_object_content_with_overlay_fallback
@@ -11970,17 +12604,7 @@ append_export_list_done:
 append_machine_external_call_sequence_export_list:
     ldx #$00
     jsr set_body_ptr_from_x
-    jsr append_count_external_call_sequence_body
-    lda #16
-    ldx call_arg_count_data
-append_machine_external_call_sequence_size_loop:
-    cpx #$00
-    beq append_machine_external_call_sequence_size_done
-    clc
-    adc #$03
-    dex
-    bne append_machine_external_call_sequence_size_loop
-append_machine_external_call_sequence_size_done:
+    jsr compute_external_call_sequence_machine_size_resident
     ldx #$00
     ldy #$00
     sty expr_value_lo
@@ -12195,8 +12819,17 @@ append_machine_external_call_sequence_code_loop:
     beq append_machine_external_call_sequence_code_epilogue
     cmp #'u'
     bne append_machine_external_call_sequence_code_done
-    jsr append_machine_external_jsr_placeholder_bytes
+    lda proc_index
+    pha
     inc proc_index
+    ldy proc_index
+    lda (body_ptr),y
+    sta call_target_index_data
+    pla
+    beq append_machine_external_call_sequence_code_emit_jsr
+    jsr append_machine_external_call_sequence_maybe_word_setup
+append_machine_external_call_sequence_code_emit_jsr:
+    jsr append_machine_external_jsr_placeholder_bytes
     inc proc_index
     jmp append_machine_external_call_sequence_code_loop
 append_machine_external_call_sequence_code_epilogue:
@@ -12250,6 +12883,11 @@ append_machine_external_call_sequence_reloc_loop:
     ldy proc_index
     lda (body_ptr),y
     sta call_target_index_data
+    lda proc_index
+    cmp #$01
+    beq append_machine_external_call_sequence_reloc_write
+    jsr append_machine_external_call_sequence_maybe_word_reloc_advance
+append_machine_external_call_sequence_reloc_write:
     lda #'r'
     jsr append_char
     lda #' '
@@ -12264,6 +12902,66 @@ append_machine_external_call_sequence_reloc_loop:
     lda call_target_index_data
     jsr append_char
     jsr append_newline
+    jsr append_advance_external_reloc_body_offset_by_three
+    inc proc_index
+    jmp append_machine_external_call_sequence_reloc_loop
+append_machine_external_call_sequence_reloc_done:
+    rts
+
+compute_external_call_sequence_machine_size_resident:
+    lda #16
+    sta expr_saved_lo
+    lda #$00
+    sta proc_index
+compute_external_call_sequence_machine_size_loop:
+    ldy proc_index
+    lda (body_ptr),y
+    cmp #'u'
+    bne compute_external_call_sequence_machine_size_done
+    lda proc_index
+    pha
+    inc proc_index
+    ldy proc_index
+    lda (body_ptr),y
+    sta call_target_index_data
+    pla
+    beq compute_external_call_sequence_machine_size_after_setup
+    jsr external_call_sequence_current_is_sid_cutoff
+    bcc compute_external_call_sequence_machine_size_after_setup
+    clc
+    lda expr_saved_lo
+    adc #$03
+    sta expr_saved_lo
+compute_external_call_sequence_machine_size_after_setup:
+    clc
+    lda expr_saved_lo
+    adc #$03
+    sta expr_saved_lo
+    inc proc_index
+    jmp compute_external_call_sequence_machine_size_loop
+compute_external_call_sequence_machine_size_done:
+    lda expr_saved_lo
+    rts
+
+append_machine_external_call_sequence_maybe_word_setup:
+    jsr external_call_sequence_current_is_sid_cutoff
+    bcc append_machine_external_call_sequence_maybe_word_setup_done
+    lda #<a_to_xy_word_setup_bytes
+    sta const_ptr
+    lda #>a_to_xy_word_setup_bytes
+    sta const_ptr+1
+    jsr append_const_ptr
+append_machine_external_call_sequence_maybe_word_setup_done:
+    rts
+
+append_machine_external_call_sequence_maybe_word_reloc_advance:
+    jsr external_call_sequence_current_is_sid_cutoff
+    bcc append_machine_external_call_sequence_maybe_word_reloc_advance_done
+    jsr append_advance_external_reloc_body_offset_by_three
+append_machine_external_call_sequence_maybe_word_reloc_advance_done:
+    rts
+
+append_advance_external_reloc_body_offset_by_three:
     clc
     lda expr_saved_lo
     adc #$03
@@ -12271,9 +12969,33 @@ append_machine_external_call_sequence_reloc_loop:
     bcc :+
     inc expr_saved_hi
 :
-    inc proc_index
-    jmp append_machine_external_call_sequence_reloc_loop
-append_machine_external_call_sequence_reloc_done:
+    rts
+
+external_call_sequence_current_is_sid_cutoff:
+    ldx call_target_index_data
+    lda #<runtime_symbol_rt_sid_cutoff
+    sta const_ptr
+    lda #>runtime_symbol_rt_sid_cutoff
+    sta const_ptr+1
+    jsr external_index_matches_const_ptr_resident
+    rts
+
+external_index_matches_const_ptr_resident:
+    jsr set_external_ptr_from_x
+    ldy #$00
+external_index_matches_const_ptr_resident_loop:
+    lda (const_ptr),y
+    cmp (export_ptr),y
+    bne external_index_matches_const_ptr_resident_no
+    lda (const_ptr),y
+    beq external_index_matches_const_ptr_resident_yes
+    iny
+    bne external_index_matches_const_ptr_resident_loop
+external_index_matches_const_ptr_resident_no:
+    clc
+    rts
+external_index_matches_const_ptr_resident_yes:
+    sec
     rts
 
 append_machine_local_external_call_sequence_code_list:
@@ -13812,6 +14534,29 @@ print_line_ptr:
 
 fail_with_ptr:
     jsr print_line_ptr
+    lda actc_chain_mode
+    and #ACTC_CHAIN_RETURN_EDITOR
+    beq fail_with_ptr_exit_error
+    lda actc_source_location_valid
+    beq fail_with_ptr_exit_error
+    lda #$00
+    sta actc_source_location_valid
+    jsr snapshot_current_scan_source_offset
+    jsr load_linecol_from_loaded_debug_offset
+    lda #ACTC_WORKFLOW_FAILURE
+    jsr run_actc_workflow_overlay
+    bcc fail_with_ptr_exit_success
+    lda #<msg_edit_return_fail
+    ldy #>msg_edit_return_fail
+    jsr print_line_ptr
+    jmp fail_with_ptr_exit_error
+fail_with_ptr_exit_success:
+    lda #$00
+    sta svc_retptr
+    sta svc_retptr+1
+    ldx #svc_retptr
+    jmp svc_program_exit
+fail_with_ptr_exit_error:
     lda #$01
     sta svc_retptr
     lda #$00
@@ -13859,6 +14604,10 @@ msg_decl_overlay:
     .asciiz "DECL OVL FAIL"
 msg_save_fail:
     .asciiz "SAVE FAIL"
+msg_chain_fail:
+    .asciiz "CHAIN FAIL"
+msg_edit_return_fail:
+    .asciiz "EDIT RETURN FAILED"
 msg_created:
     .asciiz "CREATED"
 msg_updated:
@@ -13874,6 +14623,10 @@ project_marker:
     .asciiz "ACTION.PROJ"
 module_name:
     .res 25
+actc_chain_mode:
+    .res 1
+actc_source_location_valid:
+    .res 1
 
 pattern_module:
     .asciiz "MODULE"
@@ -13940,6 +14693,12 @@ import_rt_print_str:
     .asciiz "rt.print_str"
 runtime_symbol_rt_f_add:
     .asciiz "RT_F_ADD"
+runtime_symbol_rt_i_mul:
+    .asciiz "RT_I_MUL"
+runtime_symbol_rt_i_div:
+    .asciiz "RT_I_DIV"
+runtime_symbol_rt_print_i:
+    .asciiz "RT_PRINT_I"
 runtime_symbol_rt_f_sub:
     .asciiz "RT_F_SUB"
 runtime_symbol_rt_f_mul:
@@ -14303,48 +15062,12 @@ empty_main_machine_record:
     .asciiz "m A9 A5 8D D0 03 A9 00 85 02 85 03 A2 02 4C 0F CF"
 external_call_sequence_epilogue_bytes:
     .asciiz " A9 A5 8D D0 03 A9 00 85 02 85 03 A2 02 4C 0F CF"
-actc_overlay_pass_table:
-    .byte ACTC_OVERLAY_PASS_NOOP
-    .byte ACTC_OVERLAY_REU_BASE_LO, ACTC_OVERLAY_REU_BASE_HI, ACTC_OVERLAY_REU_BASE_BANK
-    .word actc_overlay_noop_path
-    .byte ACTC_OVERLAY_PASS_SOURCE_HEADER
-    .byte ACTC_OVERLAY_REU_BASE_LO, ACTC_OVERLAY_REU_BASE_HI, ACTC_OVERLAY_REU_BASE_BANK
-    .word actc_overlay_source_header_path
-    .byte ACTC_OVERLAY_PASS_DECL_COUNTS
-    .byte ACTC_OVERLAY_REU_BASE_LO, ACTC_OVERLAY_REU_BASE_HI, ACTC_OVERLAY_REU_BASE_BANK
-    .word actc_overlay_decl_counts_path
-    .byte ACTC_OVERLAY_PASS_PAYLOAD_LAYOUT
-    .byte ACTC_OVERLAY_REU_BASE_LO, ACTC_OVERLAY_REU_BASE_HI, ACTC_OVERLAY_REU_BASE_BANK
-    .word actc_overlay_payload_layout_path
-    .byte ACTC_OVERLAY_PASS_RUNTIME_IMPORTS
-    .byte ACTC_OVERLAY_REU_BASE_LO, ACTC_OVERLAY_REU_BASE_HI, ACTC_OVERLAY_REU_BASE_BANK
-    .word actc_overlay_runtime_imports_path
-    .byte ACTC_OVERLAY_PASS_EMIT_OBJECT
-    .byte ACTC_OVERLAY_REU_BASE_LO, ACTC_OVERLAY_REU_BASE_HI, ACTC_OVERLAY_REU_BASE_BANK
-    .word actc_overlay_emit_object_path
-    .byte ACTC_OVERLAY_PASS_BODY_COLLECT
-    .byte ACTC_OVERLAY_REU_BASE_LO, ACTC_OVERLAY_REU_BASE_HI, ACTC_OVERLAY_REU_BASE_BANK
-    .word actc_overlay_body_collect_path
-    .byte ACTC_OVERLAY_PASS_BODY_PREALLOCATE
-    .byte ACTC_OVERLAY_REU_BASE_LO, ACTC_OVERLAY_REU_BASE_HI, ACTC_OVERLAY_REU_BASE_BANK
-    .word actc_overlay_body_preallocate_path
-    .byte ACTC_OVERLAY_PASS_END
-actc_overlay_noop_path:
+a_to_xy_word_setup_bytes:
+    .asciiz " AA A0 00"
+; Pass ids are contiguous decimal digits, so one writable path template replaces
+; ten duplicate descriptors and strings in the resident compiler image.
+actc_overlay_path:
     .asciiz "!ACTC_OVL0.BIN"
-actc_overlay_source_header_path:
-    .asciiz "!ACTC_OVL1.BIN"
-actc_overlay_decl_counts_path:
-    .asciiz "!ACTC_OVL2.BIN"
-actc_overlay_payload_layout_path:
-    .asciiz "!ACTC_OVL3.BIN"
-actc_overlay_runtime_imports_path:
-    .asciiz "!ACTC_OVL4.BIN"
-actc_overlay_emit_object_path:
-    .asciiz "!ACTC_OVL5.BIN"
-actc_overlay_body_collect_path:
-    .asciiz "!ACTC_OVL6.BIN"
-actc_overlay_body_preallocate_path:
-    .asciiz "!ACTC_OVL7.BIN"
 
 source_buffer:
 .if ACTC_REU_SOURCE_CACHE
@@ -14422,8 +15145,11 @@ source_window_end_ptr:
 source_window_valid:
     .res 1
 
+; Manifest membership is resolved before source parsing starts, so the later
+; parser symbol scratch can reuse the same resident bytes.
+manifest_entry:
 declared_module_name:
-    .res 25
+    .res 32
 .if ACTC_REU_EXPORT_NAMES
 saved_var_name_data = export_name_window
 .else
@@ -14434,8 +15160,6 @@ saved_var_name_data:
     .res 25
 .endif
 .endif
-manifest_entry:
-    .res 32
 .if !STREAM_OUTPUT
 content_buffer:
     .res CONTENT_BUFFER_SIZE
@@ -14497,6 +15221,12 @@ expr_compare_lo:
     .res 1
 expr_compare_hi:
     .res 1
+.if ACTC_USE_RESIDENT_POSITIVE_WORD_PARSER
+expr_word_sum_lo:
+    .res 1
+expr_word_sum_hi:
+    .res 1
+.endif
 expr_group_saved_compare_lo:
     .res 1
 expr_group_saved_compare_hi:
@@ -14504,6 +15234,8 @@ expr_group_saved_compare_hi:
 expr_runtime_op:
     .res 1
 expr_runtime_post_zero:
+    .res 1
+expr_runtime_wrapped_data:
     .res 1
 expr_saved_y_data:
     .res 1
@@ -14520,12 +15252,6 @@ expr_term_lo:
 expr_term_hi:
     .res 1
 expr_print_op:
-    .res 1
-expr_runtime_saved_int_count:
-    .res 1
-expr_runtime_saved_extern_count:
-    .res 1
-expr_runtime_saved_body_end:
     .res 1
 expr_value_lo:
     .res 1
@@ -14589,11 +15315,21 @@ condition_scan_ptr_hi_data:
 condition_window_start_data:
     .res 3
 .endif
+literal_probe_scan_ptr_lo_data:
+    .res 1
+literal_probe_scan_ptr_hi_data:
+    .res 1
+.if ACTC_REU_SOURCE_CACHE
+literal_probe_window_start_data:
+    .res 3
+.endif
 reader_scan_y_data:
     .res 1
 reader_start_y_data:
     .res 1
 reader_pattern_index_data:
+    .res 1
+reader_saved_pattern_index_data:
     .res 1
 reader_saved_x_data:
     .res 1
@@ -14607,6 +15343,36 @@ reader_probe_scan_ptr_hi_data:
 reader_probe_window_start_data:
     .res 3
 .endif
+reader_lookahead_valid_data:
+    .res 1
+reader_lookahead_kind_data:
+    .res 1
+reader_lookahead_length_data:
+    .res 1
+reader_lookahead_remaining_data:
+    .res 1
+reader_lookahead_y_data:
+    .res 1
+reader_lookahead_scan_ptr_lo_data:
+    .res 1
+reader_lookahead_scan_ptr_hi_data:
+    .res 1
+.if ACTC_REU_SOURCE_CACHE
+reader_lookahead_window_next_data:
+    .res 3
+.endif
+reader_lookahead_candidate_data:
+    .res 1
+reader_lookahead_value_lo_data:
+    .res 1
+reader_lookahead_value_hi_data:
+    .res 1
+reader_lookahead_work_lo_data:
+    .res 1
+reader_lookahead_work_hi_data:
+    .res 1
+reader_lookahead_digit_data:
+    .res 1
 reader_token_ptr_lo_data:
     .res 1
 reader_token_ptr_hi_data:

@@ -1,8 +1,21 @@
+INCLUDE "MATH1"
+
 MODULE MAIN
-REAL A
-REAL X
+
 PROC MAIN()
-A=REAL(0-7)
-X=FAbs(A)
-PrintRE(X)
-RETURN
+    REAL angle,sine,cosine,arc,logarithm,power
+
+    angle=DegToRad(30.0)
+    sine=FSin(angle)
+    cosine=FCos(angle)
+    arc=RadToDeg(FATan2(sine,cosine))
+    logarithm=FLn(MATH_E)
+    power=FPow(2.0,8.0)
+
+    PrintRE(sine)
+    PrintRE(cosine)
+    PrintRE(arc)
+    PrintRE(logarithm)
+    PrintRE(power)
+    RETURN
+ENDPROC

@@ -1,0 +1,18 @@
+#!/bin/sh
+set -eu
+
+destination=${1:-idun-action-workspace}
+template=${IDUN_ACTION_TEMPLATE:-/usr/share/actionc64u/workspace-template}
+
+if [ ! -d "$template" ]; then
+    echo "Idun Action workspace template is not installed" >&2
+    exit 1
+fi
+if [ -e "$destination" ]; then
+    echo "Refusing to replace existing path: $destination" >&2
+    exit 1
+fi
+
+cp -R "$template" "$destination"
+chmod -R u+w "$destination"
+printf 'Created Idun Action workspace: %s\n' "$destination"

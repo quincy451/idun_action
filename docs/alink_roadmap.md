@@ -1,22 +1,15 @@
 # ALINK Roadmap
 
-Current target: `ALINK.PRG` owns final direct PRG construction.
+The linker process conversion is complete for the active OBJ1 contract. Linux
+`alink` owns deterministic closure selection, relocation, direct C64 PRG
+construction, and DBG sidecar generation.
 
-Near-term work:
+Further work is format/runtime expansion rather than process porting:
 
-- keep `BIN/<MODULE>.PRG` as the default and only maintained runnable output
-- continue widening object graph loading and external symbol closure resolution
-- preserve dead-strip behavior while adding runtime helper families
-- move optional helpers behind link-time selection
-- keep cold linker tables REU-backed instead of growing resident table slabs
-- keep generated PRG startup/return behavior deterministic under UDOS
-- remove stale compatibility assumptions from docs, probes, and release exports
+- add object records only with strict parser, bounds, and determinism tests
+- keep optional runtime families reachable-import selected
+- preserve the project/shared-library search order
+- validate new hardware helpers through direct PRG or attached-hardware gates
 
-Proof gates:
-
-- `make -C ../udos vice-action-alink`
-- `make -C ../udos vice-action-actc-alink-launch`
-- `make -C ../udos vice-action-actc-alink-launch-runtime-matrices`
-- `make -C ../udos vice-action-alink-prg-matrix`
-- `make -C ../udos vice-action-alink-prg-object-code-matrices`
-- shape-specific launch gates for helper-bearing direct PRG output
+The active gates are `tests.test_linux_workspace_tools`,
+`tests.test_idun_workspace_export`, and `tests.test_idun_prg_runtime`.

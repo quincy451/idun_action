@@ -1,6 +1,9 @@
 # Build artifacts
 build/
 
+# Local APK repository signing secrets (the public key is copied into build/)
+.apk-keys/
+
 # Python test cache
 __pycache__/
 .pytest_cache/

@@ -1,20 +1,46 @@
-; GFX1 C64 graphics binding reference.
-; ACTC recognizes these builtin helper names directly. ALINK includes only the
-; referenced RT_*.OBJ modules in the final PRG.
+; GFX1 C64 graphics and resource library.
 ;
-; These helpers expose the first low-level VIC-II graphics operations used by
-; the direct PRG runtime modules. Higher-level resource/tile helpers can build
-; on this file without becoming runner-global behavior.
+; Low-level VIC-II operations are link-selected 6502 runtime helpers.  The
+; higher drawing routines are portable Action code.  Large programs should use
+; VIC bank 2: screen RAM at $8400, sprite staging at $8800, and bitmap RAM at
+; $A000.  The tracked high-level calls safely access RAM beneath BASIC ROM.
 
 MODULE GFX1
+
+BYTE CONST GFX_BLACK=0
+BYTE CONST GFX_WHITE=1
+BYTE CONST GFX_RED=2
+BYTE CONST GFX_CYAN=3
+BYTE CONST GFX_PURPLE=4
+BYTE CONST GFX_GREEN=5
+BYTE CONST GFX_BLUE=6
+BYTE CONST GFX_YELLOW=7
+BYTE CONST GFX_ORANGE=8
+BYTE CONST GFX_BROWN=9
+BYTE CONST GFX_LIGHTRED=10
+BYTE CONST GFX_DARKGRAY=11
+BYTE CONST GFX_GRAY=12
+BYTE CONST GFX_LIGHTGREEN=13
+BYTE CONST GFX_LIGHTBLUE=14
+BYTE CONST GFX_LIGHTGRAY=15
+
+CARD _GfxBitmapMemory=[$2000]
+CARD _GfxScreenMemory=[$0400]
+CARD _GfxVicBase=[0]
+CARD _GfxSpriteMemory=[$0800]
+CARD _GfxClipLeft=[0]
+CARD _GfxClipRight=[319]
+BYTE _GfxClipTop=[0]
+BYTE _GfxClipBottom=[199]
+BYTE _GfxCpuPort=$01
 
 PROC VicBank(BYTE bank)
 PROC BgColor(BYTE color)
 PROC BorderColor(BYTE color)
 PROC ScreenBase(CARD base)
 PROC BitmapBase(CARD base)
-PROC ScreenCell(BYTE x,BYTE y,BYTE ch)
-PROC ColorCell(BYTE x,BYTE y,BYTE color)
+PROC ScreenCell(BYTE x,y,ch)
+PROC ColorCell(BYTE x,y,color)
 PROC ScreenCopy(CARD addr)
 PROC ColorCopy(CARD addr)
 PROC BitmapFill(BYTE value)
@@ -23,3 +49,807 @@ PROC BitmapOn()
 PROC BitmapOff()
 PROC MBitmapOn()
 PROC MBitmapOff()
+
+; Sprite primitives are shared with SIDSPR1 and are compiler builtins.
+PROC SpriteOn(BYTE n)
+PROC SpriteOff(BYTE n)
+PROC SpritePos(BYTE n,CARD x,BYTE y)
+PROC SpriteData(BYTE n,CARD addr)
+PROC SpriteColor(BYTE n,color)
+PROC SpriteMC(BYTE n,on)
+PROC SetSpriteMC(BYTE color1,color2)
+
+PROC GfxUseBank(BYTE bank)
+    bank=bank & 3
+    IF bank=0 THEN
+        _GfxVicBase=0
+    ELSEIF bank=1 THEN
+        _GfxVicBase=$4000
+    ELSEIF bank=2 THEN
+        _GfxVicBase=$8000
+    ELSE
+        _GfxVicBase=$C000
+    FI
+    VicBank(bank)
+    RETURN
+
+PROC GfxUseScreen(CARD base)
+    _GfxScreenMemory=base
+    ScreenBase(base)
+    RETURN
+
+PROC GfxUseBitmap(CARD base)
+    _GfxBitmapMemory=base
+    BitmapBase(base)
+    RETURN
+
+PROC GfxUseSprites(CARD base)
+    _GfxSpriteMemory=base
+    RETURN
+
+PROC GfxHires(CARD screen,bitmap)
+    IF screen<$4000 THEN
+        GfxUseBank(0)
+    ELSEIF screen<$8000 THEN
+        GfxUseBank(1)
+    ELSEIF screen<$C000 THEN
+        GfxUseBank(2)
+    ELSE
+        GfxUseBank(3)
+    FI
+    GfxUseScreen(screen)
+    GfxUseBitmap(bitmap)
+    BitmapOn()
+    RETURN
+
+PROC GfxMulticolor(CARD screen,bitmap)
+    IF screen<$4000 THEN
+        GfxUseBank(0)
+    ELSEIF screen<$8000 THEN
+        GfxUseBank(1)
+    ELSEIF screen<$C000 THEN
+        GfxUseBank(2)
+    ELSE
+        GfxUseBank(3)
+    FI
+    GfxUseScreen(screen)
+    GfxUseBitmap(bitmap)
+    MBitmapOn()
+    RETURN
+
+PROC GfxBitmapClear(BYTE value)
+    CARD count
+    BYTE savedPort
+    BYTE POINTER destination
+    ASMBLOCK [
+        PHP
+        SEI
+    ]
+    savedPort=_GfxCpuPort
+    _GfxCpuPort=savedPort & $FC
+    destination=_GfxBitmapMemory
+    count=0
+    WHILE count<8000
+    DO
+        destination^=value
+        destination=destination+1
+        count=count+1
+    OD
+    _GfxCpuPort=savedPort
+    ASMBLOCK [
+        PLP
+    ]
+    RETURN
+
+PROC GfxScreenClear(BYTE value,color)
+    CARD count
+    BYTE savedPort
+    BYTE POINTER screen,colors
+    ASMBLOCK [
+        PHP
+        SEI
+    ]
+    savedPort=_GfxCpuPort
+    _GfxCpuPort=savedPort & $FC
+    screen=_GfxScreenMemory
+    colors=$D800
+    count=0
+    WHILE count<1000
+    DO
+        screen^=value
+        colors^=color & 15
+        screen=screen+1
+        colors=colors+1
+        count=count+1
+    OD
+    _GfxCpuPort=savedPort
+    ASMBLOCK [
+        PLP
+    ]
+    RETURN
+
+PROC ClipSet(CARD left,top,right,bottom)
+    IF left>319 THEN
+        left=319
+    FI
+    IF right>319 THEN
+        right=319
+    FI
+    IF top>199 THEN
+        top=199
+    FI
+    IF bottom>199 THEN
+        bottom=199
+    FI
+    _GfxClipLeft=left
+    _GfxClipTop=top
+    _GfxClipRight=right
+    _GfxClipBottom=bottom
+    RETURN
+
+PROC ClipReset()
+    _GfxClipLeft=0
+    _GfxClipTop=0
+    _GfxClipRight=319
+    _GfxClipBottom=199
+    RETURN
+
+BYTE FUNC _GfxInside(CARD x,BYTE y)
+    IF x>319 OR y>199 OR x<_GfxClipLeft OR x>_GfxClipRight OR y<_GfxClipTop OR y>_GfxClipBottom THEN
+        RETURN(0)
+    FI
+    RETURN(1)
+
+PROC Plot(CARD x,BYTE y)
+    CARD offset
+    BYTE mask,savedPort
+    BYTE POINTER pixel
+    IF _GfxInside(x,y)=0 THEN
+        RETURN
+    FI
+    offset=(y/8)*320+(x/8)*8+(y MOD 8)
+    pixel=_GfxBitmapMemory+offset
+    mask=$80 RSH (x MOD 8)
+    ASMBLOCK [
+        PHP
+        SEI
+    ]
+    savedPort=_GfxCpuPort
+    _GfxCpuPort=savedPort & $FC
+    pixel^=pixel^ % mask
+    _GfxCpuPort=savedPort
+    ASMBLOCK [
+        PLP
+    ]
+    RETURN
+
+PROC Unplot(CARD x,BYTE y)
+    CARD offset
+    BYTE mask,savedPort
+    BYTE POINTER pixel
+    IF _GfxInside(x,y)=0 THEN
+        RETURN
+    FI
+    offset=(y/8)*320+(x/8)*8+(y MOD 8)
+    pixel=_GfxBitmapMemory+offset
+    mask=$80 RSH (x MOD 8)
+    ASMBLOCK [
+        PHP
+        SEI
+    ]
+    savedPort=_GfxCpuPort
+    _GfxCpuPort=savedPort & $FC
+    pixel^=pixel^ & (mask XOR $FF)
+    _GfxCpuPort=savedPort
+    ASMBLOCK [
+        PLP
+    ]
+    RETURN
+
+PROC PlotXor(CARD x,BYTE y)
+    CARD offset
+    BYTE mask,savedPort
+    BYTE POINTER pixel
+    IF _GfxInside(x,y)=0 THEN
+        RETURN
+    FI
+    offset=(y/8)*320+(x/8)*8+(y MOD 8)
+    pixel=_GfxBitmapMemory+offset
+    mask=$80 RSH (x MOD 8)
+    ASMBLOCK [
+        PHP
+        SEI
+    ]
+    savedPort=_GfxCpuPort
+    _GfxCpuPort=savedPort & $FC
+    pixel^=pixel^ XOR mask
+    _GfxCpuPort=savedPort
+    ASMBLOCK [
+        PLP
+    ]
+    RETURN
+
+BYTE FUNC Point(CARD x,BYTE y)
+    CARD offset
+    BYTE mask,savedPort,result
+    BYTE POINTER pixel
+    IF x>319 OR y>199 THEN
+        RETURN(0)
+    FI
+    offset=(y/8)*320+(x/8)*8+(y MOD 8)
+    pixel=_GfxBitmapMemory+offset
+    mask=$80 RSH (x MOD 8)
+    ASMBLOCK [
+        PHP
+        SEI
+    ]
+    savedPort=_GfxCpuPort
+    _GfxCpuPort=savedPort & $FC
+    result=0
+    IF (pixel^ & mask)<>0 THEN
+        result=1
+    FI
+    _GfxCpuPort=savedPort
+    ASMBLOCK [
+        PLP
+    ]
+    RETURN(result)
+
+PROC MPlot(CARD x,BYTE y,color)
+    CARD offset
+    BYTE shift,mask,value,savedPort
+    BYTE POINTER pixel
+    IF x>159 OR _GfxInside(x+x,y)=0 THEN
+        RETURN
+    FI
+    offset=(y/8)*320+(x/4)*8+(y MOD 8)
+    pixel=_GfxBitmapMemory+offset
+    shift=(3-(x MOD 4))*2
+    mask=3 LSH shift
+    value=(color & 3) LSH shift
+    ASMBLOCK [
+        PHP
+        SEI
+    ]
+    savedPort=_GfxCpuPort
+    _GfxCpuPort=savedPort & $FC
+    pixel^=(pixel^ & (mask XOR $FF)) % value
+    _GfxCpuPort=savedPort
+    ASMBLOCK [
+        PLP
+    ]
+    RETURN
+
+BYTE FUNC MPoint(CARD x,BYTE y)
+    CARD offset
+    BYTE shift,savedPort,result
+    BYTE POINTER pixel
+    IF x>159 OR y>199 THEN
+        RETURN(0)
+    FI
+    offset=(y/8)*320+(x/4)*8+(y MOD 8)
+    pixel=_GfxBitmapMemory+offset
+    shift=(3-(x MOD 4))*2
+    ASMBLOCK [
+        PHP
+        SEI
+    ]
+    savedPort=_GfxCpuPort
+    _GfxCpuPort=savedPort & $FC
+    result=(pixel^ RSH shift) & 3
+    _GfxCpuPort=savedPort
+    ASMBLOCK [
+        PLP
+    ]
+    RETURN(result)
+
+PROC GfxCellColors(BYTE x,y,foreground,background)
+    CARD offset
+    BYTE savedPort
+    BYTE POINTER cell
+    IF x>39 OR y>24 THEN
+        RETURN
+    FI
+    offset=y*40+x
+    cell=_GfxScreenMemory+offset
+    ASMBLOCK [
+        PHP
+        SEI
+    ]
+    savedPort=_GfxCpuPort
+    _GfxCpuPort=savedPort & $FC
+    cell^=((foreground & 15) LSH 4) % (background & 15)
+    _GfxCpuPort=savedPort
+    ASMBLOCK [
+        PLP
+    ]
+    RETURN
+
+PROC GfxMCellColors(BYTE x,y,color1,color2,color3)
+    CARD offset
+    BYTE savedPort
+    BYTE POINTER screen,color
+    IF x>39 OR y>24 THEN
+        RETURN
+    FI
+    offset=y*40+x
+    screen=_GfxScreenMemory+offset
+    color=$D800+offset
+    ASMBLOCK [
+        PHP
+        SEI
+    ]
+    savedPort=_GfxCpuPort
+    _GfxCpuPort=savedPort & $FC
+    screen^=((color1 & 15) LSH 4) % (color2 & 15)
+    color^=color3 & 15
+    _GfxCpuPort=savedPort
+    ASMBLOCK [
+        PLP
+    ]
+    RETURN
+
+INT FUNC _GfxIAbs(INT value)
+    IF value<0 THEN
+        RETURN(0-value)
+    FI
+    RETURN(value)
+
+PROC HLineDraw(INT x0,x1,y)
+    INT swap
+    IF x1<x0 THEN
+        swap=x0
+        x0=x1
+        x1=swap
+    FI
+    WHILE x0<=x1
+    DO
+        Plot(x0,y)
+        x0=x0+1
+    OD
+    RETURN
+
+PROC HLineUnplot(INT x0,x1,y)
+    INT swap
+    IF x1<x0 THEN
+        swap=x0
+        x0=x1
+        x1=swap
+    FI
+    WHILE x0<=x1
+    DO
+        Unplot(x0,y)
+        x0=x0+1
+    OD
+    RETURN
+
+PROC VLineDraw(INT x,y0,y1)
+    INT swap
+    IF y1<y0 THEN
+        swap=y0
+        y0=y1
+        y1=swap
+    FI
+    WHILE y0<=y1
+    DO
+        Plot(x,y0)
+        y0=y0+1
+    OD
+    RETURN
+
+PROC LineDraw(INT x0,y0,x1,y1)
+    INT dx,dy,sx,sy,error,twice
+    dx=_GfxIAbs(x1-x0)
+    IF x0<x1 THEN
+        sx=1
+    ELSE
+        sx=-1
+    FI
+    dy=0-_GfxIAbs(y1-y0)
+    IF y0<y1 THEN
+        sy=1
+    ELSE
+        sy=-1
+    FI
+    error=dx+dy
+    WHILE x0<>x1 OR y0<>y1
+    DO
+        Plot(x0,y0)
+        twice=error+error
+        IF twice>=dy THEN
+            error=error+dy
+            x0=x0+sx
+        FI
+        IF twice<=dx THEN
+            error=error+dx
+            y0=y0+sy
+        FI
+    OD
+    Plot(x1,y1)
+    RETURN
+
+PROC RectangleDraw(INT left,top,right,bottom)
+    HLineDraw(left,right,top)
+    HLineDraw(left,right,bottom)
+    VLineDraw(left,top,bottom)
+    VLineDraw(right,top,bottom)
+    RETURN
+
+PROC RectangleFill(INT left,top,right,bottom)
+    INT swap
+    IF bottom<top THEN
+        swap=top
+        top=bottom
+        bottom=swap
+    FI
+    WHILE top<=bottom
+    DO
+        HLineDraw(left,right,top)
+        top=top+1
+    OD
+    RETURN
+
+PROC RectangleClear(INT left,top,right,bottom)
+    INT swap
+    IF bottom<top THEN
+        swap=top
+        top=bottom
+        bottom=swap
+    FI
+    WHILE top<=bottom
+    DO
+        HLineUnplot(left,right,top)
+        top=top+1
+    OD
+    RETURN
+
+PROC SquareDraw(INT left,top,size)
+    IF size<=0 THEN
+        RETURN
+    FI
+    RectangleDraw(left,top,left+size-1,top+size-1)
+    RETURN
+
+PROC SquareFill(INT left,top,size)
+    IF size<=0 THEN
+        RETURN
+    FI
+    RectangleFill(left,top,left+size-1,top+size-1)
+    RETURN
+
+PROC CircleDraw(INT centerX,centerY,radius)
+    INT x,y,error
+    IF radius<0 THEN
+        RETURN
+    FI
+    x=radius
+    y=0
+    error=1-x
+    WHILE x>=y
+    DO
+        Plot(centerX+x,centerY+y)
+        Plot(centerX+y,centerY+x)
+        Plot(centerX-y,centerY+x)
+        Plot(centerX-x,centerY+y)
+        Plot(centerX-x,centerY-y)
+        Plot(centerX-y,centerY-x)
+        Plot(centerX+y,centerY-x)
+        Plot(centerX+x,centerY-y)
+        y=y+1
+        IF error<0 THEN
+            error=error+y+y+1
+        ELSE
+            x=x-1
+            error=error+(y-x)*2+1
+        FI
+    OD
+    RETURN
+
+PROC CircleFill(INT centerX,centerY,radius)
+    INT x,y,error
+    IF radius<0 THEN
+        RETURN
+    FI
+    x=radius
+    y=0
+    error=1-x
+    WHILE x>=y
+    DO
+        HLineDraw(centerX-x,centerX+x,centerY+y)
+        HLineDraw(centerX-x,centerX+x,centerY-y)
+        HLineDraw(centerX-y,centerX+y,centerY+x)
+        HLineDraw(centerX-y,centerX+y,centerY-x)
+        y=y+1
+        IF error<0 THEN
+            error=error+y+y+1
+        ELSE
+            x=x-1
+            error=error+(y-x)*2+1
+        FI
+    OD
+    RETURN
+
+PROC TriangleDraw(INT x0,y0,x1,y1,x2,y2)
+    LineDraw(x0,y0,x1,y1)
+    LineDraw(x1,y1,x2,y2)
+    LineDraw(x2,y2,x0,y0)
+    RETURN
+
+BYTE FUNC _GfxReadByte(CARD address,offset)
+    BYTE savedPort,result
+    BYTE POINTER source
+    source=address+offset
+    ASMBLOCK [
+        PHP
+        SEI
+    ]
+    savedPort=_GfxCpuPort
+    _GfxCpuPort=savedPort & $F8
+    result=source^
+    _GfxCpuPort=savedPort
+    ASMBLOCK [
+        PLP
+    ]
+    RETURN(result)
+
+CARD FUNC _GfxReadWord(CARD address,offset)
+    RETURN(_GfxReadByte(address,offset)+_GfxReadByte(address,offset+1)*256)
+
+BYTE FUNC _GfxBitmapValid(CARD asset,BYTE mode)
+    CARD width,height,stride
+    IF _GfxReadByte(asset,0)<>65 OR _GfxReadByte(asset,1)<>66 OR _GfxReadByte(asset,2)<>77 OR _GfxReadByte(asset,3)<>49 OR _GfxReadByte(asset,4)<>mode THEN
+        RETURN(0)
+    FI
+    width=_GfxReadWord(asset,8)
+    height=_GfxReadWord(asset,10)
+    stride=_GfxReadWord(asset,12)
+    IF width=0 OR height=0 OR height>200 THEN
+        RETURN(0)
+    FI
+    IF mode=0 AND (width>320 OR stride<>(width+7)/8) THEN
+        RETURN(0)
+    FI
+    IF mode=1 AND (width>160 OR stride<>(width+3)/4) THEN
+        RETURN(0)
+    FI
+    RETURN(1)
+
+BYTE FUNC _GfxBitmapPixel(CARD asset,x,y)
+    CARD width,stride,offset
+    BYTE packed
+    width=_GfxReadWord(asset,8)
+    IF x>=width OR y>=_GfxReadWord(asset,10) THEN
+        RETURN(0)
+    FI
+    stride=_GfxReadWord(asset,12)
+    offset=16+y*stride+x/8
+    packed=_GfxReadByte(asset,offset)
+    RETURN((packed RSH (7-(x MOD 8))) & 1)
+
+BYTE FUNC _GfxMBitmapPixel(CARD asset,x,y)
+    CARD width,stride,offset
+    BYTE packed,shift
+    width=_GfxReadWord(asset,8)
+    IF x>=width OR y>=_GfxReadWord(asset,10) THEN
+        RETURN(0)
+    FI
+    stride=_GfxReadWord(asset,12)
+    offset=16+y*stride+x/4
+    packed=_GfxReadByte(asset,offset)
+    shift=(3-(x MOD 4))*2
+    RETURN((packed RSH shift) & 3)
+
+PROC BitmapStamp(CARD asset,originX,originY)
+    CARD width,height,x,y
+    IF _GfxBitmapValid(asset,0)=0 THEN
+        RETURN
+    FI
+    width=_GfxReadWord(asset,8)
+    height=_GfxReadWord(asset,10)
+    y=0
+    WHILE y<height
+    DO
+        x=0
+        WHILE x<width
+        DO
+            IF _GfxBitmapPixel(asset,x,y)<>0 THEN
+                Plot(originX+x,originY+y)
+            FI
+            x=x+1
+        OD
+        y=y+1
+    OD
+    RETURN
+
+PROC BitmapDrawResource(CARD asset,originX,originY)
+    CARD width,height,x,y
+    IF _GfxBitmapValid(asset,0)=0 THEN
+        RETURN
+    FI
+    width=_GfxReadWord(asset,8)
+    height=_GfxReadWord(asset,10)
+    y=0
+    WHILE y<height
+    DO
+        x=0
+        WHILE x<width
+        DO
+            IF _GfxBitmapPixel(asset,x,y)<>0 THEN
+                Plot(originX+x,originY+y)
+            ELSE
+                Unplot(originX+x,originY+y)
+            FI
+            x=x+1
+        OD
+        y=y+1
+    OD
+    RETURN
+
+PROC BitmapErase(CARD asset,originX,originY)
+    CARD width,height,x,y
+    IF _GfxBitmapValid(asset,0)=0 THEN
+        RETURN
+    FI
+    width=_GfxReadWord(asset,8)
+    height=_GfxReadWord(asset,10)
+    y=0
+    WHILE y<height
+    DO
+        x=0
+        WHILE x<width
+        DO
+            IF _GfxBitmapPixel(asset,x,y)<>0 THEN
+                Unplot(originX+x,originY+y)
+            FI
+            x=x+1
+        OD
+        y=y+1
+    OD
+    RETURN
+
+PROC BitmapMove(CARD asset,oldX,oldY,newX,newY)
+    BitmapErase(asset,oldX,oldY)
+    BitmapStamp(asset,newX,newY)
+    RETURN
+
+PROC MBitmapStamp(CARD asset,originX,originY)
+    CARD width,height,x,y
+    BYTE value
+    IF _GfxBitmapValid(asset,1)=0 THEN
+        RETURN
+    FI
+    width=_GfxReadWord(asset,8)
+    height=_GfxReadWord(asset,10)
+    y=0
+    WHILE y<height
+    DO
+        x=0
+        WHILE x<width
+        DO
+            value=_GfxMBitmapPixel(asset,x,y)
+            IF value<>0 THEN
+                MPlot(originX+x,originY+y,value)
+            FI
+            x=x+1
+        OD
+        y=y+1
+    OD
+    RETURN
+
+PROC MBitmapDrawResource(CARD asset,originX,originY)
+    CARD width,height,x,y
+    IF _GfxBitmapValid(asset,1)=0 THEN
+        RETURN
+    FI
+    width=_GfxReadWord(asset,8)
+    height=_GfxReadWord(asset,10)
+    y=0
+    WHILE y<height
+    DO
+        x=0
+        WHILE x<width
+        DO
+            MPlot(originX+x,originY+y,_GfxMBitmapPixel(asset,x,y))
+            x=x+1
+        OD
+        y=y+1
+    OD
+    RETURN
+
+PROC MBitmapErase(CARD asset,originX,originY)
+    CARD width,height,x,y
+    IF _GfxBitmapValid(asset,1)=0 THEN
+        RETURN
+    FI
+    width=_GfxReadWord(asset,8)
+    height=_GfxReadWord(asset,10)
+    y=0
+    WHILE y<height
+    DO
+        x=0
+        WHILE x<width
+        DO
+            IF _GfxMBitmapPixel(asset,x,y)<>0 THEN
+                MPlot(originX+x,originY+y,0)
+            FI
+            x=x+1
+        OD
+        y=y+1
+    OD
+    RETURN
+
+PROC MBitmapMove(CARD asset,oldX,oldY,newX,newY)
+    MBitmapErase(asset,oldX,oldY)
+    MBitmapStamp(asset,newX,newY)
+    RETURN
+
+BYTE FUNC SpriteDefaultColor(CARD asset)
+    RETURN(_GfxReadByte(asset,63) & 15)
+
+BYTE FUNC SpriteIsMulticolor(CARD asset)
+    IF (_GfxReadByte(asset,63) & $80)<>0 THEN
+        RETURN(1)
+    FI
+    RETURN(0)
+
+PROC SpritePlace(BYTE slot,CARD asset,x,BYTE y)
+    CARD count,destinationAddress
+    BYTE color,multicolor,savedPort,vicPointer
+    BYTE POINTER source,destination,pointerCell
+    IF slot>7 OR (_GfxSpriteMemory & 63)<>0 THEN
+        RETURN
+    FI
+    destinationAddress=_GfxSpriteMemory+slot*64
+    IF destinationAddress<_GfxVicBase OR destinationAddress>_GfxVicBase+$3FC0 THEN
+        RETURN
+    FI
+    color=SpriteDefaultColor(asset)
+    multicolor=SpriteIsMulticolor(asset)
+    source=asset
+    destination=destinationAddress
+    pointerCell=_GfxScreenMemory+1016+slot
+    vicPointer=(destinationAddress-_GfxVicBase)/64
+    ASMBLOCK [
+        PHP
+        SEI
+    ]
+    savedPort=_GfxCpuPort
+    _GfxCpuPort=savedPort & $F8
+    count=0
+    WHILE count<63
+    DO
+        destination^=source^
+        destination=destination+1
+        source=source+1
+        count=count+1
+    OD
+    destination^=0
+    pointerCell^=vicPointer
+    _GfxCpuPort=savedPort
+    ASMBLOCK [
+        PLP
+    ]
+    SpriteColor(slot,color)
+    SpriteMC(slot,multicolor)
+    SpritePos(slot,x,y)
+    SpriteOn(slot)
+    RETURN
+
+PROC SpriteMove(BYTE slot,CARD x,BYTE y)
+    SpritePos(slot,x,y)
+    RETURN
+
+PROC SpriteShow(BYTE slot)
+    SpriteOn(slot)
+    RETURN
+
+PROC SpriteHide(BYTE slot)
+    SpriteOff(slot)
+    RETURN
+
+PROC SpriteSharedColors(BYTE color1,color2)
+    SetSpriteMC(color1,color2)
+    RETURN
+
+; End library scope before returning to the including source.
+MODULE

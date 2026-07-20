@@ -64,11 +64,33 @@ class TestActcAlinkRuntimeMatrix(unittest.TestCase):
             ),
         )
 
+    def test_makefile_shape_group_parser_preserves_duplicate_entries(self) -> None:
+        groups = self._makefile_shape_group_lists(
+            "ACTION_ACTC_ALINK_INPUT_RUNTIME_SHAPES := \\\n"
+            "\tactc_runtime_input_one \\\n"
+            "\tactc_runtime_input_one \\\n"
+            "\tactc_runtime_input_two\n"
+        )
+
+        self.assertEqual(
+            groups["ACTION_ACTC_ALINK_INPUT_RUNTIME_SHAPES"],
+            [
+                "actc_runtime_input_one",
+                "actc_runtime_input_one",
+                "actc_runtime_input_two",
+            ],
+        )
+
     def test_all_alink_object_code_probe_shapes_are_listed_in_makefile_matrices(self) -> None:
         sys.path.insert(0, str(self.workspace / "udos" / "tools"))
         import run_action_alink_prg_probe as probe
 
-        probe_shapes = {shape for shape in probe.DIRECT_PRG_CASES if shape.startswith("object_code_")}
+        probe_shapes = {
+            shape
+            for shape, case in probe.DIRECT_PRG_CASES.items()
+            if shape.startswith("object_code_")
+            or (shape.startswith("legacy_") and case.get("expect_alink_failure"))
+        }
         matrix_shapes = set().union(
             self._makefile_shape_group(
                 self.make_text,
@@ -95,52 +117,22 @@ class TestActcAlinkRuntimeMatrix(unittest.TestCase):
         import run_action_alink_prg_probe as probe
 
         expected_shapes = {
-            "single_call",
-            "fanout",
-            "local_chain_mixed_call",
-            "local_external_chain_mixed_call",
-            "local_external_helper_only_call",
-            "local_external_deep_helper_only_call",
-            "local_external_helper_mixed_repeat_call",
-            "local_external_project_library_helper_closure",
-            "local_external_project_imports_actc_secondary_export",
-            "local_external_project_imports_actc_secondary_export_local_chain",
-            "local_external_library_imports_actc_secondary_export",
-            "local_external_library_imports_actc_secondary_export_local_chain",
-            "local_external_direct_and_library_imports_actc_tail",
-            "local_external_library_project_imports_actc_secondary_export",
-            "local_external_library_project_imports_actc_secondary_export_local_chain",
-            "local_external_mixed_shared_library_dependency_dedup",
-            "local_external_dual_secondary_exports_shared_library_dedup",
-            "local_external_dual_secondary_exports_shared_project_dedup",
-            "local_external_dual_secondary_exports_shared_actc_local_dedup",
-            "local_external_project_library_transitive_shared_tail",
-            "local_external_project_library_transitive_project_tail",
-            "local_external_project_library_transitive_tail_imports_actc_local_chain",
-            "external_project_library_project_library_chain",
-            "external_call",
-            "local_external_call",
-            "local_external_pair_call",
-            "local_external_call_twice",
-            "local_external_mixed_repeat_call",
-            "external_pair_call",
-            "external_triple_call",
-            "external_lettered_import_call",
-            "external_dependency_windowed_lettered_import_call",
-            "local_external_project_dependency_windowed_lettered_import_call",
-            "local_external_project_dependency_windowed_lettered_mixed_helper_call",
-            "external_mixed_repeat_call",
-            "external_call_twice",
+            shape
+            for shape, case in probe.DIRECT_PRG_CASES.items()
+            if "source" in case
+            and not shape.startswith("actc_runtime_")
+            and not shape.startswith("object_code_")
         }
         matrix_shapes = self._makefile_shape_group(self.make_text, "ACTION_ACTC_ALINK_OBJECT_EMISSION_SHAPES")
         direct_cases = set(probe.DIRECT_PRG_CASES)
 
         stale = sorted(matrix_shapes - direct_cases)
+        known_matrix_shapes = matrix_shapes & direct_cases
         missing = sorted(expected_shapes - matrix_shapes)
-        non_source = sorted(shape for shape in matrix_shapes if "source" not in probe.DIRECT_PRG_CASES[shape])
+        non_source = sorted(shape for shape in known_matrix_shapes if "source" not in probe.DIRECT_PRG_CASES[shape])
         wrong_family = sorted(
             shape
-            for shape in matrix_shapes
+            for shape in known_matrix_shapes
             if shape.startswith("actc_runtime_") or shape.startswith("object_code_")
         )
 
@@ -168,6 +160,46 @@ class TestActcAlinkRuntimeMatrix(unittest.TestCase):
             target_body,
         )
         self.assertNotIn("for attempt in 1 2 3", target_body)
+
+    def test_documented_actc_object_emission_matrix_count_matches_probe_cases(self) -> None:
+        sys.path.insert(0, str(self.workspace / "udos" / "tools"))
+        import run_action_alink_prg_probe as probe
+
+        expected_count = len(
+            {
+                shape
+                for shape, case in probe.DIRECT_PRG_CASES.items()
+                if "source" in case
+                and not shape.startswith("actc_runtime_")
+                and not shape.startswith("object_code_")
+            }
+        )
+        documented_counts = {
+            "actionc64u/docs/action_matrix.md": r"\| ACTC object emission \| (\d+) source-backed direct-launch shapes \|",
+            "actionc64u/docs/active_direction.md": (
+                r"object-emission launch matrix; it currently enumerates (\d+)\s+"
+                r"non-runtime, non-object-code source shapes"
+            ),
+            "udos/README.md": (
+                r"now covers all\s+(\d+) source-backed non-runtime, non-object-code "
+                r"ACTC object-emission launch"
+            ),
+            "udos/BUILDING.md": (
+                r"currently enumerates all (\d+) non-runtime, non-object-code source-backed\s+"
+                r"object-emission shapes"
+            ),
+        }
+
+        for relative_path, pattern in documented_counts.items():
+            with self.subTest(path=relative_path):
+                text = (self.workspace / relative_path).read_text()
+                match = re.search(pattern, text)
+                self.assertIsNotNone(match, f"Missing documented ACTC object-emission count in {relative_path}")
+                self.assertEqual(
+                    int(match.group(1)),
+                    expected_count,
+                    f"Documented ACTC object-emission count in {relative_path} is stale",
+                )
 
     def test_shipped_link_selected_library_helpers_have_runtime_contract(self) -> None:
         action_root = self.workspace / "actionc64u"
@@ -290,6 +322,63 @@ class TestActcAlinkRuntimeMatrix(unittest.TestCase):
         }:
             self.assertIn(shape, math_shapes)
 
+        compiler_runtime_modules = {
+            "rt_f_abs",
+            "rt_f_add",
+            "rt_f_cmp",
+            "rt_f_div",
+            "rt_f_mul",
+            "rt_f_sqrt",
+            "rt_f_sub",
+            "rt_f_to_i",
+            "rt_i_div",
+            "rt_i_mul",
+            "rt_i_to_f",
+            "rt_print_i",
+            "rt_print_f",
+            "rt_s_to_f",
+        }
+        dependency_only_runtime_modules = {
+            "rt_dbf_pack_copy",
+            "rt_dbf_pack_read",
+            "rt_dbf_pack_step",
+            "rt_dbf_pack_write",
+            "rt_dbf_state",
+            "rt_js",
+            "rt_ms",
+            "rt_sid_filter_state",
+            "rt_sid_state",
+            "rt_sid_volume_state",
+        }
+        action_facing_runtime_modules = {
+            runtime_name
+            for helper_map in generic_contracts.values()
+            for runtime_name in helper_map.values()
+        } | compiler_runtime_modules
+
+        unexpected_runtime_modules = sorted(
+            runtime_modules - action_facing_runtime_modules - dependency_only_runtime_modules
+        )
+        missing_runtime_modules = sorted(action_facing_runtime_modules - runtime_modules)
+        missing_dependency_modules = sorted(dependency_only_runtime_modules - runtime_modules)
+
+        self.assertFalse(
+            unexpected_runtime_modules,
+            "Runtime OBJ modules must be Action-facing/compiler helpers or "
+            "explicit dependency-only support: "
+            + ", ".join(unexpected_runtime_modules),
+        )
+        self.assertFalse(
+            missing_runtime_modules,
+            "Action-facing/compiler runtime helpers missing OBJ modules: "
+            + ", ".join(missing_runtime_modules),
+        )
+        self.assertFalse(
+            missing_dependency_modules,
+            "Dependency-only runtime support modules missing OBJ modules: "
+            + ", ".join(missing_dependency_modules),
+        )
+
     def test_input_runtime_matrix_covers_joystick_mouse_and_mixed_launches(self) -> None:
         matrix_groups = self._makefile_runtime_matrix_shape_groups(self.make_text)
         input_shapes = matrix_groups.get("ACTION_ACTC_ALINK_INPUT_RUNTIME_SHAPES", set())
@@ -307,22 +396,182 @@ class TestActcAlinkRuntimeMatrix(unittest.TestCase):
             "actc_runtime_input_mouse_button_condition_gfx_helper_linked",
             "actc_runtime_input_mouse_button_not_equal_condition_gfx_helper_linked",
             "actc_runtime_input_joystick_button_condition_gfx_helper_linked",
+            "actc_runtime_input_joystick_button2_condition_gfx_helper_linked",
             "actc_runtime_input_mouse_button2_condition_gfx_helper_linked",
             "actc_runtime_input_variable_port_store_linked",
             "actc_runtime_input_dual_port_presence_store_linked",
+            "actc_runtime_input_joystick_seen_result_gfx_arg_linked",
+            "actc_runtime_input_mouse_seen_result_gfx_arg_linked",
+            "actc_runtime_input_joystick_seen_result_sprite_second_arg_linked",
+            "actc_runtime_input_mouse_seen_result_sprite_second_arg_linked",
+            "actc_runtime_input_joystick_seen_nested_gfx_arg_linked",
+            "actc_runtime_input_mouse_seen_nested_gfx_arg_linked",
+            "actc_runtime_input_joystick_seen_nested_sprite_second_arg_linked",
+            "actc_runtime_input_mouse_seen_nested_sprite_second_arg_linked",
+            "actc_runtime_input_joystick_seen_result_sprite_first_arg_linked",
+            "actc_runtime_input_mouse_seen_result_sprite_first_arg_linked",
+            "actc_runtime_input_joystick_seen_nested_sprite_first_arg_linked",
+            "actc_runtime_input_mouse_seen_nested_sprite_first_arg_linked",
+            "actc_runtime_input_joystick_seen_result_sprite_data_first_arg_linked",
+            "actc_runtime_input_mouse_seen_result_sprite_data_first_arg_linked",
+            "actc_runtime_input_joystick_seen_nested_sprite_data_first_arg_linked",
+            "actc_runtime_input_mouse_seen_nested_sprite_data_first_arg_linked",
+            "actc_runtime_input_joystick_seen_result_sprite_ptr_first_arg_linked",
+            "actc_runtime_input_mouse_seen_result_sprite_ptr_first_arg_linked",
+            "actc_runtime_input_joystick_seen_nested_sprite_ptr_first_arg_linked",
+            "actc_runtime_input_mouse_seen_nested_sprite_ptr_first_arg_linked",
+            "actc_runtime_input_joystick_seen_result_sprite_pos_first_arg_linked",
+            "actc_runtime_input_mouse_seen_result_sprite_pos_first_arg_linked",
+            "actc_runtime_input_joystick_seen_nested_sprite_pos_first_arg_linked",
+            "actc_runtime_input_mouse_seen_nested_sprite_pos_first_arg_linked",
+            "actc_runtime_input_joystick_seen_result_sprite_set_mc_first_arg_linked",
+            "actc_runtime_input_mouse_seen_result_sprite_set_mc_first_arg_linked",
+            "actc_runtime_input_joystick_seen_nested_sprite_set_mc_first_arg_linked",
+            "actc_runtime_input_mouse_seen_nested_sprite_set_mc_first_arg_linked",
+            "actc_runtime_input_joystick_seen_result_sprite_mc_first_arg_linked",
+            "actc_runtime_input_mouse_seen_result_sprite_mc_first_arg_linked",
+            "actc_runtime_input_joystick_seen_nested_sprite_mc_first_arg_linked",
+            "actc_runtime_input_mouse_seen_nested_sprite_mc_first_arg_linked",
+            "actc_runtime_input_joystick_seen_result_sprite_xexp_first_arg_linked",
+            "actc_runtime_input_mouse_seen_result_sprite_xexp_first_arg_linked",
+            "actc_runtime_input_joystick_seen_nested_sprite_xexp_first_arg_linked",
+            "actc_runtime_input_mouse_seen_nested_sprite_xexp_first_arg_linked",
+            "actc_runtime_input_joystick_seen_result_sprite_yexp_first_arg_linked",
+            "actc_runtime_input_mouse_seen_result_sprite_yexp_first_arg_linked",
+            "actc_runtime_input_joystick_seen_nested_sprite_yexp_first_arg_linked",
+            "actc_runtime_input_mouse_seen_nested_sprite_yexp_first_arg_linked",
+            "actc_runtime_input_joystick_seen_result_sprite_prio_first_arg_linked",
+            "actc_runtime_input_mouse_seen_result_sprite_prio_first_arg_linked",
+            "actc_runtime_input_joystick_seen_nested_sprite_prio_first_arg_linked",
+            "actc_runtime_input_mouse_seen_nested_sprite_prio_first_arg_linked",
+            "actc_runtime_input_joystick_seen_result_sid_arg_linked",
+            "actc_runtime_input_mouse_seen_result_sid_arg_linked",
+            "actc_runtime_input_joystick_seen_nested_sid_arg_linked",
+            "actc_runtime_input_mouse_seen_nested_sid_arg_linked",
+            "actc_runtime_input_joystick_seen_result_sid_freq_second_arg_linked",
+            "actc_runtime_input_mouse_seen_result_sid_freq_second_arg_linked",
+            "actc_runtime_input_joystick_seen_nested_sid_freq_second_arg_linked",
+            "actc_runtime_input_mouse_seen_nested_sid_freq_second_arg_linked",
+            "actc_runtime_input_joystick_seen_result_sid_pulse_second_arg_linked",
+            "actc_runtime_input_mouse_seen_result_sid_pulse_second_arg_linked",
+            "actc_runtime_input_joystick_seen_nested_sid_pulse_second_arg_linked",
+            "actc_runtime_input_mouse_seen_nested_sid_pulse_second_arg_linked",
+            "actc_runtime_input_joystick_seen_result_sid_cutoff_arg_linked",
+            "actc_runtime_input_mouse_seen_result_sid_cutoff_arg_linked",
+            "actc_runtime_input_joystick_seen_nested_sid_cutoff_arg_linked",
+            "actc_runtime_input_mouse_seen_nested_sid_cutoff_arg_linked",
+            "actc_runtime_input_joystick_seen_result_sid_wave_first_arg_linked",
+            "actc_runtime_input_mouse_seen_result_sid_wave_first_arg_linked",
+            "actc_runtime_input_joystick_seen_result_sid_wave_second_arg_linked",
+            "actc_runtime_input_mouse_seen_result_sid_wave_second_arg_linked",
+            "actc_runtime_input_joystick_seen_nested_sid_wave_first_arg_linked",
+            "actc_runtime_input_mouse_seen_nested_sid_wave_first_arg_linked",
+            "actc_runtime_input_joystick_seen_nested_sid_wave_second_arg_linked",
+            "actc_runtime_input_mouse_seen_nested_sid_wave_second_arg_linked",
+            "actc_runtime_input_joystick_seen_result_sid_ad_first_arg_linked",
+            "actc_runtime_input_mouse_seen_result_sid_ad_first_arg_linked",
+            "actc_runtime_input_joystick_seen_result_sid_ad_second_arg_linked",
+            "actc_runtime_input_mouse_seen_result_sid_ad_second_arg_linked",
+            "actc_runtime_input_joystick_seen_nested_sid_ad_first_arg_linked",
+            "actc_runtime_input_mouse_seen_nested_sid_ad_first_arg_linked",
+            "actc_runtime_input_joystick_seen_nested_sid_ad_second_arg_linked",
+            "actc_runtime_input_mouse_seen_nested_sid_ad_second_arg_linked",
+            "actc_runtime_input_joystick_seen_result_sid_sr_first_arg_linked",
+            "actc_runtime_input_mouse_seen_result_sid_sr_first_arg_linked",
+            "actc_runtime_input_joystick_seen_result_sid_sr_second_arg_linked",
+            "actc_runtime_input_mouse_seen_result_sid_sr_second_arg_linked",
+            "actc_runtime_input_joystick_seen_nested_sid_sr_first_arg_linked",
+            "actc_runtime_input_mouse_seen_nested_sid_sr_first_arg_linked",
+            "actc_runtime_input_joystick_seen_nested_sid_sr_second_arg_linked",
+            "actc_runtime_input_mouse_seen_nested_sid_sr_second_arg_linked",
             "actc_runtime_input_gfx_mixed_helpers_linked",
             "actc_runtime_input_mouse_result_gfx_arg_linked",
             "actc_runtime_input_mouse_result_sid_arg_linked",
             "actc_runtime_input_mouse_result_sprite_second_arg_linked",
+            "actc_runtime_input_mouse_x_nested_sprite_first_arg_linked",
             "actc_runtime_input_mouse_x_result_sprite_pos_second_arg_linked",
             "actc_runtime_input_mouse_y_result_sprite_pos_third_arg_linked",
+            "actc_runtime_input_mouse_xy_nested_sprite_pos_linked",
+            "actc_runtime_input_mouse_button1_result_gfx_arg_linked",
+            "actc_runtime_input_mouse_button2_result_gfx_arg_linked",
+            "actc_runtime_input_mouse_button1_result_sprite_second_arg_linked",
+            "actc_runtime_input_mouse_button2_result_sprite_second_arg_linked",
+            "actc_runtime_input_mouse_button1_nested_gfx_arg_linked",
+            "actc_runtime_input_mouse_button2_nested_gfx_arg_linked",
+            "actc_runtime_input_mouse_button1_nested_sprite_second_arg_linked",
+            "actc_runtime_input_mouse_button2_nested_sprite_second_arg_linked",
+            "actc_runtime_input_joystick_button1_result_gfx_arg_linked",
+            "actc_runtime_input_joystick_button2_result_gfx_arg_linked",
+            "actc_runtime_input_joystick_button1_result_sprite_second_arg_linked",
+            "actc_runtime_input_joystick_button2_result_sprite_second_arg_linked",
+            "actc_runtime_input_joystick_button1_nested_gfx_arg_linked",
+            "actc_runtime_input_joystick_button2_nested_gfx_arg_linked",
+            "actc_runtime_input_joystick_button1_nested_sprite_second_arg_linked",
+            "actc_runtime_input_joystick_button2_nested_sprite_second_arg_linked",
             "actc_runtime_input_mouse_button_result_sid_arg_linked",
+            "actc_runtime_input_mouse_button_nested_sid_arg_linked",
+            "actc_runtime_input_mouse_button1_result_sid_freq_second_arg_linked",
+            "actc_runtime_input_mouse_button2_result_sid_freq_second_arg_linked",
+            "actc_runtime_input_mouse_button1_nested_sid_freq_second_arg_linked",
+            "actc_runtime_input_mouse_button2_nested_sid_freq_second_arg_linked",
+            "actc_runtime_input_mouse_button1_result_sid_pulse_second_arg_linked",
+            "actc_runtime_input_mouse_button2_result_sid_pulse_second_arg_linked",
+            "actc_runtime_input_mouse_button1_nested_sid_pulse_second_arg_linked",
+            "actc_runtime_input_mouse_button2_nested_sid_pulse_second_arg_linked",
+            "actc_runtime_input_mouse_button1_result_sid_cutoff_arg_linked",
+            "actc_runtime_input_mouse_button2_result_sid_cutoff_arg_linked",
+            "actc_runtime_input_mouse_button1_nested_sid_cutoff_arg_linked",
+            "actc_runtime_input_mouse_button2_nested_sid_cutoff_arg_linked",
+            "actc_runtime_input_mouse_button1_result_sid_wave_first_arg_linked",
+            "actc_runtime_input_mouse_button2_result_sid_wave_first_arg_linked",
+            "actc_runtime_input_mouse_button1_result_sid_wave_second_arg_linked",
+            "actc_runtime_input_mouse_button2_result_sid_wave_second_arg_linked",
+            "actc_runtime_input_mouse_button1_result_sid_ad_first_arg_linked",
+            "actc_runtime_input_mouse_button2_result_sid_ad_first_arg_linked",
+            "actc_runtime_input_mouse_button1_result_sid_ad_second_arg_linked",
+            "actc_runtime_input_mouse_button2_result_sid_ad_second_arg_linked",
+            "actc_runtime_input_mouse_button1_result_sid_sr_first_arg_linked",
+            "actc_runtime_input_mouse_button2_result_sid_sr_first_arg_linked",
+            "actc_runtime_input_mouse_button1_result_sid_sr_second_arg_linked",
+            "actc_runtime_input_mouse_button2_result_sid_sr_second_arg_linked",
+            "actc_runtime_input_mouse_button1_nested_sid_wave_first_arg_linked",
+            "actc_runtime_input_mouse_button2_nested_sid_wave_first_arg_linked",
+            "actc_runtime_input_mouse_button1_nested_sid_wave_second_arg_linked",
+            "actc_runtime_input_mouse_button2_nested_sid_wave_second_arg_linked",
+            "actc_runtime_input_mouse_button1_nested_sid_ad_first_arg_linked",
+            "actc_runtime_input_mouse_button2_nested_sid_ad_first_arg_linked",
+            "actc_runtime_input_mouse_button1_nested_sid_ad_second_arg_linked",
+            "actc_runtime_input_mouse_button2_nested_sid_ad_second_arg_linked",
+            "actc_runtime_input_mouse_button1_nested_sid_sr_first_arg_linked",
+            "actc_runtime_input_mouse_button2_nested_sid_sr_first_arg_linked",
+            "actc_runtime_input_mouse_button1_nested_sid_sr_second_arg_linked",
+            "actc_runtime_input_mouse_button2_nested_sid_sr_second_arg_linked",
             "actc_runtime_input_joystick_result_sid_arg_linked",
+            "actc_runtime_input_joystick_button1_result_sid_arg_linked",
+            "actc_runtime_input_joystick_button2_result_sid_arg_linked",
+            "actc_runtime_input_joystick_nested_sid_arg_linked",
             "actc_runtime_input_joystick_result_sid_word_arg_linked",
+            "actc_runtime_input_joystick_nested_sid_word_arg_linked",
             "actc_runtime_input_joystick_result_sid_first_arg_linked",
             "actc_runtime_input_joystick_result_sid_freq_second_arg_linked",
+            "actc_runtime_input_joystick_button1_result_sid_freq_second_arg_linked",
+            "actc_runtime_input_joystick_button2_result_sid_freq_second_arg_linked",
+            "actc_runtime_input_joystick_nested_sid_freq_second_arg_linked",
+            "actc_runtime_input_joystick_button1_nested_sid_freq_second_arg_linked",
+            "actc_runtime_input_joystick_button2_nested_sid_freq_second_arg_linked",
             "actc_runtime_input_joystick_result_sid_pulse_second_arg_linked",
+            "actc_runtime_input_joystick_button1_result_sid_pulse_second_arg_linked",
+            "actc_runtime_input_joystick_button2_result_sid_pulse_second_arg_linked",
+            "actc_runtime_input_joystick_nested_sid_pulse_second_arg_linked",
+            "actc_runtime_input_joystick_button1_nested_sid_pulse_second_arg_linked",
+            "actc_runtime_input_joystick_button2_nested_sid_pulse_second_arg_linked",
+            "actc_runtime_input_joystick_button1_result_sid_cutoff_arg_linked",
+            "actc_runtime_input_joystick_button2_result_sid_cutoff_arg_linked",
+            "actc_runtime_input_joystick_button1_nested_sid_cutoff_arg_linked",
+            "actc_runtime_input_joystick_button2_nested_sid_cutoff_arg_linked",
             "actc_runtime_input_joystick_result_sprite_second_arg_linked",
+            "actc_runtime_input_joystick_nested_sprite_second_arg_linked",
+            "actc_runtime_input_joystick_nested_sprite_first_arg_linked",
             "actc_runtime_input_joystick_result_sprite_first_arg_linked",
             "actc_runtime_input_joystick_result_sprite_data_first_arg_linked",
             "actc_runtime_input_joystick_result_sprite_data_second_arg_linked",
@@ -343,10 +592,40 @@ class TestActcAlinkRuntimeMatrix(unittest.TestCase):
             "actc_runtime_input_joystick_result_sprite_pos_third_arg_linked",
             "actc_runtime_input_joystick_result_sid_second_arg_linked",
             "actc_runtime_input_joystick_result_sid_wave_first_arg_linked",
+            "actc_runtime_input_joystick_button1_result_sid_wave_first_arg_linked",
+            "actc_runtime_input_joystick_button2_result_sid_wave_first_arg_linked",
+            "actc_runtime_input_joystick_button1_result_sid_wave_second_arg_linked",
+            "actc_runtime_input_joystick_button2_result_sid_wave_second_arg_linked",
+            "actc_runtime_input_joystick_nested_sid_wave_first_arg_linked",
+            "actc_runtime_input_joystick_nested_sid_wave_second_arg_linked",
+            "actc_runtime_input_joystick_button1_nested_sid_wave_first_arg_linked",
+            "actc_runtime_input_joystick_button2_nested_sid_wave_first_arg_linked",
+            "actc_runtime_input_joystick_button1_nested_sid_wave_second_arg_linked",
+            "actc_runtime_input_joystick_button2_nested_sid_wave_second_arg_linked",
             "actc_runtime_input_joystick_result_sid_ad_first_arg_linked",
             "actc_runtime_input_joystick_result_sid_ad_second_arg_linked",
+            "actc_runtime_input_joystick_button1_result_sid_ad_first_arg_linked",
+            "actc_runtime_input_joystick_button2_result_sid_ad_first_arg_linked",
+            "actc_runtime_input_joystick_button1_result_sid_ad_second_arg_linked",
+            "actc_runtime_input_joystick_button2_result_sid_ad_second_arg_linked",
+            "actc_runtime_input_joystick_nested_sid_ad_first_arg_linked",
+            "actc_runtime_input_joystick_nested_sid_ad_second_arg_linked",
+            "actc_runtime_input_joystick_button1_nested_sid_ad_first_arg_linked",
+            "actc_runtime_input_joystick_button2_nested_sid_ad_first_arg_linked",
+            "actc_runtime_input_joystick_button1_nested_sid_ad_second_arg_linked",
+            "actc_runtime_input_joystick_button2_nested_sid_ad_second_arg_linked",
             "actc_runtime_input_joystick_result_sid_sr_first_arg_linked",
             "actc_runtime_input_joystick_result_sid_sr_second_arg_linked",
+            "actc_runtime_input_joystick_button1_result_sid_sr_first_arg_linked",
+            "actc_runtime_input_joystick_button2_result_sid_sr_first_arg_linked",
+            "actc_runtime_input_joystick_button1_result_sid_sr_second_arg_linked",
+            "actc_runtime_input_joystick_button2_result_sid_sr_second_arg_linked",
+            "actc_runtime_input_joystick_nested_sid_sr_first_arg_linked",
+            "actc_runtime_input_joystick_nested_sid_sr_second_arg_linked",
+            "actc_runtime_input_joystick_button1_nested_sid_sr_first_arg_linked",
+            "actc_runtime_input_joystick_button2_nested_sid_sr_first_arg_linked",
+            "actc_runtime_input_joystick_button1_nested_sid_sr_second_arg_linked",
+            "actc_runtime_input_joystick_button2_nested_sid_sr_second_arg_linked",
             "actc_runtime_input_joystick_result_gfx_first_arg_linked",
             "actc_runtime_input_joystick_result_gfx_second_arg_linked",
             "actc_runtime_input_joystick_result_gfx_third_arg_linked",
@@ -379,6 +658,856 @@ class TestActcAlinkRuntimeMatrix(unittest.TestCase):
             self.make_text,
             "INPUT runtime matrix must launch every declared input shape",
         )
+
+    def test_direct_prg_matrix_covers_seeded_nested_input_sprite_pos_shapes(self) -> None:
+        sys.path.insert(0, str(self.workspace / "udos" / "tools"))
+        import run_action_alink_prg_probe as probe
+
+        expected_cases = {
+            "input_mouse_y_nested_sprite_pos_third_arg_direct_linked": {
+                "body": "b p0p1u1u0r\n",
+                "loads": [
+                    "LIB/RT_SPRITE_POS.OBJ",
+                    "LIB/RT_MY.OBJ",
+                    "LIB/RT_MS.OBJ",
+                ],
+            },
+            "input_mouse_xy_nested_sprite_pos_direct_linked": {
+                "body": "b p0u1u2u0r\n",
+                "loads": [
+                    "LIB/RT_SPRITE_POS.OBJ",
+                    "LIB/RT_MX.OBJ",
+                    "LIB/RT_MY.OBJ",
+                    "LIB/RT_MS.OBJ",
+                ],
+            },
+            "input_joystick_nested_sprite_pos_first_arg_direct_linked": {
+                "body": "b p0u1p1p2u0r\n",
+                "loads": [
+                    "LIB/RT_SPRITE_POS.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_nested_sprite_pos_second_arg_direct_linked": {
+                "body": "b p0p1u1p2u0r\n",
+                "loads": [
+                    "LIB/RT_SPRITE_POS.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_nested_sprite_pos_third_arg_direct_linked": {
+                "body": "b p0p1p2u1u0r\n",
+                "loads": [
+                    "LIB/RT_SPRITE_POS.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+        }
+        target_body = self._makefile_target_body(self.make_text, "vice-action-alink-prg-matrix")
+
+        for shape, expected in expected_cases.items():
+            with self.subTest(shape=shape):
+                case = probe.DIRECT_PRG_CASES[shape]
+                self.assertNotIn("source", case)
+                self.assertIn(expected["body"], case["seed_object"])
+                self.assertEqual(case["expected_alink_loads"], expected["loads"])
+        self.assertIn("[print(name) for name in p.DIRECT_PRG_CASES]", target_body)
+        self.assertIn('--shape "$$shape" --skip-launch --attempts 1', target_body)
+
+    def test_direct_prg_matrix_covers_seeded_nested_input_sprite_table_shapes(self) -> None:
+        sys.path.insert(0, str(self.workspace / "udos" / "tools"))
+        import run_action_alink_prg_probe as probe
+
+        expected_cases = {
+            "input_mouse_x_nested_sprite_data_first_arg_direct_linked": {
+                "body": "b u1p0u0r\n",
+                "loads": [
+                    "LIB/RT_SPRITE_DATA.OBJ",
+                    "LIB/RT_MX.OBJ",
+                    "LIB/RT_MS.OBJ",
+                ],
+            },
+            "input_mouse_x_nested_sprite_ptr_first_arg_direct_linked": {
+                "body": "b u1p0u0r\n",
+                "loads": [
+                    "LIB/RT_SPRITE_PTR.OBJ",
+                    "LIB/RT_MX.OBJ",
+                    "LIB/RT_MS.OBJ",
+                ],
+            },
+            "input_mouse_x_nested_sprite_data_second_arg_direct_linked": {
+                "body": "b p0u1u0r\n",
+                "loads": [
+                    "LIB/RT_SPRITE_DATA.OBJ",
+                    "LIB/RT_MX.OBJ",
+                    "LIB/RT_MS.OBJ",
+                ],
+            },
+            "input_mouse_x_nested_sprite_ptr_second_arg_direct_linked": {
+                "body": "b p0u1u0r\n",
+                "loads": [
+                    "LIB/RT_SPRITE_PTR.OBJ",
+                    "LIB/RT_MX.OBJ",
+                    "LIB/RT_MS.OBJ",
+                ],
+            },
+            "input_joystick_nested_sprite_data_first_arg_direct_linked": {
+                "body": "b p0u1p1u0r\n",
+                "loads": [
+                    "LIB/RT_SPRITE_DATA.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_nested_sprite_ptr_first_arg_direct_linked": {
+                "body": "b p0u1p1u0r\n",
+                "loads": [
+                    "LIB/RT_SPRITE_PTR.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_nested_sprite_data_second_arg_direct_linked": {
+                "body": "b p0p1u1u0r\n",
+                "loads": [
+                    "LIB/RT_SPRITE_DATA.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_nested_sprite_ptr_second_arg_direct_linked": {
+                "body": "b p0p1u1u0r\n",
+                "loads": [
+                    "LIB/RT_SPRITE_PTR.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+        }
+        target_body = self._makefile_target_body(self.make_text, "vice-action-alink-prg-matrix")
+
+        for shape, expected in expected_cases.items():
+            with self.subTest(shape=shape):
+                case = probe.DIRECT_PRG_CASES[shape]
+                self.assertNotIn("source", case)
+                self.assertIn(expected["body"], case["seed_object"])
+                self.assertEqual(case["expected_alink_loads"], expected["loads"])
+        self.assertIn("[print(name) for name in p.DIRECT_PRG_CASES]", target_body)
+        self.assertIn('--shape "$$shape" --skip-launch --attempts 1', target_body)
+
+    def test_direct_prg_matrix_covers_seeded_nested_input_side_effect_shapes(self) -> None:
+        sys.path.insert(0, str(self.workspace / "udos" / "tools"))
+        import run_action_alink_prg_probe as probe
+
+        expected_cases = {
+            "input_mouse_x_nested_gfx_arg_direct_linked": {
+                "body": "b u1u0r\n",
+                "loads": [
+                    "LIB/RT_GFX_BGCOLOR.OBJ",
+                    "LIB/RT_MX.OBJ",
+                    "LIB/RT_MS.OBJ",
+                ],
+            },
+            "input_mouse_y_nested_gfx_border_arg_direct_linked": {
+                "body": "b u1u0r\n",
+                "loads": [
+                    "LIB/RT_GFX_BORDERCOLOR.OBJ",
+                    "LIB/RT_MY.OBJ",
+                    "LIB/RT_MS.OBJ",
+                ],
+            },
+            "input_mouse_button1_nested_gfx_arg_direct_linked": {
+                "body": "b u1u0r\n",
+                "loads": [
+                    "LIB/RT_GFX_BGCOLOR.OBJ",
+                    "LIB/RT_MB1.OBJ",
+                    "LIB/RT_MB.OBJ",
+                    "LIB/RT_MS.OBJ",
+                ],
+            },
+            "input_mouse_button2_nested_gfx_arg_direct_linked": {
+                "body": "b u1u0r\n",
+                "loads": [
+                    "LIB/RT_GFX_BGCOLOR.OBJ",
+                    "LIB/RT_MB2.OBJ",
+                    "LIB/RT_MB.OBJ",
+                    "LIB/RT_MS.OBJ",
+                ],
+            },
+            "input_joystick_button1_nested_gfx_arg_direct_linked": {
+                "body": "b p0u1u0r\n",
+                "loads": [
+                    "LIB/RT_GFX_BGCOLOR.OBJ",
+                    "LIB/RT_JB1.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_button2_nested_gfx_arg_direct_linked": {
+                "body": "b p0u1u0r\n",
+                "loads": [
+                    "LIB/RT_GFX_BGCOLOR.OBJ",
+                    "LIB/RT_JB2.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_nested_gfx_arg_direct_linked": {
+                "body": "b p0u1u0r\n",
+                "loads": [
+                    "LIB/RT_GFX_BGCOLOR.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_nested_gfx_color_cell_first_arg_direct_linked": {
+                "body": "b p0u1p1p2u0r\n",
+                "loads": [
+                    "LIB/RT_GFX_COLOR_CELL.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_nested_gfx_color_cell_second_arg_direct_linked": {
+                "body": "b p0p1u1p2u0r\n",
+                "loads": [
+                    "LIB/RT_GFX_COLOR_CELL.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_nested_gfx_color_cell_third_arg_direct_linked": {
+                "body": "b p0p1p2u1u0r\n",
+                "loads": [
+                    "LIB/RT_GFX_COLOR_CELL.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_nested_gfx_screen_cell_first_arg_direct_linked": {
+                "body": "b p0u1p1p2u0r\n",
+                "loads": [
+                    "LIB/RT_GFX_SCREEN_CELL.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_nested_gfx_screen_cell_second_arg_direct_linked": {
+                "body": "b p0p1u1p2u0r\n",
+                "loads": [
+                    "LIB/RT_GFX_SCREEN_CELL.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_nested_gfx_screen_cell_third_arg_direct_linked": {
+                "body": "b p0p1p2u1u0r\n",
+                "loads": [
+                    "LIB/RT_GFX_SCREEN_CELL.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_mouse_x_nested_sid_arg_direct_linked": {
+                "body": "b u1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_VOL.OBJ",
+                    "LIB/RT_SID_VOLUME_STATE.OBJ",
+                    "LIB/RT_MX.OBJ",
+                    "LIB/RT_MS.OBJ",
+                ],
+            },
+            "input_mouse_button_nested_sid_arg_direct_linked": {
+                "body": "b u1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_VOL.OBJ",
+                    "LIB/RT_SID_VOLUME_STATE.OBJ",
+                    "LIB/RT_MB.OBJ",
+                    "LIB/RT_MS.OBJ",
+                ],
+            },
+            "input_mouse_button1_nested_sid_arg_direct_linked": {
+                "body": "b u1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_VOL.OBJ",
+                    "LIB/RT_SID_VOLUME_STATE.OBJ",
+                    "LIB/RT_MB1.OBJ",
+                    "LIB/RT_MB.OBJ",
+                    "LIB/RT_MS.OBJ",
+                ],
+            },
+            "input_mouse_button2_nested_sid_arg_direct_linked": {
+                "body": "b u1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_VOL.OBJ",
+                    "LIB/RT_SID_VOLUME_STATE.OBJ",
+                    "LIB/RT_MB2.OBJ",
+                    "LIB/RT_MB.OBJ",
+                    "LIB/RT_MS.OBJ",
+                ],
+            },
+            "input_joystick_button1_nested_sid_arg_direct_linked": {
+                "body": "b p0u1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_VOL.OBJ",
+                    "LIB/RT_SID_VOLUME_STATE.OBJ",
+                    "LIB/RT_JB1.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_button2_nested_sid_arg_direct_linked": {
+                "body": "b p0u1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_VOL.OBJ",
+                    "LIB/RT_SID_VOLUME_STATE.OBJ",
+                    "LIB/RT_JB2.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_nested_sid_wave_first_arg_direct_linked": {
+                "body": "b p0u1p1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_WAVE.OBJ",
+                    "LIB/RT_SID_STATE.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_nested_sid_wave_second_arg_direct_linked": {
+                "body": "b p0p1u1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_WAVE.OBJ",
+                    "LIB/RT_SID_STATE.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_button1_nested_sid_wave_first_arg_direct_linked": {
+                "body": "b p0u1p1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_WAVE.OBJ",
+                    "LIB/RT_SID_STATE.OBJ",
+                    "LIB/RT_JB1.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_button2_nested_sid_wave_first_arg_direct_linked": {
+                "body": "b p0u1p1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_WAVE.OBJ",
+                    "LIB/RT_SID_STATE.OBJ",
+                    "LIB/RT_JB2.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_button1_nested_sid_wave_second_arg_direct_linked": {
+                "body": "b p0p1u1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_WAVE.OBJ",
+                    "LIB/RT_SID_STATE.OBJ",
+                    "LIB/RT_JB1.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_button2_nested_sid_wave_second_arg_direct_linked": {
+                "body": "b p0p1u1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_WAVE.OBJ",
+                    "LIB/RT_SID_STATE.OBJ",
+                    "LIB/RT_JB2.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_nested_sid_ad_first_arg_direct_linked": {
+                "body": "b p0u1p1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_AD.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_nested_sid_ad_second_arg_direct_linked": {
+                "body": "b p0p1u1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_AD.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_button1_nested_sid_ad_first_arg_direct_linked": {
+                "body": "b p0u1p1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_AD.OBJ",
+                    "LIB/RT_JB1.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_button2_nested_sid_ad_first_arg_direct_linked": {
+                "body": "b p0u1p1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_AD.OBJ",
+                    "LIB/RT_JB2.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_button1_nested_sid_ad_second_arg_direct_linked": {
+                "body": "b p0p1u1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_AD.OBJ",
+                    "LIB/RT_JB1.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_button2_nested_sid_ad_second_arg_direct_linked": {
+                "body": "b p0p1u1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_AD.OBJ",
+                    "LIB/RT_JB2.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_nested_sid_sr_first_arg_direct_linked": {
+                "body": "b p0u1p1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_SR.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_nested_sid_sr_second_arg_direct_linked": {
+                "body": "b p0p1u1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_SR.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_button1_nested_sid_sr_first_arg_direct_linked": {
+                "body": "b p0u1p1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_SR.OBJ",
+                    "LIB/RT_JB1.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_button2_nested_sid_sr_first_arg_direct_linked": {
+                "body": "b p0u1p1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_SR.OBJ",
+                    "LIB/RT_JB2.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_button1_nested_sid_sr_second_arg_direct_linked": {
+                "body": "b p0p1u1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_SR.OBJ",
+                    "LIB/RT_JB1.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_button2_nested_sid_sr_second_arg_direct_linked": {
+                "body": "b p0p1u1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_SR.OBJ",
+                    "LIB/RT_JB2.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_mouse_button1_nested_sid_wave_first_arg_direct_linked": {
+                "body": "b u1p0u0r\n",
+                "loads": [
+                    "LIB/RT_SID_WAVE.OBJ",
+                    "LIB/RT_SID_STATE.OBJ",
+                    "LIB/RT_MB1.OBJ",
+                    "LIB/RT_MB.OBJ",
+                    "LIB/RT_MS.OBJ",
+                ],
+            },
+            "input_mouse_button2_nested_sid_wave_first_arg_direct_linked": {
+                "body": "b u1p0u0r\n",
+                "loads": [
+                    "LIB/RT_SID_WAVE.OBJ",
+                    "LIB/RT_SID_STATE.OBJ",
+                    "LIB/RT_MB2.OBJ",
+                    "LIB/RT_MB.OBJ",
+                    "LIB/RT_MS.OBJ",
+                ],
+            },
+            "input_mouse_button1_nested_sid_wave_second_arg_direct_linked": {
+                "body": "b p0u1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_WAVE.OBJ",
+                    "LIB/RT_SID_STATE.OBJ",
+                    "LIB/RT_MB1.OBJ",
+                    "LIB/RT_MB.OBJ",
+                    "LIB/RT_MS.OBJ",
+                ],
+            },
+            "input_mouse_button2_nested_sid_wave_second_arg_direct_linked": {
+                "body": "b p0u1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_WAVE.OBJ",
+                    "LIB/RT_SID_STATE.OBJ",
+                    "LIB/RT_MB2.OBJ",
+                    "LIB/RT_MB.OBJ",
+                    "LIB/RT_MS.OBJ",
+                ],
+            },
+            "input_mouse_button1_nested_sid_ad_first_arg_direct_linked": {
+                "body": "b u1p0u0r\n",
+                "loads": [
+                    "LIB/RT_SID_AD.OBJ",
+                    "LIB/RT_MB1.OBJ",
+                    "LIB/RT_MB.OBJ",
+                    "LIB/RT_MS.OBJ",
+                ],
+            },
+            "input_mouse_button2_nested_sid_ad_first_arg_direct_linked": {
+                "body": "b u1p0u0r\n",
+                "loads": [
+                    "LIB/RT_SID_AD.OBJ",
+                    "LIB/RT_MB2.OBJ",
+                    "LIB/RT_MB.OBJ",
+                    "LIB/RT_MS.OBJ",
+                ],
+            },
+            "input_mouse_button1_nested_sid_ad_second_arg_direct_linked": {
+                "body": "b p0u1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_AD.OBJ",
+                    "LIB/RT_MB1.OBJ",
+                    "LIB/RT_MB.OBJ",
+                    "LIB/RT_MS.OBJ",
+                ],
+            },
+            "input_mouse_button2_nested_sid_ad_second_arg_direct_linked": {
+                "body": "b p0u1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_AD.OBJ",
+                    "LIB/RT_MB2.OBJ",
+                    "LIB/RT_MB.OBJ",
+                    "LIB/RT_MS.OBJ",
+                ],
+            },
+            "input_mouse_button1_nested_sid_sr_first_arg_direct_linked": {
+                "body": "b u1p0u0r\n",
+                "loads": [
+                    "LIB/RT_SID_SR.OBJ",
+                    "LIB/RT_MB1.OBJ",
+                    "LIB/RT_MB.OBJ",
+                    "LIB/RT_MS.OBJ",
+                ],
+            },
+            "input_mouse_button2_nested_sid_sr_first_arg_direct_linked": {
+                "body": "b u1p0u0r\n",
+                "loads": [
+                    "LIB/RT_SID_SR.OBJ",
+                    "LIB/RT_MB2.OBJ",
+                    "LIB/RT_MB.OBJ",
+                    "LIB/RT_MS.OBJ",
+                ],
+            },
+            "input_mouse_button1_nested_sid_sr_second_arg_direct_linked": {
+                "body": "b p0u1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_SR.OBJ",
+                    "LIB/RT_MB1.OBJ",
+                    "LIB/RT_MB.OBJ",
+                    "LIB/RT_MS.OBJ",
+                ],
+            },
+            "input_mouse_button2_nested_sid_sr_second_arg_direct_linked": {
+                "body": "b p0u1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_SR.OBJ",
+                    "LIB/RT_MB2.OBJ",
+                    "LIB/RT_MB.OBJ",
+                    "LIB/RT_MS.OBJ",
+                ],
+            },
+            "input_mouse_y_nested_sprite_first_arg_direct_linked": {
+                "body": "b u1p0u0r\n",
+                "loads": [
+                    "LIB/RT_SPRITE_COLOR.OBJ",
+                    "LIB/RT_MY.OBJ",
+                    "LIB/RT_MS.OBJ",
+                ],
+            },
+            "input_mouse_button_nested_sprite_second_arg_direct_linked": {
+                "body": "b p0u1u0r\n",
+                "loads": [
+                    "LIB/RT_SPRITE_COLOR.OBJ",
+                    "LIB/RT_MB.OBJ",
+                    "LIB/RT_MS.OBJ",
+                ],
+            },
+            "input_mouse_button1_nested_sprite_second_arg_direct_linked": {
+                "body": "b p0u1u0r\n",
+                "loads": [
+                    "LIB/RT_SPRITE_COLOR.OBJ",
+                    "LIB/RT_MB1.OBJ",
+                    "LIB/RT_MB.OBJ",
+                    "LIB/RT_MS.OBJ",
+                ],
+            },
+            "input_mouse_button2_nested_sprite_second_arg_direct_linked": {
+                "body": "b p0u1u0r\n",
+                "loads": [
+                    "LIB/RT_SPRITE_COLOR.OBJ",
+                    "LIB/RT_MB2.OBJ",
+                    "LIB/RT_MB.OBJ",
+                    "LIB/RT_MS.OBJ",
+                ],
+            },
+            "input_joystick_button1_nested_sprite_second_arg_direct_linked": {
+                "body": "b p0p1u1u0r\n",
+                "loads": [
+                    "LIB/RT_SPRITE_COLOR.OBJ",
+                    "LIB/RT_JB1.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_button2_nested_sprite_second_arg_direct_linked": {
+                "body": "b p0p1u1u0r\n",
+                "loads": [
+                    "LIB/RT_SPRITE_COLOR.OBJ",
+                    "LIB/RT_JB2.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_nested_sprite_first_arg_direct_linked": {
+                "body": "b p0u1p1u0r\n",
+                "loads": [
+                    "LIB/RT_SPRITE_COLOR.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_nested_sprite_second_arg_direct_linked": {
+                "body": "b p0p1u1u0r\n",
+                "loads": [
+                    "LIB/RT_SPRITE_COLOR.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_nested_sprite_mc_first_arg_direct_linked": {
+                "body": "b p0u1p1u0r\n",
+                "loads": [
+                    "LIB/RT_SPRITE_MC.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_nested_sprite_mc_second_arg_direct_linked": {
+                "body": "b p0p1u1u0r\n",
+                "loads": [
+                    "LIB/RT_SPRITE_MC.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_nested_sprite_xexp_first_arg_direct_linked": {
+                "body": "b p0u1p1u0r\n",
+                "loads": [
+                    "LIB/RT_SPRITE_XEXP.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_nested_sprite_xexp_second_arg_direct_linked": {
+                "body": "b p0p1u1u0r\n",
+                "loads": [
+                    "LIB/RT_SPRITE_XEXP.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_nested_sprite_yexp_first_arg_direct_linked": {
+                "body": "b p0u1p1u0r\n",
+                "loads": [
+                    "LIB/RT_SPRITE_YEXP.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_nested_sprite_yexp_second_arg_direct_linked": {
+                "body": "b p0p1u1u0r\n",
+                "loads": [
+                    "LIB/RT_SPRITE_YEXP.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_nested_sprite_prio_first_arg_direct_linked": {
+                "body": "b p0u1p1u0r\n",
+                "loads": [
+                    "LIB/RT_SPRITE_PRIO.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_nested_sprite_prio_second_arg_direct_linked": {
+                "body": "b p0p1u1u0r\n",
+                "loads": [
+                    "LIB/RT_SPRITE_PRIO.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_nested_sprite_set_mc_first_arg_direct_linked": {
+                "body": "b p0u1p1u0r\n",
+                "loads": [
+                    "LIB/RT_SPRITE_SET_MC.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_nested_sprite_set_mc_second_arg_direct_linked": {
+                "body": "b p0p1u1u0r\n",
+                "loads": [
+                    "LIB/RT_SPRITE_SET_MC.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+        }
+        target_body = self._makefile_target_body(self.make_text, "vice-action-alink-prg-matrix")
+
+        for shape, expected in expected_cases.items():
+            with self.subTest(shape=shape):
+                case = probe.DIRECT_PRG_CASES[shape]
+                self.assertNotIn("source", case)
+                self.assertIn(expected["body"], case["seed_object"])
+                self.assertEqual(case["expected_alink_loads"], expected["loads"])
+        self.assertIn("[print(name) for name in p.DIRECT_PRG_CASES]", target_body)
+        self.assertIn('--shape "$$shape" --skip-launch --attempts 1', target_body)
+
+    def test_direct_prg_matrix_covers_seeded_nested_input_sid_word_shapes(self) -> None:
+        sys.path.insert(0, str(self.workspace / "udos" / "tools"))
+        import run_action_alink_prg_probe as probe
+
+        expected_cases = {
+            "input_mouse_x_nested_sid_freq_second_arg_direct_linked": {
+                "body": "b p0u1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_FREQ.OBJ",
+                    "LIB/RT_MX.OBJ",
+                    "LIB/RT_MS.OBJ",
+                ],
+            },
+            "input_mouse_button1_nested_sid_freq_second_arg_direct_linked": {
+                "body": "b p0u1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_FREQ.OBJ",
+                    "LIB/RT_MB1.OBJ",
+                    "LIB/RT_MB.OBJ",
+                    "LIB/RT_MS.OBJ",
+                ],
+            },
+            "input_mouse_button2_nested_sid_freq_second_arg_direct_linked": {
+                "body": "b p0u1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_FREQ.OBJ",
+                    "LIB/RT_MB2.OBJ",
+                    "LIB/RT_MB.OBJ",
+                    "LIB/RT_MS.OBJ",
+                ],
+            },
+            "input_mouse_x_nested_sid_pulse_second_arg_direct_linked": {
+                "body": "b p0u1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_PULSE.OBJ",
+                    "LIB/RT_MX.OBJ",
+                    "LIB/RT_MS.OBJ",
+                ],
+            },
+            "input_mouse_button1_nested_sid_pulse_second_arg_direct_linked": {
+                "body": "b p0u1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_PULSE.OBJ",
+                    "LIB/RT_MB1.OBJ",
+                    "LIB/RT_MB.OBJ",
+                    "LIB/RT_MS.OBJ",
+                ],
+            },
+            "input_mouse_button2_nested_sid_pulse_second_arg_direct_linked": {
+                "body": "b p0u1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_PULSE.OBJ",
+                    "LIB/RT_MB2.OBJ",
+                    "LIB/RT_MB.OBJ",
+                    "LIB/RT_MS.OBJ",
+                ],
+            },
+            "input_joystick_nested_sid_freq_second_arg_direct_linked": {
+                "body": "b p0p1u1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_FREQ.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_button1_nested_sid_freq_second_arg_direct_linked": {
+                "body": "b p0p1u1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_FREQ.OBJ",
+                    "LIB/RT_JB1.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_button2_nested_sid_freq_second_arg_direct_linked": {
+                "body": "b p0p1u1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_FREQ.OBJ",
+                    "LIB/RT_JB2.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_nested_sid_pulse_second_arg_direct_linked": {
+                "body": "b p0p1u1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_PULSE.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_button1_nested_sid_pulse_second_arg_direct_linked": {
+                "body": "b p0p1u1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_PULSE.OBJ",
+                    "LIB/RT_JB1.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_button2_nested_sid_pulse_second_arg_direct_linked": {
+                "body": "b p0p1u1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_PULSE.OBJ",
+                    "LIB/RT_JB2.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_nested_sid_cutoff_arg_direct_linked": {
+                "body": "b p0u1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_CUTOFF.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_mouse_button1_nested_sid_cutoff_arg_direct_linked": {
+                "body": "b u1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_CUTOFF.OBJ",
+                    "LIB/RT_MB1.OBJ",
+                    "LIB/RT_MB.OBJ",
+                    "LIB/RT_MS.OBJ",
+                ],
+            },
+            "input_mouse_button2_nested_sid_cutoff_arg_direct_linked": {
+                "body": "b u1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_CUTOFF.OBJ",
+                    "LIB/RT_MB2.OBJ",
+                    "LIB/RT_MB.OBJ",
+                    "LIB/RT_MS.OBJ",
+                ],
+            },
+            "input_joystick_button1_nested_sid_cutoff_arg_direct_linked": {
+                "body": "b p0u1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_CUTOFF.OBJ",
+                    "LIB/RT_JB1.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+            "input_joystick_button2_nested_sid_cutoff_arg_direct_linked": {
+                "body": "b p0u1u0r\n",
+                "loads": [
+                    "LIB/RT_SID_CUTOFF.OBJ",
+                    "LIB/RT_JB2.OBJ",
+                    "LIB/RT_JOY.OBJ",
+                ],
+            },
+        }
+        target_body = self._makefile_target_body(self.make_text, "vice-action-alink-prg-matrix")
+
+        for shape, expected in expected_cases.items():
+            with self.subTest(shape=shape):
+                case = probe.DIRECT_PRG_CASES[shape]
+                self.assertNotIn("source", case)
+                self.assertIn(expected["body"], case["seed_object"])
+                self.assertEqual(case["expected_alink_loads"], expected["loads"])
+        self.assertIn("[print(name) for name in p.DIRECT_PRG_CASES]", target_body)
+        self.assertIn('--shape "$$shape" --skip-launch --attempts 1', target_body)
 
     def test_helper_free_runtime_matrix_covers_unused_helper_library_pruning(self) -> None:
         sys.path.insert(0, str(self.workspace / "udos" / "tools"))
@@ -610,6 +1739,9 @@ class TestActcAlinkRuntimeMatrix(unittest.TestCase):
         math_shapes = matrix_groups.get("ACTION_ACTC_ALINK_MATH_RUNTIME_SHAPES", set())
 
         for shape in {
+            "actc_runtime_integer_add_sub_linked",
+            "actc_runtime_integer_mul_div_linked",
+            "actc_runtime_integer_mul_store_linked",
             "actc_runtime_math1_export_sample_linked",
             "actc_runtime_math1_fabs_split_linked",
             "actc_runtime_math1_fsqrt_split_linked",
@@ -624,6 +1756,538 @@ class TestActcAlinkRuntimeMatrix(unittest.TestCase):
             "actc_runtime_math1_real_cmp_split_linked",
         }:
             self.assertIn(shape, math_shapes)
+
+    def test_native_integer_lowering_is_compiler_owned(self) -> None:
+        emitter = (
+            self.workspace / "actionc64u" / "src" / "tools_udos" / "actc" / "actc_overlay_emit_object.asm"
+        ).read_text(encoding="ascii")
+        native_lowering = (
+            self.workspace
+            / "actionc64u"
+            / "src"
+            / "tools_udos"
+            / "actc"
+            / "actc_overlay_emit_native_integer.inc"
+        ).read_text(encoding="ascii")
+        native_local_lowering = (
+            self.workspace
+            / "actionc64u"
+            / "src"
+            / "tools_udos"
+            / "actc"
+            / "actc_overlay_emit_native_local_integer.inc"
+        ).read_text(encoding="ascii")
+        alink = (
+            self.workspace / "actionc64u" / "src" / "tools_udos" / "alink" / "alink.asm"
+        ).read_text(encoding="ascii")
+        direct_prg = (
+            self.workspace / "actionc64u" / "src" / "tools_udos" / "alink" / "direct_prg.inc"
+        ).read_text(encoding="ascii")
+
+        self.assertIn('.include "actc_overlay_emit_native_integer.inc"', emitter)
+        self.assertIn('.include "actc_overlay_emit_native_local_integer.inc"', emitter)
+        self.assertIn("is_main_native_integer_machine_object:", native_lowering)
+        self.assertIn("native_int_emit_reloc_list:", native_lowering)
+        self.assertIn("native_local_emit_reloc_list:", native_local_lowering)
+        self.assertNotIn("PRG_BUILD_INTEGER_SEQUENCE", alink)
+        self.assertNotIn("integer_sequence", direct_prg)
+        self.assertNotIn("direct_body_word_store", direct_prg)
+        self.assertNotIn("direct_body_word_load_store", direct_prg)
+        self.assertNotIn("direct_body_single_call", direct_prg)
+        self.assertNotIn("direct_body_fanout", direct_prg)
+        self.assertNotIn("direct_body_return", direct_prg)
+        self.assertNotIn("direct_body_printmath", direct_prg)
+        self.assertNotIn("direct_body_if_eq", direct_prg)
+        self.assertNotIn("direct_body_if_ne", direct_prg)
+        self.assertNotIn("direct_body_if_lt", direct_prg)
+        self.assertNotIn("direct_body_if_gt", direct_prg)
+        self.assertNotIn("direct_body_if_ge", direct_prg)
+        self.assertNotIn("direct_body_if_le", direct_prg)
+        self.assertNotIn("direct_body_if_else:\n", direct_prg)
+        self.assertNotIn("direct_body_nested_if:\n", direct_prg)
+        self.assertNotIn("direct_body_nested_else:\n", direct_prg)
+        self.assertNotIn("direct_body_do_until_eq", direct_prg)
+        self.assertNotIn("direct_body_do_until_lt", direct_prg)
+        self.assertNotIn("direct_body_nested_do_until_eq", direct_prg)
+        self.assertNotIn("direct_body_do_if_until_eq", direct_prg)
+        self.assertNotIn("direct_body_do_if_else_until_eq", direct_prg)
+        self.assertNotIn("direct_body_if_do_until_eq", direct_prg)
+        self.assertNotIn("direct_body_if_else_do_until_eq", direct_prg)
+        self.assertNotIn("direct_body_if_local_call_do_until_eq", direct_prg)
+        for retired_local_body in (
+            "if_else_local_call_do_until_eq",
+            "nested_if_local_call",
+            "nested_else_local_call",
+            "nested_do_local_call",
+            "nested_do_if_else_local_call",
+            "if_local_call_nested_do_if_else",
+            "if_else_local_call_nested_do_if_else",
+            "nested_else_local_call_nested_do_if_else",
+            "if_else_local_call_chain_nested_do_if_else",
+            "nested_else_local_call_chain_nested_do_if_else",
+        ):
+            self.assertNotIn(f"direct_body_{retired_local_body}", direct_prg)
+        self.assertNotIn("direct_prg_template_word_store", direct_prg)
+        self.assertNotIn("direct_prg_template_word_load_store", direct_prg)
+        self.assertNotIn("direct_prg_template_single_call", direct_prg)
+        self.assertNotIn("direct_prg_template_fanout", direct_prg)
+        self.assertNotIn("direct_prg_template_printmath", direct_prg)
+        self.assertNotIn("direct_prg_template_if_eq", direct_prg)
+        self.assertNotIn("direct_prg_template_if_ne", direct_prg)
+        self.assertNotIn("direct_prg_template_if_lt", direct_prg)
+        self.assertNotIn("direct_prg_template_if_gt", direct_prg)
+        self.assertNotIn("direct_prg_template_if_ge", direct_prg)
+        self.assertNotIn("direct_prg_template_if_le", direct_prg)
+        self.assertNotIn("direct_prg_template_if_else:\n", direct_prg)
+        self.assertNotIn("direct_prg_template_nested_if:\n", direct_prg)
+        self.assertNotIn("direct_prg_template_nested_else:\n", direct_prg)
+        self.assertNotIn("direct_prg_template_do_until_eq", direct_prg)
+        self.assertNotIn("direct_prg_template_do_until_lt", direct_prg)
+        self.assertNotIn("direct_prg_template_nested_do_until_eq", direct_prg)
+        self.assertNotIn("direct_prg_template_do_if_until_eq", direct_prg)
+        self.assertNotIn("direct_prg_template_do_if_else_until_eq", direct_prg)
+        self.assertNotIn("direct_prg_template_if_do_until_eq", direct_prg)
+        self.assertNotIn("direct_prg_template_if_else_do_until_eq", direct_prg)
+        self.assertNotIn("direct_prg_template_if_local_call_do_until_eq", direct_prg)
+        for retired_local_template in (
+            "if_else_local_call_do_until_eq",
+            "nested_if_local_call",
+            "nested_else_local_call",
+            "nested_do_local_call",
+            "nested_do_if_else_local_call",
+            "if_local_call_nested_do_if_else",
+            "if_else_local_call_nested_do_if_else",
+            "nested_else_local_call_nested_do_if_else",
+            "if_else_local_call_chain_nested_do_if_else",
+            "nested_else_local_call_chain_nested_do_if_else",
+        ):
+            self.assertNotIn(f"direct_prg_template_{retired_local_template}", direct_prg)
+        self.assertNotIn("build_printmath_linked_string_int", direct_prg)
+        self.assertNotIn("PRG_BUILD_PRINTMATH_STRING_INT", alink)
+
+    def test_direct_prg_legacy_candidate_table_is_removed(self) -> None:
+        direct_prg = (
+            self.workspace / "actionc64u" / "src" / "tools_udos" / "alink" / "direct_prg.inc"
+        ).read_text(encoding="ascii")
+        alink = (
+            self.workspace / "actionc64u" / "src" / "tools_udos" / "alink" / "alink.asm"
+        ).read_text(encoding="ascii")
+
+        for retired_symbol in (
+            "direct_body_table_lo",
+            "direct_body_table_hi",
+            "direct_template_table_lo",
+            "direct_template_table_hi",
+            "direct_template_len_lo",
+            "direct_template_len_hi",
+            "direct_body_seeded_runtime",
+            "direct_prg_template_seeded_runtime",
+            "direct_candidate_index",
+        ):
+            self.assertNotIn(retired_symbol, direct_prg + alink)
+        self.assertIn(
+            "build_direct_prg_content_or_fail:\n    jmp build_direct_prg_fallback",
+            direct_prg,
+        )
+
+    def test_seeded_alink_smoke_uses_relocatable_machine_objects(self) -> None:
+        sys.path.insert(0, str(self.workspace / "udos" / "tools"))
+        import run_action_alink_seeded_runtime_probe as probe
+
+        main_obj = probe.seeded_main_object_text()
+        work_obj = probe.seeded_work_object_text()
+        self.assertIn("x main 0 19\nb u0M\nu w\nm 20 00 00", main_obj)
+        self.assertIn("r 1 u0\n", main_obj)
+        self.assertIn("x w 0 1\nb M\nm 60\n", work_obj)
+        self.assertNotIn("b e0u0", main_obj)
+        self.assertNotIn("b s0i0r", work_obj)
+        self.assertEqual(
+            probe.EXPECTED_PRG,
+            bytes.fromhex("0010201310A9A58DD003A90085028503A2024C0FCF60"),
+        )
+
+    def test_local_procedure_matrix_uses_native_object_code(self) -> None:
+        sys.path.insert(0, str(self.workspace / "udos" / "tools"))
+        import run_action_alink_prg_probe as probe
+
+        for shape in (
+            "if_local_call_do_until_eq",
+            "if_else_local_call_do_until_eq",
+            "nested_if_local_call",
+            "nested_else_local_call",
+            "nested_do_local_call",
+            "nested_do_if_else_local_call",
+            "if_local_call_nested_do_if_else",
+            "if_else_local_call_nested_do_if_else",
+            "nested_else_local_call_nested_do_if_else",
+            "if_else_local_call_chain_nested_do_if_else",
+            "nested_else_local_call_chain_nested_do_if_else",
+        ):
+            with self.subTest(shape=shape):
+                case = probe.DIRECT_PRG_CASES[shape]
+                fragments = "".join(case["expected_object_fragments"])
+                self.assertIn("b M\n", fragments)
+                self.assertIn("x __idata ", fragments)
+                self.assertIn("x __iptr ", fragments)
+                self.assertGreaterEqual(case["store_check_addr"], 0x1000)
+
+    def test_local_call_loop_uses_native_object_code(self) -> None:
+        sys.path.insert(0, str(self.workspace / "udos" / "tools"))
+        import run_action_alink_prg_probe as probe
+
+        case = probe.DIRECT_PRG_CASES["if_local_call_do_until_eq"]
+        self.assertIn(
+            "x main 0 166\n"
+            "x a 104 56\n"
+            "x __p1l0 88 1\n"
+            "x __p0l0 104 1\n"
+            "x __idata 160 4\n"
+            "x __iptr 164 2\n",
+            case["expected_object_fragments"],
+        )
+        self.assertIn(
+            "r 3 x __iptr\n"
+            "r 9 x __iptr\n"
+            "r 83 x __p1l0\n"
+            "r 86 x a\n"
+            "r 157 x __p0l0\n"
+            "r 164 x __idata\n",
+            case["expected_object_fragments"],
+        )
+        self.assertEqual(case["store_check_addr"], 0x10A2)
+        self.assertEqual(case["store_check_value"], 2)
+
+    def test_simple_equality_if_uses_native_object_code(self) -> None:
+        sys.path.insert(0, str(self.workspace / "udos" / "tools"))
+        import run_action_alink_prg_probe as probe
+
+        case = probe.DIRECT_PRG_CASES["if_eq"]
+        self.assertIn(
+            "x main 0 107\nx __if0 85 1\nx __idata 101 4\nx __iptr 105 2\n",
+            case["expected_object_fragments"],
+        )
+        self.assertIn(
+            "r 3 x __iptr\nr 9 x __iptr\nr 66 x __if0\nr 105 x __idata\n",
+            case["expected_object_fragments"],
+        )
+        self.assertEqual(case["store_check_addr"], 0x1067)
+
+    def test_simple_not_equal_if_uses_native_object_code(self) -> None:
+        sys.path.insert(0, str(self.workspace / "udos" / "tools"))
+        import run_action_alink_prg_probe as probe
+
+        case = probe.DIRECT_PRG_CASES["if_ne"]
+        self.assertIn(
+            "x main 0 127\nx __if0 105 1\nx __idata 121 4\nx __iptr 125 2\n",
+            case["expected_object_fragments"],
+        )
+        self.assertIn(
+            "r 3 x __iptr\nr 9 x __iptr\nr 86 x __if0\nr 125 x __idata\n",
+            case["expected_object_fragments"],
+        )
+        self.assertEqual(case["store_check_addr"], 0x107B)
+
+    def test_simple_less_than_if_uses_native_object_code(self) -> None:
+        sys.path.insert(0, str(self.workspace / "udos" / "tools"))
+        import run_action_alink_prg_probe as probe
+
+        case = probe.DIRECT_PRG_CASES["if_lt"]
+        self.assertIn(
+            "x main 0 126\nx __if0 104 1\nx __idata 120 4\nx __iptr 124 2\n",
+            case["expected_object_fragments"],
+        )
+        self.assertIn(
+            "r 3 x __iptr\nr 9 x __iptr\nr 85 x __if0\nr 124 x __idata\n",
+            case["expected_object_fragments"],
+        )
+        self.assertEqual(case["store_check_addr"], 0x107A)
+
+    def test_simple_greater_than_if_uses_native_object_code(self) -> None:
+        sys.path.insert(0, str(self.workspace / "udos" / "tools"))
+        import run_action_alink_prg_probe as probe
+
+        case = probe.DIRECT_PRG_CASES["if_gt"]
+        self.assertIn(
+            "x main 0 128\nx __if0 106 1\nx __idata 122 4\nx __iptr 126 2\n",
+            case["expected_object_fragments"],
+        )
+        self.assertIn(
+            "r 3 x __iptr\nr 9 x __iptr\nr 87 x __if0\nr 126 x __idata\n",
+            case["expected_object_fragments"],
+        )
+        self.assertEqual(case["store_check_addr"], 0x107C)
+
+    def test_simple_greater_equal_if_uses_native_object_code(self) -> None:
+        sys.path.insert(0, str(self.workspace / "udos" / "tools"))
+        import run_action_alink_prg_probe as probe
+
+        case = probe.DIRECT_PRG_CASES["if_ge"]
+        self.assertIn(
+            "x main 0 126\nx __if0 104 1\nx __idata 120 4\nx __iptr 124 2\n",
+            case["expected_object_fragments"],
+        )
+        self.assertIn(
+            "r 3 x __iptr\nr 9 x __iptr\nr 85 x __if0\nr 124 x __idata\n",
+            case["expected_object_fragments"],
+        )
+        self.assertEqual(case["store_check_addr"], 0x107A)
+
+    def test_simple_less_equal_if_uses_native_object_code(self) -> None:
+        sys.path.insert(0, str(self.workspace / "udos" / "tools"))
+        import run_action_alink_prg_probe as probe
+
+        case = probe.DIRECT_PRG_CASES["if_le"]
+        self.assertIn(
+            "x main 0 128\nx __if0 106 1\nx __idata 122 4\nx __iptr 126 2\n",
+            case["expected_object_fragments"],
+        )
+        self.assertIn(
+            "r 3 x __iptr\nr 9 x __iptr\nr 87 x __if0\nr 126 x __idata\n",
+            case["expected_object_fragments"],
+        )
+        self.assertEqual(case["store_check_addr"], 0x107C)
+
+    def test_simple_if_else_uses_native_object_code(self) -> None:
+        sys.path.insert(0, str(self.workspace / "udos" / "tools"))
+        import run_action_alink_prg_probe as probe
+
+        case = probe.DIRECT_PRG_CASES["if_else"]
+        self.assertIn(
+            "x main 0 127\nx __if0 88 1\nx __if1 105 1\nx __idata 121 4\nx __iptr 125 2\n",
+            case["expected_object_fragments"],
+        )
+        self.assertIn(
+            "r 3 x __iptr\nr 9 x __iptr\nr 66 x __if0\nr 86 x __if1\nr 125 x __idata\n",
+            case["expected_object_fragments"],
+        )
+        self.assertEqual(case["store_check_addr"], 0x107B)
+        true_case = probe.DIRECT_PRG_CASES["if_else_true"]
+        self.assertEqual(true_case["expected_object_fragments"], case["expected_object_fragments"])
+        self.assertEqual(true_case["store_check_addr"], 0x107B)
+        self.assertEqual(true_case["store_check_value"], 0x01)
+
+    def test_nested_if_variants_use_native_object_code(self) -> None:
+        sys.path.insert(0, str(self.workspace / "udos" / "tools"))
+        import run_action_alink_prg_probe as probe
+
+        case = probe.DIRECT_PRG_CASES["nested_if"]
+        self.assertIn(
+            "x main 0 167\nx __if0 143 1\nx __if2 143 1\n"
+            "x __idata 159 6\nx __iptr 165 2\n",
+            case["expected_object_fragments"],
+        )
+        self.assertIn(
+            "r 3 x __iptr\nr 9 x __iptr\nr 85 x __if0\n"
+            "r 124 x __if2\nr 165 x __idata\n",
+            case["expected_object_fragments"],
+        )
+        self.assertEqual(case["store_check_addr"], 0x10A3)
+        false_case = probe.DIRECT_PRG_CASES["nested_if_outer_false"]
+        self.assertEqual(false_case["expected_object_fragments"], case["expected_object_fragments"])
+        self.assertEqual(false_case["store_check_value"], 0x00)
+
+        else_case = probe.DIRECT_PRG_CASES["nested_else"]
+        self.assertIn(
+            "x main 0 187\nx __if0 163 1\nx __if2 146 1\n"
+            "x __if3 163 1\nx __idata 179 6\nx __iptr 185 2\n",
+            else_case["expected_object_fragments"],
+        )
+        self.assertIn("r 144 x __if3\n", "".join(else_case["expected_object_fragments"]))
+        self.assertEqual(else_case["store_check_addr"], 0x10B7)
+        self.assertEqual(else_case["store_check_value"], 0x04)
+
+    def test_do_until_variants_use_native_object_code(self) -> None:
+        sys.path.insert(0, str(self.workspace / "udos" / "tools"))
+        import run_action_alink_prg_probe as probe
+
+        equality = probe.DIRECT_PRG_CASES["do_until_eq"]
+        self.assertIn(
+            "x main 0 105\nx __do0 30 1\nx __idata 101 2\nx __iptr 103 2\n",
+            equality["expected_object_fragments"],
+        )
+        self.assertIn("r 83 x __do0\n", "".join(equality["expected_object_fragments"]))
+        self.assertEqual(equality["store_check_addr"], 0x1065)
+
+        less_than = probe.DIRECT_PRG_CASES["do_until_lt"]
+        self.assertIn(
+            "x main 0 126\nx __do0 47 1\nx __idata 120 4\nx __iptr 124 2\n",
+            less_than["expected_object_fragments"],
+        )
+        self.assertIn("r 102 x __do0\n", "".join(less_than["expected_object_fragments"]))
+        self.assertEqual(less_than["store_check_addr"], 0x1078)
+
+        nested = probe.DIRECT_PRG_CASES["nested_do_until_eq"]
+        self.assertIn(
+            "x main 0 179\nx __do0 47 1\nx __do1 64 1\n"
+            "x __idata 173 4\nx __iptr 177 2\n",
+            nested["expected_object_fragments"],
+        )
+        self.assertIn(
+            "r 117 x __do1\nr 155 x __do0\n",
+            "".join(nested["expected_object_fragments"]),
+        )
+        self.assertEqual(nested["store_check_addr"], 0x10AD)
+
+        mixed_cases = {
+            "do_if_until_eq": ("x __do0 47 1\nx __if2 119 1\n", 0x10AF),
+            "do_if_else_until_eq": ("x __do0 47 1\nx __if2 122 1\n", 0x10C3),
+            "if_do_until_eq": ("x __if0 140 1\nx __do1 85 1\n", 0x109E),
+            "if_else_do_until_eq": (
+                "x __if0 143 1\nx __if1 198 1\nx __do1 85 1\nx __if3 143 1\n",
+                0x10D8,
+            ),
+        }
+        for shape, (exports, result_addr) in mixed_cases.items():
+            with self.subTest(shape=shape):
+                case = probe.DIRECT_PRG_CASES[shape]
+                fragments = "".join(case["expected_object_fragments"])
+                self.assertIn(exports, fragments)
+                self.assertEqual(case["store_check_addr"], result_addr)
+
+    def test_printmath_uses_native_object_code_and_link_selected_library_helpers(self) -> None:
+        sys.path.insert(0, str(self.workspace / "udos" / "tools"))
+        import run_action_alink_prg_probe as probe
+
+        case = probe.DIRECT_PRG_CASES["printmath"]
+        self.assertIn("X=X + 7 - 3", case["source"])
+        self.assertIn(
+            "x main 0 272\nx __idata 262 8\nx __iptr 270 2\n",
+            case["expected_object_fragments"],
+        )
+        self.assertIn("b u0u1M\nb M\nb M\n", case["expected_object_fragments"])
+        self.assertEqual(case["runtime_library_objects"], ["rt_print_i"])
+        self.assertEqual(case["expected_alink_loads"], ["LIB/W.OBJ", "LIB/RT_PRINT_I.OBJ"])
+        work_object = case["extra_library_objects"]["W.OBJ"]
+        self.assertIn("b u0M\nb M\nb M\n", work_object)
+        self.assertIn("m A2 00 BD", work_object)
+        self.assertNotIn("b s0i0r", work_object)
+
+    def test_native_integer_runtime_case_covers_precedence_division_and_zero_divisor(self) -> None:
+        sys.path.insert(0, str(self.workspace / "udos" / "tools"))
+        import run_action_alink_prg_probe as probe
+
+        case = probe.DIRECT_PRG_CASES["actc_runtime_integer_mul_div_linked"]
+        self.assertIn("PrintIE(A+B*C)", case["source"])
+        self.assertIn("PrintIE((A+B)*C)", case["source"])
+        self.assertIn("PrintIE(B/C)", case["source"])
+        self.assertIn("PrintIE(B/0)", case["source"])
+        self.assertIn("x main 0 298\nx __idata 290 6\nx __iptr 296 2\n", case["expected_object_fragments"])
+        self.assertIn("b u0u1u2M\nb M\nb M\n", case["expected_object_fragments"])
+        self.assertEqual(case["runtime_library_objects"], ["rt_i_mul", "rt_print_i", "rt_i_div"])
+        self.assertEqual(
+            case["expected_alink_loads"],
+            ["LIB/RT_I_MUL.OBJ", "LIB/RT_PRINT_I.OBJ", "LIB/RT_I_DIV.OBJ"],
+        )
+
+    def test_native_integer_runtime_case_covers_add_sub_without_mul_div_helpers(self) -> None:
+        sys.path.insert(0, str(self.workspace / "udos" / "tools"))
+        import run_action_alink_prg_probe as probe
+
+        case = probe.DIRECT_PRG_CASES["actc_runtime_integer_add_sub_linked"]
+        self.assertIn("PrintIE(A+B-C)", case["source"])
+        self.assertIn(
+            "x main 0 113\nx __idata 105 6\nx __iptr 111 2\n",
+            case["expected_object_fragments"],
+        )
+        self.assertIn("b u0M\nb M\nb M\n", case["expected_object_fragments"])
+        self.assertEqual(case["expected_alink_loads"], ["LIB/RT_PRINT_I.OBJ"])
+        self.assertEqual(
+            case["unexpected_alink_loads"],
+            ["LIB/RT_I_MUL.OBJ", "LIB/RT_I_DIV.OBJ"],
+        )
+
+    def test_native_integer_runtime_case_covers_assignment_store(self) -> None:
+        sys.path.insert(0, str(self.workspace / "udos" / "tools"))
+        import run_action_alink_prg_probe as probe
+
+        case = probe.DIRECT_PRG_CASES["actc_runtime_integer_mul_store_linked"]
+        self.assertIn("A=B*C", case["source"])
+        self.assertIn("PrintIE(A)", case["source"])
+        self.assertIn("x main 0 109\nx __idata 101 6\nx __iptr 107 2\n", case["expected_object_fragments"])
+        self.assertIn("b u0u1M\nb M\nb M\n", case["expected_object_fragments"])
+        self.assertEqual(case["runtime_library_objects"], ["rt_i_mul", "rt_print_i"])
+        self.assertEqual(case["screen_fragments"], ["14"])
+
+    def test_plain_word_store_and_load_store_use_native_object_code(self) -> None:
+        sys.path.insert(0, str(self.workspace / "udos" / "tools"))
+        import run_action_alink_prg_probe as probe
+
+        source_case = probe.DIRECT_PRG_CASES["word_load_store"]
+        self.assertIn("X=7\rY=X", source_case["source"])
+        self.assertIn(
+            "x main 0 72\nx __idata 66 4\nx __iptr 70 2\n",
+            source_case["expected_object_fragments"],
+        )
+        self.assertIn("b M\nb M\nb M\n", source_case["expected_object_fragments"])
+
+        for shape in ("word_store", "word_load_store_seeded"):
+            with self.subTest(shape=shape):
+                seed = probe.DIRECT_PRG_CASES[shape]["seed_object"]
+                self.assertIn("b M\n", seed)
+                self.assertIn("\nm ", seed)
+                self.assertIn("r 3 x __iptr\n", seed)
+                self.assertNotIn("b p0S0", seed)
+
+    def test_basic_return_and_transitive_library_seeds_use_native_object_code(self) -> None:
+        sys.path.insert(0, str(self.workspace / "udos" / "tools"))
+        import run_action_alink_prg_probe as probe
+
+        empty_seed = probe.DIRECT_PRG_CASES["empty_return"]["seed_object"]
+        self.assertIn("b M\n", empty_seed)
+        self.assertIn("\nm A9 A5", empty_seed)
+        self.assertNotIn("b r\n", empty_seed)
+
+        transitive = probe.DIRECT_PRG_CASES["transitive_library_load"]
+        self.assertIn("b u0M\n", transitive["seed_object"])
+        self.assertIn("r 1 u0\n", transitive["seed_object"])
+        for dependency in transitive["extra_library_objects"].values():
+            self.assertIn("b ", dependency)
+            self.assertIn("\nm ", dependency)
+            self.assertNotIn("b r\n", dependency)
+
+    def test_legacy_body_rejections_cover_retired_native_shapes(self) -> None:
+        sys.path.insert(0, str(self.workspace / "udos" / "tools"))
+        import run_action_alink_prg_probe as probe
+
+        shapes = (
+            "legacy_integer_body_missing_mul_helper_rejects",
+            "legacy_integer_body_stack_underflow_rejects",
+            "legacy_word_store_body_rejects",
+            "legacy_word_load_store_body_rejects",
+            "legacy_empty_return_body_rejects",
+            "legacy_single_call_body_rejects",
+            "legacy_fanout_body_rejects",
+            "legacy_printmath_body_rejects",
+            "legacy_string_integer_library_body_rejects",
+            "legacy_if_eq_body_rejects",
+            "legacy_if_ne_body_rejects",
+            "legacy_if_lt_body_rejects",
+            "legacy_if_gt_body_rejects",
+            "legacy_if_ge_body_rejects",
+            "legacy_if_le_body_rejects",
+            "legacy_if_else_body_rejects",
+            "legacy_nested_if_body_rejects",
+            "legacy_nested_if_else_body_rejects",
+            "legacy_do_until_eq_body_rejects",
+            "legacy_do_until_lt_body_rejects",
+            "legacy_nested_do_until_eq_body_rejects",
+            "legacy_do_if_until_eq_body_rejects",
+            "legacy_do_if_else_until_eq_body_rejects",
+            "legacy_if_do_until_eq_body_rejects",
+            "legacy_if_else_do_until_eq_body_rejects",
+            "legacy_if_local_call_do_until_eq_body_rejects",
+        )
+        rejection_matrix = self._makefile_shape_group(
+            self.make_text,
+            "ACTION_ALINK_PRG_OBJECT_CODE_REJECTION_CASES",
+        )
+
+        for shape in shapes:
+            with self.subTest(shape=shape):
+                case = probe.DIRECT_PRG_CASES[shape]
+                self.assertTrue(case["expect_alink_failure"])
+                self.assertEqual(case["expected_alink_error"], "UNSUPPORTED BODY")
+                self.assertIn(shape, rejection_matrix)
 
     def test_sid_runtime_matrix_covers_sidspr1_sid_split_helpers(self) -> None:
         matrix_groups = self._makefile_runtime_matrix_shape_groups(self.make_text)

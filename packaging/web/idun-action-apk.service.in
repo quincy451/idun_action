@@ -1,0 +1,32 @@
+[Unit]
+Description=Idun Action Alpine APK repository
+After=network.target
+
+[Service]
+Type=simple
+User=@USER@
+Group=@GROUP@
+ExecStart=/usr/sbin/lighttpd -D -f /etc/lighttpd/idun-action-apk.conf
+Restart=on-failure
+RestartSec=2
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectProc=invisible
+ProcSubset=pid
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+ReadOnlyPaths=@REPOSITORY@
+InaccessiblePaths=@KEY_DIR@
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+[Install]
+WantedBy=multi-user.target

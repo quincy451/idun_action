@@ -7,12 +7,13 @@ import sys
 
 def main() -> int:
     root = Path(__file__).resolve().parents[1]
-    workspace = root.parent
 
     targets = {
-        "actionc64u": root,
-        "cpm65-u64": workspace / "cpm65-u64",
-        "action.pdf": workspace / "action.pdf",
+        "repository": root,
+        "linux C++ source": root / "src" / "tools_linux" / "action_workspace_tools.cpp",
+        "6502 runtime library": root / "src" / "runtime" / "modules",
+        "Linux build script": root / "tools" / "build_linux_tools.sh",
+        "Idun export script": root / "tools" / "export_idun_workspace.py",
     }
 
     missing = []
@@ -25,8 +26,8 @@ def main() -> int:
 
     if missing:
         print(
-            "Missing required local paths. Verify you are running inside "
-            "/mnt/c/test/action with adjacent cpm65-u64 and action.pdf.",
+            "Missing required Idun fork paths. Restore this repository as one "
+            "self-contained checkout; no adjacent CP/M-65 or UDOS tree is required.",
             file=sys.stderr,
         )
         return 1

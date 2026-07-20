@@ -1,16 +1,25 @@
-# VICE Verification
+# Direct PRG Verification With VICE
 
-Current VICE verification boots UDOS, mounts the Action workspace, runs the
-UDOS-native tools, and verifies direct PRG output.
+VICE is optional and does not require an attached C64. The Idun test harness
+starts `x64sc` headlessly, writes a linked PRG directly into C64 memory through
+the binary monitor, discovers the PC and stack registers by name, and starts at
+the PRG load address.
 
-Primary gates:
+Run the generated-code gate:
 
-- `make -C ../udos vice-resident`
-- `make -C ../udos vice-action-alink`
-- `make -C ../udos vice-action-actc-alink-launch`
+```sh
+python3 -m unittest -v tests.test_idun_prg_runtime
+```
 
-Expected direct launch proof:
+The test compiles and links recursive word, local-array, mutual-recursion, and
+REAL calls. It then checks result memory written by the running 6502 program.
+The test skips cleanly when `x64sc` is not installed.
 
-- `ALINK.PRG` writes `BIN/MAIN.PRG`
-- UDOS launches that PRG directly
-- the probe observes the expected marker/output and returns to the UDOS prompt
+Run another linked PRG manually:
+
+```sh
+python3 tools/vice_harness.py --prg path/to/MAIN.PRG --timeout 2
+```
+
+An optional disk can be attached with `--disk-image`, but no UDOS or CP/M disk
+is part of the active verification path.

@@ -1,0 +1,308 @@
+; REU_DBF_SORT is an in-place, stable, multi-key DBF record sorter.
+;
+; Run it through an Idun-compatible Action launcher as:
+;   REU_DBF_SORT DATA.DBF 10,20,A 40,10,D
+;
+; MAIN receives Idun's argc/argv process values. argc includes argv(0), the
+; executable name; argv is a CARD array of pointers to zero-terminated strings.
+; The filename is argv(1), followed by one through ten sort specifications.
+; A specification is START,LENGTH,A or START,LENGTH,D. START is one based;
+; A means ascending and D means descending.
+;
+; DBF1 stages the complete file in an allocator-owned REU block (up to 65535
+; bytes). This program adds a 255-byte REU swap buffer, so record data does not
+; consume scarce C64 main memory. The current DBF adapter exposes up to 255
+; records with record lengths up to 255 bytes.
+
+MODULE REU_DBF_SORT
+
+BYTE FUNC ValidKeySyntax(BYTE ARRAY specification)
+    CARD index
+    BYTE section
+    BYTE digits
+    BYTE direction
+    BYTE character
+
+    index=0
+    section=0
+    digits=0
+    direction=0
+    WHILE specification(index)<>0
+    DO
+        character=specification(index)
+        IF character=44 THEN
+            IF section>=2 OR digits=0 THEN
+                RETURN(0)
+            FI
+            section=section+1
+            digits=0
+        ELSEIF section<2 THEN
+            IF character<48 OR character>57 THEN
+                RETURN(0)
+            FI
+            digits=digits+1
+        ELSE
+            IF direction<>0 THEN
+                RETURN(0)
+            FI
+            IF character<>'A AND character<>'D THEN
+                RETURN(0)
+            FI
+            direction=character
+        FI
+        index=index+1
+    OD
+    IF section<>2 OR digits<>0 OR direction=0 THEN
+        RETURN(0)
+    FI
+    RETURN(1)
+ENDFUNC
+
+CARD FUNC KeyNumber(BYTE ARRAY specification,BYTE part)
+    CARD value
+    CARD index
+    BYTE section
+    BYTE character
+
+    value=0
+    index=0
+    section=0
+    WHILE specification(index)<>0
+    DO
+        character=specification(index)
+        IF character=44 THEN
+            IF section=part THEN
+                RETURN(value)
+            FI
+            section=section+1
+        ELSEIF section=part THEN
+            value=value*10+character-48
+        FI
+        index=index+1
+    OD
+    RETURN(value)
+ENDFUNC
+
+BYTE FUNC KeyDirection(BYTE ARRAY specification)
+    CARD index
+    BYTE section
+    BYTE character
+
+    index=0
+    section=0
+    WHILE specification(index)<>0
+    DO
+        character=specification(index)
+        IF character=44 THEN
+            section=section+1
+        ELSEIF section=2 THEN
+            RETURN(character)
+        FI
+        index=index+1
+    OD
+    RETURN(0)
+ENDFUNC
+
+BYTE FUNC ValidKey(BYTE ARRAY specification,BYTE recordLength)
+    CARD start
+    CARD length
+
+    IF ValidKeySyntax(specification)=0 THEN
+        RETURN(0)
+    FI
+    start=KeyNumber(specification,0)
+    length=KeyNumber(specification,1)
+    IF start=0 OR length=0 THEN
+        RETURN(0)
+    FI
+    IF start+length-1>recordLength THEN
+        RETURN(0)
+    FI
+    RETURN(1)
+ENDFUNC
+
+INT FUNC CompareField(
+    BYTE handle,
+    BYTE leftRecord,
+    BYTE rightRecord,
+    BYTE ARRAY specification)
+    CARD start
+    CARD length
+    CARD offset
+    BYTE leftValue
+    BYTE rightValue
+    BYTE status
+    BYTE descending
+
+    start=KeyNumber(specification,0)
+    length=KeyNumber(specification,1)
+    descending=0
+    IF KeyDirection(specification)='D THEN
+        descending=1
+    FI
+    start=start-1
+    FOR offset=0 TO length-1
+    DO
+        status=DbfGo(handle,leftRecord)
+        leftValue=DbfReadByte(handle,start+offset)
+        status=DbfGo(handle,rightRecord)
+        rightValue=DbfReadByte(handle,start+offset)
+        IF leftValue<rightValue THEN
+            IF descending<>0 THEN
+                RETURN(1)
+            ELSE
+                RETURN(0-1)
+            FI
+        FI
+        IF leftValue>rightValue THEN
+            IF descending<>0 THEN
+                RETURN(0-1)
+            ELSE
+                RETURN(1)
+            FI
+        FI
+    OD
+    RETURN(0)
+ENDFUNC
+
+INT FUNC CompareRecords(
+    BYTE handle,
+    BYTE leftRecord,
+    BYTE rightRecord,
+    BYTE keyCount,
+    CARD ARRAY arguments)
+    BYTE keyIndex
+    INT result
+
+    FOR keyIndex=0 TO keyCount-1
+    DO
+        result=CompareField(
+            handle,
+            leftRecord,
+            rightRecord,
+            arguments(keyIndex+2))
+        IF result<>0 THEN
+            RETURN(result)
+        FI
+    OD
+    RETURN(0)
+ENDFUNC
+
+PROC SwapRecords(
+    BYTE handle,
+    BYTE leftRecord,
+    BYTE rightRecord,
+    BYTE recordLength,
+    CARD swapBuffer)
+    CARD offset
+    BYTE value
+    BYTE status
+
+    status=DbfGo(handle,leftRecord)
+    FOR offset=0 TO recordLength-1
+    DO
+        value=DbfReadByte(handle,offset)
+        ReuPoke8(swapBuffer,offset,value)
+    OD
+    FOR offset=0 TO recordLength-1
+    DO
+        status=DbfGo(handle,rightRecord)
+        value=DbfReadByte(handle,offset)
+        status=DbfGo(handle,leftRecord)
+        status=DbfWriteByte(handle,offset,value)
+    OD
+    status=DbfGo(handle,rightRecord)
+    FOR offset=0 TO recordLength-1
+    DO
+        value=ReuPeek8(swapBuffer,offset)
+        status=DbfWriteByte(handle,offset,value)
+    OD
+    RETURN
+ENDPROC
+
+PROC SortDbf(
+    BYTE ARRAY filename,
+    BYTE keyCount,
+    CARD ARRAY arguments)
+    REU BYTE ARRAY swapBuffer(255)
+    BYTE handle
+    BYTE totalRecords
+    BYTE recordLength
+    BYTE pass
+    BYTE record
+    BYTE keyIndex
+    BYTE swapped
+    BYTE status
+
+    handle=DbfOpen(filename)
+    IF handle=0 THEN
+        PrintE("DBF OPEN FAILED")
+        RETURN
+    FI
+    totalRecords=DbfTotalRecs(handle)
+    recordLength=DbfRecordLen(handle)
+    IF totalRecords<2 OR recordLength=0 THEN
+        PrintE("NOTHING TO SORT")
+        DbfClose(handle)
+        RETURN
+    FI
+    FOR keyIndex=0 TO keyCount-1
+    DO
+        IF ValidKey(arguments(keyIndex+2),recordLength)=0 THEN
+            PrintE("INVALID SORT KEY")
+            DbfClose(handle)
+            RETURN
+        FI
+    OD
+    pass=totalRecords-1
+    WHILE pass>0
+    DO
+        swapped=0
+        FOR record=1 TO pass
+        DO
+            IF CompareRecords(
+                handle,
+                record,
+                record+1,
+                keyCount,
+                arguments)>0 THEN
+                SwapRecords(
+                    handle,
+                    record,
+                    record+1,
+                    recordLength,
+                    swapBuffer)
+                swapped=1
+            FI
+        OD
+        IF swapped=0 THEN
+            EXIT
+        FI
+        pass=pass-1
+    OD
+    status=DbfSave(handle)
+    DbfClose(handle)
+    IF status<>0 THEN
+        PrintE("SORT COMPLETE")
+    ELSE
+        PrintE("DBF SAVE FAILED")
+    FI
+    RETURN
+ENDPROC
+
+PROC main(CARD argc,CARD ARRAY argv)
+    BYTE keyCount
+
+    IF argc<3 THEN
+        PrintE("USAGE: REU_DBF_SORT FILE KEY [KEY ...]")
+        PrintE("KEY: START,LENGTH,A OR START,LENGTH,D")
+        RETURN
+    FI
+    IF argc>12 THEN
+        PrintE("TOO MANY SORT KEYS (MAXIMUM 10)")
+        RETURN
+    FI
+    keyCount=argc-2
+    SortDbf(argv(1),keyCount,argv)
+    RETURN
+ENDPROC

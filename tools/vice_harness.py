@@ -15,8 +15,13 @@ API_VERSION = 0x02
 STX = 0x02
 
 CMD_MEMORY_GET = 0x01
+CMD_MEMORY_SET = 0x02
+CMD_REGISTERS_GET = 0x31
+CMD_REGISTERS_SET = 0x32
 CMD_KEYBOARD_FEED = 0x72
 CMD_PING = 0x81
+CMD_BANKS_AVAILABLE = 0x82
+CMD_REGISTERS_AVAILABLE = 0x83
 CMD_EXIT = 0xAA
 CMD_QUIT = 0xBB
 
@@ -87,17 +92,6 @@ def locate_x64sc() -> Path:
                 return candidate_path.resolve()
         raise ViceUnavailable("x64sc not found on PATH")
     return prefer_known_good_linux_vice(Path(candidate).resolve())
-
-
-def default_udos_resident_disk() -> Path:
-    return Path(__file__).resolve().parents[2] / "udos" / "build" / "udos-resident.d64"
-
-
-def find_udos_resident_disk() -> Path:
-    disk_image = default_udos_resident_disk()
-    if not disk_image.is_file():
-        raise ViceUnavailable(f"UDOS resident disk not found: {disk_image}; run make -C ../udos resident")
-    return disk_image.resolve()
 
 
 def reserve_tcp_port() -> int:
@@ -213,8 +207,16 @@ class BinaryMonitorClient:
         self.sock.sendall(packet)
         return request_id
 
-    def command(self, command_type: int, body: bytes = b"", timeout: float | None = None) -> bytes:
+    def command(
+        self,
+        command_type: int,
+        body: bytes = b"",
+        timeout: float | None = None,
+        *,
+        response_type: int | None = None,
+    ) -> bytes:
         request_id = self._send_command(command_type, body)
+        expected_response = command_type if response_type is None else response_type
         deadline = time.monotonic() + (timeout if timeout is not None else self.timeout)
         while time.monotonic() < deadline:
             response_type, error_code, response_request_id, payload = self._read_response()
@@ -224,15 +226,43 @@ class BinaryMonitorClient:
                 raise ViceProtocolError(
                     f"VICE monitor command 0x{command_type:02x} failed with error 0x{error_code:02x}"
                 )
-            if response_type != command_type:
+            if response_type != expected_response:
                 raise ViceProtocolError(
-                    f"VICE monitor command 0x{command_type:02x} got response 0x{response_type:02x}"
+                    f"VICE monitor command 0x{command_type:02x} got response "
+                    f"0x{response_type:02x}; expected 0x{expected_response:02x}"
                 )
             return payload
         raise ViceProtocolError(f"timed out waiting for VICE monitor response 0x{command_type:02x}")
 
     def ping(self) -> None:
         self.command(CMD_PING)
+
+    def banks_available(self) -> dict[str, int]:
+        payload = self.command(CMD_BANKS_AVAILABLE)
+        if len(payload) < 2:
+            raise ViceProtocolError("banks-available response was too short")
+        count = struct.unpack_from("<H", payload, 0)[0]
+        offset = 2
+        banks: dict[str, int] = {}
+        for _ in range(count):
+            if offset >= len(payload):
+                raise ViceProtocolError("truncated banks-available item")
+            item_size = payload[offset]
+            item_end = offset + 1 + item_size
+            if item_size < 3 or item_end > len(payload):
+                raise ViceProtocolError("invalid banks-available item")
+            bank_id = struct.unpack_from("<H", payload, offset + 1)[0]
+            name_length = payload[offset + 3]
+            if offset + 4 + name_length > item_end:
+                raise ViceProtocolError("invalid banks-available name")
+            name = payload[offset + 4 : offset + 4 + name_length].decode(
+                "ascii", errors="strict"
+            )
+            banks[name.lower()] = bank_id
+            offset = item_end
+        if offset != len(payload):
+            raise ViceProtocolError("trailing banks-available data")
+        return banks
 
     def resume(self) -> None:
         self.command(CMD_EXIT)
@@ -258,6 +288,90 @@ class BinaryMonitorClient:
         self.command(CMD_KEYBOARD_FEED, bytes((len(encoded),)) + encoded)
         self.resume()
 
+    def memory_set(
+        self,
+        start: int,
+        data: bytes,
+        *,
+        memspace: int = 0,
+        bank: int = 0,
+        side_effects: bool = False,
+    ) -> None:
+        if not data:
+            raise ViceProtocolError("cannot write an empty memory segment")
+        end = start + len(data) - 1
+        if start < 0 or end > 0xFFFF:
+            raise ViceProtocolError("memory write falls outside the 16-bit address space")
+        body = bytes((1 if side_effects else 0,))
+        body += struct.pack("<HHBH", start, end, memspace, bank)
+        self.command(CMD_MEMORY_SET, body + data)
+
+    def register_ids(self, *, memspace: int = 0) -> dict[str, int]:
+        response = self.command(CMD_REGISTERS_AVAILABLE, bytes((memspace,)))
+        if len(response) < 2:
+            raise ViceProtocolError("register-list response was too short")
+        count = struct.unpack_from("<H", response, 0)[0]
+        offset = 2
+        registers: dict[str, int] = {}
+        for _ in range(count):
+            if offset >= len(response):
+                raise ViceProtocolError("truncated register-list item")
+            item_size = response[offset]
+            item_end = offset + item_size + 1
+            if item_size < 3 or item_end > len(response):
+                raise ViceProtocolError("malformed register-list item")
+            register_id = response[offset + 1]
+            name_length = response[offset + 3]
+            name_start = offset + 4
+            name_end = name_start + name_length
+            if name_end > item_end:
+                raise ViceProtocolError("malformed register name")
+            name = response[name_start:name_end].decode("ascii", errors="strict").upper()
+            registers[name] = register_id
+            offset = item_end
+        if offset != len(response):
+            raise ViceProtocolError("unexpected trailing register-list data")
+        return registers
+
+    def registers_set(self, values: dict[int, int], *, memspace: int = 0) -> None:
+        body = bytearray((memspace,))
+        body.extend(struct.pack("<H", len(values)))
+        for register_id, value in values.items():
+            if not 0 <= register_id <= 0xFF or not 0 <= value <= 0xFFFF:
+                raise ViceProtocolError("register ID or value is out of range")
+            body.extend((3, register_id))
+            body.extend(struct.pack("<H", value))
+        self.command(
+            CMD_REGISTERS_SET,
+            bytes(body),
+            response_type=RESP_REGISTER_INFO,
+        )
+
+    def registers_get(self, *, memspace: int = 0) -> dict[int, int]:
+        response = self.command(
+            CMD_REGISTERS_GET,
+            bytes((memspace,)),
+            response_type=RESP_REGISTER_INFO,
+        )
+        if len(response) < 2:
+            raise ViceProtocolError("register response was too short")
+        count = struct.unpack_from("<H", response, 0)[0]
+        offset = 2
+        values: dict[int, int] = {}
+        for _ in range(count):
+            if offset >= len(response):
+                raise ViceProtocolError("truncated register response item")
+            item_size = response[offset]
+            item_end = offset + item_size + 1
+            if item_size < 3 or item_end > len(response):
+                raise ViceProtocolError("malformed register response item")
+            register_id = response[offset + 1]
+            values[register_id] = struct.unpack_from("<H", response, offset + 2)[0]
+            offset = item_end
+        if offset != len(response):
+            raise ViceProtocolError("unexpected trailing register response data")
+        return values
+
     def memory_get(self, start: int, end: int, *, memspace: int = 0, bank: int = 0, side_effects: bool = False) -> bytes:
         body = bytes((1 if side_effects else 0,))
         body += struct.pack("<HHBH", start, end, memspace, bank)
@@ -278,26 +392,23 @@ class ViceHarness:
         *,
         x64sc_path: Path | None = None,
         disk_image: Path | None = None,
+        true_drive: bool = True,
         port: int | None = None,
         timeout: float = 8.0,
     ):
         self.x64sc_path = x64sc_path or locate_x64sc()
-        self.disk_image = disk_image or find_udos_resident_disk()
+        self.disk_image = disk_image.resolve() if disk_image is not None else None
+        self.true_drive = true_drive
         self.port = port or reserve_tcp_port()
         self.timeout = timeout
         self.process: subprocess.Popen[str] | None = None
         self.monitor = BinaryMonitorClient("127.0.0.1", self.port, timeout=timeout)
 
     def command(self, *extra: str) -> list[str]:
-        return [
+        command = [
             str(self.x64sc_path),
+            "-console",
             "-default",
-            "-8",
-            str(self.disk_image),
-            "-drive8type",
-            "1541",
-            "-drive8truedrive",
-            "+virtualdev8",
             "-binarymonitor",
             "-binarymonitoraddress",
             f"ip4://127.0.0.1:{self.port}",
@@ -310,8 +421,22 @@ class ViceHarness:
             "dummy",
             "-keybuf-delay",
             "4",
-            *extra,
         ]
+        if self.disk_image is not None:
+            command[3:3] = [
+                "-8",
+                str(self.disk_image),
+                "-drive8type",
+                "1541",
+                "-drive8truedrive"
+                if getattr(self, "true_drive", True)
+                else "+drive8truedrive",
+                "+virtualdev8"
+                if getattr(self, "true_drive", True)
+                else "-virtualdev8",
+            ]
+        command.extend(extra)
+        return command
 
     def start(self) -> None:
         env = dict(os.environ)
@@ -332,24 +457,37 @@ class ViceHarness:
             raise ViceUnavailable(f"failed to start VICE monitor session: {exc}") from exc
 
     def stop(self) -> None:
-        self.monitor.close()
         process = self.process
         if process is None:
+            self.monitor.close()
             return
         try:
             if process.poll() is None:
-                process.terminate()
+                # Let VICE flush attached disk images before falling back to a
+                # host-side termination.  This matters for true-drive writes,
+                # whose directory sector can still be dirty when the program's
+                # KERNAL CLOSE has returned.
+                graceful_quit = getattr(self.monitor, "quit_emulator", None)
+                if callable(graceful_quit):
+                    graceful_quit()
+                else:
+                    process.terminate()
                 try:
                     process.communicate(timeout=5)
                 except subprocess.TimeoutExpired:
-                    process.kill()
-                    process.communicate(timeout=5)
+                    process.terminate()
+                    try:
+                        process.communicate(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                        process.communicate(timeout=5)
             else:
                 process.communicate(timeout=1)
         except subprocess.TimeoutExpired:
             process.kill()
             process.communicate(timeout=5)
         finally:
+            self.monitor.close()
             self.process = None
 
     def __enter__(self) -> "ViceHarness":
@@ -365,6 +503,27 @@ class ViceHarness:
     def feed_keys(self, text: str) -> None:
         self.monitor.keyboard_feed(text)
 
+    def load_prg(self, path: Path, *, entry: int | None = None) -> int:
+        payload = path.read_bytes()
+        if len(payload) < 3:
+            raise ViceProtocolError(f"PRG is too short: {path}")
+        load_address = struct.unpack_from("<H", payload, 0)[0]
+        machine_code = payload[2:]
+        if load_address + len(machine_code) > 0x10000:
+            raise ViceProtocolError(f"PRG crosses the 16-bit address boundary: {path}")
+        self.monitor.memory_set(load_address, machine_code)
+        registers = self.monitor.register_ids()
+        try:
+            pc_id = registers["PC"]
+            sp_id = registers["SP"]
+        except KeyError as exc:
+            raise ViceProtocolError(f"VICE did not expose required register {exc.args[0]}") from exc
+        start_address = load_address if entry is None else entry
+        if not 0 <= start_address <= 0xFFFF:
+            raise ViceProtocolError("PRG entry address is out of range")
+        self.monitor.registers_set({pc_id: start_address, sp_id: 0xFF})
+        return start_address
+
     def wait_for_screen_contains(self, fragment: str, *, timeout: float, poll_interval: float = 0.5) -> str:
         deadline = time.monotonic() + timeout
         last_screen = ""
@@ -378,14 +537,12 @@ class ViceHarness:
             time.sleep(poll_interval)
         raise ViceUnavailable(f"timed out waiting for screen text {fragment!r}; last screen was:\n{last_screen}")
 
-    def boot_to_udos_prompt(self, *, timeout: float = 120.0) -> str:
-        return self.wait_for_screen_contains("A:D64/>", timeout=timeout)
-
-
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Boot a UDOS disk image in VICE and wait for screen text")
-    parser.add_argument("--disk-image", help="explicit UDOS disk image path")
-    parser.add_argument("--expected", default="A:D64/>", help="screen text to wait for")
+    parser = argparse.ArgumentParser(description="Run or inspect ActionC64U output in headless VICE")
+    parser.add_argument("--disk-image", help="optional C64 disk image to attach")
+    parser.add_argument("--prg", help="direct PRG to load into C64 memory and start")
+    parser.add_argument("--entry", type=lambda value: int(value, 0), help="optional PRG entry address")
+    parser.add_argument("--expected", help="screen text to wait for")
     parser.add_argument("--timeout", type=float, default=120.0, help="seconds to wait for expected screen text")
     return parser
 
@@ -402,7 +559,16 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         with harness as vice:
-            screen = vice.wait_for_screen_contains(args.expected, timeout=args.timeout)
+            if args.prg:
+                vice.load_prg(Path(args.prg), entry=args.entry)
+                vice.monitor.resume()
+            if args.expected:
+                screen = vice.wait_for_screen_contains(args.expected, timeout=args.timeout)
+            elif args.prg:
+                time.sleep(min(args.timeout, 1.0))
+                screen = vice.read_screen_text()
+            else:
+                parser.error("provide --prg and/or --expected")
     except ViceUnavailable as exc:
         print(exc, file=sys.stderr)
         return 1

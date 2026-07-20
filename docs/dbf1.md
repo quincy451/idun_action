@@ -7,7 +7,10 @@ links only the referenced `RT_DBF_*.OBJ` modules into the final PRG.
 Current scope:
 
 - one staged DBF file at a time
-- DBF images up to a 16-bit staged length
+- DBF images up to 65535 bytes
+- an allocator-owned REU handle, so DBF staging does not use a fixed physical
+  REU address or collide with source-declared REU arrays
+- direct C64 KERNAL file I/O on device 8; no UDOS service calls
 - header and current-record access, including delete-flag status/mutation, raw
   byte writes, and field-byte reads/writes from the staged DBF image
 - creation of a new empty zero-field DBF image in the staged DBF slot
@@ -17,6 +20,12 @@ Current scope:
 - handle `1` for a successfully opened or created file
 - zero return values for inactive handles, invalid fields, invalid records, or
   failed file/REU operations
+
+Filename arguments are `CARD` pointers to nonempty zero-terminated C64 strings.
+The current KERNAL adapters use logical file 2/secondary address 2 for reads and
+logical file 3/secondary address 3 for writes. Headless VICE executes the
+generated modules and linked closure against a D64 image. Physical
+Idun/C64/REU validation remains pending.
 
 Helpers:
 
@@ -79,8 +88,8 @@ Runtime modules:
 - `RT_DBF_PACK_READ.OBJ`, `RT_DBF_PACK_WRITE.OBJ`,
   `RT_DBF_PACK_COPY.OBJ`, and `RT_DBF_PACK_STEP.OBJ` are transitive support
   modules used only when `RT_DBF_PACK.OBJ` is selected.
-- `RT_DBF_SAVE.OBJ` writes the staged DBF image back through UDOS file-write
-  services.
+- `RT_DBF_SAVE.OBJ` writes the staged DBF image through standalone KERNAL
+  open/write/close adapters.
 - `RT_DBF_DELETE.OBJ` marks the current record deleted through
   `RT_DBF_WRITEBYTE.OBJ`.
 - `RT_DBF_UNDELETE.OBJ` clears the current record delete mark through
@@ -94,3 +103,7 @@ Runtime modules:
 
 The DBF helpers are link-selected. Programs that do not call DBF functions do
 not carry DBF helper code in the linked PRG.
+
+`tools/generate_dbf_runtime.py` mechanically migrates the checked-in historical
+DBF object snapshots from fixed service calls to normal OBJ imports, then emits
+the standalone REU and KERNAL adapters. It does not build or execute UDOS.

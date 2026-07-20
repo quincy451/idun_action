@@ -1,0 +1,53 @@
+# Maintainer: ActionC64U Idun Project <packages@idun-action.local>
+pkgname=idun_action
+pkgver=@PKGVER@
+pkgrel=@PKGREL@
+pkgdesc="Action language Linux tools and C64 runtime for the Idun cartridge"
+url="https://localhost/idun-action"
+arch="aarch64"
+license="MIT"
+# The full data split intentionally remains in the aarch64 repository beside
+# its exact-version binary dependency, so the noarch suggestion is disabled.
+options="!check !strip !tracedeps !archcheck"
+subpackages="idun_action_full:_full"
+source="idun_action-$pkgver.tar.gz"
+builddir="$srcdir/idun-action"
+
+_action_commands="@ACTION_COMMANDS@"
+
+package() {
+	install -d \
+		"$pkgdir/usr/bin" \
+		"$pkgdir/usr/share/actionc64u/TOOLS" \
+		"$pkgdir/usr/share/actionc64u/DOC"
+	install -m755 "$builddir/TOOLS/action-workspace-tools" \
+		"$pkgdir/usr/share/actionc64u/TOOLS/action-workspace-tools"
+	install -m644 "$builddir/TOOLS/actsvc" \
+		"$pkgdir/usr/share/actionc64u/TOOLS/actsvc"
+	for _command in $_action_commands; do
+		ln -s action-workspace-tools \
+			"$pkgdir/usr/share/actionc64u/TOOLS/$_command"
+		ln -s "../share/actionc64u/TOOLS/$_command" \
+			"$pkgdir/usr/bin/$_command"
+	done
+	cp -a "$builddir/LIB" "$pkgdir/usr/share/actionc64u/LIB"
+	cp -a "$builddir/DOC/." "$pkgdir/usr/share/actionc64u/DOC/"
+	install -Dm644 "$builddir/LICENSE" \
+		"$pkgdir/usr/share/licenses/idun_action/LICENSE"
+}
+
+_full() {
+	pkgdesc="ActionC64U Idun tools with a complete writable workspace template"
+	depends="idun_action=$pkgver-r$pkgrel"
+
+	_workspace="$subpkgdir/usr/share/actionc64u/workspace-template"
+	install -d "$_workspace/OBJ" "$_workspace/BIN"
+	install -m644 "$builddir/ACTION.PROJ" "$_workspace/ACTION.PROJ"
+	for _directory in SRC PLAYGROUND RES LIB DOC; do
+		cp -a "$builddir/$_directory" "$_workspace/$_directory"
+	done
+	install -Dm755 "$builddir/idun-action-new-workspace" \
+		"$subpkgdir/usr/bin/idun-action-new-workspace"
+}
+
+sha512sums="@SHA512@  idun_action-$pkgver.tar.gz"

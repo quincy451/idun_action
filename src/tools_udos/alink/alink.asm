@@ -6,6 +6,7 @@ READST = $FFB7
 CLOSE_K = $FFC3
 CLRCHN = $FFCC
 CHRIN = $FFCF
+CHROUT = $FFD2
 VICE_LFN_FILE = 2
 TOOL_ABI_FILE_NAME_LO = $CDC6
 TOOL_ABI_FILE_NAME_HI = $CDC7
@@ -314,7 +315,6 @@ LINKED_LITERAL_LO = 0
 LINKED_LITERAL_HI = 1
 LINKED_LITERAL_BYTES = 2
 PRG_BUILD_DIRECT = 0
-PRG_BUILD_PRINTMATH_STRING_INT = 12
 PRG_BUILD_REAL_PRINT_INT = 13
 PRG_BUILD_REAL_PRINT_BINARY = 14
 PRG_BUILD_OBJECT_CODE = 15
@@ -345,6 +345,8 @@ RUNTIME_HELPER_KIND_XY_WORD_READBACK = 14
 RUNTIME_HELPER_KIND_AY_BYTE_READBACK = 15
 RUNTIME_HELPER_KIND_AXY_BYTES_CLC_READBACK = 16
 RUNTIME_HELPER_KIND_AXY_E0_BYTES_CLC_READBACK = 17
+ALINK_CHAIN_NONE = $00
+ALINK_CHAIN_DEBUG = $01
 
 
 .segment "ZPTEMP": zeropage
@@ -367,6 +369,7 @@ body_ptr = src_ptr
 
 start:
     jsr init_module_name
+    jsr detect_alink_chain_mode
     jsr build_manifest_entry
     jsr require_loaded_project
     jsr require_manifest_entry_tracked
@@ -421,12 +424,27 @@ start:
     jsr save_source_buffer_to_target
     lda #$43
     sta debug_phase_zp
+    bcc save_prg_ok
+    lda #<msg_save_fail
+    ldy #>msg_save_fail
+    jmp fail_with_ptr
+
+save_prg_ok:
+    lda #$44
+    sta debug_phase_zp
+    jsr emit_debug_sidecar_or_fail
     bcc save_ok
     lda #<msg_save_fail
     ldy #>msg_save_fail
     jmp fail_with_ptr
 
 save_ok:
+    jsr queue_alink_successor
+    bcc :+
+    lda #<msg_chain_fail
+    ldy #>msg_chain_fail
+    jmp fail_with_ptr
+:
     lda #$00
     sta svc_retptr
     sta svc_retptr+1
@@ -461,6 +479,66 @@ init_module_name_default_loop:
     iny
     bne init_module_name_default_loop
 init_module_name_done:
+    rts
+
+detect_alink_chain_mode:
+    lda #ALINK_CHAIN_NONE
+    sta alink_chain_mode
+    ldx #svc_retptr
+    jsr alink_svc_program_get_cmdline_len
+    lda svc_retptr
+    ora svc_retptr+1
+    beq detect_alink_chain_mode_done
+    ldx #svc_retptr
+    jsr alink_svc_program_get_cmdline_ptr
+    lda svc_retptr
+    sta src_ptr
+    lda svc_retptr+1
+    sta src_ptr+1
+    ldy #$00
+detect_alink_chain_mode_scan:
+    lda (src_ptr),y
+    beq detect_alink_chain_mode_done
+    cmp #':'
+    beq detect_alink_chain_mode_debug
+    iny
+    bne detect_alink_chain_mode_scan
+detect_alink_chain_mode_debug:
+    lda #ALINK_CHAIN_DEBUG
+    sta alink_chain_mode
+detect_alink_chain_mode_done:
+    rts
+
+queue_alink_successor:
+    lda alink_chain_mode
+    beq queue_alink_successor_done
+    ldy #$00
+queue_alink_successor_prefix:
+    lda actdbg_command_prefix,y
+    beq queue_alink_successor_module_begin
+    sta target_path,y
+    iny
+    bne queue_alink_successor_prefix
+queue_alink_successor_module_begin:
+    ldx #$00
+queue_alink_successor_module:
+    lda module_name,x
+    beq queue_alink_successor_terminate
+    sta target_path,y
+    iny
+    inx
+    bne queue_alink_successor_module
+queue_alink_successor_terminate:
+    lda #$00
+    sta target_path,y
+    lda #<target_path
+    sta svc_retptr
+    lda #>target_path
+    sta svc_retptr+1
+    ldx #svc_retptr
+    jmp svc_program_chain_sc0
+queue_alink_successor_done:
+    clc
     rts
 
 skip_cmdline_spaces:
@@ -3327,11 +3405,17 @@ parse_body_ops_loop:
     ldy #$00
 parse_body_ops_string_loop:
     lda (scan_ptr),y
-    beq parse_body_ops_string_done_branch
+    bne :+
+    jmp parse_body_ops_string_done
+:
     cmp #10
-    beq parse_body_ops_string_done_branch
+    bne :+
+    jmp parse_body_ops_string_done
+:
     cmp #13
-    beq parse_body_ops_string_done_branch
+    bne :+
+    jmp parse_body_ops_string_done
+:
     cmp #'c'
     beq parse_body_ops_store_branch
     cmp #'u'
@@ -3349,6 +3433,10 @@ parse_body_ops_string_loop:
     cmp #'a'
     beq parse_body_ops_store_branch
     cmp #'m'
+    beq parse_body_ops_store_branch
+    cmp #'*'
+    beq parse_body_ops_store_branch
+    cmp #'/'
     beq parse_body_ops_store_branch
     cmp #'q'
     beq parse_body_ops_store_branch
@@ -3949,6 +4037,10 @@ build_live_set_check_single_ops:
     beq build_live_set_single_branch
     cmp #'m'
     beq build_live_set_single_branch
+    cmp #'*'
+    beq build_live_set_single_branch
+    cmp #'/'
+    beq build_live_set_single_branch
     cmp #'q'
     beq build_live_set_single_branch
     cmp #'n'
@@ -4147,6 +4239,7 @@ advance_scan_ptr_by_const_ptr_done:
     rts
 
 .include "direct_prg.inc"
+.include "debug_sidecar.inc"
 
 
 append_payload_byte:
@@ -4273,11 +4366,7 @@ copy_target_path_to_binary_target_path_done:
 save_source_buffer_to_target:
     lda #$C2
     sta binary_target_path+16
-    sta $03F0
     lda #$00
-    sta $03F1
-    sta $03F2
-    sta $03F3
     jsr flush_output_stream_or_fail
     jsr close_output_stream
     bcc save_source_buffer_to_target_ok
@@ -4638,7 +4727,8 @@ snapshot_bad_object_target_loop:
 
 print_line_ptr:
     jsr print_ptr
-    jmp svc_console_newline
+    lda #13
+    jmp CHROUT
 
 fail_with_ptr:
     sta svc_retptr
@@ -4692,8 +4782,15 @@ fail_with_ptr_snapshot_meta:
 print_ptr:
     sta svc_retptr
     sty svc_retptr+1
-    ldx #svc_retptr
-    jmp svc_console_write_sc0
+    ldy #$00
+print_ptr_loop:
+    lda (svc_retptr),y
+    beq print_ptr_done
+    jsr CHROUT
+    iny
+    bne print_ptr_loop
+print_ptr_done:
+    rts
 
 msg_bad_name:
     .asciiz "BAD NAME"
@@ -4709,6 +4806,8 @@ msg_load_fail:
     .asciiz "LOAD FAIL"
 msg_save_fail:
     .asciiz "SAVE FAIL"
+msg_chain_fail:
+    .asciiz "CHAIN FAIL"
 msg_bad_object:
     .asciiz "BAD OBJECT"
 msg_too_large:
@@ -4721,6 +4820,9 @@ msg_updated:
     .asciiz "UPDATED"
 msg_ok:
     .asciiz "ALINK OK"
+
+actdbg_command_prefix:
+    .asciiz "ACTDBG "
 
 default_module_name:
     .asciiz "MAIN"
@@ -4751,6 +4853,8 @@ bit_masks:
 
 module_name:
     .res 25
+alink_chain_mode:
+    .res 1
 target_path_pad:
     .res $0000
 target_path:
@@ -4810,8 +4914,6 @@ source_window_end_ptr:
 source_window_valid:
     .res 1
 alink_source_direct_cached:
-    .res 1
-direct_candidate_index:
     .res 1
 prg_build_strategy:
     .res 1
@@ -4895,8 +4997,6 @@ pending_name_window:
     .res PENDING_NAME_BYTES
 pending_meta_window:
     .res PENDING_META_BYTES
-external_print_string_ptr:
-    .res 2
 linked_store_value:
     .res 1
 linked_store_value_hi:
@@ -4980,6 +5080,8 @@ linked_runtime_result_arg_count:
 linked_runtime_result_loaded:
     .res 1
 linked_runtime_result_store_ordinal:
+    .res 1
+linked_runtime_result_nested:
     .res 1
 linked_runtime_store_count:
     .res 1

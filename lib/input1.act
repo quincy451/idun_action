@@ -29,3 +29,6 @@ BYTE FUNC MouseY()
 BYTE FUNC MouseBtn()
 BYTE FUNC MouseBtn1()
 BYTE FUNC MouseBtn2()
+
+; End declaration-only binding scope before returning to the including source.
+MODULE

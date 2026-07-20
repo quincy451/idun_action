@@ -135,14 +135,11 @@ collect_proc_body_ops_overlay_after_space_check:
     ldy symbol_end_y_local
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    beq collect_proc_body_ops_overlay_local_skip_line
-    cmp #10
-    beq collect_proc_body_ops_overlay_local_skip_line
-    cmp #13
-    beq collect_proc_body_ops_overlay_local_skip_line
-    cmp #'='
-    beq :+
+    jsr match_line_end_local
+    bcc collect_proc_body_ops_overlay_local_skip_line
+    lda #'='
+    jsr match_scan_char_local
+    bcc :+
     jmp collect_proc_body_ops_overlay_bad_var
 :   jmp collect_proc_body_ops_overlay_local_after_equals
 collect_proc_body_ops_overlay_local_skip_line:
@@ -155,20 +152,20 @@ collect_proc_body_ops_overlay_local_after_equals:
     bcc :+
     jmp collect_proc_body_ops_overlay_bad_var
 :   ldy symbol_end_y_local
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #'='
+    jsr consume_scan_char_local
     bcc :+
     jmp collect_proc_body_ops_overlay_bad_literal
 :   lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #'['
-    beq collect_proc_body_ops_overlay_try_local_int_group
+    lda #'['
+    jsr match_scan_char_local
+    bcc collect_proc_body_ops_overlay_try_local_int_group
     jmp collect_proc_body_ops_overlay_try_local_int_parse_value
 
 collect_proc_body_ops_overlay_try_local_int_group:
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #'['
+    jsr consume_scan_char_local
     bcc :+
     jmp collect_proc_body_ops_overlay_bad_literal
 :   lda #ACTC_OVERLAY_CTX_EMIT_RUNTIME_VALUE_FN_LO
@@ -177,12 +174,12 @@ collect_proc_body_ops_overlay_try_local_int_group:
     jmp collect_proc_body_ops_overlay_bad_literal
 :   lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #']'
-    beq :+
+    lda #']'
+    jsr match_scan_char_local
+    bcc :+
     jmp collect_proc_body_ops_overlay_bad_literal
-:   lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+:   lda #']'
+    jsr consume_scan_char_local
     bcc collect_proc_body_ops_overlay_try_local_int_after_value
     jmp collect_proc_body_ops_overlay_bad_literal
 
@@ -199,8 +196,7 @@ collect_proc_body_ops_overlay_try_local_int_after_value:
     jmp collect_proc_body_ops_overlay_bad_literal
 :   lda #ACTC_OVERLAY_CTX_ASSIGNMENT_TARGET_INDEX_PTR_LO
     jsr load_x_from_context_byte_ptr
-    lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_FN_LO
-    jsr load_context_function_ptr
+    jsr load_append_body_op_ptr
     lda #'S'
     jsr call_loaded_target_with_a
     jmp collect_proc_body_ops_overlay_skip_line
@@ -212,13 +208,11 @@ collect_proc_body_ops_overlay_try_od:
     bcs collect_proc_body_ops_overlay_try_until
     jsr pop_loop_kind_local_or_fail
     beq :+
-    lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_NO_ARG_FN_LO
-    jsr load_context_function_ptr
+    jsr load_append_body_op_no_arg_ptr
     lda #'x'
     jsr call_loaded_target_with_a
     jmp collect_proc_body_ops_overlay_skip_line
-:   lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_NO_ARG_FN_LO
-    jsr load_context_function_ptr
+:   jsr load_append_body_op_no_arg_ptr
     lda #'o'
     jsr call_loaded_target_with_a
     jmp collect_proc_body_ops_overlay_skip_line
@@ -230,7 +224,7 @@ collect_proc_body_ops_overlay_try_until:
     bcs collect_proc_body_ops_overlay_try_do
     lda #<pattern_until
     ldy #>pattern_until
-    jsr advance_scan_ptr_by_local_pattern
+    jsr source_reader_consume_local_pattern
     lda #'t'
     jsr store_runtime_condition_with_a_local_or_fail
     bcs :+
@@ -244,13 +238,12 @@ collect_proc_body_ops_overlay_try_do:
     bcs collect_proc_body_ops_overlay_try_do_keyword
     lda #$01
     jsr push_loop_kind_local_or_fail
-    lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_NO_ARG_FN_LO
-    jsr load_context_function_ptr
+    jsr load_append_body_op_no_arg_ptr
     lda #'d'
     jsr call_loaded_target_with_a
     lda #<pattern_while
     ldy #>pattern_while
-    jsr advance_scan_ptr_by_local_pattern
+    jsr source_reader_consume_local_pattern
     lda #'f'
     jsr store_runtime_condition_with_a_local_or_fail
     bcs :+
@@ -264,8 +257,7 @@ collect_proc_body_ops_overlay_try_do_keyword:
     bcs collect_proc_body_ops_overlay_try_endif
     lda #$00
     jsr push_loop_kind_local_or_fail
-    lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_NO_ARG_FN_LO
-    jsr load_context_function_ptr
+    jsr load_append_body_op_no_arg_ptr
     lda #'d'
     jsr call_loaded_target_with_a
     jmp collect_proc_body_ops_overlay_skip_line
@@ -275,8 +267,7 @@ collect_proc_body_ops_overlay_try_endif:
     ldy #>pattern_endif
     jsr pattern_matches_local_scan_ptr_keyword
     bcs collect_proc_body_ops_overlay_try_fi
-    lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_NO_ARG_FN_LO
-    jsr load_context_function_ptr
+    jsr load_append_body_op_no_arg_ptr
     lda #'v'
     jsr call_loaded_target_with_a
     jmp collect_proc_body_ops_overlay_skip_line
@@ -286,8 +277,7 @@ collect_proc_body_ops_overlay_try_fi:
     ldy #>pattern_fi
     jsr pattern_matches_local_scan_ptr_keyword
     bcs collect_proc_body_ops_overlay_try_else
-    lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_NO_ARG_FN_LO
-    jsr load_context_function_ptr
+    jsr load_append_body_op_no_arg_ptr
     lda #'v'
     jsr call_loaded_target_with_a
     jmp collect_proc_body_ops_overlay_skip_line
@@ -297,8 +287,7 @@ collect_proc_body_ops_overlay_try_else:
     ldy #>pattern_else
     jsr pattern_matches_local_scan_ptr_keyword
     bcs collect_proc_body_ops_overlay_try_if
-    lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_NO_ARG_FN_LO
-    jsr load_context_function_ptr
+    jsr load_append_body_op_no_arg_ptr
     lda #'w'
     jsr call_loaded_target_with_a
     jmp collect_proc_body_ops_overlay_skip_line
@@ -310,7 +299,7 @@ collect_proc_body_ops_overlay_try_if:
     bcs collect_proc_body_ops_overlay_try_print_quote
     lda #<pattern_if
     ldy #>pattern_if
-    jsr advance_scan_ptr_by_local_pattern
+    jsr source_reader_consume_local_pattern
     lda #'h'
     jsr store_runtime_condition_with_a_local_or_fail
     bcs :+
@@ -324,14 +313,13 @@ collect_proc_body_ops_overlay_try_print_quote:
     bcs collect_proc_body_ops_overlay_try_printe
     lda #<pattern_print_quote
     ldy #>pattern_print_quote
-    jsr advance_scan_ptr_by_local_pattern
+    jsr source_reader_consume_local_pattern
     lda #ACTC_OVERLAY_CTX_STORE_STRING_LITERAL_FN_LO
     jsr call_context_function
     bcc :+
     jmp collect_proc_body_ops_overlay_bad_literal
 :
-    lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_FN_LO
-    jsr load_context_function_ptr
+    jsr load_append_body_op_ptr
     lda #'s'
     jsr call_loaded_target_with_a
     jmp collect_proc_body_ops_overlay_skip_line
@@ -343,14 +331,13 @@ collect_proc_body_ops_overlay_try_printe:
     bcs collect_proc_body_ops_overlay_try_printre
     lda #<pattern_printe_quote
     ldy #>pattern_printe_quote
-    jsr advance_scan_ptr_by_local_pattern
+    jsr source_reader_consume_local_pattern
     lda #ACTC_OVERLAY_CTX_STORE_STRING_LITERAL_FN_LO
     jsr call_context_function
     bcc :+
     jmp collect_proc_body_ops_overlay_bad_literal
 :
-    lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_FN_LO
-    jsr load_context_function_ptr
+    jsr load_append_body_op_ptr
     lda #'e'
     jsr call_loaded_target_with_a
     jmp collect_proc_body_ops_overlay_skip_line
@@ -362,7 +349,7 @@ collect_proc_body_ops_overlay_try_printre:
     bcs collect_proc_body_ops_overlay_try_printr
     lda #<pattern_printre
     ldy #>pattern_printre
-    jsr advance_scan_ptr_by_local_pattern
+    jsr source_reader_consume_local_pattern
     lda #$01
     jsr store_runtime_real_print_with_newline_flag_local_or_fail
     bcs :+
@@ -377,7 +364,7 @@ collect_proc_body_ops_overlay_try_printr:
     bcs collect_proc_body_ops_overlay_try_printie
     lda #<pattern_printr
     ldy #>pattern_printr
-    jsr advance_scan_ptr_by_local_pattern
+    jsr source_reader_consume_local_pattern
     lda #$00
     jsr store_runtime_real_print_with_newline_flag_local_or_fail
     bcs :+
@@ -392,7 +379,7 @@ collect_proc_body_ops_overlay_try_printie:
     bcs collect_proc_body_ops_overlay_try_printi
     lda #<pattern_printie
     ldy #>pattern_printie
-    jsr advance_scan_ptr_by_local_pattern
+    jsr source_reader_consume_local_pattern
     lda #ACTC_OVERLAY_CTX_STORE_SMALL_DECIMAL_LITERAL_FN_LO
     jsr call_context_function
     bcc :+
@@ -400,8 +387,7 @@ collect_proc_body_ops_overlay_try_printie:
     jsr store_runtime_expr_with_a_local_or_fail
     bcs :++
     jmp collect_proc_body_ops_overlay_skip_line
-:   lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_FN_LO
-    jsr load_context_function_ptr
+:   jsr load_append_body_op_ptr
     lda #'i'
     jsr call_loaded_target_with_a
     jmp collect_proc_body_ops_overlay_skip_line
@@ -414,7 +400,7 @@ collect_proc_body_ops_overlay_try_printi:
     bcs collect_proc_body_ops_overlay_try_return
     lda #<pattern_printi
     ldy #>pattern_printi
-    jsr advance_scan_ptr_by_local_pattern
+    jsr source_reader_consume_local_pattern
     lda #ACTC_OVERLAY_CTX_STORE_SMALL_DECIMAL_LITERAL_FN_LO
     jsr call_context_function
     bcc :+
@@ -422,8 +408,7 @@ collect_proc_body_ops_overlay_try_printi:
     jsr store_runtime_expr_with_a_local_or_fail
     bcs :++
     jmp collect_proc_body_ops_overlay_skip_line
-:   lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_FN_LO
-    jsr load_context_function_ptr
+:   jsr load_append_body_op_ptr
     lda #'j'
     jsr call_loaded_target_with_a
     jmp collect_proc_body_ops_overlay_skip_line
@@ -436,16 +421,12 @@ collect_proc_body_ops_overlay_try_return:
     bcs collect_proc_body_ops_overlay_try_assignment
     lda #<pattern_return
     ldy #>pattern_return
-    jsr advance_scan_ptr_by_local_pattern
+    jsr source_reader_consume_local_pattern
     ldy #$00
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    beq collect_proc_body_ops_overlay_try_return_emit
-    cmp #10
-    beq collect_proc_body_ops_overlay_try_return_emit
-    cmp #13
-    beq collect_proc_body_ops_overlay_try_return_emit
+    jsr match_line_end_local
+    bcc collect_proc_body_ops_overlay_try_return_emit
     lda #ACTC_OVERLAY_CTX_EMIT_RUNTIME_VALUE_FN_LO
     jsr call_context_function
     bcc :+
@@ -455,8 +436,7 @@ collect_proc_body_ops_overlay_try_return:
     bcc collect_proc_body_ops_overlay_try_return_emit
     jmp collect_proc_body_ops_overlay_bad_literal
 collect_proc_body_ops_overlay_try_return_emit:
-    lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_NO_ARG_FN_LO
-    jsr load_context_function_ptr
+    jsr load_append_body_op_no_arg_ptr
     lda #'r'
     jsr call_loaded_target_with_a
     jmp collect_proc_body_ops_overlay_skip_line
@@ -470,9 +450,9 @@ collect_proc_body_ops_overlay_try_assignment:
     ldy symbol_end_y_local
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #'='
-    beq :+
+    lda #'='
+    jsr match_scan_char_local
+    bcc :+
     jmp collect_proc_body_ops_overlay_try_local_call
 :
     sty symbol_end_y_local
@@ -497,8 +477,8 @@ collect_proc_body_ops_overlay_try_assignment:
 
 collect_proc_body_ops_overlay_try_assignment_word:
     ldy symbol_end_y_local
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #'='
+    jsr consume_scan_char_local
     bcc :+
     jmp collect_proc_body_ops_overlay_bad_literal
 :   lda #ACTC_OVERLAY_CTX_EMIT_RUNTIME_VALUE_FN_LO
@@ -512,16 +492,15 @@ collect_proc_body_ops_overlay_try_assignment_word_require_line_end:
     jmp collect_proc_body_ops_overlay_bad_literal
 :   lda #ACTC_OVERLAY_CTX_ASSIGNMENT_TARGET_INDEX_PTR_LO
     jsr load_x_from_context_byte_ptr
-    lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_FN_LO
-    jsr load_context_function_ptr
+    jsr load_append_body_op_ptr
     lda #'S'
     jsr call_loaded_target_with_a
     jmp collect_proc_body_ops_overlay_skip_line
 
 collect_proc_body_ops_overlay_try_assignment_real:
     ldy symbol_end_y_local
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #'='
+    jsr consume_scan_char_local
     bcc :+
     jmp collect_proc_body_ops_overlay_bad_literal
 :   jsr emit_real_assignment_local_or_fail
@@ -530,9 +509,9 @@ collect_proc_body_ops_overlay_try_assignment_real:
 
 collect_proc_body_ops_overlay_try_local_call:
     ldy symbol_end_y_local
-    jsr read_scan_char_at_y
-    cmp #'('
-    bne collect_proc_body_ops_overlay_skip_line
+    lda #'('
+    jsr match_scan_char_local
+    bcs collect_proc_body_ops_overlay_skip_line
     lda #ACTC_OVERLAY_CTX_RESOLVE_CALL_TARGET_FN_LO
     jsr call_context_function
     bcc collect_proc_body_ops_overlay_call_resolved
@@ -548,8 +527,7 @@ collect_proc_body_ops_overlay_call_resolved:
     pha
     lda #ACTC_OVERLAY_CTX_CALL_TARGET_INDEX_PTR_LO
     jsr load_x_from_context_byte_ptr
-    lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_FN_LO
-    jsr load_context_function_ptr
+    jsr load_append_body_op_ptr
     pla
     jsr call_loaded_target_with_a
 
@@ -561,7 +539,7 @@ collect_proc_body_ops_overlay_skip_line:
 collect_proc_body_ops_overlay_proc_decl:
     lda #<pattern_proc
     ldy #>pattern_proc
-    jsr advance_scan_ptr_by_local_pattern
+    jsr source_reader_consume_local_pattern
     lda #ACTC_OVERLAY_CTX_SKIP_SOURCE_SPACES_FN_LO
     jsr call_context_function
     lda #ACTC_OVERLAY_CTX_COPY_SYMBOL_FROM_SCAN_PTR_FN_LO
@@ -642,6 +620,61 @@ read_scan_char_at_y:
     plp
     rts
 
+match_scan_char_local:
+    sta stored_byte_local
+    jsr read_scan_char_at_y
+    cmp stored_byte_local
+    bne match_scan_char_local_fail
+    clc
+    rts
+match_scan_char_local_fail:
+    sec
+    rts
+
+match_line_end_local:
+    lda #$00
+    jsr match_scan_char_local
+    bcc match_line_end_local_ok
+    lda #10
+    jsr match_scan_char_local
+    bcc match_line_end_local_ok
+    lda #13
+    jsr match_scan_char_local
+    bcc match_line_end_local_ok
+    sec
+    rts
+match_line_end_local_ok:
+    clc
+    rts
+
+peek_decimal_digit_value_local:
+    jsr read_scan_char_at_y
+    cmp #'0'
+    bcc peek_decimal_digit_value_local_fail
+    cmp #'9'+1
+    bcs peek_decimal_digit_value_local_fail
+    sec
+    sbc #'0'
+    clc
+    rts
+peek_decimal_digit_value_local_fail:
+    sec
+    rts
+
+consume_scan_char_local:
+    sta stored_byte_local
+    jsr read_scan_char_at_y
+    cmp stored_byte_local
+    bne consume_scan_char_local_fail
+    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
+    jsr call_context_function
+    bcs consume_scan_char_local_fail
+    clc
+    rts
+consume_scan_char_local_fail:
+    sec
+    rts
+
 consume_uppercase_char_local:
     sta stored_byte_local
     jsr read_scan_char_at_y
@@ -711,8 +744,7 @@ emit_current_proc_param_binds_local_loop:
     sec
     sbc #$01
     tax
-    lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_FN_LO
-    jsr load_context_function_ptr
+    jsr load_append_body_op_ptr
     lda #'S'
     jsr call_loaded_target_with_a
     dec param_bind_count_local
@@ -723,14 +755,12 @@ emit_current_proc_param_binds_local_done:
 emit_real_assignment_local_or_fail:
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #'('
-    bne :+
+    lda #'('
+    jsr match_scan_char_local
+    bcs :+
     jmp emit_real_small_int_assignment_local_or_fail
 :
-    cmp #'0'
-    bcc :+
-    cmp #'9'+1
+    jsr peek_decimal_digit_value_local
     bcs :+
     jmp emit_real_small_int_assignment_local_or_fail
 :
@@ -779,23 +809,26 @@ emit_real_assignment_local_after_copy_check:
     lda #ACTC_OVERLAY_CTX_REQUIRE_REAL_VAR_FN_LO
     jsr call_indexed_context_function
     bcs emit_real_assignment_local_after_copy_check_fail
-    jsr read_scan_char_at_y
-    cmp #'+'
-    beq :+
-    cmp #'-'
-    beq :+
-    cmp #'*'
-    beq :+
-    cmp #'/'
-    beq :+
+    lda #'+'
+    jsr match_scan_char_local
+    bcc :+
+    lda #'-'
+    jsr match_scan_char_local
+    bcc :+
+    lda #'*'
+    jsr match_scan_char_local
+    bcc :+
+    lda #'/'
+    jsr match_scan_char_local
+    bcc :+
     sec
     rts
 emit_real_assignment_local_after_copy_check_fail:
     sec
     rts
 :   sta real_operator_local
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda real_operator_local
+    jsr consume_scan_char_local
     bcs emit_real_assignment_local_after_copy_check_fail
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
@@ -814,8 +847,7 @@ emit_real_assignment_local_after_copy_check_fail:
     lda #ACTC_OVERLAY_CTX_REQUIRE_LINE_END_FN_LO
     jsr call_context_function
     bcs emit_real_assignment_local_after_copy_check_fail
-    lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_FN_LO
-    jsr load_context_function_ptr
+    jsr load_append_body_op_ptr
     ldx real_lhs_index_local
     lda #'L'
     jsr call_loaded_target_with_a
@@ -833,8 +865,7 @@ emit_real_assignment_local_after_copy_check_fail:
     lda real_operator_local
     jsr call_loaded_target_with_a
     bcs emit_real_assignment_local_after_copy_check_fail
-    lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_FN_LO
-    jsr load_context_function_ptr
+    jsr load_append_body_op_ptr
     lda #'u'
     jsr call_loaded_target_with_a
     lda #ACTC_OVERLAY_CTX_ASSIGNMENT_TARGET_INDEX_PTR_LO
@@ -863,19 +894,18 @@ emit_real_fabs_assignment_local_or_fail:
     ldy symbol_end_y_local
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #')'
-    bne emit_real_fabs_assignment_local_or_fail_fail
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #')'
+    jsr match_scan_char_local
+    bcs emit_real_fabs_assignment_local_or_fail_fail
+    lda #')'
+    jsr consume_scan_char_local
     bcs emit_real_fabs_assignment_local_or_fail_fail
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
     lda #ACTC_OVERLAY_CTX_REQUIRE_LINE_END_FN_LO
     jsr call_context_function
     bcs emit_real_fabs_assignment_local_or_fail_fail
-    lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_FN_LO
-    jsr load_context_function_ptr
+    jsr load_append_body_op_ptr
     ldx real_lhs_index_local
     lda #'L'
     jsr call_loaded_target_with_a
@@ -888,8 +918,7 @@ emit_real_fabs_assignment_local_or_fail:
     jsr call_loaded_target_with_a
     bcs emit_real_fabs_assignment_local_or_fail_fail
     stx real_rhs_index_local
-    lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_FN_LO
-    jsr load_context_function_ptr
+    jsr load_append_body_op_ptr
     ldx real_rhs_index_local
     lda #'u'
     jsr call_loaded_target_with_a
@@ -908,8 +937,7 @@ emit_real_fabs_assignment_local_or_fail_fail:
     rts
 
 emit_real_copy_assignment_local_ok:
-    lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_FN_LO
-    jsr load_context_function_ptr
+    jsr load_append_body_op_ptr
     ldx real_lhs_index_local
     lda #'L'
     jsr call_loaded_target_with_a
@@ -928,8 +956,7 @@ emit_real_copy_assignment_local_ok:
     rts
 
 emit_real_bridge_assignment_local_ok:
-    lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_FN_LO
-    jsr load_context_function_ptr
+    jsr load_append_body_op_ptr
     ldx real_lhs_index_local
     lda #'L'
     jsr call_loaded_target_with_a
@@ -939,8 +966,7 @@ emit_real_bridge_assignment_local_ok:
     bcc :+
     sec
     rts
-:   lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_FN_LO
-    jsr load_context_function_ptr
+:   jsr load_append_body_op_ptr
     lda #'u'
     jsr call_loaded_target_with_a
     lda #ACTC_OVERLAY_CTX_ASSIGNMENT_TARGET_INDEX_PTR_LO
@@ -998,17 +1024,16 @@ emit_runtime_int_explicit_value_after_open_local_or_fail:
     ldy symbol_end_y_local
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #')'
-    bne emit_runtime_int_explicit_value_after_open_local_or_fail_fail
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #')'
+    jsr match_scan_char_local
+    bcs emit_runtime_int_explicit_value_after_open_local_or_fail_fail
+    lda #')'
+    jsr consume_scan_char_local
     bcs emit_runtime_int_explicit_value_after_open_local_or_fail_fail
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
     sty symbol_end_y_local
-    lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_FN_LO
-    jsr load_context_function_ptr
+    jsr load_append_body_op_ptr
     ldx real_lhs_index_local
     lda #'L'
     jsr call_loaded_target_with_a
@@ -1019,8 +1044,7 @@ emit_runtime_int_explicit_value_after_open_local_or_fail:
     jsr call_context_function
     bcs emit_runtime_int_explicit_value_after_open_local_or_fail_fail
     stx real_rhs_index_local
-    lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_FN_LO
-    jsr load_context_function_ptr
+    jsr load_append_body_op_ptr
     ldx real_rhs_index_local
     lda #'u'
     jsr call_loaded_target_with_a
@@ -1097,11 +1121,11 @@ emit_real_explicit_bridge_assignment_local_or_fail:
     ldy symbol_end_y_local
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #')'
-    bne emit_real_explicit_bridge_assignment_local_or_fail_fail
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #')'
+    jsr match_scan_char_local
+    bcs emit_real_explicit_bridge_assignment_local_or_fail_fail
+    lda #')'
+    jsr consume_scan_char_local
     bcs emit_real_explicit_bridge_assignment_local_or_fail_fail
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
@@ -1130,13 +1154,13 @@ emit_real_explicit_value_local_or_fail:
 :
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #')'
-    beq :+
+    lda #')'
+    jsr match_scan_char_local
+    bcc :+
     jmp emit_real_explicit_value_local_or_fail_wide
 :
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #')'
+    jsr consume_scan_char_local
     bcc :+
     jmp emit_real_explicit_value_local_or_fail_wide
 :
@@ -1201,13 +1225,13 @@ emit_real_explicit_value_local_or_fail_wide:
     bcs emit_real_explicit_value_local_or_fail_signed_prep
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #')'
-    beq :+
+    lda #')'
+    jsr match_scan_char_local
+    bcc :+
     jmp emit_real_explicit_value_local_or_fail_signed_prep
 :
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #')'
+    jsr consume_scan_char_local
     bcc :+
     jmp emit_real_explicit_value_local_or_fail_signed_prep
 :
@@ -1261,25 +1285,25 @@ emit_real_explicit_value_local_or_fail_signed_prep:
     ldy symbol_start_y_local
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #'0'
-    beq :+
+    lda #'0'
+    jsr match_scan_char_local
+    bcc :+
     jmp emit_real_explicit_value_local_or_fail_fail
 :
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #'0'
+    jsr consume_scan_char_local
     bcc :+
     jmp emit_real_explicit_value_local_or_fail_fail
 :
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #'-'
-    beq :+
+    lda #'-'
+    jsr match_scan_char_local
+    bcc :+
     jmp emit_real_explicit_value_local_or_fail_fail
 :
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #'-'
+    jsr consume_scan_char_local
     bcc :+
     jmp emit_real_explicit_value_local_or_fail_fail
 :
@@ -1289,13 +1313,13 @@ emit_real_explicit_value_local_or_fail_signed_prep:
 :
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #')'
-    beq :+
+    lda #')'
+    jsr match_scan_char_local
+    bcc :+
     jmp emit_real_explicit_value_local_or_fail_fail
 :
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #')'
+    jsr consume_scan_char_local
     bcs emit_real_explicit_value_local_or_fail_fail
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
@@ -1327,8 +1351,7 @@ emit_real_explicit_value_local_or_fail_signed_prep:
     stx real_lhs_index_local
 
 emit_real_explicit_value_local_finish:
-    lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_FN_LO
-    jsr load_context_function_ptr
+    jsr load_append_body_op_ptr
     ldx real_rhs_index_local
     lda #'p'
     jsr call_loaded_target_with_a
@@ -1350,358 +1373,10 @@ emit_real_explicit_value_local_or_fail_fail:
     sec
     rts
 
-store_positive_word_value_local_to_expr_value:
-    tya
-    pha
-    lda #ACTC_OVERLAY_CTX_EXPR_VALUE_PTR_LO
-    jsr load_context_ptr_to_work_zp
-    ldy #$00
-    lda positive_word_value_lo
-    sta (ACTC_OVERLAY_WORK_ZP),y
-    iny
-    lda positive_word_value_hi
-    sta (ACTC_OVERLAY_WORK_ZP),y
-    pla
-    tay
-    clc
-    rts
-
-parse_positive_word_sum_local_or_fail:
-.if ACTC_KEEP_BODY_RESIDENT_FALLBACK
-    lda #ACTC_OVERLAY_CTX_PARSE_POSITIVE_WORD_SUM_FN_LO
-    jsr call_context_function
-    rts
-.else
-    jsr parse_positive_word_term_local_or_fail
-    bcc :+
-    sec
-    rts
-:   lda positive_word_value_lo
-    sta positive_word_sum_lo
-    lda positive_word_value_hi
-    sta positive_word_sum_hi
-parse_positive_word_sum_local_loop:
-    lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
-    jsr call_context_function
-    jsr read_scan_char_at_y
-    beq parse_positive_word_sum_local_done
-    cmp #10
-    beq parse_positive_word_sum_local_done
-    cmp #13
-    beq parse_positive_word_sum_local_done
-    cmp #','
-    beq parse_positive_word_sum_local_done
-    cmp #')'
-    beq parse_positive_word_sum_local_done
-    cmp #']'
-    beq parse_positive_word_sum_local_done
-    cmp #'='
-    beq parse_positive_word_sum_local_done
-    cmp #'<'
-    beq parse_positive_word_sum_local_done
-    cmp #'>'
-    beq parse_positive_word_sum_local_done
-    cmp #'+'
-    beq parse_positive_word_sum_local_add
-    cmp #'-'
-    beq parse_positive_word_sum_local_sub
-    sec
-    rts
-
-parse_positive_word_sum_local_add:
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
-    bcs parse_positive_word_sum_local_fail
-    jsr parse_positive_word_term_local_or_fail
-    bcs parse_positive_word_sum_local_fail
-    clc
-    lda positive_word_sum_lo
-    adc positive_word_value_lo
-    sta positive_word_sum_lo
-    lda positive_word_sum_hi
-    adc positive_word_value_hi
-    sta positive_word_sum_hi
-    bcc parse_positive_word_sum_local_loop
-    sec
-    rts
-
-parse_positive_word_sum_local_sub:
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
-    bcs parse_positive_word_sum_local_fail
-    jsr parse_positive_word_term_local_or_fail
-    bcs parse_positive_word_sum_local_fail
-    lda positive_word_sum_lo
-    sec
-    sbc positive_word_value_lo
-    sta positive_word_sum_lo
-    lda positive_word_sum_hi
-    sbc positive_word_value_hi
-    sta positive_word_sum_hi
-    bcs parse_positive_word_sum_local_loop
-parse_positive_word_sum_local_fail:
-    sec
-    rts
-
-parse_positive_word_sum_local_done:
-    lda positive_word_sum_lo
-    sta positive_word_value_lo
-    lda positive_word_sum_hi
-    sta positive_word_value_hi
-    jmp store_positive_word_value_local_to_expr_value
-.endif
-parse_positive_word_term_local_or_fail:
-    jsr parse_positive_word_factor_local_or_fail
-    bcc :+
-    jmp parse_positive_word_term_local_fail
-:   lda positive_word_value_lo
-    sta positive_word_term_lo
-    lda positive_word_value_hi
-    sta positive_word_term_hi
-parse_positive_word_term_local_loop:
-    lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
-    jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #'*'
-    beq parse_positive_word_term_local_mul
-    cmp #'/'
-    beq parse_positive_word_term_local_div
-    lda positive_word_term_lo
-    sta positive_word_value_lo
-    lda positive_word_term_hi
-    sta positive_word_value_hi
-    clc
-    rts
-
-parse_positive_word_term_local_mul:
-    lda positive_word_term_lo
-    sta positive_word_term_saved_lo
-    lda positive_word_term_hi
-    sta positive_word_term_saved_hi
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
-    bcc :+
-    jmp parse_positive_word_term_local_fail
-:   jsr parse_positive_word_factor_local_or_fail
-    bcc :+
-    jmp parse_positive_word_term_local_fail
-:   lda positive_word_value_lo
-    sta positive_word_temp_lo
-    lda positive_word_value_hi
-    sta positive_word_temp_hi
-    lda #$00
-    sta positive_word_term_lo
-    sta positive_word_term_hi
-parse_positive_word_term_local_mul_loop:
-    lda positive_word_temp_lo
-    ora positive_word_temp_hi
-    beq parse_positive_word_term_local_loop
-    clc
-    lda positive_word_term_lo
-    adc positive_word_term_saved_lo
-    sta positive_word_term_lo
-    lda positive_word_term_hi
-    adc positive_word_term_saved_hi
-    sta positive_word_term_hi
-    bcs parse_positive_word_term_local_fail
-    lda positive_word_temp_lo
-    sec
-    sbc #$01
-    sta positive_word_temp_lo
-    lda positive_word_temp_hi
-    sbc #$00
-    sta positive_word_temp_hi
-    jmp parse_positive_word_term_local_mul_loop
-
-parse_positive_word_term_local_div:
-    lda positive_word_term_lo
-    sta positive_word_term_saved_lo
-    lda positive_word_term_hi
-    sta positive_word_term_saved_hi
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
-    bcs parse_positive_word_term_local_fail
-    jsr parse_positive_word_factor_local_or_fail
-    bcs parse_positive_word_term_local_fail
-    lda positive_word_value_lo
-    ora positive_word_value_hi
-    bne :+
-    sec
-    rts
-:   lda positive_word_value_lo
-    sta positive_word_temp_lo
-    lda positive_word_value_hi
-    sta positive_word_temp_hi
-    lda #$00
-    sta positive_word_term_lo
-    sta positive_word_term_hi
-parse_positive_word_term_local_div_loop:
-    lda positive_word_term_saved_hi
-    cmp positive_word_temp_hi
-    bcc parse_positive_word_term_local_div_done
-    bne :+
-    lda positive_word_term_saved_lo
-    cmp positive_word_temp_lo
-    bcc parse_positive_word_term_local_div_done
-:   lda positive_word_term_saved_lo
-    sec
-    sbc positive_word_temp_lo
-    sta positive_word_term_saved_lo
-    lda positive_word_term_saved_hi
-    sbc positive_word_temp_hi
-    sta positive_word_term_saved_hi
-    inc positive_word_term_lo
-    bne parse_positive_word_term_local_div_loop
-    inc positive_word_term_hi
-    bne parse_positive_word_term_local_div_loop
-parse_positive_word_term_local_div_done:
-    jmp parse_positive_word_term_local_loop
-parse_positive_word_term_local_fail:
-    sec
-    rts
-
-parse_positive_word_factor_local_or_fail:
-    lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
-    jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #'('
-    beq parse_positive_word_factor_local_group
-    lda #ACTC_OVERLAY_CTX_FIND_BUILTIN_CONSTANT_FN_LO
-    jsr call_context_function
-    bcs :+
-    lda #ACTC_OVERLAY_CTX_EXPR_VALUE_PTR_LO
-    jsr load_context_ptr_to_work_zp
-    ldy #$00
-    lda (ACTC_OVERLAY_WORK_ZP),y
-    sta positive_word_value_lo
-    iny
-    lda (ACTC_OVERLAY_WORK_ZP),y
-    sta positive_word_value_hi
-    clc
-    rts
-:
-    jmp parse_positive_word_decimal_local_or_fail
-
-parse_positive_word_factor_local_group:
-    lda positive_word_sum_lo
-    sta positive_word_outer_sum_lo
-    lda positive_word_sum_hi
-    sta positive_word_outer_sum_hi
-    lda positive_word_term_saved_lo
-    sta positive_word_outer_term_saved_lo
-    lda positive_word_term_saved_hi
-    sta positive_word_outer_term_saved_hi
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
-    bcs parse_positive_word_term_local_fail
-    jsr parse_positive_word_sum_local_or_fail
-    bcs parse_positive_word_term_local_fail
-    lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
-    jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #')'
-    beq :+
-    jmp parse_positive_word_decimal_local_or_fail_fail
-:
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
-    lda positive_word_outer_sum_lo
-    sta positive_word_sum_lo
-    lda positive_word_outer_sum_hi
-    sta positive_word_sum_hi
-    lda positive_word_outer_term_saved_lo
-    sta positive_word_term_saved_lo
-    lda positive_word_outer_term_saved_hi
-    sta positive_word_term_saved_hi
-    clc
-    rts
-
-parse_optional_grouped_positive_word_sum_local_or_fail:
-    lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
-    jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #'('
-    beq :+
-    jmp parse_positive_word_sum_local_or_fail
-:
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
-    bcs parse_optional_grouped_positive_word_sum_local_or_fail_fail
-    jsr parse_positive_word_sum_local_or_fail
-    bcs parse_optional_grouped_positive_word_sum_local_or_fail_fail
-    lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
-    jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #')'
-    bne parse_optional_grouped_positive_word_sum_local_or_fail_fail
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
-    bcs parse_optional_grouped_positive_word_sum_local_or_fail_fail
-    clc
-    rts
-parse_optional_grouped_positive_word_sum_local_or_fail_fail:
-    sec
-    rts
-
-parse_positive_word_decimal_local_or_fail:
-    lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
-    jsr call_context_function
-    lda #$00
-    sta positive_word_value_lo
-    sta positive_word_value_hi
-    sta positive_word_digit_count
-parse_positive_word_decimal_local_loop:
-    jsr read_scan_char_at_y
-    cmp #'0'
-    bcc parse_positive_word_decimal_local_done_check
-    cmp #'9'+1
-    bcs parse_positive_word_decimal_local_done_check
-    sec
-    sbc #'0'
-    sta stored_byte_local
-    lda positive_word_value_lo
-    sta positive_word_saved_lo
-    lda positive_word_value_hi
-    sta positive_word_saved_hi
-    lda #$00
-    sta positive_word_term_lo
-    sta positive_word_term_hi
-    ldx #10
-parse_positive_word_decimal_local_mul10_loop:
-    clc
-    lda positive_word_term_lo
-    adc positive_word_saved_lo
-    sta positive_word_term_lo
-    lda positive_word_term_hi
-    adc positive_word_saved_hi
-    sta positive_word_term_hi
-    bcs parse_positive_word_decimal_local_or_fail_fail
-    dex
-    bne parse_positive_word_decimal_local_mul10_loop
-    clc
-    lda positive_word_term_lo
-    adc stored_byte_local
-    sta positive_word_value_lo
-    lda positive_word_term_hi
-    adc #$00
-    sta positive_word_value_hi
-    bcs parse_positive_word_decimal_local_or_fail_fail
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
-    inc positive_word_digit_count
-    bne parse_positive_word_decimal_local_loop
-parse_positive_word_decimal_local_done_check:
-    lda positive_word_digit_count
-    beq parse_positive_word_decimal_local_or_fail_fail
-    clc
-    rts
-parse_positive_word_decimal_local_or_fail_fail:
-    sec
-    rts
+.include "actc_overlay_positive_word.inc"
 
 emit_runtime_real_push_literal_local_from_indexes:
-    lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_FN_LO
-    jsr load_context_function_ptr
+    jsr load_append_body_op_ptr
     ldx real_rhs_index_local
     lda #'p'
     jsr call_loaded_target_with_a
@@ -1713,8 +1388,7 @@ emit_runtime_real_push_literal_local_from_indexes:
     rts
 
 emit_runtime_real_wide_bridge_value_local_from_indexes:
-    lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_FN_LO
-    jsr load_context_function_ptr
+    jsr load_append_body_op_ptr
     ldx real_rhs_index_local
     lda #'p'
     jsr call_loaded_target_with_a
@@ -1740,17 +1414,16 @@ emit_runtime_real_unary_value_local_or_fail:
     ldy symbol_end_y_local
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #')'
-    bne emit_runtime_real_unary_value_local_or_fail_fail
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #')'
+    jsr match_scan_char_local
+    bcs emit_runtime_real_unary_value_local_or_fail_fail
+    lda #')'
+    jsr consume_scan_char_local
     bcs emit_runtime_real_unary_value_local_or_fail_fail
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
     sty symbol_end_y_local
-    lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_FN_LO
-    jsr load_context_function_ptr
+    jsr load_append_body_op_ptr
     ldx real_lhs_index_local
     lda #'L'
     jsr call_loaded_target_with_a
@@ -1763,8 +1436,7 @@ emit_runtime_real_unary_value_local_or_fail:
     jsr call_loaded_target_with_a
     bcs emit_runtime_real_unary_value_local_or_fail_fail
     stx real_rhs_index_local
-    lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_FN_LO
-    jsr load_context_function_ptr
+    jsr load_append_body_op_ptr
     ldx real_rhs_index_local
     lda #'u'
     jsr call_loaded_target_with_a
@@ -1799,20 +1471,23 @@ emit_runtime_real_binary_value_local_or_fail:
     ldy symbol_end_y_local
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #'+'
-    beq emit_runtime_real_binary_value_local_operator
-    cmp #'-'
-    beq emit_runtime_real_binary_value_local_operator
-    cmp #'*'
-    beq emit_runtime_real_binary_value_local_operator
-    cmp #'/'
-    beq emit_runtime_real_binary_value_local_operator
+    lda #'+'
+    jsr match_scan_char_local
+    bcc emit_runtime_real_binary_value_local_operator
+    lda #'-'
+    jsr match_scan_char_local
+    bcc emit_runtime_real_binary_value_local_operator
+    lda #'*'
+    jsr match_scan_char_local
+    bcc emit_runtime_real_binary_value_local_operator
+    lda #'/'
+    jsr match_scan_char_local
+    bcc emit_runtime_real_binary_value_local_operator
     jmp emit_runtime_real_binary_value_local_or_fail_restore
 emit_runtime_real_binary_value_local_operator:
     sta real_operator_local
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda real_operator_local
+    jsr consume_scan_char_local
     bcs emit_runtime_real_binary_value_local_or_fail_restore
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
@@ -1831,8 +1506,7 @@ emit_runtime_real_binary_value_local_operator:
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
     sty symbol_end_y_local
-    lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_FN_LO
-    jsr load_context_function_ptr
+    jsr load_append_body_op_ptr
     ldx real_lhs_index_local
     lda #'L'
     jsr call_loaded_target_with_a
@@ -1851,8 +1525,7 @@ emit_runtime_real_binary_value_local_operator:
     jsr call_loaded_target_with_a
     bcs emit_runtime_real_binary_value_local_or_fail_restore
     stx real_rhs_index_local
-    lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_FN_LO
-    jsr load_context_function_ptr
+    jsr load_append_body_op_ptr
     ldx real_rhs_index_local
     lda #'u'
     jsr call_loaded_target_with_a
@@ -1881,15 +1554,14 @@ emit_runtime_real_explicit_bridge_value_local_or_fail:
     ldy symbol_end_y_local
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #')'
-    bne emit_runtime_real_explicit_bridge_value_local_or_fail_fail
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #')'
+    jsr match_scan_char_local
+    bcs emit_runtime_real_explicit_bridge_value_local_or_fail_fail
+    lda #')'
+    jsr consume_scan_char_local
     bcs emit_runtime_real_explicit_bridge_value_local_or_fail_fail
     sty symbol_end_y_local
-    lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_FN_LO
-    jsr load_context_function_ptr
+    jsr load_append_body_op_ptr
     ldx real_lhs_index_local
     lda #'L'
     jsr call_loaded_target_with_a
@@ -1898,8 +1570,7 @@ emit_runtime_real_explicit_bridge_value_local_or_fail:
     jsr call_indexed_context_function_keep_x
     bcs emit_runtime_real_explicit_bridge_value_local_or_fail_fail
     stx real_rhs_index_local
-    lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_FN_LO
-    jsr load_context_function_ptr
+    jsr load_append_body_op_ptr
     ldx real_rhs_index_local
     lda #'u'
     jsr call_loaded_target_with_a
@@ -1929,12 +1600,12 @@ emit_runtime_real_explicit_value_after_open_local_or_fail:
     jmp emit_runtime_real_explicit_value_after_open_local_or_fail_wide
 :   lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #')'
-    beq :+
+    lda #')'
+    jsr match_scan_char_local
+    bcc :+
     jmp emit_runtime_real_explicit_value_after_open_local_or_fail_wide
-:   lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+:   lda #')'
+    jsr consume_scan_char_local
     bcc :+
     jmp emit_runtime_real_explicit_value_after_open_local_or_fail_wide
 :   lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
@@ -1989,12 +1660,12 @@ emit_runtime_real_explicit_value_after_open_local_or_fail_wide:
     bcs emit_runtime_real_explicit_value_after_open_local_or_fail_signed
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #')'
-    beq :+
+    lda #')'
+    jsr match_scan_char_local
+    bcc :+
     jmp emit_runtime_real_explicit_value_after_open_local_or_fail_signed
-:   lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+:   lda #')'
+    jsr consume_scan_char_local
     bcc :+
     jmp emit_runtime_real_explicit_value_after_open_local_or_fail_signed
 :   lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
@@ -2040,31 +1711,31 @@ emit_runtime_real_explicit_value_after_open_local_or_fail_signed:
     ldy symbol_start_y_local
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #'0'
-    beq :+
+    lda #'0'
+    jsr match_scan_char_local
+    bcc :+
     jmp emit_runtime_real_explicit_value_after_open_local_or_fail_fail
-:   lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+:   lda #'0'
+    jsr consume_scan_char_local
     bcc :+
     jmp emit_runtime_real_explicit_value_after_open_local_or_fail_fail
 :   lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #'-'
-    bne emit_runtime_real_explicit_value_after_open_local_or_fail_fail
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #'-'
+    jsr match_scan_char_local
+    bcs emit_runtime_real_explicit_value_after_open_local_or_fail_fail
+    lda #'-'
+    jsr consume_scan_char_local
     bcs emit_runtime_real_explicit_value_after_open_local_or_fail_fail
     jsr parse_optional_grouped_positive_word_sum_local_or_fail
     bcs emit_runtime_real_explicit_value_after_open_local_or_fail_fail
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #')'
-    bne emit_runtime_real_explicit_value_after_open_local_or_fail_fail
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #')'
+    jsr match_scan_char_local
+    bcs emit_runtime_real_explicit_value_after_open_local_or_fail_fail
+    lda #')'
+    jsr consume_scan_char_local
     bcs emit_runtime_real_explicit_value_after_open_local_or_fail_fail
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
@@ -2154,11 +1825,10 @@ store_runtime_expr_with_a_local_or_fail_generic:
 store_runtime_expr_with_a_local_or_fail_after_value:
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #')'
-    bne store_runtime_expr_with_a_local_or_fail_fail
-    lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_NO_ARG_FN_LO
-    jsr load_context_function_ptr
+    lda #')'
+    jsr match_scan_char_local
+    bcs store_runtime_expr_with_a_local_or_fail_fail
+    jsr load_append_body_op_no_arg_ptr
     lda runtime_print_op_local
     jsr call_loaded_target_with_a
     clc
@@ -2174,11 +1844,11 @@ store_runtime_real_print_with_newline_flag_local_or_fail:
     bcs store_runtime_real_print_with_newline_flag_local_or_fail_fail
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #')'
-    bne store_runtime_real_print_with_newline_flag_local_or_fail_fail
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #')'
+    jsr match_scan_char_local
+    bcs store_runtime_real_print_with_newline_flag_local_or_fail_fail
+    lda #')'
+    jsr consume_scan_char_local
     bcs store_runtime_real_print_with_newline_flag_local_or_fail_fail
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
@@ -2204,8 +1874,7 @@ store_runtime_real_print_with_newline_flag_local_have_flag:
     jsr call_context_function
     bcs store_runtime_real_print_with_newline_flag_local_or_fail_fail
     stx real_rhs_index_local
-    lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_FN_LO
-    jsr load_context_function_ptr
+    jsr load_append_body_op_ptr
     ldx real_lhs_index_local
     lda #'p'
     jsr call_loaded_target_with_a
@@ -2266,13 +1935,15 @@ emit_runtime_real_condition_clause_local_or_fail:
     bcc :+
     jmp emit_runtime_real_condition_clause_local_or_fail_fail
 :
-    jsr read_scan_char_at_y
-    cmp #'='
-    beq emit_runtime_real_condition_clause_local_eq
-    cmp #'<'
-    beq emit_runtime_real_condition_clause_local_lt_entry
-    cmp #'>'
-    beq emit_runtime_real_condition_clause_local_gt_entry
+    lda #'='
+    jsr match_scan_char_local
+    bcc emit_runtime_real_condition_clause_local_eq
+    lda #'<'
+    jsr match_scan_char_local
+    bcc emit_runtime_real_condition_clause_local_lt_entry
+    lda #'>'
+    jsr match_scan_char_local
+    bcc emit_runtime_real_condition_clause_local_gt_entry
     sec
     rts
 emit_runtime_real_condition_clause_local_eq:
@@ -2280,37 +1951,38 @@ emit_runtime_real_condition_clause_local_eq:
     sta runtime_compare_op_local
     lda #$01
     sta runtime_compare_flag_local
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #'='
+    jsr consume_scan_char_local
     bcc :+
     jmp emit_runtime_real_condition_clause_local_or_fail_fail
 :
     jmp emit_runtime_real_condition_clause_local_rhs
 emit_runtime_real_condition_clause_local_lt_entry:
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #'<'
+    jsr consume_scan_char_local
     bcc :+
     jmp emit_runtime_real_condition_clause_local_or_fail_fail
 :
-    jsr read_scan_char_at_y
-    cmp #'>'
-    beq emit_runtime_real_condition_clause_local_ne
-    cmp #'='
-    beq emit_runtime_real_condition_clause_local_le
+    lda #'>'
+    jsr match_scan_char_local
+    bcc emit_runtime_real_condition_clause_local_ne
+    lda #'='
+    jsr match_scan_char_local
+    bcc emit_runtime_real_condition_clause_local_le
     lda #'l'
     sta runtime_compare_op_local
     lda #$01
     sta runtime_compare_flag_local
     jmp emit_runtime_real_condition_clause_local_rhs
 emit_runtime_real_condition_clause_local_gt_entry:
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #'>'
+    jsr consume_scan_char_local
     bcc :+
     jmp emit_runtime_real_condition_clause_local_or_fail_fail
 :
-    jsr read_scan_char_at_y
-    cmp #'='
-    beq emit_runtime_real_condition_clause_local_ge
+    lda #'='
+    jsr match_scan_char_local
+    bcc emit_runtime_real_condition_clause_local_ge
     lda #'g'
     sta runtime_compare_op_local
     lda #$01
@@ -2321,8 +1993,8 @@ emit_runtime_real_condition_clause_local_ne:
     sta runtime_compare_op_local
     lda #$01
     sta runtime_compare_flag_local
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #'>'
+    jsr consume_scan_char_local
     bcc :+
     jmp emit_runtime_real_condition_clause_local_or_fail_fail
 :
@@ -2332,8 +2004,8 @@ emit_runtime_real_condition_clause_local_le:
     sta runtime_compare_op_local
     lda #$02
     sta runtime_compare_flag_local
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #'='
+    jsr consume_scan_char_local
     bcc :+
     jmp emit_runtime_real_condition_clause_local_or_fail_fail
 :
@@ -2343,8 +2015,8 @@ emit_runtime_real_condition_clause_local_ge:
     sta runtime_compare_op_local
     lda #$00
     sta runtime_compare_flag_local
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #'='
+    jsr consume_scan_char_local
     bcc :+
     jmp emit_runtime_real_condition_clause_local_or_fail_fail
 :
@@ -2362,8 +2034,7 @@ emit_runtime_real_condition_clause_local_rhs:
     jmp emit_runtime_real_condition_clause_local_or_fail_fail
 :
     stx real_rhs_index_local
-    lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_FN_LO
-    jsr load_context_function_ptr
+    jsr load_append_body_op_ptr
     ldx real_rhs_index_local
     lda #'u'
     jsr call_loaded_target_with_a
@@ -2386,13 +2057,11 @@ emit_runtime_real_condition_clause_local_zero_flag:
 :
 emit_runtime_real_condition_clause_local_have_flag:
     stx real_rhs_index_local
-    lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_FN_LO
-    jsr load_context_function_ptr
+    jsr load_append_body_op_ptr
     ldx real_rhs_index_local
     lda #'p'
     jsr call_loaded_target_with_a
-    lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_NO_ARG_FN_LO
-    jsr load_context_function_ptr
+    jsr load_append_body_op_no_arg_ptr
     lda runtime_compare_op_local
     jsr call_loaded_target_with_a
     ldy symbol_end_y_local
@@ -2432,8 +2101,7 @@ store_runtime_condition_with_a_local_or_fail_after_value:
     jsr call_context_function
     bcs store_runtime_condition_with_a_local_or_fail_fail
 store_runtime_condition_with_a_local_or_fail_done:
-    lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_NO_ARG_FN_LO
-    jsr load_context_function_ptr
+    jsr load_append_body_op_no_arg_ptr
     lda runtime_condition_op_local
     jsr call_loaded_target_with_a
     clc
@@ -2445,12 +2113,8 @@ store_runtime_condition_with_a_local_or_fail_fail:
 require_then_or_line_end_local:
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    beq require_then_or_line_end_local_ok
-    cmp #10
-    beq require_then_or_line_end_local_ok
-    cmp #13
-    beq require_then_or_line_end_local_ok
+    jsr match_line_end_local
+    bcc require_then_or_line_end_local_ok
     lda #'T'
     jsr consume_uppercase_char_local
     bcs require_then_or_line_end_local_fail
@@ -2465,12 +2129,8 @@ require_then_or_line_end_local:
     bcs require_then_or_line_end_local_fail
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    beq require_then_or_line_end_local_ok
-    cmp #10
-    beq require_then_or_line_end_local_ok
-    cmp #13
-    beq require_then_or_line_end_local_ok
+    jsr match_line_end_local
+    bcc require_then_or_line_end_local_ok
 require_then_or_line_end_local_fail:
     sec
     rts
@@ -2481,12 +2141,8 @@ require_then_or_line_end_local_ok:
 require_do_or_line_end_local:
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    beq require_do_or_line_end_local_ok
-    cmp #10
-    beq require_do_or_line_end_local_ok
-    cmp #13
-    beq require_do_or_line_end_local_ok
+    jsr match_line_end_local
+    bcc require_do_or_line_end_local_ok
     lda #'D'
     jsr consume_uppercase_char_local
     bcs require_do_or_line_end_local_fail
@@ -2495,12 +2151,8 @@ require_do_or_line_end_local:
     bcs require_do_or_line_end_local_fail
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    beq require_do_or_line_end_local_ok
-    cmp #10
-    beq require_do_or_line_end_local_ok
-    cmp #13
-    beq require_do_or_line_end_local_ok
+    jsr match_line_end_local
+    bcc require_do_or_line_end_local_ok
 require_do_or_line_end_local_fail:
     sec
     rts
@@ -2611,25 +2263,25 @@ emit_real_small_int_assignment_local_or_fail_signed:
     ldy symbol_start_y_local
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #'0'
-    beq :+
+    lda #'0'
+    jsr match_scan_char_local
+    bcc :+
     jmp emit_real_small_int_assignment_local_or_fail_fail
 :
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #'0'
+    jsr consume_scan_char_local
     bcc :+
     jmp emit_real_small_int_assignment_local_or_fail_fail
 :
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #'-'
-    beq :+
+    lda #'-'
+    jsr match_scan_char_local
+    bcc :+
     jmp emit_real_small_int_assignment_local_or_fail_fail
 :
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #'-'
+    jsr consume_scan_char_local
     bcc :+
     jmp emit_real_small_int_assignment_local_or_fail_fail
 :
@@ -2693,8 +2345,7 @@ emit_real_small_int_assignment_local_or_fail_fail:
     rts
 
 emit_real_literal_assignment_local_from_indexes:
-    lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_FN_LO
-    jsr load_context_function_ptr
+    jsr load_append_body_op_ptr
     ldx real_rhs_index_local
     lda #'p'
     jsr call_loaded_target_with_a
@@ -2713,8 +2364,7 @@ emit_real_literal_assignment_local_from_indexes:
     rts
 
 emit_real_wide_bridge_assignment_local_from_indexes:
-    lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_FN_LO
-    jsr load_context_function_ptr
+    jsr load_append_body_op_ptr
     ldx real_rhs_index_local
     lda #'p'
     jsr call_loaded_target_with_a
@@ -2774,17 +2424,12 @@ pattern_matches_local_scan_ptr_keyword:
     lda #ACTC_OVERLAY_CTX_PATTERN_MATCHES_SCAN_PTR_KEYWORD_FN_LO
     jmp call_context_function
 
-advance_scan_ptr_by_local_pattern:
+source_reader_consume_local_pattern:
     jsr set_resident_const_ptr_from_ay
     lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_PTR_BY_CONST_FN_LO
     jmp call_context_function
 
-symbol_buffer_matches_local_const:
-    jsr set_resident_const_ptr_from_ay
-    lda #ACTC_OVERLAY_CTX_SYMBOL_BUFFER_MATCHES_CONST_PTR_FN_LO
-    jmp call_context_function
-
-consume_keyword_open_local:
+source_reader_begin_local_keyword_open:
     sta pattern_ptr_local
     sty pattern_ptr_local+1
     stx saved_x_local
@@ -2792,29 +2437,46 @@ consume_keyword_open_local:
     sta reader_scan_y_local
     lda #$00
     sta reader_pattern_index_local
-consume_keyword_open_local_loop:
+    rts
+
+source_reader_local_pattern_char_from_index:
     lda pattern_ptr_local
     sta ACTC_OVERLAY_WORK_ZP
     lda pattern_ptr_local+1
     sta ACTC_OVERLAY_WORK_ZP+1
-    ldx reader_pattern_index_local
-    txa
-    tay
+    ldy reader_pattern_index_local
     lda (ACTC_OVERLAY_WORK_ZP),y
-    beq consume_keyword_open_local_open
+    rts
+
+source_reader_consume_local_pattern_char:
+    jsr source_reader_local_pattern_char_from_index
+    beq source_reader_consume_local_pattern_char_fail
     sta call_arg_a
     ldy reader_scan_y_local
-    jsr read_scan_char_at_y
-    jsr uppercase_ascii_local
-    cmp call_arg_a
-    bne consume_keyword_open_local_fail
-    ldy reader_scan_y_local
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
-    bcs consume_keyword_open_local_fail
+    lda call_arg_a
+    jsr consume_uppercase_char_local
+    bcs source_reader_consume_local_pattern_char_fail
     sty reader_scan_y_local
     inc reader_pattern_index_local
-    bne consume_keyword_open_local_loop
+    clc
+    rts
+source_reader_consume_local_pattern_char_fail:
+    sec
+    rts
+
+symbol_buffer_matches_local_const:
+    jsr set_resident_const_ptr_from_ay
+    lda #ACTC_OVERLAY_CTX_SYMBOL_BUFFER_MATCHES_CONST_PTR_FN_LO
+    jmp call_context_function
+
+consume_keyword_open_local:
+    jsr source_reader_begin_local_keyword_open
+consume_keyword_open_local_loop:
+    jsr source_reader_local_pattern_char_from_index
+    beq consume_keyword_open_local_open
+    jsr source_reader_consume_local_pattern_char
+    bcs consume_keyword_open_local_fail
+    jmp consume_keyword_open_local_loop
 consume_keyword_open_local_fail:
     ldx saved_x_local
     ldy reader_scan_y_local
@@ -2822,11 +2484,11 @@ consume_keyword_open_local_fail:
     rts
 consume_keyword_open_local_open:
     ldy reader_scan_y_local
-    jsr read_scan_char_at_y
-    cmp #'('
-    bne consume_keyword_open_local_fail
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #'('
+    jsr match_scan_char_local
+    bcs consume_keyword_open_local_fail
+    lda #'('
+    jsr consume_scan_char_local
     bcs consume_keyword_open_local_fail
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
@@ -2912,6 +2574,14 @@ call_indexed_context_function_keep_x:
     lda #$00
     ldx saved_x_local
     jmp call_loaded_target_with_a
+
+load_append_body_op_ptr:
+    lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_FN_LO
+    jmp load_context_function_ptr
+
+load_append_body_op_no_arg_ptr:
+    lda #ACTC_OVERLAY_CTX_APPEND_BODY_OP_NO_ARG_FN_LO
+    jmp load_context_function_ptr
 
 load_context_function_ptr:
     sta saved_a_local
@@ -3412,40 +3082,6 @@ int_parse_matched_local:
 reader_scan_y_local:
     .byte $00
 reader_pattern_index_local:
-    .byte $00
-positive_word_value_lo:
-    .byte $00
-positive_word_value_hi:
-    .byte $00
-positive_word_sum_lo:
-    .byte $00
-positive_word_sum_hi:
-    .byte $00
-positive_word_outer_sum_lo:
-    .byte $00
-positive_word_outer_sum_hi:
-    .byte $00
-positive_word_saved_lo:
-    .byte $00
-positive_word_saved_hi:
-    .byte $00
-positive_word_outer_term_saved_lo:
-    .byte $00
-positive_word_outer_term_saved_hi:
-    .byte $00
-positive_word_term_saved_lo:
-    .byte $00
-positive_word_term_saved_hi:
-    .byte $00
-positive_word_term_lo:
-    .byte $00
-positive_word_term_hi:
-    .byte $00
-positive_word_temp_lo:
-    .byte $00
-positive_word_temp_hi:
-    .byte $00
-positive_word_digit_count:
     .byte $00
 loop_depth_local:
     .byte $00

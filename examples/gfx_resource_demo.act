@@ -1,0 +1,16 @@
+INCLUDE "GFX1"
+
+SPRITE Player=RESOURCE "player.spr"
+BITMAP Marker=RESOURCE "marker.abm"
+
+MODULE MAIN
+
+PROC MAIN()
+    GfxHires($8400,$A000)
+    GfxUseSprites($8800)
+    GfxBitmapClear(0)
+    GfxScreenClear(0,GFX_BLACK)
+    SpritePlace(0,Player,120,80)
+    BitmapStamp(Marker,32,32)
+    RETURN
+ENDPROC

@@ -9,8 +9,9 @@ import unittest
 
 
 class TestActcOverlay(unittest.TestCase):
-    CTX_SIZE = 233
+    CTX_SIZE = 237
     ACTC_BODY_OVERLAY_MIN_HEADROOM = 0x80
+    ACTC_EMIT_OVERLAY_MIN_HEADROOM = 0x800
     ACTC_OVERLAY_WINDOW_SIZE = 0x2000
 
     def setUp(self) -> None:
@@ -72,8 +73,14 @@ class TestActcOverlay(unittest.TestCase):
         self.assertNotIn('.asciiz "RT_SID_FREQ"', body_overlay_text)
         self.assertNotIn('.asciiz "RT_SID_FREQ"', body_preallocate_overlay_text)
         self.assertIn("ACTC_OVERLAY_PASS_BODY_PREALLOCATE", overlay_abi_text)
+        self.assertIn("ACTC_OVERLAY_PASS_EMIT_NATIVE_OBJECT", overlay_abi_text)
         self.assertIn("ACTC_OVERLAY_PASS_BODY_PREALLOCATE", actc_text)
-        self.assertIn("!ACTC_OVL7.BIN", actc_text)
+        self.assertIn('.asciiz "!ACTC_OVL0.BIN"', actc_text)
+        self.assertIn("cmp #ACTC_OVERLAY_PASS_COUNT", actc_text)
+        self.assertIn("sta actc_overlay_path+9", actc_text)
+        self.assertNotIn("actc_overlay_pass_table:", actc_text)
+        self.assertIn("ACTC_OVERLAY_PASS_EMIT_NATIVE_LOCAL_OBJECT", overlay_abi_text)
+        self.assertIn("ACTC_OVERLAY_STATUS_NOT_APPLICABLE", overlay_abi_text)
         self.assertIn("ACTC_OVERLAY_CTX_BODY_TABLE_ONLY = 228", overlay_abi_text)
         self.assertIn("ACTC_OVERLAY_CTX_BODY_MODE = ACTC_OVERLAY_CTX_BODY_TABLE_ONLY", overlay_abi_text)
         self.assertIn("ACTC_OVERLAY_CTX_SYMBOL_BUFFER_MATCHES_CONST_PTR_FN_LO", overlay_abi_text)
@@ -109,14 +116,30 @@ class TestActcOverlay(unittest.TestCase):
         self.assertIn("preallocate_word_int_assignment_external_from_declared_overlay:", body_preallocate_overlay_text)
         self.assertIn("preallocate_int_conversion_external_from_scan_y_overlay:", body_preallocate_overlay_text)
         self.assertIn("ACTC_OVERLAY_CTX_FIND_OR_STORE_RT_F_CMP_FN_LO", overlay_abi_text)
-        self.assertIn("ACTC_OVERLAY_CTX_SIZE = 233", overlay_abi_text)
+        self.assertIn("ACTC_OVERLAY_ABI_VERSION = 2", overlay_abi_text)
+        self.assertIn("ACTC_OVERLAY_CTX_SOURCE_READER_CONSUME_TOKEN_FN_LO = 233", overlay_abi_text)
+        self.assertIn("ACTC_OVERLAY_CTX_SOURCE_READER_TOKEN_VALUE_PTR_LO = 235", overlay_abi_text)
+        self.assertIn("ACTC_OVERLAY_CTX_SIZE = 237", overlay_abi_text)
         self.assertIn("load_body_overlay_builtin_runtime_table:", actc_text)
         self.assertIn(
             "sta actc_overlay_context+ACTC_OVERLAY_CTX_BODY_MODE",
             actc_text,
         )
         self.assertIn("ACTC_OVERLAY_CTX_SYMBOL_BUFFER_MATCHES_CONST_PTR_FN_LO", actc_text)
-        self.assertIn(".if ACTC_KEEP_BODY_RESIDENT_FALLBACK + ACTC_PREALLOCATE_BODY_EXTERNALS", actc_text)
+        self.assertIn(
+            "sta actc_overlay_context+ACTC_OVERLAY_CTX_SOURCE_READER_PEEK_TOKEN_FN_LO",
+            actc_text,
+        )
+        self.assertIn(
+            "sta actc_overlay_context+ACTC_OVERLAY_CTX_SOURCE_READER_CONSUME_TOKEN_FN_LO",
+            actc_text,
+        )
+        self.assertIn(
+            "sta actc_overlay_context+ACTC_OVERLAY_CTX_SOURCE_READER_TOKEN_VALUE_PTR_LO",
+            actc_text,
+        )
+        self.assertIn('.include "actc_overlay_positive_word.inc"', body_overlay_text)
+        self.assertIn('.include "actc_overlay_positive_word.inc"', body_preallocate_overlay_text)
         self.assertIn("ACTC_OVERLAY_CTX_FIND_OR_STORE_RT_F_CMP_FN_LO", actc_text)
         self.assertIn("preallocate_body_externals_with_overlay:", actc_text)
         self.assertIn("ACTC_OVERLAY_BODY_MODE_PREALLOCATE_EXTERNALS", actc_text)
@@ -201,9 +224,8 @@ class TestActcOverlay(unittest.TestCase):
             "    ldy preallocate_print_start_y_data\n"
             "    jsr save_condition_reader_mark\n"
             "    jsr skip_inline_spaces_at_scan_y\n"
-            "    jsr source_reader_peek_scan_y\n"
-            "    cmp #'('\n"
-            "    bne preallocate_int_print_statement_call_external_miss_restore\n"
+            "    jsr source_reader_match_open_paren_from_scan_y\n"
+            "    bcs preallocate_int_print_statement_call_external_miss_restore\n"
             "    lda #'('\n"
             "    jsr source_reader_consume_char_from_scan_y\n"
             "    bcs preallocate_int_print_statement_call_external_miss_restore\n"
@@ -232,9 +254,8 @@ class TestActcOverlay(unittest.TestCase):
             "    bcc preallocate_call_with_arg_externals_fail\n"
             "    ldy symbol_end_y_data\n"
             "    jsr skip_inline_spaces_at_scan_y\n"
-            "    jsr source_reader_peek_scan_y\n"
-            "    cmp #'('\n"
-            "    bne preallocate_call_with_arg_externals_fail\n"
+            "    jsr source_reader_match_open_paren_from_scan_y\n"
+            "    bcs preallocate_call_with_arg_externals_fail\n"
             "    jsr resolve_call_target_from_declared_or_fail",
             actc_text,
         )
@@ -397,6 +418,8 @@ class TestActcOverlay(unittest.TestCase):
         self.run_checked([str(self.root / "tools" / "build_actc_overlay_runtime_imports.sh")])
         self.run_checked([str(self.root / "tools" / "build_actc_overlay_payload_layout.sh")])
         self.run_checked([str(self.root / "tools" / "build_actc_overlay_emit_object.sh")])
+        self.run_checked([str(self.root / "tools" / "build_actc_overlay_emit_native_object.sh")])
+        self.run_checked([str(self.root / "tools" / "build_actc_overlay_emit_native_local_object.sh")])
 
     def assert_body_overlay_map_keeps_headroom(self, map_name: str, overlay_name: str) -> None:
         map_text = (self.build_dir / map_name).read_text(encoding="ascii")
@@ -413,6 +436,18 @@ class TestActcOverlay(unittest.TestCase):
                 f"keep at least {self.ACTC_BODY_OVERLAY_MIN_HEADROOM} bytes for link-selected library growth\n"
                 f"{map_text}"
             ),
+        )
+
+    def assert_emit_overlay_map_keeps_headroom(self, map_name: str, overlay_name: str) -> None:
+        map_text = (self.build_dir / map_name).read_text(encoding="ascii")
+        match = re.search(r"^CODE\s+[0-9A-Fa-f]{6}\s+[0-9A-Fa-f]{6}\s+([0-9A-Fa-f]{6})\s+", map_text, re.MULTILINE)
+        self.assertIsNotNone(match, msg=map_text)
+        assert match is not None
+        headroom = self.ACTC_OVERLAY_WINDOW_SIZE - int(match.group(1), 16)
+        self.assertGreaterEqual(
+            headroom,
+            self.ACTC_EMIT_OVERLAY_MIN_HEADROOM,
+            msg=f"{overlay_name} has only {headroom} bytes free for native object-emission growth\n{map_text}",
         )
 
     def test_body_overlays_keep_library_growth_headroom(self) -> None:
@@ -465,7 +500,8 @@ class TestActcOverlay(unittest.TestCase):
             summary = json.loads(result.stdout)
             self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
             self.assertFalse(summary["hit_limit"], msg=result.stdout)
-            self.assertEqual(summary["dumps"]["actc_overlay_requested_pass"], [5], msg=result.stdout)
+            self.last_emit_overlay_pass = summary["dumps"]["actc_overlay_requested_pass"]
+            self.assertIn(self.last_emit_overlay_pass, ([5], [8]), msg=result.stdout)
             self.assertTrue(
                 any(op["kind"] == "rsta" and op["path"] == "!ACTC_OVL6.BIN" and op["status"] == 1 for op in summary["ops"]),
                 msg=result.stdout,
@@ -492,6 +528,658 @@ class TestActcOverlay(unittest.TestCase):
         self.assertEqual(obj.count("u extcall\n"), 1, msg=obj)
         self.assertIn("r 1 u0\n", obj)
         self.assertNotIn("b u0r\n", obj)
+
+    def test_native_integer_emitter_does_not_claim_abi_result_calls(self) -> None:
+        obj = self.compile_overlay_object(
+            "MODULE MAIN\r"
+            "BYTE J\r"
+            "BYTE P\r"
+            "PROC MAIN()\r"
+            "J=Joy(2)\r"
+            "P=JoySeen(2)\r"
+            "RETURN\r",
+            "actc-overlay-native-integer-abi-result-calls",
+        )
+
+        self.assertIn("b p0u0S0p1u1S1r\n", obj)
+        self.assertIn("u rt_joy\n", obj)
+        self.assertIn("u rt_jp\n", obj)
+        self.assertNotIn("\nm ", obj)
+        self.assertEqual(self.last_emit_overlay_pass, [5])
+
+    def test_native_integer_emitter_owns_simple_equality_if(self) -> None:
+        obj = self.compile_overlay_object(
+            "MODULE MAIN\r"
+            "CARD X\r"
+            "CARD Y\r"
+            "PROC MAIN()\r"
+            "X=7\r"
+            "IF X=7 THEN\r"
+            "Y=1\r"
+            "FI\r"
+            "RETURN\r",
+            "actc-overlay-native-integer-equality-if",
+        )
+
+        self.assertIn(
+            "x main 0 107\n"
+            "x __if0 85 1\n"
+            "x __idata 101 4\n"
+            "x __iptr 105 2\n",
+            obj,
+        )
+        self.assertIn("b M\nb M\nb M\nb M\n", obj)
+        self.assertIn(
+            "68 85 05 68 85 04 68 85 03 68 C5 04 D0 06 "
+            "A5 03 C5 05 F0 03 4C 00 00",
+            obj,
+        )
+        self.assertIn("r 66 x __if0\n", obj)
+        self.assertNotIn("b p0S0L0p1qhp2S1vr\n", obj)
+        self.assertEqual(self.last_emit_overlay_pass, [8])
+
+    def test_native_integer_emitter_owns_simple_not_equal_if(self) -> None:
+        obj = self.compile_overlay_object(
+            "MODULE MAIN\r"
+            "CARD X\r"
+            "CARD Y\r"
+            "PROC MAIN()\r"
+            "X=2\r"
+            "Y=1\r"
+            "IF X<>Y THEN\r"
+            "Y=3\r"
+            "FI\r"
+            "RETURN\r",
+            "actc-overlay-native-integer-not-equal-if",
+        )
+
+        self.assertIn(
+            "x main 0 127\n"
+            "x __if0 105 1\n"
+            "x __idata 121 4\n"
+            "x __iptr 125 2\n",
+            obj,
+        )
+        self.assertIn(
+            "68 85 05 68 85 04 68 85 03 68 C5 04 D0 09 "
+            "A5 03 C5 05 D0 03 4C 00 00",
+            obj,
+        )
+        self.assertIn("r 86 x __if0\n", obj)
+        self.assertNotIn("b p0S0p1S1L0L1nhp2S1vr\n", obj)
+        self.assertEqual(self.last_emit_overlay_pass, [8])
+
+    def test_native_integer_emitter_owns_simple_less_than_if(self) -> None:
+        obj = self.compile_overlay_object(
+            "MODULE MAIN\r"
+            "CARD X\r"
+            "CARD Y\r"
+            "PROC MAIN()\r"
+            "X=1\r"
+            "Y=2\r"
+            "IF X<Y THEN\r"
+            "Y=3\r"
+            "FI\r"
+            "RETURN\r",
+            "actc-overlay-native-integer-less-than-if",
+        )
+
+        self.assertIn(
+            "x main 0 126\n"
+            "x __if0 104 1\n"
+            "x __idata 120 4\n"
+            "x __iptr 124 2\n",
+            obj,
+        )
+        self.assertIn(
+            "68 85 05 68 85 04 68 AA 68 E4 05 90 09 D0 04 "
+            "C5 04 90 03 4C 00 00",
+            obj,
+        )
+        self.assertIn("r 85 x __if0\n", obj)
+        self.assertNotIn("b p0S0p1S1L0L1lhp2S1vr\n", obj)
+        self.assertEqual(self.last_emit_overlay_pass, [8])
+
+    def test_native_integer_emitter_owns_simple_greater_than_if(self) -> None:
+        obj = self.compile_overlay_object(
+            "MODULE MAIN\r"
+            "CARD X\r"
+            "CARD Y\r"
+            "PROC MAIN()\r"
+            "X=2\r"
+            "Y=1\r"
+            "IF X>Y THEN\r"
+            "Y=3\r"
+            "FI\r"
+            "RETURN\r",
+            "actc-overlay-native-integer-greater-than-if",
+        )
+
+        self.assertIn(
+            "x main 0 128\n"
+            "x __if0 106 1\n"
+            "x __idata 122 4\n"
+            "x __iptr 126 2\n",
+            obj,
+        )
+        self.assertIn(
+            "68 85 05 68 85 04 68 AA 68 E4 05 90 08 D0 09 "
+            "C5 04 90 02 D0 03 4C 00 00",
+            obj,
+        )
+        self.assertIn("r 87 x __if0\n", obj)
+        self.assertNotIn("b p0S0p1S1L0L1ghp2S1vr\n", obj)
+        self.assertEqual(self.last_emit_overlay_pass, [8])
+
+    def test_native_integer_emitter_owns_simple_greater_equal_if(self) -> None:
+        obj = self.compile_overlay_object(
+            "MODULE MAIN\r"
+            "CARD X\r"
+            "CARD Y\r"
+            "PROC MAIN()\r"
+            "X=2\r"
+            "Y=1\r"
+            "IF X>=Y THEN\r"
+            "Y=3\r"
+            "FI\r"
+            "RETURN\r",
+            "actc-overlay-native-integer-greater-equal-if",
+        )
+
+        self.assertIn(
+            "x main 0 126\n"
+            "x __if0 104 1\n"
+            "x __idata 120 4\n"
+            "x __iptr 124 2\n",
+            obj,
+        )
+        self.assertIn(
+            "68 85 05 68 85 04 68 AA 68 E4 05 90 06 D0 07 "
+            "C5 04 B0 03 4C 00 00",
+            obj,
+        )
+        self.assertIn("r 85 x __if0\n", obj)
+        self.assertNotIn("b p0S0p1S1L0L1lp2qhp3S1vr\n", obj)
+        self.assertEqual(self.last_emit_overlay_pass, [8])
+
+    def test_native_integer_emitter_owns_simple_less_equal_if(self) -> None:
+        obj = self.compile_overlay_object(
+            "MODULE MAIN\r"
+            "CARD X\r"
+            "CARD Y\r"
+            "PROC MAIN()\r"
+            "X=1\r"
+            "Y=1\r"
+            "IF X<=Y THEN\r"
+            "Y=3\r"
+            "FI\r"
+            "RETURN\r",
+            "actc-overlay-native-integer-less-equal-if",
+        )
+
+        self.assertIn(
+            "x main 0 128\n"
+            "x __if0 106 1\n"
+            "x __idata 122 4\n"
+            "x __iptr 126 2\n",
+            obj,
+        )
+        self.assertIn(
+            "68 85 05 68 85 04 68 AA 68 E4 05 90 0B D0 06 "
+            "C5 04 90 05 F0 03 4C 00 00",
+            obj,
+        )
+        self.assertIn("r 87 x __if0\n", obj)
+        self.assertNotIn("b p0S0p1S1L0L1gp2qhp3S1vr\n", obj)
+        self.assertEqual(self.last_emit_overlay_pass, [8])
+
+    def test_native_integer_emitter_owns_simple_if_else(self) -> None:
+        obj = self.compile_overlay_object(
+            "MODULE MAIN\r"
+            "CARD X\r"
+            "CARD Y\r"
+            "PROC MAIN()\r"
+            "X=7\r"
+            "IF X=8 THEN\r"
+            "Y=1\r"
+            "ELSE\r"
+            "Y=2\r"
+            "FI\r"
+            "RETURN\r",
+            "actc-overlay-native-integer-if-else",
+        )
+
+        self.assertIn(
+            "x main 0 127\n"
+            "x __if0 88 1\n"
+            "x __if1 105 1\n"
+            "x __idata 121 4\n"
+            "x __iptr 125 2\n",
+            obj,
+        )
+        self.assertIn("b M\nb M\nb M\nb M\nb M\n", obj)
+        self.assertIn("4C 00 00 A9 02 48", obj)
+        self.assertIn(
+            "r 3 x __iptr\n"
+            "r 9 x __iptr\n"
+            "r 66 x __if0\n"
+            "r 86 x __if1\n"
+            "r 125 x __idata\n",
+            obj,
+        )
+        self.assertNotIn("b p0S0L0p1qhp2S1wp3S1vr\n", obj)
+        self.assertEqual(self.last_emit_overlay_pass, [8])
+
+    def test_native_integer_emitter_owns_nested_if(self) -> None:
+        obj = self.compile_overlay_object(
+            "MODULE MAIN\r"
+            "CARD X\r"
+            "CARD Y\r"
+            "CARD Z\r"
+            "PROC MAIN()\r"
+            "X=1\r"
+            "Y=2\r"
+            "IF X<Y THEN\r"
+            "IF Y>1 THEN\r"
+            "Z=3\r"
+            "FI\r"
+            "FI\r"
+            "RETURN\r",
+            "actc-overlay-native-integer-nested-if",
+        )
+
+        self.assertIn(
+            "x main 0 167\n"
+            "x __if0 143 1\n"
+            "x __if2 143 1\n"
+            "x __idata 159 6\n"
+            "x __iptr 165 2\n",
+            obj,
+        )
+        self.assertIn("b M\nb M\nb M\nb M\nb M\n", obj)
+        self.assertIn(
+            "r 3 x __iptr\n"
+            "r 9 x __iptr\n"
+            "r 85 x __if0\n"
+            "r 124 x __if2\n"
+            "r 165 x __idata\n",
+            obj,
+        )
+        self.assertNotIn("b p0S0p1S1L0L1lhL1p2ghp3S2vvr\n", obj)
+        self.assertEqual(self.last_emit_overlay_pass, [8])
+
+    def test_native_integer_emitter_owns_nested_if_else(self) -> None:
+        obj = self.compile_overlay_object(
+            "MODULE MAIN\r"
+            "CARD X\r"
+            "CARD Y\r"
+            "CARD Z\r"
+            "PROC MAIN()\r"
+            "X=1\r"
+            "Y=2\r"
+            "IF X<Y THEN\r"
+            "IF Y>2 THEN\r"
+            "Z=3\r"
+            "ELSE\r"
+            "Z=4\r"
+            "FI\r"
+            "FI\r"
+            "RETURN\r",
+            "actc-overlay-native-integer-nested-if-else",
+        )
+
+        self.assertIn(
+            "x main 0 187\n"
+            "x __if0 163 1\n"
+            "x __if2 146 1\n"
+            "x __if3 163 1\n"
+            "x __idata 179 6\n"
+            "x __iptr 185 2\n",
+            obj,
+        )
+        self.assertIn("b M\nb M\nb M\nb M\nb M\nb M\n", obj)
+        self.assertIn(
+            "r 3 x __iptr\n"
+            "r 9 x __iptr\n"
+            "r 85 x __if0\n"
+            "r 124 x __if2\n"
+            "r 144 x __if3\n"
+            "r 185 x __idata\n",
+            obj,
+        )
+        self.assertNotIn("b p0S0p1S1L0L1lhL1p2ghp3S2wp4S2vvr\n", obj)
+        self.assertEqual(self.last_emit_overlay_pass, [8])
+
+    def test_native_integer_nested_conditions_track_inversion_per_operation(self) -> None:
+        obj = self.compile_overlay_object(
+            "MODULE MAIN\r"
+            "CARD X\r"
+            "CARD Y\r"
+            "CARD Z\r"
+            "PROC MAIN()\r"
+            "X=2\r"
+            "Y=1\r"
+            "IF X>=Y THEN\r"
+            "IF Y<X THEN\r"
+            "Z=5\r"
+            "FI\r"
+            "FI\r"
+            "RETURN\r",
+            "actc-overlay-native-integer-nested-mixed-inversion",
+        )
+
+        self.assertIn(
+            "x main 0 168\n"
+            "x __if0 144 1\n"
+            "x __if2 144 1\n"
+            "x __idata 160 6\n"
+            "x __iptr 166 2\n",
+            obj,
+        )
+        greater_equal = "90 06 D0 07 C5 04 B0 03 4C 00 00"
+        less_than = "90 09 D0 04 C5 04 90 03 4C 00 00"
+        self.assertIn(greater_equal, obj)
+        self.assertIn(less_than, obj)
+        self.assertLess(obj.index(greater_equal), obj.index(less_than))
+        self.assertIn("r 85 x __if0\nr 125 x __if2\nr 166 x __idata\n", obj)
+        self.assertEqual(self.last_emit_overlay_pass, [8])
+
+    def test_native_integer_emitter_owns_do_until_equality(self) -> None:
+        obj = self.compile_overlay_object(
+            "MODULE MAIN\r"
+            "CARD X\r"
+            "PROC MAIN()\r"
+            "X=0\r"
+            "DO\r"
+            "X=1\r"
+            "UNTIL X=1\r"
+            "OD\r"
+            "RETURN\r",
+            "actc-overlay-native-integer-do-until-equality",
+        )
+
+        self.assertIn(
+            "x main 0 105\n"
+            "x __do0 30 1\n"
+            "x __idata 101 2\n"
+            "x __iptr 103 2\n",
+            obj,
+        )
+        self.assertIn("b M\nb M\nb M\nb M\n", obj)
+        self.assertIn(
+            "r 3 x __iptr\n"
+            "r 9 x __iptr\n"
+            "r 83 x __do0\n"
+            "r 103 x __idata\n",
+            obj,
+        )
+        self.assertNotIn("b p0S0dp1S0L0p2qtor\n", obj)
+        self.assertEqual(self.last_emit_overlay_pass, [8])
+
+    def test_native_integer_emitter_owns_do_until_less_than(self) -> None:
+        obj = self.compile_overlay_object(
+            "MODULE MAIN\r"
+            "CARD X\r"
+            "CARD Y\r"
+            "PROC MAIN()\r"
+            "X=1\r"
+            "Y=2\r"
+            "DO\r"
+            "X=1\r"
+            "UNTIL X<Y\r"
+            "OD\r"
+            "RETURN\r",
+            "actc-overlay-native-integer-do-until-less-than",
+        )
+
+        self.assertIn(
+            "x main 0 126\n"
+            "x __do0 47 1\n"
+            "x __idata 120 4\n"
+            "x __iptr 124 2\n",
+            obj,
+        )
+        self.assertIn(
+            "68 85 05 68 85 04 68 AA 68 E4 05 90 09 D0 04 "
+            "C5 04 90 03 4C 00 00",
+            obj,
+        )
+        self.assertIn(
+            "r 3 x __iptr\n"
+            "r 9 x __iptr\n"
+            "r 102 x __do0\n"
+            "r 124 x __idata\n",
+            obj,
+        )
+        self.assertNotIn("b p0S0p1S1dp2S0L0L1ltor\n", obj)
+        self.assertEqual(self.last_emit_overlay_pass, [8])
+
+    def test_native_integer_emitter_owns_nested_do_until_equality(self) -> None:
+        obj = self.compile_overlay_object(
+            "MODULE MAIN\r"
+            "CARD X\r"
+            "CARD Y\r"
+            "PROC MAIN()\r"
+            "X=0\r"
+            "Y=0\r"
+            "DO\r"
+            "X=1\r"
+            "DO\r"
+            "Y=2\r"
+            "UNTIL Y=2\r"
+            "OD\r"
+            "UNTIL X=1\r"
+            "OD\r"
+            "RETURN\r",
+            "actc-overlay-native-integer-nested-do-until-equality",
+        )
+
+        self.assertIn(
+            "x main 0 179\n"
+            "x __do0 47 1\n"
+            "x __do1 64 1\n"
+            "x __idata 173 4\n"
+            "x __iptr 177 2\n",
+            obj,
+        )
+        self.assertIn("b M\nb M\nb M\nb M\nb M\n", obj)
+        self.assertIn(
+            "r 3 x __iptr\n"
+            "r 9 x __iptr\n"
+            "r 117 x __do1\n"
+            "r 155 x __do0\n"
+            "r 177 x __idata\n",
+            obj,
+        )
+        self.assertNotIn("b p0S0p1S1dp2S0dp3S1L1p4qtoL0p5qtor\n", obj)
+        self.assertEqual(self.last_emit_overlay_pass, [8])
+
+    def test_native_integer_emitter_owns_do_if_until_equality(self) -> None:
+        obj = self.compile_overlay_object(
+            "MODULE MAIN\r"
+            "CARD X\r"
+            "CARD Y\r"
+            "PROC MAIN()\r"
+            "X=0\r"
+            "Y=0\r"
+            "DO\r"
+            "X=1\r"
+            "IF X=1 THEN\r"
+            "Y=2\r"
+            "FI\r"
+            "UNTIL Y=2\r"
+            "OD\r"
+            "RETURN\r",
+            "actc-overlay-native-integer-do-if-until-equality",
+        )
+
+        self.assertIn(
+            "x main 0 179\n"
+            "x __do0 47 1\n"
+            "x __if2 119 1\n"
+            "x __idata 173 4\n"
+            "x __iptr 177 2\n",
+            obj,
+        )
+        self.assertIn("b M\nb M\nb M\nb M\nb M\n", obj)
+        self.assertIn(
+            "r 3 x __iptr\n"
+            "r 9 x __iptr\n"
+            "r 100 x __if2\n"
+            "r 155 x __do0\n"
+            "r 177 x __idata\n",
+            obj,
+        )
+        self.assertNotIn("b p0S0p1S1dp2S0L0p3qhp4S1vL1p5qtor\n", obj)
+        self.assertEqual(self.last_emit_overlay_pass, [8])
+
+    def test_native_integer_emitter_owns_do_if_else_until_equality(self) -> None:
+        obj = self.compile_overlay_object(
+            "MODULE MAIN\r"
+            "CARD X\r"
+            "CARD Y\r"
+            "PROC MAIN()\r"
+            "X=0\r"
+            "Y=0\r"
+            "DO\r"
+            "X=1\r"
+            "IF X=2 THEN\r"
+            "Y=3\r"
+            "ELSE\r"
+            "Y=4\r"
+            "FI\r"
+            "UNTIL Y=4\r"
+            "OD\r"
+            "RETURN\r",
+            "actc-overlay-native-integer-do-if-else-until-equality",
+        )
+
+        self.assertIn(
+            "x main 0 199\n"
+            "x __do0 47 1\n"
+            "x __if2 122 1\n"
+            "x __if3 139 1\n"
+            "x __idata 193 4\n"
+            "x __iptr 197 2\n",
+            obj,
+        )
+        self.assertIn("b M\nb M\nb M\nb M\nb M\nb M\n", obj)
+        self.assertIn(
+            "r 3 x __iptr\n"
+            "r 9 x __iptr\n"
+            "r 100 x __if2\n"
+            "r 120 x __if3\n"
+            "r 175 x __do0\n"
+            "r 197 x __idata\n",
+            obj,
+        )
+        self.assertNotIn("b p0S0p1S1dp2S0L0p3qhp4S1wp5S1vL1p6qtor\n", obj)
+        self.assertEqual(self.last_emit_overlay_pass, [8])
+
+    def test_native_integer_emitter_owns_if_do_until_equality(self) -> None:
+        obj = self.compile_overlay_object(
+            "MODULE MAIN\r"
+            "CARD X\r"
+            "CARD Y\r"
+            "PROC MAIN()\r"
+            "X=1\r"
+            "Y=0\r"
+            "IF X=1 THEN\r"
+            "DO\r"
+            "Y=2\r"
+            "UNTIL Y=2\r"
+            "OD\r"
+            "FI\r"
+            "RETURN\r",
+            "actc-overlay-native-integer-if-do-until-equality",
+        )
+
+        self.assertIn(
+            "x main 0 162\n"
+            "x __if0 140 1\n"
+            "x __do1 85 1\n"
+            "x __idata 156 4\n"
+            "x __iptr 160 2\n",
+            obj,
+        )
+        self.assertIn("b M\nb M\nb M\nb M\nb M\n", obj)
+        self.assertIn(
+            "r 3 x __iptr\n"
+            "r 9 x __iptr\n"
+            "r 83 x __if0\n"
+            "r 138 x __do1\n"
+            "r 160 x __idata\n",
+            obj,
+        )
+        self.assertNotIn("b p0S0p1S1L0p2qhdp3S1L1p4qtovr\n", obj)
+        self.assertEqual(self.last_emit_overlay_pass, [8])
+
+    def test_native_integer_emitter_owns_if_else_do_until_equality(self) -> None:
+        obj = self.compile_overlay_object(
+            "MODULE MAIN\r"
+            "CARD X\r"
+            "CARD Y\r"
+            "PROC MAIN()\r"
+            "X=1\r"
+            "Y=0\r"
+            "IF X=2 THEN\r"
+            "DO\r"
+            "Y=3\r"
+            "UNTIL Y=3\r"
+            "OD\r"
+            "ELSE\r"
+            "DO\r"
+            "Y=4\r"
+            "UNTIL Y=4\r"
+            "OD\r"
+            "FI\r"
+            "RETURN\r",
+            "actc-overlay-native-integer-if-else-do-until-equality",
+        )
+
+        self.assertIn(
+            "x main 0 220\n"
+            "x __if0 143 1\n"
+            "x __if1 198 1\n"
+            "x __do1 85 1\n"
+            "x __if3 143 1\n"
+            "x __idata 214 4\n"
+            "x __iptr 218 2\n",
+            obj,
+        )
+        self.assertIn("b M\nb M\nb M\nb M\nb M\nb M\nb M\n", obj)
+        self.assertIn(
+            "r 3 x __iptr\n"
+            "r 9 x __iptr\n"
+            "r 83 x __if0\n"
+            "r 138 x __do1\n"
+            "r 141 x __if1\n"
+            "r 196 x __if3\n"
+            "r 218 x __idata\n",
+            obj,
+        )
+        self.assertNotIn("b p0S0p1S1L0p2qhdp3S1L1p4qtowdp5S1L1p6qtovr\n", obj)
+        self.assertEqual(self.last_emit_overlay_pass, [8])
+
+    def test_native_integer_relocation_scan_continues_after_if(self) -> None:
+        obj = self.compile_overlay_object(
+            "MODULE MAIN\r"
+            "CARD X\r"
+            "PROC MAIN()\r"
+            "X=1\r"
+            "IF X=1 THEN\r"
+            "X=2\r"
+            "FI\r"
+            "ExtCall()\r"
+            "RETURN\r",
+            "actc-overlay-native-integer-post-if-import",
+        )
+
+        self.assertIn("x main 0 108\nx __if0 85 1\n", obj)
+        self.assertIn("b u0M\n", obj)
+        self.assertIn("r 66 x __if0\nr 86 u0\nr 106 x __idata\n", obj)
+        self.assertIn("u extcall\n", obj)
+        self.assertEqual(self.last_emit_overlay_pass, [8])
 
     def test_actc_preallocation_body_overlay_mode_records_nested_plain_call_args(self) -> None:
         obj = self.compile_overlay_object(
@@ -1305,7 +1993,7 @@ class TestActcOverlay(unittest.TestCase):
             summary = json.loads(result.stdout)
             self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
             self.assertFalse(summary["hit_limit"], msg=result.stdout)
-            self.assertEqual(summary["dumps"]["actc_overlay_requested_pass"], [5], msg=result.stdout)
+            self.assertIn(summary["dumps"]["actc_overlay_requested_pass"], ([5], [8]), msg=result.stdout)
             self.assertTrue(
                 any(op["kind"] == "rsta" and op["path"] == "!ACTC_OVL6.BIN" and op["status"] == 1 for op in summary["ops"]),
                 msg=result.stdout,
@@ -1382,7 +2070,7 @@ class TestActcOverlay(unittest.TestCase):
             summary = json.loads(result.stdout)
             self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
             self.assertFalse(summary["hit_limit"], msg=result.stdout)
-            self.assertEqual(summary["dumps"]["actc_overlay_requested_pass"], [5], msg=result.stdout)
+            self.assertIn(summary["dumps"]["actc_overlay_requested_pass"], ([5], [8]), msg=result.stdout)
             self.assertTrue(
                 any(op["kind"] == "rsta" and op["path"] == "!ACTC_OVL6.BIN" and op["status"] == 1 for op in summary["ops"]),
                 msg=result.stdout,
@@ -1465,7 +2153,7 @@ class TestActcOverlay(unittest.TestCase):
             summary = json.loads(result.stdout)
             self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
             self.assertFalse(summary["hit_limit"], msg=result.stdout)
-            self.assertEqual(summary["dumps"]["actc_overlay_requested_pass"], [5], msg=result.stdout)
+            self.assertIn(summary["dumps"]["actc_overlay_requested_pass"], ([5], [8]), msg=result.stdout)
             self.assertTrue(
                 any(op["kind"] == "rsta" and op["path"] == "!ACTC_OVL6.BIN" and op["status"] == 1 for op in summary["ops"]),
                 msg=result.stdout,
@@ -1550,7 +2238,7 @@ class TestActcOverlay(unittest.TestCase):
             summary = json.loads(result.stdout)
             self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
             self.assertFalse(summary["hit_limit"], msg=result.stdout)
-            self.assertEqual(summary["dumps"]["actc_overlay_requested_pass"], [5], msg=result.stdout)
+            self.assertIn(summary["dumps"]["actc_overlay_requested_pass"], ([5], [8]), msg=result.stdout)
             self.assertTrue(
                 any(op["kind"] == "rsta" and op["path"] == "!ACTC_OVL6.BIN" and op["status"] == 1 for op in summary["ops"]),
                 msg=result.stdout,
@@ -1635,7 +2323,7 @@ class TestActcOverlay(unittest.TestCase):
             summary = json.loads(result.stdout)
             self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
             self.assertFalse(summary["hit_limit"], msg=result.stdout)
-            self.assertEqual(summary["dumps"]["actc_overlay_requested_pass"], [5], msg=result.stdout)
+            self.assertIn(summary["dumps"]["actc_overlay_requested_pass"], ([5], [8]), msg=result.stdout)
             self.assertTrue(
                 any(op["kind"] == "rsta" and op["path"] == "!ACTC_OVL6.BIN" and op["status"] == 1 for op in summary["ops"]),
                 msg=result.stdout,
@@ -1718,7 +2406,7 @@ class TestActcOverlay(unittest.TestCase):
             summary = json.loads(result.stdout)
             self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
             self.assertFalse(summary["hit_limit"], msg=result.stdout)
-            self.assertEqual(summary["dumps"]["actc_overlay_requested_pass"], [5], msg=result.stdout)
+            self.assertIn(summary["dumps"]["actc_overlay_requested_pass"], ([5], [8]), msg=result.stdout)
             self.assertTrue(
                 any(op["kind"] == "rsta" and op["path"] == "!ACTC_OVL6.BIN" and op["status"] == 1 for op in summary["ops"]),
                 msg=result.stdout,
@@ -1799,7 +2487,7 @@ class TestActcOverlay(unittest.TestCase):
             summary = json.loads(result.stdout)
             self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
             self.assertFalse(summary["hit_limit"], msg=result.stdout)
-            self.assertEqual(summary["dumps"]["actc_overlay_requested_pass"], [5], msg=result.stdout)
+            self.assertIn(summary["dumps"]["actc_overlay_requested_pass"], ([5], [8]), msg=result.stdout)
             self.assertTrue(
                 any(op["kind"] == "rsta" and op["path"] == "!ACTC_OVL6.BIN" and op["status"] == 1 for op in summary["ops"]),
                 msg=result.stdout,
@@ -1882,7 +2570,7 @@ class TestActcOverlay(unittest.TestCase):
             summary = json.loads(result.stdout)
             self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
             self.assertFalse(summary["hit_limit"], msg=result.stdout)
-            self.assertEqual(summary["dumps"]["actc_overlay_requested_pass"], [5], msg=result.stdout)
+            self.assertIn(summary["dumps"]["actc_overlay_requested_pass"], ([5], [8]), msg=result.stdout)
             self.assertTrue(
                 any(op["kind"] == "rsta" and op["path"] == "!ACTC_OVL6.BIN" and op["status"] == 1 for op in summary["ops"]),
                 msg=result.stdout,
@@ -1963,7 +2651,7 @@ class TestActcOverlay(unittest.TestCase):
             summary = json.loads(result.stdout)
             self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
             self.assertFalse(summary["hit_limit"], msg=result.stdout)
-            self.assertEqual(summary["dumps"]["actc_overlay_requested_pass"], [5], msg=result.stdout)
+            self.assertIn(summary["dumps"]["actc_overlay_requested_pass"], ([5], [8]), msg=result.stdout)
             self.assertTrue(
                 any(op["kind"] == "rsta" and op["path"] == "!ACTC_OVL6.BIN" and op["status"] == 1 for op in summary["ops"]),
                 msg=result.stdout,
@@ -2041,7 +2729,7 @@ class TestActcOverlay(unittest.TestCase):
             summary = json.loads(result.stdout)
             self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
             self.assertFalse(summary["hit_limit"], msg=result.stdout)
-            self.assertEqual(summary["dumps"]["actc_overlay_requested_pass"], [5], msg=result.stdout)
+            self.assertIn(summary["dumps"]["actc_overlay_requested_pass"], ([5], [8]), msg=result.stdout)
             self.assertEqual(summary["dumps"]["actc_overlay_context"][0:2], [5, 0], msg=result.stdout)
             self.assertTrue(
                 any(op["kind"] == "rsta" and op["path"] == "!ACTC_OVL1.BIN" and op["status"] == 1 for op in summary["ops"]),
@@ -2201,7 +2889,7 @@ class TestActcOverlay(unittest.TestCase):
             summary = json.loads(result.stdout)
             self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
             self.assertFalse(summary["hit_limit"], msg=result.stdout)
-            self.assertEqual(summary["dumps"]["actc_overlay_requested_pass"], [5], msg=result.stdout)
+            self.assertIn(summary["dumps"]["actc_overlay_requested_pass"], ([5], [8]), msg=result.stdout)
             self.assertEqual(summary["dumps"]["actc_overlay_context"][0:2], [5, 0], msg=result.stdout)
             self.assertTrue(
                 any(op["kind"] == "rsta" and op["path"] == "!ACTC_OVL1.BIN" and op["status"] == 1 for op in summary["ops"]),
@@ -2295,7 +2983,7 @@ class TestActcOverlay(unittest.TestCase):
             summary = json.loads(result.stdout)
             self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
             self.assertFalse(summary["hit_limit"], msg=result.stdout)
-            self.assertEqual(summary["dumps"]["actc_overlay_requested_pass"], [5], msg=result.stdout)
+            self.assertIn(summary["dumps"]["actc_overlay_requested_pass"], ([5], [8]), msg=result.stdout)
             self.assertTrue(
                 any(op["kind"] == "rsta" and op["path"] == "!ACTC_OVL6.BIN" and op["status"] == 1 for op in summary["ops"]),
                 msg=result.stdout,
@@ -2374,7 +3062,7 @@ class TestActcOverlay(unittest.TestCase):
             summary = json.loads(result.stdout)
             self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
             self.assertFalse(summary["hit_limit"], msg=result.stdout)
-            self.assertEqual(summary["dumps"]["actc_overlay_requested_pass"], [5], msg=result.stdout)
+            self.assertIn(summary["dumps"]["actc_overlay_requested_pass"], ([5], [8]), msg=result.stdout)
             self.assertTrue(
                 any(op["kind"] == "rsta" and op["path"] == "!ACTC_OVL6.BIN" and op["status"] == 1 for op in summary["ops"]),
                 msg=result.stdout,
@@ -2459,7 +3147,7 @@ class TestActcOverlay(unittest.TestCase):
             summary = json.loads(result.stdout)
             self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
             self.assertFalse(summary["hit_limit"], msg=result.stdout)
-            self.assertEqual(summary["dumps"]["actc_overlay_requested_pass"], [5], msg=result.stdout)
+            self.assertIn(summary["dumps"]["actc_overlay_requested_pass"], ([5], [8]), msg=result.stdout)
             self.assertTrue(
                 any(op["kind"] == "rsta" and op["path"] == "!ACTC_OVL6.BIN" and op["status"] == 1 for op in summary["ops"]),
                 msg=result.stdout,
@@ -3882,7 +4570,7 @@ class TestActcOverlay(unittest.TestCase):
             summary = json.loads(result.stdout)
             self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
             self.assertFalse(summary["hit_limit"], msg=result.stdout)
-            self.assertEqual(summary["dumps"]["actc_overlay_requested_pass"], [5], msg=result.stdout)
+            self.assertIn(summary["dumps"]["actc_overlay_requested_pass"], ([5], [8]), msg=result.stdout)
             self.assertTrue(
                 any(op["kind"] == "rsta" and op["path"] == "!ACTC_OVL6.BIN" and op["status"] == 1 for op in summary["ops"]),
                 msg=result.stdout,
@@ -3958,7 +4646,7 @@ class TestActcOverlay(unittest.TestCase):
             summary = json.loads(result.stdout)
             self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
             self.assertFalse(summary["hit_limit"], msg=result.stdout)
-            self.assertEqual(summary["dumps"]["actc_overlay_requested_pass"], [5], msg=result.stdout)
+            self.assertIn(summary["dumps"]["actc_overlay_requested_pass"], ([5], [8]), msg=result.stdout)
             self.assertTrue(
                 any(op["kind"] == "rsta" and op["path"] == "!ACTC_OVL6.BIN" and op["status"] == 1 for op in summary["ops"]),
                 msg=result.stdout,
@@ -4029,7 +4717,7 @@ class TestActcOverlay(unittest.TestCase):
             summary = json.loads(result.stdout)
             self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
             self.assertFalse(summary["hit_limit"], msg=result.stdout)
-            self.assertEqual(summary["dumps"]["actc_overlay_requested_pass"], [5], msg=result.stdout)
+            self.assertIn(summary["dumps"]["actc_overlay_requested_pass"], ([5], [8]), msg=result.stdout)
             self.assertTrue(
                 any(op["kind"] == "rsta" and op["path"] == "!ACTC_OVL6.BIN" and op["status"] == 1 for op in summary["ops"]),
                 msg=result.stdout,
@@ -4104,7 +4792,7 @@ class TestActcOverlay(unittest.TestCase):
             summary = json.loads(result.stdout)
             self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
             self.assertFalse(summary["hit_limit"], msg=result.stdout)
-            self.assertEqual(summary["dumps"]["actc_overlay_requested_pass"], [5], msg=result.stdout)
+            self.assertIn(summary["dumps"]["actc_overlay_requested_pass"], ([5], [8]), msg=result.stdout)
             self.assertTrue(
                 any(op["kind"] == "rsta" and op["path"] == "!ACTC_OVL6.BIN" and op["status"] == 1 for op in summary["ops"]),
                 msg=result.stdout,
@@ -4180,7 +4868,7 @@ class TestActcOverlay(unittest.TestCase):
             summary = json.loads(result.stdout)
             self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
             self.assertFalse(summary["hit_limit"], msg=result.stdout)
-            self.assertEqual(summary["dumps"]["actc_overlay_requested_pass"], [5], msg=result.stdout)
+            self.assertIn(summary["dumps"]["actc_overlay_requested_pass"], ([5], [8]), msg=result.stdout)
             self.assertTrue(
                 any(op["kind"] == "rsta" and op["path"] == "!ACTC_OVL6.BIN" and op["status"] == 1 for op in summary["ops"]),
                 msg=result.stdout,
@@ -4254,7 +4942,7 @@ class TestActcOverlay(unittest.TestCase):
             summary = json.loads(result.stdout)
             self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
             self.assertFalse(summary["hit_limit"], msg=result.stdout)
-            self.assertEqual(summary["dumps"]["actc_overlay_requested_pass"], [5], msg=result.stdout)
+            self.assertIn(summary["dumps"]["actc_overlay_requested_pass"], ([5], [8]), msg=result.stdout)
             self.assertTrue(
                 any(op["kind"] == "rsta" and op["path"] == "!ACTC_OVL6.BIN" and op["status"] == 1 for op in summary["ops"]),
                 msg=result.stdout,
@@ -4327,7 +5015,7 @@ class TestActcOverlay(unittest.TestCase):
             summary = json.loads(result.stdout)
             self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
             self.assertFalse(summary["hit_limit"], msg=result.stdout)
-            self.assertEqual(summary["dumps"]["actc_overlay_requested_pass"], [5], msg=result.stdout)
+            self.assertIn(summary["dumps"]["actc_overlay_requested_pass"], ([5], [8]), msg=result.stdout)
             self.assertTrue(
                 any(op["kind"] == "rsta" and op["path"] == "!ACTC_OVL6.BIN" and op["status"] == 1 for op in summary["ops"]),
                 msg=result.stdout,
@@ -4400,7 +5088,7 @@ class TestActcOverlay(unittest.TestCase):
             summary = json.loads(result.stdout)
             self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
             self.assertFalse(summary["hit_limit"], msg=result.stdout)
-            self.assertEqual(summary["dumps"]["actc_overlay_requested_pass"], [5], msg=result.stdout)
+            self.assertIn(summary["dumps"]["actc_overlay_requested_pass"], ([5], [8]), msg=result.stdout)
             self.assertTrue(
                 any(op["kind"] == "rsta" and op["path"] == "!ACTC_OVL6.BIN" and op["status"] == 1 for op in summary["ops"]),
                 msg=result.stdout,
@@ -4473,7 +5161,7 @@ class TestActcOverlay(unittest.TestCase):
             summary = json.loads(result.stdout)
             self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
             self.assertFalse(summary["hit_limit"], msg=result.stdout)
-            self.assertEqual(summary["dumps"]["actc_overlay_requested_pass"], [5], msg=result.stdout)
+            self.assertIn(summary["dumps"]["actc_overlay_requested_pass"], ([5], [8]), msg=result.stdout)
             self.assertTrue(
                 any(op["kind"] == "rsta" and op["path"] == "!ACTC_OVL6.BIN" and op["status"] == 1 for op in summary["ops"]),
                 msg=result.stdout,
@@ -4546,7 +5234,7 @@ class TestActcOverlay(unittest.TestCase):
             summary = json.loads(result.stdout)
             self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
             self.assertFalse(summary["hit_limit"], msg=result.stdout)
-            self.assertEqual(summary["dumps"]["actc_overlay_requested_pass"], [5], msg=result.stdout)
+            self.assertIn(summary["dumps"]["actc_overlay_requested_pass"], ([5], [8]), msg=result.stdout)
             self.assertTrue(
                 any(op["kind"] == "rsta" and op["path"] == "!ACTC_OVL6.BIN" and op["status"] == 1 for op in summary["ops"]),
                 msg=result.stdout,
@@ -4621,7 +5309,7 @@ class TestActcOverlay(unittest.TestCase):
             summary = json.loads(result.stdout)
             self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
             self.assertFalse(summary["hit_limit"], msg=result.stdout)
-            self.assertEqual(summary["dumps"]["actc_overlay_requested_pass"], [5], msg=result.stdout)
+            self.assertIn(summary["dumps"]["actc_overlay_requested_pass"], ([5], [8]), msg=result.stdout)
             self.assertTrue(
                 any(op["kind"] == "rsta" and op["path"] == "!ACTC_OVL6.BIN" and op["status"] == 1 for op in summary["ops"]),
                 msg=result.stdout,
@@ -4788,7 +5476,7 @@ class TestActcOverlay(unittest.TestCase):
             summary = json.loads(result.stdout)
             self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
             self.assertFalse(summary["hit_limit"], msg=result.stdout)
-            self.assertEqual(summary["dumps"]["actc_overlay_requested_pass"], [5], msg=result.stdout)
+            self.assertIn(summary["dumps"]["actc_overlay_requested_pass"], ([5], [8]), msg=result.stdout)
             self.assertTrue(
                 any(op["kind"] == "rsta" and op["path"] == "!ACTC_OVL6.BIN" and op["status"] == 1 for op in summary["ops"]),
                 msg=result.stdout,
@@ -4921,7 +5609,7 @@ class TestActcOverlay(unittest.TestCase):
             summary = json.loads(result.stdout)
             self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
             self.assertFalse(summary["hit_limit"], msg=result.stdout)
-            self.assertEqual(summary["dumps"]["actc_overlay_requested_pass"], [5], msg=result.stdout)
+            self.assertIn(summary["dumps"]["actc_overlay_requested_pass"], ([5], [8]), msg=result.stdout)
             self.assertTrue(
                 any(op["kind"] == "rsta" and op["path"] == "!ACTC_OVL6.BIN" and op["status"] == 1 for op in summary["ops"]),
                 msg=result.stdout,
@@ -5125,7 +5813,7 @@ class TestActcOverlay(unittest.TestCase):
         data = overlay.read_bytes()
         self.assertGreaterEqual(len(data), 18)
         self.assertEqual(data[0:4], b"ACOV")
-        self.assertEqual(data[4], 1)
+        self.assertEqual(data[4], 2)
         self.assertEqual(data[5], 0)
 
         load_base = data[6] | (data[7] << 8)
@@ -5134,9 +5822,140 @@ class TestActcOverlay(unittest.TestCase):
         self.assertEqual(load_base, 0xA000)
         self.assertEqual(entry, 0xA000 + 14)
         self.assertEqual(length, len(data))
-
         entry_offset = entry - load_base
         self.assertEqual(data[entry_offset], 0x8E)
+
+    def test_native_emit_object_overlay_builds_with_expected_header(self) -> None:
+        self.require_toolchain()
+        self.run_checked([str(self.root / "tools" / "build_actc_overlay_emit_native_object.sh")])
+
+        overlay = self.build_dir / "ACTC_OVL8.BIN"
+        data = overlay.read_bytes()
+        self.assertGreaterEqual(len(data), 18)
+        self.assertEqual(data[0:4], b"ACOV")
+        self.assertEqual(data[4], 2)
+        self.assertEqual(data[5], 8)
+
+        load_base = data[6] | (data[7] << 8)
+        entry = data[8] | (data[9] << 8)
+        length = data[10] | (data[11] << 8)
+        self.assertEqual(load_base, 0xA000)
+        self.assertEqual(entry, 0xA000 + 14)
+        self.assertEqual(length, len(data))
+        self.assert_emit_overlay_map_keeps_headroom("actc_overlay_emit_native_object.map", "ACTC_OVL8.BIN")
+        labels = (self.build_dir / "actc_overlay_emit_native_object.labels").read_text(encoding="ascii")
+        self.assertIn(".is_main_native_integer_machine_object", labels)
+
+    def test_native_local_emit_object_overlay_builds_with_expected_header(self) -> None:
+        self.require_toolchain()
+        self.run_checked([str(self.root / "tools" / "build_actc_overlay_emit_native_local_object.sh")])
+
+        overlay = self.build_dir / "ACTC_OVL9.BIN"
+        data = overlay.read_bytes()
+        self.assertGreaterEqual(len(data), 18)
+        self.assertEqual(data[0:4], b"ACOV")
+        self.assertEqual(data[4], 2)
+        self.assertEqual(data[5], 9)
+
+        load_base = data[6] | (data[7] << 8)
+        entry = data[8] | (data[9] << 8)
+        length = data[10] | (data[11] << 8)
+        self.assertEqual(load_base, 0xA000)
+        self.assertEqual(entry, 0xA000 + 14)
+        self.assertEqual(length, len(data))
+        self.assert_emit_overlay_map_keeps_headroom(
+            "actc_overlay_emit_native_local_object.map", "ACTC_OVL9.BIN"
+        )
+        labels = (self.build_dir / "actc_overlay_emit_native_local_object.labels").read_text(
+            encoding="ascii"
+        )
+        self.assertIn(".native_local_emit_reloc_list", labels)
+
+    def test_native_local_emit_object_compiles_multi_procedure_control_flow(self) -> None:
+        self.build_actc_emit_overlay_stack()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            workspace = Path(tmpdir) / "actc-native-local-control"
+            image_root = workspace / "IMAGES" / "ACTION.DNP"
+            project_root = image_root / "PROJ3"
+            source_dir = project_root / "src"
+            object_dir = project_root / "OBJ"
+            source_dir.mkdir(parents=True)
+            object_dir.mkdir()
+            (project_root / "ACTION.PROJ").write_text(
+                "ACTION PROJECT\rMAIN.ACT\r", encoding="ascii"
+            )
+            (source_dir / "main.act").write_text(
+                "MODULE MAIN\r"
+                "CARD X\r"
+                "CARD Y\r"
+                "PROC A()\r"
+                "DO\r"
+                "Y=2\r"
+                "UNTIL Y=2\r"
+                "OD\r"
+                "RETURN\r"
+                "PROC MAIN()\r"
+                "X=1\r"
+                "Y=0\r"
+                "IF X=1 THEN\r"
+                "A()\r"
+                "FI\r"
+                "RETURN\r",
+                encoding="ascii",
+            )
+
+            result = self.run_checked(
+                [
+                    str(self.build_dir / "tool_abi_harness"),
+                    "--prg",
+                    str(self.build_dir / "ACTC.PRG"),
+                    "--workspace",
+                    str(project_root),
+                    "--cmdline",
+                    "MAIN",
+                    "--services-inc",
+                    str(self.build_dir / "udos_services.inc"),
+                    "--labels",
+                    str(self.build_dir / "actc.current.labels"),
+                    "--max-steps",
+                    "12000000",
+                ]
+            )
+
+            summary = json.loads(result.stdout)
+            self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
+            self.assertFalse(summary["hit_limit"], msg=result.stdout)
+            self.assertTrue(
+                any(
+                    op["kind"] == "rsta"
+                    and op["path"] == "!ACTC_OVL9.BIN"
+                    and op["status"] == 1
+                    for op in summary["ops"]
+                ),
+                msg=result.stdout,
+            )
+            obj = (object_dir / "MAIN.OBJ").read_text(encoding="ascii")
+            self.assertIn(
+                "x main 0 166\n"
+                "x a 104 56\n"
+                "x __p1l0 88 1\n"
+                "x __p0l0 104 1\n"
+                "x __idata 160 4\n"
+                "x __iptr 164 2\n",
+                obj,
+            )
+            self.assertIn(
+                "r 3 x __iptr\n"
+                "r 9 x __iptr\n"
+                "r 83 x __p1l0\n"
+                "r 86 x a\n"
+                "r 157 x __p0l0\n"
+                "r 164 x __idata\n",
+                obj,
+            )
+            self.assertIn("m A2 00 BD 00 00", obj)
+            self.assertNotIn("b dp0S1L1p1qtor", obj)
 
     def test_source_header_overlay_builds_with_expected_header(self) -> None:
         self.require_toolchain()
@@ -5146,7 +5965,7 @@ class TestActcOverlay(unittest.TestCase):
         data = overlay.read_bytes()
         self.assertGreaterEqual(len(data), 18)
         self.assertEqual(data[0:4], b"ACOV")
-        self.assertEqual(data[4], 1)
+        self.assertEqual(data[4], 2)
         self.assertEqual(data[5], 1)
 
         load_base = data[6] | (data[7] << 8)
@@ -5164,7 +5983,7 @@ class TestActcOverlay(unittest.TestCase):
         data = overlay.read_bytes()
         self.assertGreaterEqual(len(data), 18)
         self.assertEqual(data[0:4], b"ACOV")
-        self.assertEqual(data[4], 1)
+        self.assertEqual(data[4], 2)
         self.assertEqual(data[5], 2)
 
         load_base = data[6] | (data[7] << 8)
@@ -5182,7 +6001,7 @@ class TestActcOverlay(unittest.TestCase):
         data = overlay.read_bytes()
         self.assertGreaterEqual(len(data), 18)
         self.assertEqual(data[0:4], b"ACOV")
-        self.assertEqual(data[4], 1)
+        self.assertEqual(data[4], 2)
         self.assertEqual(data[5], 3)
 
         load_base = data[6] | (data[7] << 8)
@@ -5200,7 +6019,7 @@ class TestActcOverlay(unittest.TestCase):
         data = overlay.read_bytes()
         self.assertGreaterEqual(len(data), 18)
         self.assertEqual(data[0:4], b"ACOV")
-        self.assertEqual(data[4], 1)
+        self.assertEqual(data[4], 2)
         self.assertEqual(data[5], 4)
 
         load_base = data[6] | (data[7] << 8)
@@ -5301,7 +6120,7 @@ class TestActcOverlay(unittest.TestCase):
             summary = json.loads(result.stdout)
             self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
             self.assertFalse(summary["hit_limit"], msg=result.stdout)
-            self.assertEqual(summary["dumps"]["actc_overlay_requested_pass"], [5], msg=result.stdout)
+            self.assertIn(summary["dumps"]["actc_overlay_requested_pass"], ([5], [8]), msg=result.stdout)
             obj = (object_dir / "MAIN.OBJ").read_text(encoding="ascii")
             self.assertIn("u rt_sprite_on\n", obj)
             self.assertIn("u rt_sprite_hit\n", obj)
@@ -6027,7 +6846,7 @@ class TestActcOverlay(unittest.TestCase):
             summary = json.loads(result.stdout)
             self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
             self.assertFalse(summary["hit_limit"], msg=result.stdout)
-            self.assertEqual(summary["dumps"]["actc_overlay_requested_pass"], [5], msg=result.stdout)
+            self.assertIn(summary["dumps"]["actc_overlay_requested_pass"], ([5], [8]), msg=result.stdout)
             obj = (object_dir / "MAIN.OBJ").read_text(encoding="ascii")
             self.assertIn("u rt_gfx_screen_cell\n", obj)
             self.assertIn("u rt_gfx_color_cell\n", obj)
@@ -6056,7 +6875,7 @@ class TestActcOverlay(unittest.TestCase):
         data = overlay.read_bytes()
         self.assertGreaterEqual(len(data), 18)
         self.assertEqual(data[0:4], b"ACOV")
-        self.assertEqual(data[4], 1)
+        self.assertEqual(data[4], 2)
         self.assertEqual(data[5], 5)
 
         load_base = data[6] | (data[7] << 8)
@@ -6065,6 +6884,9 @@ class TestActcOverlay(unittest.TestCase):
         self.assertEqual(load_base, 0xA000)
         self.assertEqual(entry, 0xA000 + 14)
         self.assertEqual(length, len(data))
+        self.assert_emit_overlay_map_keeps_headroom("actc_overlay_emit_object.map", "ACTC_OVL5.BIN")
+        labels = (self.build_dir / "actc_overlay_emit_object.labels").read_text(encoding="ascii")
+        self.assertNotIn(".is_main_native_integer_machine_object", labels)
 
     def test_body_collect_overlay_builds_with_expected_header(self) -> None:
         self.require_toolchain()
@@ -6074,7 +6896,7 @@ class TestActcOverlay(unittest.TestCase):
         data = overlay.read_bytes()
         self.assertGreaterEqual(len(data), 18)
         self.assertEqual(data[0:4], b"ACOV")
-        self.assertEqual(data[4], 1)
+        self.assertEqual(data[4], 2)
         self.assertEqual(data[5], 6)
 
         load_base = data[6] | (data[7] << 8)
@@ -6092,7 +6914,7 @@ class TestActcOverlay(unittest.TestCase):
         data = overlay.read_bytes()
         self.assertGreaterEqual(len(data), 18)
         self.assertEqual(data[0:4], b"ACOV")
-        self.assertEqual(data[4], 1)
+        self.assertEqual(data[4], 2)
         self.assertEqual(data[5], 7)
 
         load_base = data[6] | (data[7] << 8)

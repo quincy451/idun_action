@@ -85,9 +85,13 @@ compute_payload_layout_overlay_body_loop:
     jmp compute_payload_layout_overlay_add_call
 :
     cmp #'s'
-    beq compute_payload_layout_overlay_add_string
+    bne :+
+    jmp compute_payload_layout_overlay_add_string
+:
     cmp #'e'
-    beq compute_payload_layout_overlay_add_string
+    bne :+
+    jmp compute_payload_layout_overlay_add_string
+:
     cmp #'i'
     bne :+
     jmp compute_payload_layout_overlay_add_int
@@ -131,6 +135,10 @@ compute_payload_layout_overlay_body_loop:
     cmp #'a'
     beq compute_payload_layout_overlay_add_single
     cmp #'m'
+    beq compute_payload_layout_overlay_add_single
+    cmp #'*'
+    beq compute_payload_layout_overlay_add_single
+    cmp #'/'
     beq compute_payload_layout_overlay_add_single
     cmp #'q'
     beq compute_payload_layout_overlay_add_single

@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "policy": "preserved-source-only",
+  "active_product": "Idun/Linux",
+  "legacy_roots": [
+    {"path": "src/tools_udos/act2save", "replacement": ["alink", "act2save", "actsave"]},
+    {"path": "src/tools_udos/actadd", "replacement": ["actadd"]},
+    {"path": "src/tools_udos/actc", "replacement": ["actc"]},
+    {"path": "src/tools_udos/actchk", "replacement": ["actchk"]},
+    {"path": "src/tools_udos/actcopy", "replacement": ["actcopy"]},
+    {"path": "src/tools_udos/actdbg", "replacement": ["actdbg", "actsvc"]},
+    {"path": "src/tools_udos/actdel", "replacement": ["actdel"]},
+    {"path": "src/tools_udos/actdir", "replacement": ["actdir"]},
+    {"path": "src/tools_udos/actedit", "replacement": ["actedit"]},
+    {"path": "src/tools_udos/actfile", "replacement": ["actfile"]},
+    {"path": "src/tools_udos/actinfo", "replacement": ["actinfo"]},
+    {"path": "src/tools_udos/actmkdir", "replacement": ["actmkdir"]},
+    {"path": "src/tools_udos/actmon", "replacement": ["actmon"]},
+    {"path": "src/tools_udos/actnew", "replacement": ["actnew"]},
+    {"path": "src/tools_udos/actren", "replacement": ["actmove", "actren"]},
+    {"path": "src/tools_udos/actrmdir", "replacement": ["actrmdir"]},
+    {"path": "src/tools_udos/actsrc", "replacement": ["actsrc"]},
+    {"path": "src/tools_udos/acttree", "replacement": ["acttree", "tree"]},
+    {"path": "src/tools_udos/actwork", "replacement": ["actwork"]},
+    {"path": "src/tools_udos/actwrite", "replacement": ["actwrite"]},
+    {"path": "src/tools_udos/alink", "replacement": ["alink"]},
+    {"path": "src/tools_udos/common", "replacement": ["src/tools_linux"]},
+    {"path": "src/tools_udos/deltree", "replacement": ["deltree"]},
+    {"path": "src/tools_udos/stageinfo", "replacement": []},
+    {"path": "src/tools_udos/xcopy", "replacement": ["xcopy"]}
+  ]
+}

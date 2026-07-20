@@ -26,10 +26,13 @@ ACTC_PREALLOCATE_BODY_EXTERNALS_IN_OVERLAY="${ACTC_PREALLOCATE_BODY_EXTERNALS_IN
 ACTC_SOURCE_WINDOW="${ACTC_SOURCE_WINDOW:-1280}"
 ACTC_SOURCE_LOOKAHEAD="${ACTC_SOURCE_LOOKAHEAD:-255}"
 ACTC_SOURCE_HEADER_OVERLAY_BUILD="$ROOT_DIR/tools/build_actc_overlay_source_header.sh"
+ACTC_WORKFLOW_OVERLAY_BUILD="$ROOT_DIR/tools/build_actc_overlay_noop.sh"
 ACTC_DECL_OVERLAY_BUILD="$ROOT_DIR/tools/build_actc_overlay_decl_counts.sh"
 ACTC_LAYOUT_OVERLAY_BUILD="$ROOT_DIR/tools/build_actc_overlay_payload_layout.sh"
 ACTC_IMPORT_OVERLAY_BUILD="$ROOT_DIR/tools/build_actc_overlay_runtime_imports.sh"
 ACTC_EMIT_OVERLAY_BUILD="$ROOT_DIR/tools/build_actc_overlay_emit_object.sh"
+ACTC_NATIVE_EMIT_OVERLAY_BUILD="$ROOT_DIR/tools/build_actc_overlay_emit_native_object.sh"
+ACTC_NATIVE_LOCAL_EMIT_OVERLAY_BUILD="$ROOT_DIR/tools/build_actc_overlay_emit_native_local_object.sh"
 ACTC_BODY_OVERLAY_BUILD="$ROOT_DIR/tools/build_actc_overlay_body_collect.sh"
 ACTC_PREALLOC_OVERLAY_BUILD="$ROOT_DIR/tools/build_actc_overlay_body_preallocate.sh"
 
@@ -49,6 +52,7 @@ ca65 -g -D ACTC_REU_SOURCE_CACHE=1 -D "ACTC_USE_DECL_OVERLAY=$ACTC_USE_DECL_OVER
 ld65 -C "$CFG" -o "$BIN" "$OBJ" -Ln "$CURRENT_LABELS" -m "$CURRENT_MAP"
 printf '\x00\x09' > "$PRG"
 cat "$BIN" >> "$PRG"
+bash "$ACTC_WORKFLOW_OVERLAY_BUILD" >/dev/null
 if [[ "$ACTC_USE_SOURCE_HEADER_OVERLAY" != "0" ]]; then
   bash "$ACTC_SOURCE_HEADER_OVERLAY_BUILD" >/dev/null
 fi
@@ -63,6 +67,8 @@ if [[ "$ACTC_USE_IMPORT_OVERLAY" != "0" ]]; then
 fi
 if [[ "$ACTC_USE_EMIT_OVERLAY" != "0" ]]; then
   bash "$ACTC_EMIT_OVERLAY_BUILD" >/dev/null
+  bash "$ACTC_NATIVE_EMIT_OVERLAY_BUILD" >/dev/null
+  bash "$ACTC_NATIVE_LOCAL_EMIT_OVERLAY_BUILD" >/dev/null
 fi
 if [[ "$ACTC_USE_BODY_OVERLAY" != "0" ]]; then
   ACTC_KEEP_BODY_RESIDENT_FALLBACK="$ACTC_KEEP_BODY_RESIDENT_FALLBACK" bash "$ACTC_BODY_OVERLAY_BUILD" >/dev/null

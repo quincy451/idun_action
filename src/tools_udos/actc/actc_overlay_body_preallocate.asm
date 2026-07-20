@@ -112,12 +112,13 @@ preallocate_body_externals_overlay_not_proc:
     ldy symbol_end_y_local
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
     sty saved_y_local
-    cmp #'('
-    beq preallocate_body_externals_overlay_call
-    cmp #'='
-    beq preallocate_body_externals_overlay_assignment
+    lda #'('
+    jsr preallocate_match_scan_char_from_y_overlay
+    bcc preallocate_body_externals_overlay_call
+    lda #'='
+    jsr preallocate_match_scan_char_from_y_overlay
+    bcc preallocate_body_externals_overlay_assignment
     jmp preallocate_body_externals_overlay_skip_line
 preallocate_body_externals_overlay_assignment:
     lda symbol_end_y_local
@@ -130,11 +131,8 @@ preallocate_body_externals_overlay_assignment:
     ldy assignment_target_end_y_local
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #'='
-    bne preallocate_body_externals_overlay_skip_line
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #'='
+    jsr preallocate_consume_scan_char_from_y_overlay
     bcc preallocate_body_externals_overlay_scan_at_y
     jmp preallocate_body_externals_overlay_skip_line
 preallocate_body_externals_overlay_scan_after_symbol:
@@ -148,11 +146,8 @@ preallocate_body_externals_overlay_print_statement:
     ldy symbol_end_y_local
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #'('
-    bne preallocate_body_externals_overlay_skip_line
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #'('
+    jsr preallocate_consume_scan_char_from_y_overlay
     bcs preallocate_body_externals_overlay_skip_line
     jsr preallocate_plain_call_args_overlay
     jmp preallocate_body_externals_overlay_skip_line
@@ -168,8 +163,8 @@ preallocate_body_externals_overlay_call:
     bcc :+
     jmp preallocate_body_externals_overlay_bad_proc
 :   ldy saved_y_local
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #'('
+    jsr preallocate_consume_scan_char_from_y_overlay
     bcs preallocate_body_externals_overlay_skip_line
     jsr preallocate_plain_call_args_overlay
     jmp preallocate_body_externals_overlay_skip_line
@@ -182,7 +177,7 @@ preallocate_body_externals_overlay_skip_line:
 preallocate_body_externals_overlay_proc_decl:
     lda #<pattern_proc
     ldy #>pattern_proc
-    jsr advance_scan_ptr_by_local_pattern
+    jsr source_reader_consume_local_pattern
     lda #ACTC_OVERLAY_CTX_SKIP_SOURCE_SPACES_FN_LO
     jsr call_context_function
     lda #ACTC_OVERLAY_CTX_COPY_SYMBOL_FROM_SCAN_PTR_FN_LO
@@ -218,11 +213,8 @@ preallocate_real_unary_assignment_external_from_declared_overlay:
     ldy assignment_target_end_y_local
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #'='
-    bne preallocate_real_unary_assignment_external_from_declared_overlay_miss
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #'='
+    jsr preallocate_consume_scan_char_from_y_overlay
     bcs preallocate_real_unary_assignment_external_from_declared_overlay_miss
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
@@ -265,13 +257,8 @@ preallocate_word_int_assignment_external_from_declared_overlay:
     ldy assignment_target_end_y_local
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #'='
-    beq :+
-    jmp preallocate_word_int_assignment_external_from_declared_overlay_miss
-:
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #'='
+    jsr preallocate_consume_scan_char_from_y_overlay
     bcc :+
     jmp preallocate_word_int_assignment_external_from_declared_overlay_miss
 :
@@ -319,13 +306,8 @@ preallocate_int_conversion_external_from_scan_y_overlay:
     ldy symbol_end_y_local
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #')'
-    beq :+
-    jmp preallocate_int_conversion_external_from_scan_y_overlay_miss
-:
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #')'
+    jsr preallocate_consume_scan_char_from_y_overlay
     bcc :+
     jmp preallocate_int_conversion_external_from_scan_y_overlay_miss
 :
@@ -369,13 +351,8 @@ preallocate_real_explicit_bridge_assignment_external_from_scan_y_overlay:
     ldy symbol_end_y_local
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #')'
-    beq :+
-    jmp preallocate_real_explicit_bridge_assignment_external_from_scan_y_overlay_miss
-:
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #')'
+    jsr preallocate_consume_scan_char_from_y_overlay
     bcc :+
     jmp preallocate_real_explicit_bridge_assignment_external_from_scan_y_overlay_miss
 :
@@ -414,13 +391,8 @@ preallocate_real_print_statement_external_from_declared_overlay_parse:
     jsr call_context_function
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #'('
-    beq :+
-    jmp preallocate_real_print_statement_external_from_declared_overlay_miss
-:
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #'('
+    jsr preallocate_consume_scan_char_from_y_overlay
     bcc :+
     jmp preallocate_real_print_statement_external_from_declared_overlay_miss
 :
@@ -432,13 +404,8 @@ preallocate_real_print_statement_external_from_declared_overlay_parse:
 preallocate_real_print_statement_external_from_declared_overlay_after_value:
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #')'
-    beq :+
-    jmp preallocate_real_print_statement_external_from_declared_overlay_miss
-:
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #')'
+    jsr preallocate_consume_scan_char_from_y_overlay
     bcc :+
     jmp preallocate_real_print_statement_external_from_declared_overlay_miss
 :
@@ -579,8 +546,7 @@ preallocate_real_numeric_conversion_external_from_scan_y_overlay_done:
     rts
 
 preallocate_real_numeric_positive_conversion_external_from_scan_y_overlay:
-    lda #ACTC_OVERLAY_CTX_PARSE_POSITIVE_WORD_SUM_FN_LO
-    jsr call_context_function
+    jsr parse_positive_word_sum_local_or_fail
     bcs preallocate_real_numeric_positive_conversion_external_from_scan_y_overlay_miss
     jsr preallocate_consume_close_from_scan_y_overlay
     bcs preallocate_real_numeric_positive_conversion_external_from_scan_y_overlay_miss
@@ -602,8 +568,7 @@ preallocate_real_numeric_positive_conversion_external_from_scan_y_overlay_miss:
 preallocate_real_numeric_signed_conversion_external_from_scan_y_overlay:
     jsr preallocate_consume_signed_word_prefix_from_scan_y_overlay
     bcs preallocate_real_numeric_signed_conversion_external_from_scan_y_overlay_miss
-    lda #ACTC_OVERLAY_CTX_PARSE_POSITIVE_WORD_SUM_FN_LO
-    jsr call_context_function
+    jsr parse_positive_word_sum_local_or_fail
     bcs preallocate_real_numeric_signed_conversion_external_from_scan_y_overlay_miss
     jsr preallocate_consume_close_from_scan_y_overlay
     bcs preallocate_real_numeric_signed_conversion_external_from_scan_y_overlay_miss
@@ -649,13 +614,8 @@ preallocate_real_unary_print_external_from_scan_y_overlay_operator:
     ldy symbol_end_y_local
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #'('
-    beq :+
-    jmp preallocate_real_unary_print_external_from_scan_y_overlay_miss
-:
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #'('
+    jsr preallocate_consume_scan_char_from_y_overlay
     bcc :+
     jmp preallocate_real_unary_print_external_from_scan_y_overlay_miss
 :
@@ -717,19 +677,22 @@ preallocate_real_binary_print_external_from_scan_y_overlay:
     ldy symbol_end_y_local
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #'+'
-    beq preallocate_real_binary_print_external_from_scan_y_overlay_operator
-    cmp #'-'
-    beq preallocate_real_binary_print_external_from_scan_y_overlay_operator
-    cmp #'*'
-    beq preallocate_real_binary_print_external_from_scan_y_overlay_operator
-    cmp #'/'
-    bne preallocate_real_binary_print_external_from_scan_y_overlay_miss
+    lda #'+'
+    jsr preallocate_match_scan_char_from_y_overlay
+    bcc preallocate_real_binary_print_external_from_scan_y_overlay_operator
+    lda #'-'
+    jsr preallocate_match_scan_char_from_y_overlay
+    bcc preallocate_real_binary_print_external_from_scan_y_overlay_operator
+    lda #'*'
+    jsr preallocate_match_scan_char_from_y_overlay
+    bcc preallocate_real_binary_print_external_from_scan_y_overlay_operator
+    lda #'/'
+    jsr preallocate_match_scan_char_from_y_overlay
+    bcc preallocate_real_binary_print_external_from_scan_y_overlay_operator
+    jmp preallocate_real_binary_print_external_from_scan_y_overlay_miss
 preallocate_real_binary_print_external_from_scan_y_overlay_operator:
     sta real_operator_local
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    jsr preallocate_consume_scan_char_from_y_overlay
     bcc :+
     jmp preallocate_real_binary_print_external_from_scan_y_overlay_miss
 :
@@ -820,43 +783,42 @@ preallocate_real_condition_cmp_external_from_scan_y_overlay:
 preallocate_real_condition_cmp_external_from_scan_y_overlay_after_lhs:
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #'='
-    beq preallocate_real_condition_cmp_external_from_scan_y_overlay_consume_one
-    cmp #'<'
-    beq preallocate_real_condition_cmp_external_from_scan_y_overlay_consume_lt
-    cmp #'>'
-    beq preallocate_real_condition_cmp_external_from_scan_y_overlay_consume_gt
+    lda #'='
+    jsr preallocate_match_scan_char_from_y_overlay
+    bcc preallocate_real_condition_cmp_external_from_scan_y_overlay_consume_one
+    lda #'<'
+    jsr preallocate_match_scan_char_from_y_overlay
+    bcc preallocate_real_condition_cmp_external_from_scan_y_overlay_consume_lt
+    lda #'>'
+    jsr preallocate_match_scan_char_from_y_overlay
+    bcc preallocate_real_condition_cmp_external_from_scan_y_overlay_consume_gt
     jmp preallocate_real_condition_cmp_external_from_scan_y_overlay_miss
 preallocate_real_condition_cmp_external_from_scan_y_overlay_consume_one:
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    jsr preallocate_consume_scan_char_from_y_overlay
     bcc preallocate_real_condition_cmp_external_from_scan_y_overlay_rhs
     jmp preallocate_real_condition_cmp_external_from_scan_y_overlay_miss
 preallocate_real_condition_cmp_external_from_scan_y_overlay_consume_lt:
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    jsr preallocate_consume_scan_char_from_y_overlay
     bcc :+
     jmp preallocate_real_condition_cmp_external_from_scan_y_overlay_miss
 :
-    jsr read_scan_char_at_y
-    cmp #'>'
-    beq preallocate_real_condition_cmp_external_from_scan_y_overlay_consume_second
-    cmp #'='
-    beq preallocate_real_condition_cmp_external_from_scan_y_overlay_consume_second
+    lda #'>'
+    jsr preallocate_match_scan_char_from_y_overlay
+    bcc preallocate_real_condition_cmp_external_from_scan_y_overlay_consume_second
+    lda #'='
+    jsr preallocate_match_scan_char_from_y_overlay
+    bcc preallocate_real_condition_cmp_external_from_scan_y_overlay_consume_second
     jmp preallocate_real_condition_cmp_external_from_scan_y_overlay_rhs
 preallocate_real_condition_cmp_external_from_scan_y_overlay_consume_gt:
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    jsr preallocate_consume_scan_char_from_y_overlay
     bcc :+
     jmp preallocate_real_condition_cmp_external_from_scan_y_overlay_miss
 :
-    jsr read_scan_char_at_y
-    cmp #'='
-    bne preallocate_real_condition_cmp_external_from_scan_y_overlay_rhs
+    lda #'='
+    jsr preallocate_match_scan_char_from_y_overlay
+    bcs preallocate_real_condition_cmp_external_from_scan_y_overlay_rhs
 preallocate_real_condition_cmp_external_from_scan_y_overlay_consume_second:
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    jsr preallocate_consume_scan_char_from_y_overlay
     bcc :+
     jmp preallocate_real_condition_cmp_external_from_scan_y_overlay_miss
 :
@@ -972,6 +934,32 @@ preallocate_consume_upper_scan_char_from_y_overlay:
     lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
     jmp call_context_function
 
+preallocate_match_scan_char_from_y_overlay:
+    sta compare_char_local
+    jsr read_scan_char_at_y
+    cmp compare_char_local
+    beq :+
+    sec
+    rts
+:
+    clc
+    rts
+
+preallocate_consume_scan_char_from_y_overlay:
+    sta compare_char_local
+    jsr read_scan_char_at_y
+    cmp compare_char_local
+    beq :+
+    sec
+    rts
+:
+    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
+    jmp call_context_function
+
+preallocate_advance_scan_char_from_y_overlay:
+    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
+    jmp call_context_function
+
 uppercase_ascii_local:
     cmp #'a'
     bcc uppercase_ascii_local_done
@@ -1004,8 +992,7 @@ preallocate_real_plain_decimal_assignment_external_from_scan_y_overlay_done:
     rts
 
 preallocate_real_plain_positive_assignment_external_from_scan_y_overlay:
-    lda #ACTC_OVERLAY_CTX_PARSE_POSITIVE_WORD_SUM_FN_LO
-    jsr call_context_function
+    jsr parse_positive_word_sum_local_or_fail
     bcs preallocate_real_plain_positive_assignment_external_from_scan_y_overlay_miss
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
@@ -1030,8 +1017,7 @@ preallocate_real_plain_positive_assignment_external_from_scan_y_overlay_miss:
 preallocate_real_plain_signed_assignment_external_from_scan_y_overlay:
     jsr preallocate_consume_signed_word_prefix_from_scan_y_overlay
     bcs preallocate_real_plain_signed_assignment_external_from_scan_y_overlay_miss
-    lda #ACTC_OVERLAY_CTX_PARSE_POSITIVE_WORD_SUM_FN_LO
-    jsr call_context_function
+    jsr parse_positive_word_sum_local_or_fail
     bcs preallocate_real_plain_signed_assignment_external_from_scan_y_overlay_miss
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
@@ -1091,8 +1077,7 @@ preallocate_real_explicit_decimal_after_open_from_scan_y_overlay_done:
     rts
 
 preallocate_real_explicit_positive_assignment_external_from_scan_y_overlay:
-    lda #ACTC_OVERLAY_CTX_PARSE_POSITIVE_WORD_SUM_FN_LO
-    jsr call_context_function
+    jsr parse_positive_word_sum_local_or_fail
     bcs preallocate_real_explicit_positive_assignment_external_from_scan_y_overlay_miss
     jsr preallocate_consume_close_and_line_end_from_scan_y_overlay
     bcs preallocate_real_explicit_positive_assignment_external_from_scan_y_overlay_miss
@@ -1111,8 +1096,7 @@ preallocate_real_explicit_positive_assignment_external_from_scan_y_overlay_miss:
 preallocate_real_explicit_signed_assignment_external_from_scan_y_overlay:
     jsr preallocate_consume_signed_word_prefix_from_scan_y_overlay
     bcs preallocate_real_explicit_signed_assignment_external_from_scan_y_overlay_miss
-    lda #ACTC_OVERLAY_CTX_PARSE_POSITIVE_WORD_SUM_FN_LO
-    jsr call_context_function
+    jsr parse_positive_word_sum_local_or_fail
     bcs preallocate_real_explicit_signed_assignment_external_from_scan_y_overlay_miss
     jsr preallocate_consume_close_and_line_end_from_scan_y_overlay
     bcs preallocate_real_explicit_signed_assignment_external_from_scan_y_overlay_miss
@@ -1131,25 +1115,15 @@ preallocate_real_explicit_signed_assignment_external_from_scan_y_overlay_miss:
 preallocate_consume_signed_word_prefix_from_scan_y_overlay:
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #'0'
-    beq :+
-    jmp preallocate_consume_signed_word_prefix_from_scan_y_overlay_miss
-:
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #'0'
+    jsr preallocate_consume_scan_char_from_y_overlay
     bcc :+
     jmp preallocate_consume_signed_word_prefix_from_scan_y_overlay_miss
 :
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #'-'
-    beq :+
-    jmp preallocate_consume_signed_word_prefix_from_scan_y_overlay_miss
-:
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #'-'
+    jsr preallocate_consume_scan_char_from_y_overlay
     bcc :+
     jmp preallocate_consume_signed_word_prefix_from_scan_y_overlay_miss
 :
@@ -1164,13 +1138,8 @@ preallocate_consume_signed_word_prefix_from_scan_y_overlay_miss:
 preallocate_consume_close_and_line_end_from_scan_y_overlay:
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #')'
-    beq :+
-    jmp preallocate_consume_close_and_line_end_from_scan_y_overlay_miss
-:
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #')'
+    jsr preallocate_consume_scan_char_from_y_overlay
     bcc :+
     jmp preallocate_consume_close_and_line_end_from_scan_y_overlay_miss
 :
@@ -1190,13 +1159,8 @@ preallocate_consume_close_and_line_end_from_scan_y_overlay_miss:
 preallocate_consume_close_from_scan_y_overlay:
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #')'
-    beq :+
-    jmp preallocate_consume_close_from_scan_y_overlay_miss
-:
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #')'
+    jsr preallocate_consume_scan_char_from_y_overlay
     bcc :+
     jmp preallocate_consume_close_from_scan_y_overlay_miss
 :
@@ -1241,13 +1205,8 @@ preallocate_consume_keyword_open_from_scan_y_overlay:
     ldy symbol_end_y_local
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #'('
-    beq :+
-    jmp preallocate_consume_keyword_open_from_scan_y_overlay_miss
-:
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #'('
+    jsr preallocate_consume_scan_char_from_y_overlay
     bcc :+
     jmp preallocate_consume_keyword_open_from_scan_y_overlay_miss
 :
@@ -1286,13 +1245,8 @@ preallocate_real_unary_operator_assignment_external_from_scan_y_overlay_operator
     ldy symbol_end_y_local
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #'('
-    beq :+
-    jmp preallocate_real_unary_operator_assignment_external_from_scan_y_overlay_miss
-:
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #'('
+    jsr preallocate_consume_scan_char_from_y_overlay
     bcc :+
     jmp preallocate_real_unary_operator_assignment_external_from_scan_y_overlay_miss
 :
@@ -1317,13 +1271,8 @@ preallocate_real_unary_operator_assignment_external_from_scan_y_overlay_operator
     ldy symbol_end_y_local
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #')'
-    beq :+
-    jmp preallocate_real_unary_operator_assignment_external_from_scan_y_overlay_miss
-:
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #')'
+    jsr preallocate_consume_scan_char_from_y_overlay
     bcc :+
     jmp preallocate_real_unary_operator_assignment_external_from_scan_y_overlay_miss
 :
@@ -1367,19 +1316,22 @@ preallocate_real_binary_operator_assignment_external_from_scan_y_overlay:
     ldy symbol_end_y_local
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #'+'
-    beq preallocate_real_binary_operator_assignment_external_from_scan_y_overlay_operator
-    cmp #'-'
-    beq preallocate_real_binary_operator_assignment_external_from_scan_y_overlay_operator
-    cmp #'*'
-    beq preallocate_real_binary_operator_assignment_external_from_scan_y_overlay_operator
-    cmp #'/'
-    bne preallocate_real_binary_operator_assignment_external_from_scan_y_overlay_miss
+    lda #'+'
+    jsr preallocate_match_scan_char_from_y_overlay
+    bcc preallocate_real_binary_operator_assignment_external_from_scan_y_overlay_operator
+    lda #'-'
+    jsr preallocate_match_scan_char_from_y_overlay
+    bcc preallocate_real_binary_operator_assignment_external_from_scan_y_overlay_operator
+    lda #'*'
+    jsr preallocate_match_scan_char_from_y_overlay
+    bcc preallocate_real_binary_operator_assignment_external_from_scan_y_overlay_operator
+    lda #'/'
+    jsr preallocate_match_scan_char_from_y_overlay
+    bcc preallocate_real_binary_operator_assignment_external_from_scan_y_overlay_operator
+    jmp preallocate_real_binary_operator_assignment_external_from_scan_y_overlay_miss
 preallocate_real_binary_operator_assignment_external_from_scan_y_overlay_operator:
     sta real_operator_local
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    jsr preallocate_consume_scan_char_from_y_overlay
     bcc :+
     jmp preallocate_real_binary_operator_assignment_external_from_scan_y_overlay_miss
 :
@@ -1467,29 +1419,34 @@ preallocate_plain_call_args_overlay:
 preallocate_plain_call_args_overlay_loop:
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    bne :+
+    lda #$00
+    jsr preallocate_match_scan_char_from_y_overlay
+    bcs :+
     jmp preallocate_plain_call_args_overlay_done
-:   cmp #10
-    bne :+
+:   lda #10
+    jsr preallocate_match_scan_char_from_y_overlay
+    bcs :+
     jmp preallocate_plain_call_args_overlay_done
-:   cmp #13
-    bne :+
+:   lda #13
+    jsr preallocate_match_scan_char_from_y_overlay
+    bcs :+
     jmp preallocate_plain_call_args_overlay_done
-:   cmp #'"'
-    beq preallocate_plain_call_args_overlay_string
-    cmp #'('
-    beq preallocate_plain_call_args_overlay_lparen
-    cmp #')'
-    beq preallocate_plain_call_args_overlay_rparen
+:   lda #'"'
+    jsr preallocate_match_scan_char_from_y_overlay
+    bcc preallocate_plain_call_args_overlay_string
+    lda #'('
+    jsr preallocate_match_scan_char_from_y_overlay
+    bcc preallocate_plain_call_args_overlay_lparen
+    lda #')'
+    jsr preallocate_match_scan_char_from_y_overlay
+    bcc preallocate_plain_call_args_overlay_rparen
     jsr preallocate_int_conversion_external_from_scan_y_overlay
     bcc preallocate_plain_call_args_overlay_loop
     lda #ACTC_OVERLAY_CTX_COPY_SYMBOL_FROM_SCAN_Y_FN_LO
     jsr call_context_function
     bcc preallocate_plain_call_args_overlay_symbol
 preallocate_plain_call_args_overlay_consume_one:
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    jsr preallocate_advance_scan_char_from_y_overlay
     bcs preallocate_plain_call_args_overlay_fail
     jmp preallocate_plain_call_args_overlay_loop
 preallocate_plain_call_args_overlay_symbol:
@@ -1499,9 +1456,9 @@ preallocate_plain_call_args_overlay_symbol:
     ldy symbol_end_y_local
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #'('
-    bne preallocate_plain_call_args_overlay_symbol_not_call
+    lda #'('
+    jsr preallocate_match_scan_char_from_y_overlay
+    bcs preallocate_plain_call_args_overlay_symbol_not_call
     sty saved_y_local
     lda #ACTC_OVERLAY_CTX_RESOLVE_CALL_TARGET_FN_LO
     jsr call_context_function
@@ -1512,21 +1469,22 @@ preallocate_plain_call_args_overlay_symbol_not_call:
     jmp preallocate_plain_call_args_overlay_loop
 preallocate_plain_call_args_overlay_lparen:
     inc preallocate_call_arg_scan_depth_local
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #'('
+    jsr preallocate_consume_scan_char_from_y_overlay
     bcs preallocate_plain_call_args_overlay_fail
     jmp preallocate_plain_call_args_overlay_loop
 preallocate_plain_call_args_overlay_rparen:
     lda preallocate_call_arg_scan_depth_local
     beq preallocate_plain_call_args_overlay_consume_done
     dec preallocate_call_arg_scan_depth_local
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #')'
+    jsr preallocate_consume_scan_char_from_y_overlay
     bcs preallocate_plain_call_args_overlay_fail
     jmp preallocate_plain_call_args_overlay_loop
 preallocate_plain_call_args_overlay_consume_done:
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #')'
+    jsr preallocate_consume_scan_char_from_y_overlay
+    bcs preallocate_plain_call_args_overlay_fail
 preallocate_plain_call_args_overlay_done:
     clc
     rts
@@ -1545,21 +1503,28 @@ preallocate_line_call_args_overlay:
 preallocate_line_call_args_overlay_loop:
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    bne :+
+    lda #$00
+    jsr preallocate_match_scan_char_from_y_overlay
+    bcs :+
     jmp preallocate_line_call_args_overlay_done
-:   cmp #10
-    bne :+
+:   lda #10
+    jsr preallocate_match_scan_char_from_y_overlay
+    bcs :+
     jmp preallocate_line_call_args_overlay_done
-:   cmp #13
-    bne :+
+:   lda #13
+    jsr preallocate_match_scan_char_from_y_overlay
+    bcs :+
     jmp preallocate_line_call_args_overlay_done
-:   cmp #'"'
-    beq preallocate_line_call_args_overlay_string
-    cmp #'('
-    beq preallocate_line_call_args_overlay_lparen
-    cmp #')'
-    beq preallocate_line_call_args_overlay_rparen
+:   lda #'"'
+    jsr preallocate_match_scan_char_from_y_overlay
+    bcs :+
+    jmp preallocate_line_call_args_overlay_string
+:   lda #'('
+    jsr preallocate_match_scan_char_from_y_overlay
+    bcc preallocate_line_call_args_overlay_lparen
+    lda #')'
+    jsr preallocate_match_scan_char_from_y_overlay
+    bcc preallocate_line_call_args_overlay_rparen
     jsr preallocate_int_conversion_external_from_scan_y_overlay
     bcs preallocate_line_call_args_overlay_try_call
     lda #$01
@@ -1570,8 +1535,7 @@ preallocate_line_call_args_overlay_try_call:
     jsr call_context_function
     bcc preallocate_line_call_args_overlay_symbol
 preallocate_line_call_args_overlay_consume_one:
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    jsr preallocate_advance_scan_char_from_y_overlay
     bcs preallocate_line_call_args_overlay_fail
     jmp preallocate_line_call_args_overlay_loop
 preallocate_line_call_args_overlay_symbol:
@@ -1581,17 +1545,17 @@ preallocate_line_call_args_overlay_symbol:
     ldy symbol_end_y_local
     lda #ACTC_OVERLAY_CTX_SKIP_INLINE_SPACES_FN_LO
     jsr call_context_function
-    jsr read_scan_char_at_y
-    cmp #'('
-    bne preallocate_line_call_args_overlay_symbol_not_call
+    lda #'('
+    jsr preallocate_match_scan_char_from_y_overlay
+    bcs preallocate_line_call_args_overlay_symbol_not_call
     sty saved_y_local
     lda #ACTC_OVERLAY_CTX_RESOLVE_CALL_TARGET_FN_LO
     jsr call_context_function
     ldy saved_y_local
     lda #$01
     sta preallocate_line_ops_seen_local
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #'('
+    jsr preallocate_consume_scan_char_from_y_overlay
     bcs preallocate_line_call_args_overlay_fail
     jmp preallocate_line_call_args_overlay_loop
 preallocate_line_call_args_overlay_symbol_not_call:
@@ -1599,8 +1563,8 @@ preallocate_line_call_args_overlay_symbol_not_call:
     jmp preallocate_line_call_args_overlay_loop
 preallocate_line_call_args_overlay_lparen:
     inc preallocate_call_arg_scan_depth_local
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #'('
+    jsr preallocate_consume_scan_char_from_y_overlay
     bcs preallocate_line_call_args_overlay_fail
     jmp preallocate_line_call_args_overlay_loop
 preallocate_line_call_args_overlay_rparen:
@@ -1608,8 +1572,8 @@ preallocate_line_call_args_overlay_rparen:
     beq preallocate_line_call_args_overlay_consume_rparen
     dec preallocate_call_arg_scan_depth_local
 preallocate_line_call_args_overlay_consume_rparen:
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #')'
+    jsr preallocate_consume_scan_char_from_y_overlay
     bcs preallocate_line_call_args_overlay_fail
     jmp preallocate_line_call_args_overlay_loop
 preallocate_line_call_args_overlay_string:
@@ -1626,25 +1590,28 @@ preallocate_line_call_args_overlay_fail:
     rts
 
 preallocate_skip_string_in_plain_call_arg_overlay:
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #'"'
+    jsr preallocate_consume_scan_char_from_y_overlay
     bcs preallocate_skip_string_in_plain_call_arg_overlay_fail
 preallocate_skip_string_in_plain_call_arg_overlay_loop:
-    jsr read_scan_char_at_y
-    beq preallocate_skip_string_in_plain_call_arg_overlay_done
-    cmp #10
-    beq preallocate_skip_string_in_plain_call_arg_overlay_done
-    cmp #13
-    beq preallocate_skip_string_in_plain_call_arg_overlay_done
-    cmp #'"'
-    beq preallocate_skip_string_in_plain_call_arg_overlay_close
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #$00
+    jsr preallocate_match_scan_char_from_y_overlay
+    bcc preallocate_skip_string_in_plain_call_arg_overlay_done
+    lda #10
+    jsr preallocate_match_scan_char_from_y_overlay
+    bcc preallocate_skip_string_in_plain_call_arg_overlay_done
+    lda #13
+    jsr preallocate_match_scan_char_from_y_overlay
+    bcc preallocate_skip_string_in_plain_call_arg_overlay_done
+    lda #'"'
+    jsr preallocate_match_scan_char_from_y_overlay
+    bcc preallocate_skip_string_in_plain_call_arg_overlay_close
+    jsr preallocate_advance_scan_char_from_y_overlay
     bcs preallocate_skip_string_in_plain_call_arg_overlay_fail
     jmp preallocate_skip_string_in_plain_call_arg_overlay_loop
 preallocate_skip_string_in_plain_call_arg_overlay_close:
-    lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_Y_FN_LO
-    jsr call_context_function
+    lda #'"'
+    jsr preallocate_consume_scan_char_from_y_overlay
     bcs preallocate_skip_string_in_plain_call_arg_overlay_fail
 preallocate_skip_string_in_plain_call_arg_overlay_done:
     clc
@@ -1779,7 +1746,7 @@ pattern_matches_local_scan_ptr_keyword:
     lda #ACTC_OVERLAY_CTX_PATTERN_MATCHES_SCAN_PTR_KEYWORD_FN_LO
     jmp call_context_function
 
-advance_scan_ptr_by_local_pattern:
+source_reader_consume_local_pattern:
     jsr set_resident_const_ptr_from_ay
     lda #ACTC_OVERLAY_CTX_ADVANCE_SCAN_PTR_BY_CONST_FN_LO
     jmp call_context_function
@@ -1886,6 +1853,8 @@ call_loaded_target_with_a:
     pha
     lda call_arg_a
     rts
+
+.include "actc_overlay_positive_word.inc"
 
 ; Builtin runtime helper lookup lives in the active body overlay.
 ; Each row packs the argument count into bits 6..7 of the builtin pointer high byte.

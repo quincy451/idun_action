@@ -1,5 +1,20 @@
 .include "actc_overlay_abi.inc"
 
+.ifndef ACTC_EMIT_NATIVE_ONLY
+ACTC_EMIT_NATIVE_ONLY = 0
+.endif
+.ifndef ACTC_EMIT_NATIVE_LOCAL_ONLY
+ACTC_EMIT_NATIVE_LOCAL_ONLY = 0
+.endif
+
+.if ACTC_EMIT_NATIVE_LOCAL_ONLY
+ACTC_EMIT_OVERLAY_PASS = ACTC_OVERLAY_PASS_EMIT_NATIVE_LOCAL_OBJECT
+.elseif ACTC_EMIT_NATIVE_ONLY
+ACTC_EMIT_OVERLAY_PASS = ACTC_OVERLAY_PASS_EMIT_NATIVE_OBJECT
+.else
+ACTC_EMIT_OVERLAY_PASS = ACTC_OVERLAY_PASS_EMIT_OBJECT
+.endif
+
 .export actc_overlay_header
 .export actc_overlay_entry
 .export actc_overlay_end
@@ -9,7 +24,7 @@
 actc_overlay_header:
     .byte 'A','C','O','V'
     .byte ACTC_OVERLAY_ABI_VERSION
-    .byte ACTC_OVERLAY_PASS_EMIT_OBJECT
+    .byte ACTC_EMIT_OVERLAY_PASS
     .word ACTC_OVERLAY_EXEC_BASE
     .word actc_overlay_entry
     .word actc_overlay_end - actc_overlay_header
@@ -19,8 +34,19 @@ actc_overlay_entry:
     stx ACTC_OVERLAY_CONTEXT_ZP
     sty ACTC_OVERLAY_CONTEXT_ZP+1
     ldy #ACTC_OVERLAY_CTX_PASS_ID
-    lda #ACTC_OVERLAY_PASS_EMIT_OBJECT
+    lda #ACTC_EMIT_OVERLAY_PASS
     sta (ACTC_OVERLAY_CONTEXT_ZP),y
+
+.if ACTC_EMIT_NATIVE_ONLY
+    jsr is_main_native_integer_machine_object
+    bcs :+
+    ldy #ACTC_OVERLAY_CTX_STATUS
+    lda #ACTC_OVERLAY_STATUS_NOT_APPLICABLE
+    sta (ACTC_OVERLAY_CONTEXT_ZP),y
+    clc
+    rts
+:
+.endif
 
     jsr build_object_content_overlay
     bcs actc_overlay_fail
@@ -203,7 +229,11 @@ emit_debug_body_op_list_op_loop:
     lda body_debug_count_local
     cmp body_debug_index_data
     beq emit_debug_body_op_list_next_proc
+.if ACTC_EMIT_NATIVE_ONLY
+    lda #'L'
+.else
     lda #'l'
+.endif
     jsr emit_char_overlay
     lda #' '
     jsr emit_char_overlay
@@ -211,8 +241,19 @@ emit_debug_body_op_list_op_loop:
     jsr emit_small_decimal
     lda #' '
     jsr emit_char_overlay
+.if ACTC_EMIT_NATIVE_ONLY
+.if ACTC_EMIT_NATIVE_LOCAL_ONLY
+    jsr native_int_load_debug_offset
+.else
+    ldx body_debug_index_data
+    lda native_int_debug_offsets_lo,x
+    ldy native_int_debug_offsets_hi,x
+.endif
+    jsr emit_word_decimal
+.else
     lda body_debug_index_data
     jsr emit_small_decimal
+.endif
     lda #' '
     jsr emit_char_overlay
     lda #'0'
@@ -447,6 +488,9 @@ emit_debug_var_type_for_x:
     rts
 
 emit_export_list:
+.if ACTC_EMIT_NATIVE_ONLY
+    jmp emit_native_integer_export_list
+.else
     jsr is_main_local_call_sequence_machine_object
     bcc emit_export_list_not_local_call_sequence
     jmp emit_machine_local_call_sequence_export_list
@@ -527,17 +571,7 @@ emit_machine_external_call_sequence_export_list:
     lda #ACTC_OVERLAY_CTX_SET_BODY_PTR_FN_LO
     jsr call_indexed_context_function
     jsr load_resident_body_ptr_to_scan_zp
-    jsr emit_count_external_call_sequence_body
-    lda #16
-    ldx body_debug_count_local
-emit_machine_external_call_sequence_size_loop:
-    cpx #$00
-    beq emit_machine_external_call_sequence_size_done
-    clc
-    adc #$03
-    dex
-    bne emit_machine_external_call_sequence_size_loop
-emit_machine_external_call_sequence_size_done:
+    jsr compute_external_call_sequence_machine_size
     ldx #$00
     ldy #$00
     sty word_value_lo
@@ -643,8 +677,14 @@ emit_machine_export_line:
     ldy #$00
     jsr emit_word_decimal
     jmp emit_newline
+.endif
 
 emit_body_ops_list:
+.if ACTC_EMIT_NATIVE_ONLY
+    jsr emit_native_integer_body_marker_list
+    clc
+    rts
+.else
     jsr is_main_local_call_sequence_machine_object
     bcc emit_body_ops_list_not_local_call_sequence
     jsr emit_machine_local_call_sequence_body_marker_list
@@ -712,8 +752,13 @@ emit_body_ops_list_newline:
 emit_body_ops_list_done:
     clc
     rts
+.endif
 
 emit_machine_code_list:
+.if ACTC_EMIT_NATIVE_ONLY
+    jsr emit_native_integer_machine_code_list
+    jmp emit_machine_code_list_done
+.else
     jsr is_empty_main_machine_object
     bcc emit_machine_code_list_check_local_call
     lda #<empty_main_machine_record
@@ -738,10 +783,12 @@ emit_machine_code_list_check_external_call_sequence:
     bcc emit_machine_code_list_done
     jsr emit_machine_external_call_sequence_code_list
     jmp emit_machine_code_list_done
+.endif
 emit_machine_code_list_done:
     clc
     rts
 
+.if ACTC_EMIT_NATIVE_ONLY = 0
 emit_machine_external_call_sequence_code_list:
     lda #'m'
     jsr emit_char_overlay
@@ -758,8 +805,17 @@ emit_machine_external_call_sequence_code_loop:
     beq emit_machine_external_call_sequence_code_epilogue
     cmp #'u'
     bne emit_machine_external_call_sequence_code_done
-    jsr emit_machine_external_jsr_placeholder_bytes
+    lda body_debug_index_data
+    pha
     inc body_debug_index_data
+    ldy body_debug_index_data
+    jsr emit_object_peek_payload_y
+    sta proc_var_index_local
+    pla
+    beq emit_machine_external_call_sequence_code_emit_jsr
+    jsr emit_machine_external_call_sequence_maybe_word_setup
+emit_machine_external_call_sequence_code_emit_jsr:
+    jsr emit_machine_external_jsr_placeholder_bytes
     inc body_debug_index_data
     jmp emit_machine_external_call_sequence_code_loop
 emit_machine_external_call_sequence_code_epilogue:
@@ -816,6 +872,11 @@ emit_machine_external_call_sequence_reloc_loop:
     ldy body_debug_index_data
     jsr emit_object_peek_payload_y
     sta proc_var_index_local
+    lda body_debug_index_data
+    cmp #$01
+    beq emit_machine_external_call_sequence_reloc_write
+    jsr emit_machine_external_call_sequence_maybe_word_reloc_advance
+emit_machine_external_call_sequence_reloc_write:
     lda #'r'
     jsr emit_char_overlay
     lda #' '
@@ -830,6 +891,70 @@ emit_machine_external_call_sequence_reloc_loop:
     lda proc_var_index_local
     jsr emit_char_overlay
     jsr emit_newline
+    jsr emit_advance_external_reloc_body_offset_by_three
+    inc body_debug_index_data
+    jmp emit_machine_external_call_sequence_reloc_loop
+emit_machine_external_call_sequence_reloc_done:
+    rts
+
+compute_external_call_sequence_machine_size:
+    lda #16
+    sta word_value_lo
+    lda #$00
+    sta body_debug_index_data
+compute_external_call_sequence_machine_size_loop:
+    ldy body_debug_index_data
+    jsr emit_object_peek_payload_y
+    cmp #'u'
+    bne compute_external_call_sequence_machine_size_done
+    lda body_debug_index_data
+    pha
+    inc body_debug_index_data
+    ldy body_debug_index_data
+    jsr emit_object_peek_payload_y
+    sta proc_var_index_local
+    pla
+    beq compute_external_call_sequence_machine_size_after_setup
+    jsr emit_external_call_sequence_current_is_sid_cutoff
+    bcc compute_external_call_sequence_machine_size_after_setup
+    clc
+    lda word_value_lo
+    adc #$03
+    sta word_value_lo
+compute_external_call_sequence_machine_size_after_setup:
+    clc
+    lda word_value_lo
+    adc #$03
+    sta word_value_lo
+    inc body_debug_index_data
+    jmp compute_external_call_sequence_machine_size_loop
+compute_external_call_sequence_machine_size_done:
+    lda word_value_lo
+    rts
+
+emit_machine_external_call_sequence_maybe_word_setup:
+    jsr emit_external_call_sequence_current_is_sid_cutoff
+    bcc emit_machine_external_call_sequence_maybe_word_setup_done
+    lda #<a_to_xy_word_setup_bytes
+    sta ACTC_OVERLAY_SCAN_ZP
+    lda #>a_to_xy_word_setup_bytes
+    sta ACTC_OVERLAY_SCAN_ZP+1
+    jsr emit_scan_zp_string
+    ldx #$00
+    lda #ACTC_OVERLAY_CTX_SET_BODY_PTR_FN_LO
+    jsr call_indexed_context_function
+    jsr load_resident_body_ptr_to_scan_zp
+emit_machine_external_call_sequence_maybe_word_setup_done:
+    rts
+
+emit_machine_external_call_sequence_maybe_word_reloc_advance:
+    jsr emit_external_call_sequence_current_is_sid_cutoff
+    bcc emit_machine_external_call_sequence_maybe_word_reloc_advance_done
+    jsr emit_advance_external_reloc_body_offset_by_three
+emit_machine_external_call_sequence_maybe_word_reloc_advance_done:
+    rts
+
+emit_advance_external_reloc_body_offset_by_three:
     clc
     lda proc_var_base_local
     adc #$03
@@ -837,9 +962,45 @@ emit_machine_external_call_sequence_reloc_loop:
     bcc :+
     inc proc_var_scope_local
 :
-    inc body_debug_index_data
-    jmp emit_machine_external_call_sequence_reloc_loop
-emit_machine_external_call_sequence_reloc_done:
+    rts
+
+emit_external_call_sequence_current_is_sid_cutoff:
+    lda #$00
+    sta compare_char_local
+    lda proc_var_index_local
+    jsr external_import_selector_to_index
+    bcc emit_external_call_sequence_current_is_sid_cutoff_restore_body
+    tax
+    lda #ACTC_OVERLAY_CTX_SET_EXTERNAL_PTR_FN_LO
+    jsr call_indexed_context_function
+    jsr load_resident_export_ptr_to_scan_zp
+    lda #<runtime_symbol_rt_sid_cutoff_emit
+    sta ACTC_OVERLAY_WORK_ZP
+    lda #>runtime_symbol_rt_sid_cutoff_emit
+    sta ACTC_OVERLAY_WORK_ZP+1
+    ldy #$00
+emit_external_call_sequence_current_is_sid_cutoff_loop:
+    lda (ACTC_OVERLAY_WORK_ZP),y
+    cmp (ACTC_OVERLAY_SCAN_ZP),y
+    bne emit_external_call_sequence_current_is_sid_cutoff_restore_body
+    lda (ACTC_OVERLAY_WORK_ZP),y
+    beq emit_external_call_sequence_current_is_sid_cutoff_yes
+    iny
+    bne emit_external_call_sequence_current_is_sid_cutoff_loop
+emit_external_call_sequence_current_is_sid_cutoff_yes:
+    lda #$01
+    sta compare_char_local
+emit_external_call_sequence_current_is_sid_cutoff_restore_body:
+    ldx #$00
+    lda #ACTC_OVERLAY_CTX_SET_BODY_PTR_FN_LO
+    jsr call_indexed_context_function
+    jsr load_resident_body_ptr_to_scan_zp
+    lda compare_char_local
+    beq emit_external_call_sequence_current_is_sid_cutoff_no
+    sec
+    rts
+emit_external_call_sequence_current_is_sid_cutoff_no:
+    clc
     rts
 
 emit_machine_local_external_call_sequence_code_list:
@@ -1399,6 +1560,7 @@ emit_machine_local_external_call_sequence_body_marker_machine:
     jsr emit_char_overlay
     jsr emit_newline
     rts
+.endif
 
 emit_external_list:
     lda #$00
@@ -1566,6 +1728,7 @@ emit_lower_scan_zp_string_loop:
 emit_lower_scan_zp_string_done:
     rts
 
+.if ACTC_EMIT_NATIVE_ONLY = 0
 is_empty_main_machine_object:
     lda #ACTC_OVERLAY_CTX_EXPORT_COUNT_PTR_LO
     jsr load_count_from_context
@@ -1614,6 +1777,7 @@ is_empty_main_machine_object_yes:
 is_empty_main_machine_object_no:
     clc
     rts
+.endif
 
 scan_zp_is_main_symbol:
     ldy #$00
@@ -1645,6 +1809,7 @@ scan_zp_is_main_symbol_no:
     clc
     rts
 
+.if ACTC_EMIT_NATIVE_ONLY = 0
 scan_zp_is_return_body:
     ldy #$00
     jsr emit_object_peek_payload_y
@@ -1738,6 +1903,7 @@ scan_zp_is_external_call_sequence_return_body_no:
     clc
     rts
 
+.endif
 external_import_selector_to_index:
     ; Object body selectors are one-byte base36 import IDs: 0-9, A-Z.
     cmp #'0'
@@ -1761,6 +1927,7 @@ external_import_selector_to_index_no:
     clc
     rts
 
+.if ACTC_EMIT_NATIVE_ONLY = 0
 emit_count_external_call_sequence_body:
     ldy #$00
     sty body_debug_count_local
@@ -2014,6 +2181,7 @@ emit_count_local_external_call_sequence_body_call:
     jmp emit_count_local_external_call_sequence_body_loop
 emit_count_local_external_call_sequence_body_done:
     rts
+.endif
 
 emit_machine_body_marker_line:
     lda #'b'
@@ -2059,6 +2227,14 @@ emit_object_selector_overlay_digit:
     clc
     adc #'0'
     jmp emit_char_overlay
+
+.if ACTC_EMIT_NATIVE_ONLY
+.if ACTC_EMIT_NATIVE_LOCAL_ONLY
+.include "actc_overlay_emit_native_local_integer.inc"
+.else
+.include "actc_overlay_emit_native_integer.inc"
+.endif
+.endif
 
 emit_newline:
     lda #10
@@ -2384,6 +2560,10 @@ empty_main_machine_record:
     .asciiz "m A9 A5 8D D0 03 A9 00 85 02 85 03 A2 02 4C 0F CF"
 external_call_sequence_epilogue_bytes:
     .asciiz " A9 A5 8D D0 03 A9 00 85 02 85 03 A2 02 4C 0F CF"
+a_to_xy_word_setup_bytes:
+    .asciiz " AA A0 00"
+runtime_symbol_rt_sid_cutoff_emit:
+    .asciiz "RT_SID_CUTOFF"
 call_target_minus_one:
     .byte $00
 call_target_ptr:

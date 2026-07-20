@@ -1,5 +1,17 @@
+INCLUDE "GFX1"
+
 MODULE MAIN
+
 PROC MAIN()
-ScreenCell(5,2,65)
-ColorCell(6,3,10)
-RETURN
+    GfxHires($8400,$A000)
+    GfxUseSprites($8800)
+    GfxBitmapClear(0)
+    GfxScreenClear(0,GFX_BLACK)
+    GfxCellColors(0,0,GFX_WHITE,GFX_BLACK)
+    LineDraw(8,8,120,72)
+    RectangleDraw(16,24,96,64)
+    SquareDraw(128,32,32)
+    CircleDraw(220,80,36)
+    TriangleDraw(40,120,120,180,8,184)
+    RETURN
+ENDPROC

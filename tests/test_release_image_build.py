@@ -36,16 +36,26 @@ class TestReleaseImageBuild(unittest.TestCase):
             "udosboot",
             "udoscore",
             "actc.prg",
-            "actsave.prg",
+            "act2save.prg",
             "alink.prg",
             "actmon.prg",
             "actinfo.prg",
             "actcopy.prg",
         ]
-        required_entries.extend(f"actc_ovl{index}.bin" for index in range(8))
+        required_entries.extend(f"actc_ovl{index}.bin" for index in range(10))
 
         for required in required_entries:
             self.assertIn(required, listing, msg=listing)
+
+        self.assertNotIn("actsave.prg", listing)
+        action_root = (
+            self.root.parent / "udos" / "build" / "udos-release-fs" / "IMAGES" / "ACTION.DNP"
+        )
+        act2save = action_root / "ACT2SAVE.PRG"
+        actsave = action_root / "ACTSAVE.PRG"
+        self.assertTrue(act2save.is_file())
+        self.assertTrue(actsave.is_file())
+        self.assertEqual(actsave.read_bytes(), act2save.read_bytes())
 
 
 if __name__ == "__main__":

@@ -1,7 +1,8 @@
 MODULE ovldemo
 OVERLAY Math
-PrintIE(42)
+    PrintIE(42)
 ENDOVERLAY
 PROC main()
-OverlayCall(Math)
-RETURN
+    OverlayCall(Math)
+    RETURN
+ENDPROC

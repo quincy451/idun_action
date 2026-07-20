@@ -1,0 +1,64 @@
+; ASMBLOCK_DEMO mixes generated Action with validated NMOS 6502 assembly.
+; The assembly can use CPU registers, fixed memory, Action globals, normal
+; routine parameters and locals, Action procedure names, and block-local labels.
+
+MODULE ASMBLOCK_DEMO
+
+BYTE color
+CARD total
+
+PROC CountColor(CARD amount)
+    CARD localAmount
+
+    localAmount=amount
+    ASMBLOCK [
+        lda color
+        clc
+        adc localAmount
+        sta color
+
+        lda total
+        clc
+        adc amount
+        sta total
+        lda total+1
+        adc amount+1
+        sta total+1
+
+        ldx #3
+    delay:
+        dex
+        bne delay
+    ]
+    RETURN
+ENDPROC
+
+CARD FUNC DoubleValue(CARD value)
+    CARD result
+
+    ASMBLOCK [
+        lda value
+        asl a
+        sta result
+        lda value+1
+        rol a
+        sta result+1
+    ]
+    RETURN(result)
+ENDFUNC
+
+BYTE FUNC RegisterPlusOne=*(BYTE value)
+    ASMBLOCK [
+        clc
+        adc #1
+        rts
+    ]
+ENDFUNC
+
+PROC MAIN()
+    color=RegisterPlusOne(5)
+    CountColor(10)
+    total=DoubleValue(total)
+    PrintIE(total)
+    RETURN
+ENDPROC

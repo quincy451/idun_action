@@ -32,6 +32,10 @@ Object Code Records
 - `m <hex bytes>`
 - `r <offset> u<index>`
 - `r <offset> x <symbol>`
+- `r <offset> l|lo u<index> [addend]`
+- `r <offset> l|lo x <symbol> [addend]`
+- `r <offset> h|hi u<index> [addend]`
+- `r <offset> h|hi x <symbol> [addend]`
 
 For the first code-section slice, ALINK accepts a root export whose body marker
 is `b M`, validates the decoded `m` byte count against the export size, prefixes
@@ -57,6 +61,14 @@ the symbol is not local to the object, so the body marker does not need a
 duplicate `u<index>` token for that target. Data section layout beyond the
 concatenated `m` code stream is a later extension.
 
+The optional `l`/`lo` or `h`/`hi` selector patches one byte with the low or high
+byte of the resolved 16-bit address. The compact and long spellings are
+equivalent, allowing native ACTC and Linux ACTC objects to be linked
+interchangeably. ASMBLOCK uses the long forms for immediate operands such as
+`#<buffer` and `#>buffer`; an omitted selector retains the normal two-byte
+little-endian relocation. Every form accepts a signed decimal addend suffix,
+which is applied after placement with a final `$0000-$FFFF` range check.
+
 For objects with multiple exports, ALINK treats dependency reachability as
 export-body-specific. Imports referenced only by an unused export are not loaded,
 while imports referenced by the selected export are followed even when that
@@ -64,7 +76,8 @@ selected export is not the first export in the object.
 
 Runtime Contract
 
-The emitted PRG is the program presented to UDOS for launch. ALINK decides what
+The emitted PRG is the program presented to the Idun C64 target for launch.
+ALINK decides what
 must be included. A linked program must not require a separate generic runtime
 program to interpret or host it.
 

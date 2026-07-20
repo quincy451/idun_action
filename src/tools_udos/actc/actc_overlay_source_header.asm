@@ -66,6 +66,7 @@ actc_overlay_entry:
     rts
 
 source_header_fail_bad_module:
+    jsr debug_bad_module_scan_head
     ldy #ACTC_OVERLAY_CTX_DIAG_PTR_LO
     lda #<msg_bad_module
     sta (ACTC_OVERLAY_CONTEXT_ZP),y
@@ -81,52 +82,57 @@ source_header_fail:
     rts
 
 skip_source_whitespace:
-    ldy #$00
 skip_source_whitespace_loop:
-    jsr source_header_peek_scan_y
-    cmp #' '
-    beq skip_source_whitespace_advance
-    cmp #9
-    beq skip_source_whitespace_advance
-    cmp #10
-    beq skip_source_whitespace_advance
-    cmp #13
-    beq skip_source_whitespace_advance
-skip_source_whitespace_done:
-    rts
-skip_source_whitespace_advance:
-    jsr source_header_consume_scan_y
+    jsr source_header_consume_whitespace_char
     bcs skip_source_whitespace_done
     jmp skip_source_whitespace_loop
+skip_source_whitespace_done:
+    rts
 
 skip_source_spaces:
-    ldy #$00
 skip_source_spaces_loop:
-    jsr source_header_peek_scan_y
-    cmp #' '
-    beq skip_source_spaces_advance
-    cmp #9
-    beq skip_source_spaces_advance
-skip_source_spaces_done:
-    rts
-skip_source_spaces_advance:
-    jsr source_header_consume_scan_y
+    jsr source_header_consume_inline_space_char
     bcs skip_source_spaces_done
     jmp skip_source_spaces_loop
+skip_source_spaces_done:
+    rts
+
+source_header_consume_whitespace_char:
+    ldy #$00
+    jsr source_header_peek_scan_y
+    cmp #' '
+    beq source_header_consume_whitespace_char_consume
+    cmp #9
+    beq source_header_consume_whitespace_char_consume
+    cmp #10
+    beq source_header_consume_whitespace_char_consume
+    cmp #13
+    beq source_header_consume_whitespace_char_consume
+    sec
+    rts
+source_header_consume_whitespace_char_consume:
+    jsr source_header_consume_scan_y
+    rts
+
+source_header_consume_inline_space_char:
+    ldy #$00
+    jsr source_header_peek_scan_y
+    cmp #' '
+    beq source_header_consume_inline_space_char_consume
+    cmp #9
+    beq source_header_consume_inline_space_char_consume
+    sec
+    rts
+source_header_consume_inline_space_char_consume:
+    jsr source_header_consume_scan_y
+    rts
 
 match_module_keyword:
     ldx #$00
 match_module_keyword_loop:
     lda module_keyword,x
     beq match_module_keyword_ok
-    sta expected_char
-    ldy #$00
-    jsr source_header_peek_scan_y
-    beq match_module_keyword_fail
-    jsr uppercase_ascii
-    cmp expected_char
-    bne match_module_keyword_fail
-    jsr source_header_consume_scan_y
+    jsr source_header_consume_uppercase_char
     bcs match_module_keyword_fail
     inx
     bne match_module_keyword_loop
@@ -140,25 +146,12 @@ match_module_keyword_fail:
 compare_requested_module:
     ldx #$00
 compare_requested_module_loop:
-    ldy #$00
-    jsr source_header_peek_scan_y
-    beq compare_requested_module_fail
-    sta expected_char
-    jsr source_header_symbol_token_char_valid_x
+    jsr source_header_consume_requested_module_char
     bcc compare_requested_module_char_valid
-    jmp compare_requested_module_done
+    lda compare_char
+    beq compare_requested_module_done
+    jmp compare_requested_module_fail
 compare_requested_module_char_valid:
-    lda expected_char
-    sta compare_char
-    txa
-    tay
-    lda (ACTC_OVERLAY_WORK_ZP),y
-    jsr uppercase_ascii
-    cmp compare_char
-    bne compare_requested_module_fail
-    ldy #$00
-    jsr source_header_consume_scan_y
-    bcs compare_requested_module_fail
     inx
     cpx #24
     bcc compare_requested_module_loop
@@ -175,6 +168,22 @@ compare_requested_module_done:
     cmp #$00
     bne compare_requested_module_fail
     clc
+    rts
+
+source_header_consume_uppercase_char:
+    sta expected_char
+    ldy #$00
+    jsr source_header_peek_scan_y
+    beq source_header_consume_uppercase_char_fail
+    jsr uppercase_ascii
+    cmp expected_char
+    bne source_header_consume_uppercase_char_fail
+    jsr source_header_consume_scan_y
+    bcs source_header_consume_uppercase_char_fail
+    clc
+    rts
+source_header_consume_uppercase_char_fail:
+    sec
     rts
 
 uppercase_ascii:
@@ -224,6 +233,42 @@ uppercase_symbol_body_valid_check_underscore:
     rts
 uppercase_symbol_body_valid_ok:
     clc
+    rts
+
+source_header_consume_requested_module_char:
+    ldy #$00
+    jsr source_header_peek_scan_y
+    bne source_header_consume_requested_module_have_char
+    lda #$FF
+    sta compare_char
+    sec
+    rts
+source_header_consume_requested_module_have_char:
+    sta expected_char
+    jsr source_header_symbol_token_char_valid_x
+    bcc source_header_consume_requested_module_char_valid
+    lda #$00
+    sta compare_char
+    sec
+    rts
+source_header_consume_requested_module_char_valid:
+    lda expected_char
+    sta compare_char
+    txa
+    tay
+    lda (ACTC_OVERLAY_WORK_ZP),y
+    jsr uppercase_ascii
+    cmp compare_char
+    bne source_header_consume_requested_module_fail
+    ldy #$00
+    jsr source_header_consume_scan_y
+    bcs source_header_consume_requested_module_fail
+    clc
+    rts
+source_header_consume_requested_module_fail:
+    lda #$FF
+    sta compare_char
+    sec
     rts
 
 save_module_start_mark:
@@ -401,6 +446,16 @@ source_header_consume_scan_y_advance:
     rts
 source_header_consume_scan_y_fail:
     sec
+    rts
+
+debug_bad_module_scan_head:
+    ldy #$00
+debug_bad_module_scan_head_loop:
+    jsr source_header_peek_scan_y
+    sta $03E8,y
+    iny
+    cpy #$08
+    bcc debug_bad_module_scan_head_loop
     rts
 
 module_keyword:

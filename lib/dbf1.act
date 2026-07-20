@@ -29,3 +29,6 @@ BYTE FUNC DbfHeaderLen(BYTE handle)
 BYTE FUNC DbfRecordLen(BYTE handle)
 BYTE FUNC DbfTotalRecs(BYTE handle)
 BYTE FUNC DbfCurrRecNo(BYTE handle)
+
+; End declaration-only binding scope before returning to the including source.
+MODULE

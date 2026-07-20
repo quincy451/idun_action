@@ -13,17 +13,18 @@ BYTE mpresent
 BYTE jmask
 BYTE mmask
 PROC main()
-jmask=JOY_UP+JOY_BUTTON1+JOY_BUTTON2
-mmask=MOUSE_BUTTON1+MOUSE_BUTTON2
-jstate=Joy(2)
-seen=JoySeen(2)
-jb1=JoyBtn1(2)
-jb2=JoyBtn2(2)
-mseen=MousePoll(1)
-mpresent=MouseSeen()
-mx=MouseX()
-my=MouseY()
-mb=MouseBtn()
-mb1=MouseBtn1()
-mb2=MouseBtn2()
-RETURN
+    jmask=JOY_UP+JOY_BUTTON1+JOY_BUTTON2
+    mmask=MOUSE_BUTTON1+MOUSE_BUTTON2
+    jstate=Joy(2)
+    seen=JoySeen(2)
+    jb1=JoyBtn1(2)
+    jb2=JoyBtn2(2)
+    mseen=MousePoll(1)
+    mpresent=MouseSeen()
+    mx=MouseX()
+    my=MouseY()
+    mb=MouseBtn()
+    mb1=MouseBtn1()
+    mb2=MouseBtn2()
+    RETURN
+ENDPROC

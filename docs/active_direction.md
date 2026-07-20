@@ -1,112 +1,131 @@
 # Active Project Direction
 
-This project has pivoted away from CP/M-65 as an execution target.
+This fork targets the Idun cartridge Linux environment.
 
 The active product path is:
 
-- UDOS as the standalone Commodore 64 Ultimate shell/runtime
-- Action tooling as UDOS-aware `.PRG` programs
-- C64 Ultimate ROM/Ultimate DOS services through the UDOS resident service layer
-- direct linked `.PRG` output as the only maintained runtime artifact
+- Linux processes for build-time and workspace tools on the Idun Raspberry Pi
+- direct linked Commodore 64 `.PRG` output as the maintained runtime artifact
+- link-selected 6502 helper modules for services required by generated programs
+- no UDOS dependency in the active toolchain or generated-program contract
 
-The active code paths are:
+`ALINK` remains a C64 program linker: it will run on Linux, but it emits C64
+`.PRG` files and debug sidecars, not Linux executables.
 
-- `../udos/src/asm/udos_resident.asm`
-- `../udos/tools/run_action_*.py`
-- `src/tools_udos/`
-- `tools/build_*_udos.sh`
-- `tools/export_udos_workspace.py`
+## Active Code Paths
 
-The CP/M-65 compiler/linker/bootstrap code and the old VM toolchain have been
-removed. Repository code should not add new runtime-runner flows. Action-linked
-programs now target direct 6502 `.PRG` output, and the UDOS resident shell is
-native 6502 rather than a VM bytecode host.
+- `src/tools_linux/`
+- `src/target_idun/` for the small UDOS-free C64 debug/profile agent
+- `tools/build_linux_tools.sh`
+- `tools/export_idun_workspace.py`
+- `tests/test_linux_workspace_tools.py`
+- `tests/test_idun_workspace_export.py`
+- `src/runtime/modules/` for linkable 6502 runtime modules
 
-## Active Verification Gates
+The native ActionC64U repository owns the common contents of
+`src/runtime/modules/`. This fork pins the same digests in
+`resources/shared_6502_manifest.json`; `make sync-native` imports an intentional
+native update and `make sync-native-check` proves both checkouts agree. The DBF
+create and file-open-write adapters are the only OS-specific exclusions.
 
-Use UDOS gates as the source of truth:
+Historical UDOS sources are preserved but formally retired. The complete
+retirement boundary and replacement inventory are documented in
+`docs/retired_udos_tools.md` and `resources/retired_udos_tools.json`.
 
-```sh
-make -C ../udos PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-actc
-make -C ../udos PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-alink
-make -C ../udos PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-actc-alink-launch
-make -C ../udos PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-alink-prg-object-code-matrices
-make -C ../udos PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-actc-alink-launch-runtime-matrices
-```
+## Active Verification
 
-Treat `vice-action-alink` as the default direct-native linker gate that emits
-`BIN/MAIN.PRG`.
-Treat `vice-action-actc-alink-launch` as the helper-free higher-level default.
-Treat `vice-action-alink-prg-object-code-matrices` as the focused direct
-object-code graph, behavior, and rejection gate.
-Treat `vice-action-actc-alink-launch-runtime-matrices` as the focused
-link-selected runtime helper gate, including exported helper demo programs via
-`vice-action-actc-alink-launch-helper-demos`.
-Treat `vice-action-actc-alink-launch-printmath` as a green named direct
-launch gate for the imported `printmath` shape.
-
-Use narrower UDOS gates when working on a specific tool:
+Use Linux-only gates for the current fork work:
 
 ```sh
-make -C ../udos PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-actadd
-make -C ../udos PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-act2save
-make -C ../udos PROOF_DEPS= RESIDENT_DEPS= RELEASE_DEPS= vice-action-actcopy
+make all
+make test-sanitize
+make test-prg
+make check
 ```
+
+Do not use UDOS builds, UDOS VICE probes, or sibling `../udos` make targets as
+proof for this fork's active Linux process tools.
 
 ## Development Rules
 
-- Prefer `src/tools_udos` over deleted CP/M-era compiler/linker paths.
-- Prefer `tools/build_*_udos.sh`; do not reintroduce CP/M `.COM` build scripts.
-- Do not treat `cpmemu` success as proof that the active target works.
-- Do not add new CP/M or runtime-runner features.
+- Prefer `src/tools_linux` for converted tools.
+- Prefer `std::string`, `std::vector`, and filesystem abstractions over fixed
+  6502-style buffers.
+- Do not add new dependencies on `udos_services.inc`, `UDOSDIR.TXT`, or UDOS
+  resident labels in Linux tools.
+- Do not build or test UDOS while working on the Linux process conversions.
+- Keep generated `.PRG` output as Commodore 64 code.
+- Move any service needed at C64 runtime into a selective 6502 library module
+  linked by `ALINK`.
 
-## Current Design Inputs
+## Current State
 
-Optional runtime/library work should follow the link-selected helper direction:
-helpers are selected by the linker and carried by the final `.PRG`, not by a
-separate runtime program.
+Converted workspace tools:
 
-Current concrete API inputs:
+- `actnew`
+- `actadd`
+- `actwork`
+- `actsrc`
+- `actfile`
+- `actchk`
+- `actdir`, `actcopy`, `actdel`, `actmkdir`, `actrmdir`, `actmove`,
+  `actren`, `actwrite`, `actinfo`, `acttree`, `tree`, `xcopy`, `deltree`,
+  `actspc`
+- `actmon` Linux project/workflow monitor
+- `actdbg` Linux `.PRG`/`.DBG` source/address and symbol inspector with
+  SQLite-persisted prepared breakpoints and an Idun live console for registers,
+  memory, run/halt, software breakpoints, events, and source lookup
+- `actprof` Linux source-level PC-sampling profiler with imported and live
+  collection modes and `.action/profile.sqlite3` persistence
+- `actsprite` and `actbitmap` Linux resource editors with atomic ASP1/ABM1
+  storage, scriptable operations, and interactive hires/multicolor TUIs
+- `acthelp` external SQLite language, library, builtin, constant, and example
+  reference; the validated catalog currently contains 260 topics
+- `actedit` Linux source editor command with an SQLite-backed source and symbol
+  index, linked semantic map, F5 definitions, F6 formatting, F7 references,
+  an internal block clipboard, navigation history, and Ctrl-click definition
+  lookup
+- `act2save` / `actsave` compatibility names backed by the Linux linker path
+- `actc` for native procedure/call object emission and
+  `PrintE("...")` / constant `PrintIE(...)` direct output, including
+  structured IF/ELSE and loop lowering, initialized/address-bound
+  `BYTE`/`CARD` storage, variable `PrintI(...)` / `PrintIE(...)`, recursive word
+  arithmetic, arbitrary unsigned word comparisons, BYTE/CARD/INT/REAL arrays,
+  typed pointers and indirect parameters, length-prefixed BYTE strings,
+  reentrant local-routine frames, and typed BYTE/CARD/INT/REAL user-function
+  returns; full IEEE-754 binary32 behavior; `ASMBLOCK`; external graphics
+  resources; and builtin argument staging for the complete `GFX1`, `INPUT1`,
+  `SIDSPR1`, and `DBF1` callable families
+- `alink` for `OBJ1` machine-code records, dependency closure,
+  shared/project runtime libraries, object validation, and direct C64 `.PRG`
+  output; every successful link atomically rebuilds
+  `.action/code-map.sqlite3`
+- the Idun export excludes legacy runtime objects whose payload is only their
+  helper name; `DOC/runtime-status.txt` records these unavailable surfaces
 
-- graphics/resource datatype direction:
-  - `docs/graphics_ideas.txt`
-- SID and sprite helper direction:
-  - `docs/sid_and_sprite_ideas.txt`
-- first Action-facing math binding sketch:
-  - `docs/math1_bindings_draft.act`
-- DBF-style database API sketch:
-  - `docs/dbf_test.c`
-- concrete helper-family ABI draft:
-  - `docs/helper_family_abi_draft.md`
-- first Action-facing SID/sprite binding sketch:
-  - `docs/sidspr1_bindings_draft.act`
-- first Action-facing joystick/mouse input binding sketch:
-  - `docs/input1_bindings_draft.act`
+Remaining product work:
 
-These are design inputs for optional helper families. They should not be
-implemented as permanent runner-global features.
-
-## Current Next Work
-
-The current practical path is:
-
-1. Keep the UDOS external-tool ABI load/save/copy/delete/rename services stable.
-2. Remove temporary probe/debug noise once permanent diagnostics cover the same
-   failures.
-3. Continue widening `ACTC.PRG` object emission.
-4. Continue widening `ALINK.PRG` object resolution and final direct-PRG
-   generation.
-5. Keep the native `ALINK -> MAIN.PRG` path green.
-6. Keep moving optional feature helpers toward link-only runtime modules.
-7. Build on the resident REU stage/read services and convert ACTC toward the
-   REU-backed source-streaming plan in `docs/actc_source_streaming_plan.md` so
-   source size is no longer tied to one contiguous buffer.
-8. Keep large ACTC/ALINK lookup payloads moving into REU-backed tables as new
-   capacity pressure appears.
-9. Keep `ACTC.PRG -> ALINK.PRG -> MAIN.PRG` green under UDOS.
-10. Treat graphics, SID/sprite, input, DBF, math, TCP, and 80-column support as
-    optional raw-6502 helper families with thin language bindings, not as
-    new permanent runner-global behavior.
-11. Use `docs/helper_family_abi_draft.md` as the current concrete contract for
-    the first optional helper-family wave, with `SIDSPR1` as the preferred
-    first implementation family.
+1. Validate the `actsvc` transport, implemented instruction-step primitive,
+   persistent breakpoint reinstallation, and PC sampling on attached Idun/C64
+   hardware.
+2. Validate standalone REU/DBF/KERNAL I/O, graphics, SID, sprite, joystick, and
+   mouse behavior on physical C64 hardware. Legacy placeholders are not
+   exported.
+3. Keep shared Action source, OBJ1 records, link-selected 6502 runtime behavior,
+   and direct-PRG results compatible with the UDOS-native product while using
+   OS-appropriate implementations for editors, help, project tools, debugging,
+   profiling, and packaging. The current comparison and native work order are
+   recorded in `docs/udos_feature_parity.md`. The fixed register-entry ABI is
+   now shared for native ASMBLOCK and core raw-code bodies, including all three
+   integer literal radices and explicit signature limits. Native preprocessing
+   now includes bounded directives, Idun-compatible checked signed 64-bit
+   integer `CONST` expressions, and bodyless numeric or grouped local-symbol
+   routine-address expressions with checked signed addends on either side. It
+   also folds bounded `REAL CONST` expressions with exact decimal conversion
+   and binary32 round-to-nearest, ties-to-even after every operation.
+   Native named-REAL `FMin` and `FMax` calls now use synchronized,
+   independently selected target helpers with complete selector semantics.
+   Linked external symbol expressions inside unchecked
+   raw `[...]` bodies, general REAL/function
+   behavior, full MATH1/GFX1, resources, and workflow parity remain explicit
+   native work rather than Idun regressions.

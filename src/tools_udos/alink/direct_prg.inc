@@ -97,10 +97,6 @@ REAL_WHILE_BINARY_EXT_HI = $10
 select_prg_build_strategy_or_fail:
     lda #PRG_BUILD_DIRECT
     sta prg_build_strategy
-    jsr find_linked_printmath_prg_case
-    bcs select_prg_build_strategy_not_printmath
-    rts
-select_prg_build_strategy_not_printmath:
     jsr find_linked_real_print_int_prg_case
     bcs select_prg_build_strategy_not_real_print_int
     rts
@@ -152,11 +148,6 @@ select_prg_build_strategy_not_object_code:
     jmp require_direct_prg_body_supported_or_fail
 
 build_prg_content_or_fail:
-    lda prg_build_strategy
-    cmp #PRG_BUILD_PRINTMATH_STRING_INT
-    bne build_prg_content_not_printmath_string_int
-    jmp build_printmath_linked_string_int_prg_content_or_fail
-build_prg_content_not_printmath_string_int:
     lda prg_build_strategy
     cmp #PRG_BUILD_REAL_PRINT_INT
     bne build_prg_content_not_real_print_int
@@ -217,83 +208,18 @@ build_prg_content_not_runtime_helper_sequence:
     bne build_prg_content_not_object_code
     jmp build_object_code_prg_content_or_fail
 build_prg_content_not_object_code:
-    jmp build_direct_prg_content_or_fail
+    jmp build_direct_prg_fallback
 
 build_direct_prg_content_or_fail:
-    jsr find_direct_prg_candidate_or_fail
-    ldx direct_candidate_index
-    lda direct_template_table_lo,x
-    sta const_ptr
-    lda direct_template_table_hi,x
-    sta const_ptr+1
-    lda direct_template_len_lo,x
-    sta current_bit_lo
-    lda direct_template_len_hi,x
-    sta current_bit_hi
-    jmp copy_direct_prg_template
+    jmp build_direct_prg_fallback
 
 require_direct_prg_body_supported_or_fail:
-    jmp find_direct_prg_candidate_or_fail
+    jmp build_direct_prg_fallback
 
-find_direct_prg_candidate_or_fail:
-    lda #$00
-    sta direct_candidate_index
-find_direct_prg_candidate_loop:
-    ldx direct_candidate_index
-    cpx #34
-    beq build_direct_prg_fallback
-    lda direct_body_table_lo,x
-    sta const_ptr
-    lda direct_body_table_hi,x
-    sta const_ptr+1
-    jsr direct_entry_body_matches_const
-    bcc find_direct_prg_candidate_done
-    inc direct_candidate_index
-    jmp find_direct_prg_candidate_loop
-find_direct_prg_candidate_done:
-    rts
 build_direct_prg_fallback:
     lda #<msg_unsupported_body
     ldy #>msg_unsupported_body
     jmp fail_with_ptr
-
-find_linked_printmath_prg_case:
-    lda #<direct_body_printmath
-    sta const_ptr
-    lda #>direct_body_printmath
-    sta const_ptr+1
-    jsr direct_entry_body_matches_const
-    bcc find_linked_printmath_prg_case_body_ok
-    sec
-    rts
-find_linked_printmath_prg_case_body_ok:
-    lda external_count
-    bne find_linked_printmath_prg_case_have_external
-    lda #<msg_bad_object
-    ldy #>msg_bad_object
-    jmp fail_with_ptr
-find_linked_printmath_prg_case_have_external:
-    jsr save_current_module_name
-    ldx #$00
-    jsr copy_external_name_to_module_name_from_x_or_fail
-    jsr build_object_target_path
-    jsr load_pending_object_or_library_or_fail
-    jsr require_loaded_source_not_truncated_or_fail
-    jsr require_supported_object_header_or_fail
-    jsr require_loaded_object_exports_module_or_fail
-    jsr loaded_external_print_body_is_s0i0r
-    bcs find_linked_printmath_prg_case_unsupported
-    jsr require_loaded_external_print_string_or_fail
-    jsr require_loaded_external_store_int_or_fail
-    jsr restore_saved_module_name
-    lda #PRG_BUILD_PRINTMATH_STRING_INT
-    sta prg_build_strategy
-    clc
-    rts
-find_linked_printmath_prg_case_unsupported:
-    jsr restore_saved_module_name
-    sec
-    rts
 
 find_linked_real_print_int_prg_case:
     lda #<direct_body_real_print_int
@@ -313,7 +239,7 @@ find_linked_real_print_int_prg_case_body_ok:
     jmp fail_with_ptr
 find_linked_real_print_int_prg_case_have_externals:
     lda int_count
-    cmp #$04
+    cmp #$02
     bcs find_linked_real_print_int_prg_case_have_ints
     lda #<msg_bad_object
     ldy #>msg_bad_object
@@ -446,6 +372,7 @@ find_linked_input_real_print_int_prg_case_have_ints:
     lda #$00
     sta linked_runtime_arg_count
     sta linked_runtime_result_pending
+    sta linked_runtime_result_nested
     ldx #$00
     jsr runtime_helper_kind_for_external_index_x
     bcc :+
@@ -533,6 +460,7 @@ find_linked_input_stored_real_print_int_prg_case_have_ints:
     lda #$00
     sta linked_runtime_arg_count
     sta linked_runtime_result_pending
+    sta linked_runtime_result_nested
     ldx #$00
     jsr runtime_helper_kind_for_external_index_x
     bcc :+
@@ -2428,6 +2356,46 @@ find_runtime_helper_sequence_prg_case_call:
     rts
 :
     sta linked_runtime_helper_kind
+    jsr runtime_helper_sequence_nested_noarg_byte_readback_active
+    bcs find_runtime_helper_sequence_prg_case_call_not_nested_noarg_byte_readback
+    lda linked_runtime_result_pending
+    beq :+
+    jsr runtime_helper_sequence_materialize_pending_result_arg_or_fail
+    bcc :+
+    sec
+    rts
+:
+    inc linked_runtime_call_count
+    jsr runtime_helper_sequence_update_nested_noarg_byte_readback_result
+    jmp find_runtime_helper_sequence_prg_case_loop
+find_runtime_helper_sequence_prg_case_call_not_nested_noarg_byte_readback:
+    jsr runtime_helper_sequence_nested_a_byte_readback_active
+    bcs find_runtime_helper_sequence_prg_case_call_not_nested_a_readback
+    jsr runtime_helper_sequence_validate_nested_a_byte_readback_or_fail
+    bcc find_runtime_helper_sequence_prg_case_call_nested_a_readback_valid
+    sec
+    rts
+find_runtime_helper_sequence_prg_case_call_nested_a_readback_valid:
+    inc linked_runtime_call_count
+    jsr runtime_helper_sequence_update_nested_a_byte_readback_result
+    jmp find_runtime_helper_sequence_prg_case_loop
+find_runtime_helper_sequence_prg_case_call_not_nested_a_readback:
+    jsr runtime_helper_sequence_materialize_before_byte_readback_or_fail
+    bcc :+
+    sec
+    rts
+:
+    jsr runtime_helper_sequence_deferred_byte_readback_active
+    bcs find_runtime_helper_sequence_prg_case_call_regular
+    inc linked_runtime_call_count
+    jsr runtime_helper_sequence_update_result_pending
+    jsr runtime_helper_sequence_materialize_pending_result_arg_or_fail
+    bcc :+
+    sec
+    rts
+:
+    jmp find_runtime_helper_sequence_prg_case_loop
+find_runtime_helper_sequence_prg_case_call_regular:
     jsr runtime_helper_sequence_validate_current_call
     bcc :+
     sec
@@ -2560,7 +2528,17 @@ runtime_helper_sequence_reset_body_parse:
     sta linked_runtime_result_arg_count
     sta linked_runtime_result_loaded
     sta linked_runtime_result_store_ordinal
+    sta linked_runtime_result_nested
     sta linked_runtime_store_count
+    rts
+
+runtime_helper_sequence_clear_pending_result:
+    lda #$00
+    sta linked_runtime_result_pending
+    sta linked_runtime_result_arg_count
+    sta linked_runtime_result_loaded
+    sta linked_runtime_result_store_ordinal
+    sta linked_runtime_result_nested
     rts
 
 runtime_helper_sequence_store_arg_from_a:
@@ -2569,11 +2547,14 @@ runtime_helper_sequence_store_arg_from_a:
     beq :+
     lda linked_runtime_result_loaded
     bne :+
+    lda linked_runtime_result_nested
+    bne :+
     lda #$00
     sta linked_runtime_result_pending
     sta linked_runtime_result_arg_count
     sta linked_runtime_result_loaded
     sta linked_runtime_result_store_ordinal
+    sta linked_runtime_result_nested
 :
     lda linked_runtime_arg_count
     cmp #$04
@@ -2606,6 +2587,8 @@ runtime_helper_sequence_store_arg_done:
     rts
 
 runtime_helper_sequence_update_result_pending:
+    lda #$00
+    sta linked_runtime_result_nested
     lda linked_runtime_helper_kind
     cmp #RUNTIME_HELPER_KIND_BYTE_READBACK
     bne :+
@@ -2674,6 +2657,202 @@ runtime_helper_sequence_update_result_pending:
     sta linked_runtime_result_store_ordinal
     rts
 
+runtime_helper_sequence_deferred_byte_readback_active:
+    lda linked_runtime_helper_kind
+    cmp #RUNTIME_HELPER_KIND_BYTE_READBACK
+    bne runtime_helper_sequence_deferred_byte_readback_inactive
+    lda linked_runtime_arg_count
+    beq runtime_helper_sequence_deferred_byte_readback_inactive
+    clc
+    rts
+runtime_helper_sequence_deferred_byte_readback_inactive:
+    sec
+    rts
+
+runtime_helper_sequence_nested_noarg_byte_readback_active:
+    lda linked_runtime_helper_kind
+    cmp #RUNTIME_HELPER_KIND_BYTE_READBACK
+    bne runtime_helper_sequence_nested_noarg_byte_readback_inactive
+    lda linked_external_index
+    beq runtime_helper_sequence_nested_noarg_byte_readback_inactive
+    sta linked_import_index
+    lda #$00
+    sta linked_object_index
+    ldy linked_runtime_body_pos
+runtime_helper_sequence_nested_noarg_byte_readback_scan:
+    lda (body_ptr),y
+    cmp #'p'
+    beq runtime_helper_sequence_nested_noarg_byte_readback_param
+    cmp #'u'
+    bne runtime_helper_sequence_nested_noarg_byte_readback_inactive
+    iny
+    lda (body_ptr),y
+    jsr object_code_import_index_from_a
+    bcs runtime_helper_sequence_nested_noarg_byte_readback_inactive
+    cmp linked_import_index
+    bcc runtime_helper_sequence_nested_noarg_byte_readback_ok
+    lda linked_object_index
+    bne runtime_helper_sequence_nested_noarg_byte_readback_inactive
+    iny
+    jmp runtime_helper_sequence_nested_noarg_byte_readback_scan
+runtime_helper_sequence_nested_noarg_byte_readback_param:
+    lda #$01
+    sta linked_object_index
+    iny
+    iny
+    jmp runtime_helper_sequence_nested_noarg_byte_readback_scan
+runtime_helper_sequence_nested_noarg_byte_readback_ok:
+    clc
+    rts
+runtime_helper_sequence_nested_noarg_byte_readback_inactive:
+    sec
+    rts
+
+runtime_helper_sequence_nested_a_byte_readback_active:
+    lda linked_runtime_helper_kind
+    cmp #RUNTIME_HELPER_KIND_A_BYTE_READBACK
+    bne runtime_helper_sequence_nested_a_byte_readback_inactive
+    lda linked_runtime_arg_count
+    cmp #$01
+    bne :+
+    lda linked_external_index
+    beq runtime_helper_sequence_nested_a_byte_readback_inactive
+    clc
+    rts
+:
+    lda linked_runtime_arg_count
+    cmp #$02
+    bcc runtime_helper_sequence_nested_a_byte_readback_inactive
+    clc
+    rts
+runtime_helper_sequence_nested_a_byte_readback_inactive:
+    sec
+    rts
+
+runtime_helper_sequence_validate_nested_a_byte_readback_or_fail:
+    lda linked_runtime_arg_count
+    bne runtime_helper_sequence_validate_nested_a_byte_readback_nonzero
+    sec
+    rts
+runtime_helper_sequence_validate_nested_a_byte_readback_nonzero:
+    cmp #$01
+    bne :+
+    jmp runtime_helper_sequence_arg0_hi_zero
+:
+    cmp #$02
+    bne :+
+    jmp runtime_helper_sequence_arg1_hi_zero
+:
+    cmp #$03
+    bne :+
+    jmp runtime_helper_sequence_arg2_hi_zero
+:
+    jmp runtime_helper_sequence_arg3_hi_zero
+
+runtime_helper_sequence_update_nested_a_byte_readback_result:
+    lda linked_runtime_arg_count
+    beq :+
+    dec linked_runtime_arg_count
+:
+    lda #$01
+    sta linked_runtime_result_pending
+    sta linked_runtime_result_nested
+    lda linked_runtime_arg_count
+    sta linked_runtime_result_arg_count
+    lda #$00
+    sta linked_runtime_result_loaded
+    sta linked_runtime_result_store_ordinal
+    rts
+
+runtime_helper_sequence_update_nested_noarg_byte_readback_result:
+    lda #$01
+    sta linked_runtime_result_pending
+    sta linked_runtime_result_nested
+    lda linked_runtime_arg_count
+    sta linked_runtime_result_arg_count
+    lda #$00
+    sta linked_runtime_result_loaded
+    sta linked_runtime_result_store_ordinal
+    rts
+
+runtime_helper_sequence_materialize_before_byte_readback_or_fail:
+    lda linked_runtime_helper_kind
+    cmp #RUNTIME_HELPER_KIND_BYTE_READBACK
+    beq :+
+    clc
+    rts
+:
+    lda linked_runtime_result_pending
+    bne :+
+    clc
+    rts
+:
+    lda linked_runtime_arg_count
+    bne :+
+    jsr runtime_helper_sequence_clear_pending_result
+    clc
+    rts
+:
+    jmp runtime_helper_sequence_materialize_pending_result_arg_or_fail
+
+runtime_helper_sequence_materialize_pending_result_arg_or_fail:
+    lda linked_runtime_result_pending
+    bne :+
+    sec
+    rts
+:
+    lda linked_runtime_result_loaded
+    beq runtime_helper_sequence_materialize_direct_result_arg_or_fail
+    jmp runtime_helper_sequence_commit_loaded_arg_or_fail
+runtime_helper_sequence_materialize_direct_result_arg_or_fail:
+    lda linked_runtime_arg_count
+    cmp #$04
+    bcc :+
+    sec
+    rts
+:
+    lda linked_runtime_store_count
+    cmp #VAR_MAX
+    bcc :+
+    sec
+    rts
+:
+    tax
+    lda #$FF
+    sta linked_runtime_store_window+RUNTIME_STORE_VAR
+    sta linked_runtime_store_window+RUNTIME_STORE_LITERAL
+    jsr store_linked_runtime_store_window_from_x_or_fail
+    lda linked_runtime_store_count
+    ora #$80
+    ldx linked_runtime_arg_count
+    cpx #$00
+    bne :+
+    sta linked_runtime_arg0
+    jmp runtime_helper_sequence_materialize_direct_result_arg_stored
+:
+    cpx #$01
+    bne :+
+    sta linked_runtime_arg1
+    jmp runtime_helper_sequence_materialize_direct_result_arg_stored
+:
+    cpx #$02
+    bne :+
+    sta linked_runtime_arg2
+    jmp runtime_helper_sequence_materialize_direct_result_arg_stored
+:
+    sta linked_runtime_arg3
+runtime_helper_sequence_materialize_direct_result_arg_stored:
+    inc linked_runtime_arg_count
+    inc linked_runtime_store_count
+    lda #$00
+    sta linked_runtime_result_pending
+    sta linked_runtime_result_arg_count
+    sta linked_runtime_result_loaded
+    sta linked_runtime_result_store_ordinal
+    sta linked_runtime_result_nested
+    clc
+    rts
+
 runtime_helper_sequence_note_store_or_fail:
     cmp #VAR_MAX
     bcc :+
@@ -2701,6 +2880,7 @@ runtime_helper_sequence_note_store_or_fail:
     sta linked_runtime_result_arg_count
     sta linked_runtime_result_loaded
     sta linked_runtime_result_store_ordinal
+    sta linked_runtime_result_nested
     clc
     rts
 runtime_helper_sequence_note_literal_store:
@@ -2723,6 +2903,7 @@ runtime_helper_sequence_note_literal_store:
     sta linked_runtime_result_arg_count
     sta linked_runtime_result_loaded
     sta linked_runtime_result_store_ordinal
+    sta linked_runtime_result_nested
     clc
     rts
 
@@ -2754,6 +2935,8 @@ runtime_helper_sequence_note_runtime_load:
     lda #$01
     sta linked_runtime_result_loaded
     stx linked_runtime_result_store_ordinal
+    lda #$00
+    sta linked_runtime_result_nested
     clc
     rts
 
@@ -2838,6 +3021,7 @@ runtime_helper_sequence_commit_loaded_arg_done:
     sta linked_runtime_result_arg_count
     sta linked_runtime_result_loaded
     sta linked_runtime_result_store_ordinal
+    sta linked_runtime_result_nested
 runtime_helper_sequence_commit_loaded_arg_ok:
     clc
     rts
@@ -4250,64 +4434,8 @@ find_object_code_prg_case_unsupported:
     sec
     rts
 
-loaded_external_print_body_is_s0i0r:
-    lda #<linked_body_string_int
-    sta const_ptr
-    lda #>linked_body_string_int
-    sta const_ptr+1
-    jmp loaded_first_body_matches_const_ptr
-
 loaded_external_print_body_is_M:
     jmp loaded_first_body_is_object_code
-
-loaded_first_body_matches_const_ptr:
-    lda const_ptr
-    sta saved_state_lo
-    lda const_ptr+1
-    sta saved_state_hi
-    jsr reset_scan_ptr_after_header
-loaded_first_body_matches_const_ptr_loop:
-    jsr skip_line_breaks
-    ldy #$00
-    lda (scan_ptr),y
-    beq loaded_first_body_matches_const_ptr_no
-    lda #<line_body
-    sta const_ptr
-    lda #>line_body
-    sta const_ptr+1
-    jsr pattern_matches_scan_ptr
-    bcs loaded_first_body_matches_const_ptr_next
-    jsr advance_scan_ptr_by_const_ptr
-    lda saved_state_lo
-    sta const_ptr
-    lda saved_state_hi
-    sta const_ptr+1
-    ldy #$00
-loaded_first_body_matches_const_ptr_compare:
-    lda (const_ptr),y
-    beq loaded_first_body_matches_const_ptr_check_end
-    cmp (scan_ptr),y
-    bne loaded_first_body_matches_const_ptr_no
-    iny
-    bne loaded_first_body_matches_const_ptr_compare
-loaded_first_body_matches_const_ptr_check_end:
-    lda (scan_ptr),y
-    beq loaded_first_body_matches_const_ptr_ok
-    cmp #10
-    beq loaded_first_body_matches_const_ptr_ok
-    cmp #13
-    beq loaded_first_body_matches_const_ptr_ok
-    sec
-    rts
-loaded_first_body_matches_const_ptr_next:
-    jsr skip_current_line
-    jmp loaded_first_body_matches_const_ptr_loop
-loaded_first_body_matches_const_ptr_ok:
-    clc
-    rts
-loaded_first_body_matches_const_ptr_no:
-    sec
-    rts
 
 copy_loaded_first_import_to_module_name_or_fail:
     jsr reset_scan_ptr_after_header
@@ -4342,103 +4470,6 @@ copy_loaded_first_import_to_module_name_bad:
     lda #<msg_bad_object
     ldy #>msg_bad_object
     jmp fail_with_ptr
-
-require_loaded_external_print_string_or_fail:
-    jsr reset_scan_ptr_after_header
-require_loaded_external_print_string_loop:
-    jsr skip_line_breaks
-    ldy #$00
-    lda (scan_ptr),y
-    beq require_loaded_external_print_string_bad
-    lda #<line_string
-    sta const_ptr
-    lda #>line_string
-    sta const_ptr+1
-    jsr pattern_matches_scan_ptr
-    bcs require_loaded_external_print_string_next
-    jsr advance_scan_ptr_by_const_ptr
-    lda scan_ptr
-    sta external_print_string_ptr
-    lda scan_ptr+1
-    sta external_print_string_ptr+1
-    rts
-require_loaded_external_print_string_next:
-    jsr skip_current_line
-    jmp require_loaded_external_print_string_loop
-require_loaded_external_print_string_bad:
-    lda #<msg_bad_object
-    ldy #>msg_bad_object
-    jmp fail_with_ptr
-
-require_loaded_external_store_int_or_fail:
-    jsr reset_scan_ptr_after_header
-require_loaded_external_store_int_loop:
-    jsr skip_line_breaks
-    ldy #$00
-    lda (scan_ptr),y
-    beq require_loaded_external_store_int_bad
-    lda #<line_int
-    sta const_ptr
-    lda #>line_int
-    sta const_ptr+1
-    jsr pattern_matches_scan_ptr
-    bcs require_loaded_external_store_int_next
-    jsr advance_scan_ptr_by_const_ptr
-    jsr parse_decimal_byte_or_fail
-    sta linked_store_value
-    rts
-require_loaded_external_store_int_next:
-    jsr skip_current_line
-    jmp require_loaded_external_store_int_loop
-require_loaded_external_store_int_bad:
-    lda #<msg_bad_object
-    ldy #>msg_bad_object
-    jmp fail_with_ptr
-
-append_external_print_string_to_prg:
-    lda external_print_string_ptr
-    sta src_ptr
-    lda external_print_string_ptr+1
-    sta src_ptr+1
-build_external_print_prg_string_loop:
-    ldy #$00
-    lda (src_ptr),y
-    beq build_external_print_prg_string_done
-    cmp #10
-    beq build_external_print_prg_string_done
-    cmp #13
-    beq build_external_print_prg_string_done
-    jsr append_payload_byte
-    inc src_ptr
-    bne build_external_print_prg_string_loop
-    inc src_ptr+1
-    jmp build_external_print_prg_string_loop
-build_external_print_prg_string_done:
-    lda #$00
-    jmp append_payload_byte
-
-build_printmath_linked_string_int_prg_content_or_fail:
-    lda #<direct_prg_template_printmath
-    sta const_ptr
-    lda #>direct_prg_template_printmath
-    sta const_ptr+1
-    lda #<(direct_prg_template_printmath_linked_int - direct_prg_template_printmath)
-    sta current_bit_lo
-    lda #>(direct_prg_template_printmath_linked_int - direct_prg_template_printmath)
-    sta current_bit_hi
-    jsr copy_direct_prg_template
-    lda linked_store_value
-    jsr append_payload_byte
-    lda #<direct_prg_template_printmath_linked_int_end
-    sta const_ptr
-    lda #>direct_prg_template_printmath_linked_int_end
-    sta const_ptr+1
-    lda #<(direct_prg_template_printmath_linked_string - direct_prg_template_printmath_linked_int_end)
-    sta current_bit_lo
-    lda #>(direct_prg_template_printmath_linked_string - direct_prg_template_printmath_linked_int_end)
-    sta current_bit_hi
-    jsr copy_direct_prg_template
-    jmp append_external_print_string_to_prg
 
 build_real_print_int_prg_content_or_fail:
     lda #$00
@@ -5871,6 +5902,71 @@ build_runtime_helper_sequence_prg_call:
     jmp build_object_code_prg_bad
 :
     sta linked_runtime_helper_kind
+    jsr runtime_helper_sequence_nested_noarg_byte_readback_active
+    bcs build_runtime_helper_sequence_prg_call_not_nested_noarg_byte_readback
+    lda #$00
+    sta linked_object_index
+    lda linked_runtime_result_pending
+    beq build_runtime_helper_sequence_prg_call_nested_noarg_byte_readback_ready
+    lda linked_runtime_result_loaded
+    sta linked_object_index
+    jsr runtime_helper_sequence_materialize_pending_result_arg_or_fail
+    bcc :+
+    jmp build_object_code_prg_bad
+:
+    lda linked_object_index
+    bne build_runtime_helper_sequence_prg_call_nested_noarg_byte_readback_ready
+    jsr append_runtime_helper_sequence_result_store_or_fail
+build_runtime_helper_sequence_prg_call_nested_noarg_byte_readback_ready:
+    ldx linked_external_index
+    jsr append_runtime_jsr_to_pending_target_x
+    jsr runtime_helper_sequence_update_nested_noarg_byte_readback_result
+    jmp build_runtime_helper_sequence_prg_loop
+build_runtime_helper_sequence_prg_call_not_nested_noarg_byte_readback:
+    jsr runtime_helper_sequence_nested_a_byte_readback_active
+    bcs build_runtime_helper_sequence_prg_call_not_nested_a_readback
+    jsr runtime_helper_sequence_validate_nested_a_byte_readback_or_fail
+    bcc :+
+    jmp build_object_code_prg_bad
+:
+    lda linked_runtime_arg_count
+    beq :+
+    jsr append_runtime_helper_sequence_lda_last_arg_low
+:
+    ldx linked_external_index
+    jsr append_runtime_jsr_to_pending_target_x
+    jsr runtime_helper_sequence_update_nested_a_byte_readback_result
+    jmp build_runtime_helper_sequence_prg_loop
+build_runtime_helper_sequence_prg_call_not_nested_a_readback:
+    lda linked_runtime_helper_kind
+    cmp #RUNTIME_HELPER_KIND_BYTE_READBACK
+    bne build_runtime_helper_sequence_prg_call_no_prior_result
+    lda linked_runtime_result_pending
+    beq build_runtime_helper_sequence_prg_call_no_prior_result
+    lda linked_runtime_arg_count
+    bne build_runtime_helper_sequence_prg_call_materialize_prior_result
+    jsr runtime_helper_sequence_clear_pending_result
+    jmp build_runtime_helper_sequence_prg_call_no_prior_result
+build_runtime_helper_sequence_prg_call_materialize_prior_result:
+    jsr runtime_helper_sequence_materialize_pending_result_arg_or_fail
+    bcc :+
+    jmp build_object_code_prg_bad
+:
+    jsr append_runtime_helper_sequence_result_store_or_fail
+build_runtime_helper_sequence_prg_call_no_prior_result:
+    jsr runtime_helper_sequence_deferred_byte_readback_active
+    bcs build_runtime_helper_sequence_prg_call_regular
+    jsr append_runtime_helper_sequence_current_call_or_fail
+    ldx linked_external_index
+    jsr append_runtime_jsr_to_pending_target_x
+    jsr runtime_helper_sequence_update_result_pending
+    jsr runtime_helper_sequence_materialize_pending_result_arg_or_fail
+    bcc :+
+    jmp build_object_code_prg_bad
+:
+    jsr append_runtime_helper_sequence_result_store_or_fail
+    jmp build_runtime_helper_sequence_prg_loop
+build_runtime_helper_sequence_prg_call_regular:
     jsr runtime_helper_sequence_validate_current_call
     bcc :+
     jmp build_object_code_prg_bad
@@ -6003,6 +6099,78 @@ runtime_helper_sequence_compute_call:
     jmp build_object_code_prg_bad
 :
     sta linked_runtime_helper_kind
+    jsr runtime_helper_sequence_nested_noarg_byte_readback_active
+    bcs runtime_helper_sequence_compute_call_not_nested_noarg_byte_readback
+    lda #$00
+    sta linked_object_index
+    lda linked_runtime_result_pending
+    beq runtime_helper_sequence_compute_call_nested_noarg_byte_readback_ready
+    lda linked_runtime_result_loaded
+    sta linked_object_index
+    jsr runtime_helper_sequence_materialize_pending_result_arg_or_fail
+    bcc :+
+    jmp build_object_code_prg_bad
+:
+    lda linked_object_index
+    bne runtime_helper_sequence_compute_call_nested_noarg_byte_readback_ready
+    lda #$08
+    jsr runtime_helper_sequence_add_a_to_next_addr
+runtime_helper_sequence_compute_call_nested_noarg_byte_readback_ready:
+    lda #$03
+    jsr runtime_helper_sequence_add_a_to_next_addr
+    jsr runtime_helper_sequence_update_nested_noarg_byte_readback_result
+    jmp runtime_helper_sequence_compute_loop
+runtime_helper_sequence_compute_call_not_nested_noarg_byte_readback:
+    jsr runtime_helper_sequence_nested_a_byte_readback_active
+    bcs runtime_helper_sequence_compute_call_not_nested_a_readback
+    jsr runtime_helper_sequence_validate_nested_a_byte_readback_or_fail
+    bcc :+
+    jmp build_object_code_prg_bad
+:
+    lda linked_runtime_arg_count
+    beq runtime_helper_sequence_compute_call_nested_a_readback_noarg
+    lda #$05
+    jsr runtime_helper_sequence_add_a_to_next_addr
+    jsr runtime_helper_sequence_load_last_arg_to_x
+    jsr runtime_helper_sequence_add_arg_ref_extra_from_x
+    jmp runtime_helper_sequence_compute_call_nested_a_readback_update
+runtime_helper_sequence_compute_call_nested_a_readback_noarg:
+    lda #$03
+    jsr runtime_helper_sequence_add_a_to_next_addr
+runtime_helper_sequence_compute_call_nested_a_readback_update:
+    jsr runtime_helper_sequence_update_nested_a_byte_readback_result
+    jmp runtime_helper_sequence_compute_loop
+runtime_helper_sequence_compute_call_not_nested_a_readback:
+    lda linked_runtime_helper_kind
+    cmp #RUNTIME_HELPER_KIND_BYTE_READBACK
+    bne runtime_helper_sequence_compute_call_no_prior_result
+    lda linked_runtime_result_pending
+    beq runtime_helper_sequence_compute_call_no_prior_result
+    lda linked_runtime_arg_count
+    bne runtime_helper_sequence_compute_call_materialize_prior_result
+    jsr runtime_helper_sequence_clear_pending_result
+    jmp runtime_helper_sequence_compute_call_no_prior_result
+runtime_helper_sequence_compute_call_materialize_prior_result:
+    jsr runtime_helper_sequence_materialize_pending_result_arg_or_fail
+    bcc :+
+    jmp build_object_code_prg_bad
+:
+    lda #$08
+    jsr runtime_helper_sequence_add_a_to_next_addr
+runtime_helper_sequence_compute_call_no_prior_result:
+    jsr runtime_helper_sequence_deferred_byte_readback_active
+    bcs runtime_helper_sequence_compute_call_regular
+    lda #$03
+    jsr runtime_helper_sequence_add_a_to_next_addr
+    jsr runtime_helper_sequence_update_result_pending
+    jsr runtime_helper_sequence_materialize_pending_result_arg_or_fail
+    bcc :+
+    jmp build_object_code_prg_bad
+:
+    lda #$08
+    jsr runtime_helper_sequence_add_a_to_next_addr
+    jmp runtime_helper_sequence_compute_loop
+runtime_helper_sequence_compute_call_regular:
     jsr runtime_helper_sequence_validate_current_call
     bcc :+
     jmp build_object_code_prg_bad
@@ -6154,6 +6322,13 @@ runtime_helper_sequence_add_arg0_eight:
 runtime_helper_sequence_add_arg0_fourteen:
     lda #$0E
     jmp runtime_helper_sequence_add_a_to_next_addr
+runtime_helper_sequence_add_arg2_axy_like_len:
+    lda #$09
+    jsr runtime_helper_sequence_add_a_to_next_addr
+    ldx linked_runtime_arg0
+    jsr runtime_helper_sequence_add_arg_ref_extra_from_x
+    ldx linked_runtime_arg1
+    jmp runtime_helper_sequence_add_arg_ref_extra_from_x
 runtime_helper_sequence_add_current_call_literal_args:
     jsr runtime_helper_sequence_pending_a_arg1_active
     bcs runtime_helper_sequence_add_current_call_arg2_literal_args
@@ -6198,15 +6373,15 @@ runtime_helper_sequence_add_current_call_arg2_literal_args:
     lda linked_runtime_helper_kind
     cmp #RUNTIME_HELPER_KIND_AXY_BYTES_CLC
     bne :+
-    jmp runtime_helper_sequence_add_nine_to_next_addr
+    jmp runtime_helper_sequence_add_arg2_axy_like_len
 :
     cmp #RUNTIME_HELPER_KIND_AXY_BYTES_CLC_READBACK
     bne :+
-    jmp runtime_helper_sequence_add_nine_to_next_addr
+    jmp runtime_helper_sequence_add_arg2_axy_like_len
 :
     cmp #RUNTIME_HELPER_KIND_SPRITE_POS
     bne :+
-    jmp runtime_helper_sequence_add_nine_to_next_addr
+    jmp runtime_helper_sequence_add_arg2_axy_like_len
 :
 runtime_helper_sequence_add_current_call_arg3_literal_args:
     jsr runtime_helper_sequence_pending_a_arg3_active
@@ -6224,7 +6399,9 @@ runtime_helper_sequence_add_current_call_all_literal_args:
     jmp runtime_helper_sequence_add_arg0_fourteen
 :
     cmp #RUNTIME_HELPER_KIND_SPRITE_POS
-    beq runtime_helper_sequence_add_ten_to_next_addr
+    bne :+
+    jmp runtime_helper_sequence_add_sprite_pos_literal_arg_len
+:
     cmp #RUNTIME_HELPER_KIND_AXY_BYTES_CLC
     beq runtime_helper_sequence_add_ten_to_next_addr
     cmp #RUNTIME_HELPER_KIND_AXY_BYTES_CLC_READBACK
@@ -6279,6 +6456,49 @@ runtime_helper_sequence_add_six_to_next_addr:
 runtime_helper_sequence_add_nine_to_next_addr:
     lda #$09
     jmp runtime_helper_sequence_add_a_to_next_addr
+
+runtime_helper_sequence_add_sprite_pos_literal_arg_len:
+    lda #$0A
+    jsr runtime_helper_sequence_add_a_to_next_addr
+    ldx linked_runtime_arg0
+    jsr runtime_helper_sequence_add_arg_ref_extra_from_x
+    ldx linked_runtime_arg1
+    jsr runtime_helper_sequence_add_arg_ref_extra_from_x
+    ldx linked_runtime_arg2
+    jmp runtime_helper_sequence_add_arg_ref_extra_from_x
+
+runtime_helper_sequence_add_arg_ref_extra_from_x:
+    txa
+    bpl :+
+    lda #$01
+    jmp runtime_helper_sequence_add_a_to_next_addr
+:
+    rts
+
+runtime_helper_sequence_load_last_arg_to_x:
+    lda linked_runtime_arg_count
+    cmp #$01
+    bne :+
+    ldx linked_runtime_arg0
+    rts
+:
+    cmp #$02
+    bne :+
+    ldx linked_runtime_arg1
+    rts
+:
+    cmp #$03
+    bne :+
+    ldx linked_runtime_arg2
+    rts
+:
+    ldx linked_runtime_arg3
+    rts
+
+append_runtime_helper_sequence_lda_last_arg_low:
+    jsr runtime_helper_sequence_load_last_arg_to_x
+    jmp append_runtime_helper_sequence_lda_arg_x_low
+
 runtime_helper_sequence_add_pending_loaded_len:
     lda linked_runtime_result_loaded
     beq :+
@@ -8006,9 +8226,6 @@ direct_entry_body_matches_const_ok:
     rts
 
 copy_direct_prg_template:
-    lda #$00
-    sta main_flags_lo
-    sta main_flags_hi
     lda current_bit_lo
     sta saved_state_lo
     lda current_bit_hi
@@ -8031,285 +8248,6 @@ copy_direct_prg_template_loop:
 copy_direct_prg_template_done:
     rts
 
-direct_body_table_lo:
-    .byte <direct_body_single_call
-    .byte <direct_body_fanout
-    .byte <direct_body_word_store
-    .byte <direct_body_word_load_store
-    .byte <direct_body_printmath
-    .byte <direct_body_if_eq
-    .byte <direct_body_if_lt
-    .byte <direct_body_if_gt
-    .byte <direct_body_if_ge
-    .byte <direct_body_if_ne
-    .byte <direct_body_if_le
-    .byte <direct_body_if_else
-    .byte <direct_body_nested_if
-    .byte <direct_body_nested_else
-    .byte <direct_body_nested_do_until_eq
-    .byte <direct_body_do_if_until_eq
-    .byte <direct_body_do_if_else_until_eq
-    .byte <direct_body_if_do_until_eq
-    .byte <direct_body_if_else_do_until_eq
-    .byte <direct_body_if_local_call_do_until_eq
-    .byte <direct_body_if_else_local_call_do_until_eq
-    .byte <direct_body_nested_if_local_call
-    .byte <direct_body_nested_else_local_call
-    .byte <direct_body_nested_do_local_call
-    .byte <direct_body_nested_do_if_else_local_call
-    .byte <direct_body_if_local_call_nested_do_if_else
-    .byte <direct_body_if_else_local_call_nested_do_if_else
-    .byte <direct_body_nested_else_local_call_nested_do_if_else
-    .byte <direct_body_if_else_local_call_chain_nested_do_if_else
-    .byte <direct_body_nested_else_local_call_chain_nested_do_if_else
-    .byte <direct_body_do_until_eq
-    .byte <direct_body_do_until_lt
-    .byte <direct_body_return
-    .byte <direct_body_seeded_runtime
-direct_body_table_hi:
-    .byte >direct_body_single_call
-    .byte >direct_body_fanout
-    .byte >direct_body_word_store
-    .byte >direct_body_word_load_store
-    .byte >direct_body_printmath
-    .byte >direct_body_if_eq
-    .byte >direct_body_if_lt
-    .byte >direct_body_if_gt
-    .byte >direct_body_if_ge
-    .byte >direct_body_if_ne
-    .byte >direct_body_if_le
-    .byte >direct_body_if_else
-    .byte >direct_body_nested_if
-    .byte >direct_body_nested_else
-    .byte >direct_body_nested_do_until_eq
-    .byte >direct_body_do_if_until_eq
-    .byte >direct_body_do_if_else_until_eq
-    .byte >direct_body_if_do_until_eq
-    .byte >direct_body_if_else_do_until_eq
-    .byte >direct_body_if_local_call_do_until_eq
-    .byte >direct_body_if_else_local_call_do_until_eq
-    .byte >direct_body_nested_if_local_call
-    .byte >direct_body_nested_else_local_call
-    .byte >direct_body_nested_do_local_call
-    .byte >direct_body_nested_do_if_else_local_call
-    .byte >direct_body_if_local_call_nested_do_if_else
-    .byte >direct_body_if_else_local_call_nested_do_if_else
-    .byte >direct_body_nested_else_local_call_nested_do_if_else
-    .byte >direct_body_if_else_local_call_chain_nested_do_if_else
-    .byte >direct_body_nested_else_local_call_chain_nested_do_if_else
-    .byte >direct_body_do_until_eq
-    .byte >direct_body_do_until_lt
-    .byte >direct_body_return
-    .byte >direct_body_seeded_runtime
-direct_template_table_lo:
-    .byte <direct_prg_template_single_call
-    .byte <direct_prg_template_fanout
-    .byte <direct_prg_template_word_store
-    .byte <direct_prg_template_word_load_store
-    .byte <direct_prg_template_printmath
-    .byte <direct_prg_template_if_eq
-    .byte <direct_prg_template_if_lt
-    .byte <direct_prg_template_if_gt
-    .byte <direct_prg_template_if_ge
-    .byte <direct_prg_template_if_ne
-    .byte <direct_prg_template_if_le
-    .byte <direct_prg_template_if_else
-    .byte <direct_prg_template_nested_if
-    .byte <direct_prg_template_nested_else
-    .byte <direct_prg_template_nested_do_until_eq
-    .byte <direct_prg_template_do_if_until_eq
-    .byte <direct_prg_template_do_if_else_until_eq
-    .byte <direct_prg_template_if_do_until_eq
-    .byte <direct_prg_template_if_else_do_until_eq
-    .byte <direct_prg_template_if_local_call_do_until_eq
-    .byte <direct_prg_template_if_else_local_call_do_until_eq
-    .byte <direct_prg_template_nested_if_local_call
-    .byte <direct_prg_template_nested_else_local_call
-    .byte <direct_prg_template_nested_do_local_call
-    .byte <direct_prg_template_nested_do_if_else_local_call
-    .byte <direct_prg_template_if_local_call_nested_do_if_else
-    .byte <direct_prg_template_if_else_local_call_nested_do_if_else
-    .byte <direct_prg_template_nested_else_local_call_nested_do_if_else
-    .byte <direct_prg_template_if_else_local_call_chain_nested_do_if_else
-    .byte <direct_prg_template_nested_else_local_call_chain_nested_do_if_else
-    .byte <direct_prg_template_do_until_eq
-    .byte <direct_prg_template_do_until_lt
-    .byte <direct_prg_template_seeded_runtime
-    .byte <direct_prg_template_seeded_runtime
-direct_template_table_hi:
-    .byte >direct_prg_template_single_call
-    .byte >direct_prg_template_fanout
-    .byte >direct_prg_template_word_store
-    .byte >direct_prg_template_word_load_store
-    .byte >direct_prg_template_printmath
-    .byte >direct_prg_template_if_eq
-    .byte >direct_prg_template_if_lt
-    .byte >direct_prg_template_if_gt
-    .byte >direct_prg_template_if_ge
-    .byte >direct_prg_template_if_ne
-    .byte >direct_prg_template_if_le
-    .byte >direct_prg_template_if_else
-    .byte >direct_prg_template_nested_if
-    .byte >direct_prg_template_nested_else
-    .byte >direct_prg_template_nested_do_until_eq
-    .byte >direct_prg_template_do_if_until_eq
-    .byte >direct_prg_template_do_if_else_until_eq
-    .byte >direct_prg_template_if_do_until_eq
-    .byte >direct_prg_template_if_else_do_until_eq
-    .byte >direct_prg_template_if_local_call_do_until_eq
-    .byte >direct_prg_template_if_else_local_call_do_until_eq
-    .byte >direct_prg_template_nested_if_local_call
-    .byte >direct_prg_template_nested_else_local_call
-    .byte >direct_prg_template_nested_do_local_call
-    .byte >direct_prg_template_nested_do_if_else_local_call
-    .byte >direct_prg_template_if_local_call_nested_do_if_else
-    .byte >direct_prg_template_if_else_local_call_nested_do_if_else
-    .byte >direct_prg_template_nested_else_local_call_nested_do_if_else
-    .byte >direct_prg_template_if_else_local_call_chain_nested_do_if_else
-    .byte >direct_prg_template_nested_else_local_call_chain_nested_do_if_else
-    .byte >direct_prg_template_do_until_eq
-    .byte >direct_prg_template_do_until_lt
-    .byte >direct_prg_template_seeded_runtime
-    .byte >direct_prg_template_seeded_runtime
-direct_template_len_lo:
-    .byte <(direct_prg_template_single_call_end - direct_prg_template_single_call)
-    .byte <(direct_prg_template_fanout_end - direct_prg_template_fanout)
-    .byte <(direct_prg_template_word_store_end - direct_prg_template_word_store)
-    .byte <(direct_prg_template_word_load_store_end - direct_prg_template_word_load_store)
-    .byte <(direct_prg_template_printmath_end - direct_prg_template_printmath)
-    .byte <(direct_prg_template_if_eq_end - direct_prg_template_if_eq)
-    .byte <(direct_prg_template_if_lt_end - direct_prg_template_if_lt)
-    .byte <(direct_prg_template_if_gt_end - direct_prg_template_if_gt)
-    .byte <(direct_prg_template_if_ge_end - direct_prg_template_if_ge)
-    .byte <(direct_prg_template_if_ne_end - direct_prg_template_if_ne)
-    .byte <(direct_prg_template_if_le_end - direct_prg_template_if_le)
-    .byte <(direct_prg_template_if_else_end - direct_prg_template_if_else)
-    .byte <(direct_prg_template_nested_if_end - direct_prg_template_nested_if)
-    .byte <(direct_prg_template_nested_else_end - direct_prg_template_nested_else)
-    .byte <(direct_prg_template_nested_do_until_eq_end - direct_prg_template_nested_do_until_eq)
-    .byte <(direct_prg_template_do_if_until_eq_end - direct_prg_template_do_if_until_eq)
-    .byte <(direct_prg_template_do_if_else_until_eq_end - direct_prg_template_do_if_else_until_eq)
-    .byte <(direct_prg_template_if_do_until_eq_end - direct_prg_template_if_do_until_eq)
-    .byte <(direct_prg_template_if_else_do_until_eq_end - direct_prg_template_if_else_do_until_eq)
-    .byte <(direct_prg_template_if_local_call_do_until_eq_end - direct_prg_template_if_local_call_do_until_eq)
-    .byte <(direct_prg_template_if_else_local_call_do_until_eq_end - direct_prg_template_if_else_local_call_do_until_eq)
-    .byte <(direct_prg_template_nested_if_local_call_end - direct_prg_template_nested_if_local_call)
-    .byte <(direct_prg_template_nested_else_local_call_end - direct_prg_template_nested_else_local_call)
-    .byte <(direct_prg_template_nested_do_local_call_end - direct_prg_template_nested_do_local_call)
-    .byte <(direct_prg_template_nested_do_if_else_local_call_end - direct_prg_template_nested_do_if_else_local_call)
-    .byte <(direct_prg_template_if_local_call_nested_do_if_else_end - direct_prg_template_if_local_call_nested_do_if_else)
-    .byte <(direct_prg_template_if_else_local_call_nested_do_if_else_end - direct_prg_template_if_else_local_call_nested_do_if_else)
-    .byte <(direct_prg_template_nested_else_local_call_nested_do_if_else_end - direct_prg_template_nested_else_local_call_nested_do_if_else)
-    .byte <(direct_prg_template_if_else_local_call_chain_nested_do_if_else_end - direct_prg_template_if_else_local_call_chain_nested_do_if_else)
-    .byte <(direct_prg_template_nested_else_local_call_chain_nested_do_if_else_end - direct_prg_template_nested_else_local_call_chain_nested_do_if_else)
-    .byte <(direct_prg_template_do_until_eq_end - direct_prg_template_do_until_eq)
-    .byte <(direct_prg_template_do_until_lt_end - direct_prg_template_do_until_lt)
-    .byte <(direct_prg_template_seeded_runtime_end - direct_prg_template_seeded_runtime)
-    .byte <(direct_prg_template_seeded_runtime_end - direct_prg_template_seeded_runtime)
-direct_template_len_hi:
-    .byte >(direct_prg_template_single_call_end - direct_prg_template_single_call)
-    .byte >(direct_prg_template_fanout_end - direct_prg_template_fanout)
-    .byte >(direct_prg_template_word_store_end - direct_prg_template_word_store)
-    .byte >(direct_prg_template_word_load_store_end - direct_prg_template_word_load_store)
-    .byte >(direct_prg_template_printmath_end - direct_prg_template_printmath)
-    .byte >(direct_prg_template_if_eq_end - direct_prg_template_if_eq)
-    .byte >(direct_prg_template_if_lt_end - direct_prg_template_if_lt)
-    .byte >(direct_prg_template_if_gt_end - direct_prg_template_if_gt)
-    .byte >(direct_prg_template_if_ge_end - direct_prg_template_if_ge)
-    .byte >(direct_prg_template_if_ne_end - direct_prg_template_if_ne)
-    .byte >(direct_prg_template_if_le_end - direct_prg_template_if_le)
-    .byte >(direct_prg_template_if_else_end - direct_prg_template_if_else)
-    .byte >(direct_prg_template_nested_if_end - direct_prg_template_nested_if)
-    .byte >(direct_prg_template_nested_else_end - direct_prg_template_nested_else)
-    .byte >(direct_prg_template_nested_do_until_eq_end - direct_prg_template_nested_do_until_eq)
-    .byte >(direct_prg_template_do_if_until_eq_end - direct_prg_template_do_if_until_eq)
-    .byte >(direct_prg_template_do_if_else_until_eq_end - direct_prg_template_do_if_else_until_eq)
-    .byte >(direct_prg_template_if_do_until_eq_end - direct_prg_template_if_do_until_eq)
-    .byte >(direct_prg_template_if_else_do_until_eq_end - direct_prg_template_if_else_do_until_eq)
-    .byte >(direct_prg_template_if_local_call_do_until_eq_end - direct_prg_template_if_local_call_do_until_eq)
-    .byte >(direct_prg_template_if_else_local_call_do_until_eq_end - direct_prg_template_if_else_local_call_do_until_eq)
-    .byte >(direct_prg_template_nested_if_local_call_end - direct_prg_template_nested_if_local_call)
-    .byte >(direct_prg_template_nested_else_local_call_end - direct_prg_template_nested_else_local_call)
-    .byte >(direct_prg_template_nested_do_local_call_end - direct_prg_template_nested_do_local_call)
-    .byte >(direct_prg_template_nested_do_if_else_local_call_end - direct_prg_template_nested_do_if_else_local_call)
-    .byte >(direct_prg_template_if_local_call_nested_do_if_else_end - direct_prg_template_if_local_call_nested_do_if_else)
-    .byte >(direct_prg_template_if_else_local_call_nested_do_if_else_end - direct_prg_template_if_else_local_call_nested_do_if_else)
-    .byte >(direct_prg_template_nested_else_local_call_nested_do_if_else_end - direct_prg_template_nested_else_local_call_nested_do_if_else)
-    .byte >(direct_prg_template_if_else_local_call_chain_nested_do_if_else_end - direct_prg_template_if_else_local_call_chain_nested_do_if_else)
-    .byte >(direct_prg_template_nested_else_local_call_chain_nested_do_if_else_end - direct_prg_template_nested_else_local_call_chain_nested_do_if_else)
-    .byte >(direct_prg_template_do_until_eq_end - direct_prg_template_do_until_eq)
-    .byte >(direct_prg_template_do_until_lt_end - direct_prg_template_do_until_lt)
-    .byte >(direct_prg_template_seeded_runtime_end - direct_prg_template_seeded_runtime)
-    .byte >(direct_prg_template_seeded_runtime_end - direct_prg_template_seeded_runtime)
-
-direct_body_single_call:
-    .asciiz "c0r"
-direct_body_fanout:
-    .asciiz "c0c1r"
-direct_body_word_store:
-    .asciiz "p0S0r"
-direct_body_word_load_store:
-    .asciiz "p0S0L0S1r"
-direct_body_printmath:
-    .asciiz "e0u0j0i1r"
-direct_body_if_eq:
-    .asciiz "p0S0L0p1qhp2S1vr"
-direct_body_if_lt:
-    .asciiz "p0S0p1S1L0L1lhp2S1vr"
-direct_body_if_gt:
-    .asciiz "p0S0p1S1L0L1ghp2S1vr"
-direct_body_if_ge:
-    .asciiz "p0S0p1S1L0L1lp2qhp3S1vr"
-direct_body_if_ne:
-    .asciiz "p0S0p1S1L0L1nhp2S1vr"
-direct_body_if_le:
-    .asciiz "p0S0p1S1L0L1gp2qhp3S1vr"
-direct_body_if_else:
-    .asciiz "p0S0L0p1qhp2S1wp3S1vr"
-direct_body_nested_if:
-    .asciiz "p0S0p1S1L0L1lhL1p2ghp3S2vvr"
-direct_body_nested_else:
-    .asciiz "p0S0p1S1L0L1lhL1p2ghp3S2wp4S2vvr"
-direct_body_nested_do_until_eq:
-    .asciiz "p0S0p1S1dp2S0dp3S1L1p4qtoL0p5qtor"
-direct_body_do_if_until_eq:
-    .asciiz "p0S0p1S1dp2S0L0p3qhp4S1vL1p5qtor"
-direct_body_do_if_else_until_eq:
-    .asciiz "p0S0p1S1dp2S0L0p3qhp4S1wp5S1vL1p6qtor"
-direct_body_if_do_until_eq:
-    .asciiz "p0S0p1S1L0p2qhdp3S1L1p4qtovr"
-direct_body_if_else_do_until_eq:
-    .asciiz "p0S0p1S1L0p2qhdp3S1L1p4qtowdp5S1L1p6qtovr"
-direct_body_if_local_call_do_until_eq:
-    .asciiz "p2S0p3S1L0p4qhc0vr"
-direct_body_if_else_local_call_do_until_eq:
-    .asciiz "p2S0p3S1L0p4qhp5S1wc0vr"
-direct_body_nested_if_local_call:
-    .asciiz "p1S0p2S1L0p3qhL1p4qhc0vvr"
-direct_body_nested_else_local_call:
-    .asciiz "p1S0p2S1L0p3qhL1p4qhp5S1wc0vvr"
-direct_body_nested_do_local_call:
-    .asciiz "p1S0p2S1dp3S0dc0L1p4qtoL0p5qtor"
-direct_body_nested_do_if_else_local_call:
-    .asciiz "p1S0p2S1dp3S0dL0p4qhp5S1wc0vL1p6qtoL0p7qtor"
-direct_body_if_local_call_nested_do_if_else:
-    .asciiz "p4S0p5S1L0p6qhc0vr"
-direct_body_if_else_local_call_nested_do_if_else:
-    .asciiz "p4S0p5S1L0p6qhp7S1wc0vr"
-direct_body_nested_else_local_call_nested_do_if_else:
-    .asciiz "p4S0p5S1L0p6qhL1p7qhp8S1wc0vvr"
-direct_body_if_else_local_call_chain_nested_do_if_else:
-    .asciiz "p4S0p5S1L0p6qhp7S1wc1vr"
-direct_body_nested_else_local_call_chain_nested_do_if_else:
-    .asciiz "p4S0p5S1L0p6qhL1p7qhp8S1wc1vvr"
-direct_body_do_until_eq:
-    .asciiz "p0S0dp1S0L0p2qtor"
-direct_body_do_until_lt:
-    .asciiz "p0S0p1S1dp2S0L0L1ltor"
-direct_body_return:
-    .asciiz "r"
-direct_body_seeded_runtime:
-    .asciiz "e0u0p0p1ayp2p3gzr"
 direct_body_runtime_helper_if_eq:
     .asciiz "p0u0p1qhp2u1vr"
 direct_body_runtime_helper_if_ne:
@@ -8542,424 +8480,6 @@ direct_body_real_while_lt_once:
     .asciiz "p1u0T0S0p3u0T1S1dL0U0L1U1u1p4lfp5S2p6p6T1S1xr"
 direct_body_real_while_lt_convert_once:
     .asciiz "p1u0T0S0p3u0T1S1dL0U0L1U1u1p4lfp5S2p7u0T1S1xr"
-linked_body_string_int:
-    .asciiz "s0i0r"
-direct_prg_template_single_call:
-    .byte $00,$10,$A9,$A5,$8D,$D0,$03,$A9,$00,$85,$02,$85,$03,$A2,$02,$4C
-    .byte $0F,$CF,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
-    .byte $00,$00,$48,$45,$20,$10,$49,$18,$10
-direct_prg_template_single_call_end:
-
-direct_prg_template_fanout:
-    .byte $00,$10,$A9,$A5,$8D,$D0,$03,$A9,$00,$85,$02,$85,$03,$A2,$02,$4C
-    .byte $0F,$CF,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
-    .byte $00,$00,$48,$45,$20,$10,$48,$45,$20,$10,$45,$21,$10,$49,$18,$10
-direct_prg_template_fanout_end:
-
-direct_prg_template_word_store:
-    .byte $00,$10,$A9,$07,$A2,$00,$8D,$22,$10,$8E,$23,$10,$8D,$D1,$03,$8E
-    .byte $D2,$03,$A9,$A5,$8D,$D0,$03,$A9,$00,$85,$02,$85,$03,$A2,$02,$4C
-    .byte $0F,$CF,$00,$00,$00,$00
-direct_prg_template_word_store_end:
-
-direct_prg_template_word_load_store:
-    .byte $00,$10,$A9,$07,$A2,$00,$8D,$2E,$10,$8E,$2F,$10,$AD,$2E,$10,$AE
-    .byte $2F,$10,$8D,$30,$10,$8E,$31,$10,$8D,$D1,$03,$8E,$D2,$03,$A9,$A5
-    .byte $8D,$D0,$03,$A9,$00,$85,$02,$85,$03,$A2,$02,$4C,$0F,$CF,$00,$00
-    .byte $00,$00,$00,$00
-direct_prg_template_word_load_store_end:
-
-direct_prg_template_printmath:
-    .byte $00,$10,$A9,$7B,$85,$02,$A9,$13,$85,$03,$A2,$02,$20,$03,$CF,$20
-    .byte $06,$CF,$20,$50,$12,$A9,$36,$A2,$00,$8D,$77,$13,$8E,$78,$13,$A9
-    .byte $79,$85,$02,$A9,$13,$85,$03,$A0,$00,$A2,$00,$AD,$78,$13,$C9,$27
-    .byte $90,$1D,$D0,$07,$AD,$77,$13,$C9,$10,$90,$14,$38,$AD,$77,$13,$E9
-    .byte $10,$8D,$77,$13,$AD,$78,$13,$E9,$27,$8D,$78,$13,$E8,$D0,$DC,$E0
-    .byte $00,$D0,$04,$C0,$00,$F0,$0E,$8A,$18,$69,$30,$8D,$79,$13,$A2,$02
-    .byte $20,$03,$CF,$A0,$01,$A2,$00,$AD,$78,$13,$C9,$03,$90,$1D,$D0,$07
-    .byte $AD,$77,$13,$C9,$E8,$90,$14,$38,$AD,$77,$13,$E9,$E8,$8D,$77,$13
-    .byte $AD,$78,$13,$E9,$03,$8D,$78,$13,$E8,$D0,$DC,$E0,$00,$D0,$04,$C0
-    .byte $00,$F0,$0E,$8A,$18,$69,$30,$8D,$79,$13,$A2,$02,$20,$03,$CF,$A0
-    .byte $01,$A2,$00,$AD,$78,$13,$C9,$00,$90,$1D,$D0,$07,$AD,$77,$13,$C9
-    .byte $64,$90,$14,$38,$AD,$77,$13,$E9,$64,$8D,$77,$13,$AD,$78,$13,$E9
-    .byte $00,$8D,$78,$13,$E8,$D0,$DC,$E0,$00,$D0,$04,$C0,$00,$F0,$0E,$8A
-    .byte $18,$69,$30,$8D,$79,$13,$A2,$02,$20,$03,$CF,$A0,$01,$A2,$00,$AD
-    .byte $78,$13,$C9,$00,$90,$1D,$D0,$07,$AD,$77,$13,$C9,$0A,$90,$14,$38
-    .byte $AD,$77,$13,$E9,$0A,$8D,$77,$13,$AD,$78,$13,$E9,$00,$8D,$78,$13
-    .byte $E8,$D0,$DC,$E0,$00,$D0,$04,$C0,$00,$F0,$0E,$8A,$18,$69,$30,$8D
-    .byte $79,$13,$A2,$02,$20,$03,$CF,$A0,$01,$AD,$77,$13,$18,$69,$30,$8D
-    .byte $79,$13,$A2,$02,$20,$03,$CF,$A9,$3B,$A2,$00,$8D,$77,$13,$8E,$78
-    .byte $13,$A9,$79,$85,$02,$A9,$13,$85,$03,$A0,$00,$A2,$00,$AD,$78,$13
-    .byte $C9,$27,$90,$1D,$D0,$07,$AD,$77,$13,$C9,$10,$90,$14,$38,$AD,$77
-    .byte $13,$E9,$10,$8D,$77,$13,$AD,$78,$13,$E9,$27,$8D,$78,$13,$E8,$D0
-    .byte $DC,$E0,$00,$D0,$04,$C0,$00,$F0,$0E,$8A,$18,$69,$30,$8D,$79,$13
-    .byte $A2,$02,$20,$03,$CF,$A0,$01,$A2,$00,$AD,$78,$13,$C9,$03,$90,$1D
-    .byte $D0,$07,$AD,$77,$13,$C9,$E8,$90,$14,$38,$AD,$77,$13,$E9,$E8,$8D
-    .byte $77,$13,$AD,$78,$13,$E9,$03,$8D,$78,$13,$E8,$D0,$DC,$E0,$00,$D0
-    .byte $04,$C0,$00,$F0,$0E,$8A,$18,$69,$30,$8D,$79,$13,$A2,$02,$20,$03
-    .byte $CF,$A0,$01,$A2,$00,$AD,$78,$13,$C9,$00,$90,$1D,$D0,$07,$AD,$77
-    .byte $13,$C9,$64,$90,$14,$38,$AD,$77,$13,$E9,$64,$8D,$77,$13,$AD,$78
-    .byte $13,$E9,$00,$8D,$78,$13,$E8,$D0,$DC,$E0,$00,$D0,$04,$C0,$00,$F0
-    .byte $0E,$8A,$18,$69,$30,$8D,$79,$13,$A2,$02,$20,$03,$CF,$A0,$01,$A2
-    .byte $00,$AD,$78,$13,$C9,$00,$90,$1D,$D0,$07,$AD,$77,$13,$C9,$0A,$90
-    .byte $14,$38,$AD,$77,$13,$E9,$0A,$8D,$77,$13,$AD,$78,$13,$E9,$00,$8D
-    .byte $78,$13,$E8,$D0,$DC,$E0,$00,$D0,$04,$C0,$00,$F0,$0E,$8A,$18,$69
-    .byte $30,$8D,$79,$13,$A2,$02,$20,$03,$CF,$A0,$01,$AD,$77,$13,$18,$69
-    .byte $30,$8D,$79,$13,$A2,$02,$20,$03,$CF,$20,$06,$CF,$8D,$D1,$03,$8E
-    .byte $D2,$03,$A9,$A5,$8D,$D0,$03,$A9,$00,$85,$02,$85,$03,$A2,$02,$4C
-    .byte $0F,$CF,$A9,$81,$85,$02,$A9,$13,$85,$03,$A2,$02,$20,$03,$CF,$A9
-direct_prg_template_printmath_linked_int:
-    .byte $07
-direct_prg_template_printmath_linked_int_end:
-    .byte $A2,$00,$8D,$77,$13,$8E,$78,$13,$A9,$79,$85,$02,$A9,$13,$85
-    .byte $03,$A0,$00,$A2,$00,$AD,$78,$13,$C9,$27,$90,$1D,$D0,$07,$AD,$77
-    .byte $13,$C9,$10,$90,$14,$38,$AD,$77,$13,$E9,$10,$8D,$77,$13,$AD,$78
-    .byte $13,$E9,$27,$8D,$78,$13,$E8,$D0,$DC,$E0,$00,$D0,$04,$C0,$00,$F0
-    .byte $0E,$8A,$18,$69,$30,$8D,$79,$13,$A2,$02,$20,$03,$CF,$A0,$01,$A2
-    .byte $00,$AD,$78,$13,$C9,$03,$90,$1D,$D0,$07,$AD,$77,$13,$C9,$E8,$90
-    .byte $14,$38,$AD,$77,$13,$E9,$E8,$8D,$77,$13,$AD,$78,$13,$E9,$03,$8D
-    .byte $78,$13,$E8,$D0,$DC,$E0,$00,$D0,$04,$C0,$00,$F0,$0E,$8A,$18,$69
-    .byte $30,$8D,$79,$13,$A2,$02,$20,$03,$CF,$A0,$01,$A2,$00,$AD,$78,$13
-    .byte $C9,$00,$90,$1D,$D0,$07,$AD,$77,$13,$C9,$64,$90,$14,$38,$AD,$77
-    .byte $13,$E9,$64,$8D,$77,$13,$AD,$78,$13,$E9,$00,$8D,$78,$13,$E8,$D0
-    .byte $DC,$E0,$00,$D0,$04,$C0,$00,$F0,$0E,$8A,$18,$69,$30,$8D,$79,$13
-    .byte $A2,$02,$20,$03,$CF,$A0,$01,$A2,$00,$AD,$78,$13,$C9,$00,$90,$1D
-    .byte $D0,$07,$AD,$77,$13,$C9,$0A,$90,$14,$38,$AD,$77,$13,$E9,$0A,$8D
-    .byte $77,$13,$AD,$78,$13,$E9,$00,$8D,$78,$13,$E8,$D0,$DC,$E0,$00,$D0
-    .byte $04,$C0,$00,$F0,$0E,$8A,$18,$69,$30,$8D,$79,$13,$A2,$02,$20,$03
-    .byte $CF,$A0,$01,$AD,$77,$13,$18,$69,$30,$8D,$79,$13,$A2,$02,$20,$03
-    .byte $CF,$20,$06,$CF,$60,$00,$00,$00,$00,$00,$00,$00,$00,$48,$45,$4C
-    .byte $4C,$4F,$00
-direct_prg_template_printmath_linked_string:
-    .byte $54,$4F,$4F,$4C,$00
-direct_prg_template_printmath_end:
-
-direct_prg_template_if_eq:
-    .byte $00,$10,$A9,$07,$A2,$00,$8D,$49,$10,$8E,$4A,$10,$AD,$49,$10,$AE
-    .byte $4A,$10,$8D,$47,$10,$8E,$48,$10,$A9,$07,$A2,$00,$EC,$48,$10,$D0
-    .byte $05,$CD,$47,$10,$F0,$03,$4C,$31,$10,$A9,$01,$A2,$00,$8D,$4B,$10
-    .byte $8E,$4C,$10,$8D,$D1,$03,$8E,$D2,$03,$A9,$A5,$8D,$D0,$03,$A9,$00
-    .byte $85,$02,$85,$03,$A2,$02,$4C,$0F,$CF,$00,$00,$00,$00,$00,$00
-direct_prg_template_if_eq_end:
-
-direct_prg_template_if_lt:
-    .byte $00,$10,$A9,$01,$A2,$00,$8D,$65,$10,$8E,$66,$10,$A9,$02,$A2,$00
-    .byte $8D,$67,$10,$8E,$68,$10,$AD,$65,$10,$AE,$66,$10,$8D,$63,$10,$8E
-    .byte $64,$10,$AD,$67,$10,$AE,$68,$10,$EC,$64,$10,$90,$0D,$D0,$07,$CD
-    .byte $63,$10,$90,$06,$F0,$04,$A9,$01,$D0,$02,$A9,$00,$A2,$00,$C9,$00
-    .byte $D0,$03,$4C,$4D,$10,$A9,$03,$A2,$00,$8D,$67,$10,$8E,$68,$10,$8D
-    .byte $D1,$03,$8E,$D2,$03,$A9,$A5,$8D,$D0,$03,$A9,$00,$85,$02,$85,$03
-    .byte $A2,$02,$4C,$0F,$CF,$00,$00,$00,$00,$00,$00
-direct_prg_template_if_lt_end:
-
-direct_prg_template_if_gt:
-    .byte $00,$10,$A9,$02,$A2,$00,$8D,$65,$10,$8E,$66,$10,$A9,$01,$A2,$00
-    .byte $8D,$67,$10,$8E,$68,$10,$AD,$65,$10,$AE,$66,$10,$8D,$63,$10,$8E
-    .byte $64,$10,$AD,$67,$10,$AE,$68,$10,$EC,$64,$10,$90,$07,$D0,$0D,$CD
-    .byte $63,$10,$90,$02,$F0,$04,$A9,$01,$D0,$02,$A9,$00,$A2,$00,$C9,$00
-    .byte $D0,$03,$4C,$4D,$10,$A9,$03,$A2,$00,$8D,$67,$10,$8E,$68,$10,$8D
-    .byte $D1,$03,$8E,$D2,$03,$A9,$A5,$8D,$D0,$03,$A9,$00,$85,$02,$85,$03
-    .byte $A2,$02,$4C,$0F,$CF,$00,$00,$00,$00,$00,$00
-direct_prg_template_if_gt_end:
-
-direct_prg_template_if_ge:
-    .byte $00,$10,$A9,$02,$A2,$00,$8D,$75,$10,$8E,$76,$10,$A9,$01,$A2,$00
-    .byte $8D,$77,$10,$8E,$78,$10,$AD,$75,$10,$AE,$76,$10,$8D,$73,$10,$8E
-    .byte $74,$10,$AD,$77,$10,$AE,$78,$10,$EC,$74,$10,$90,$0D,$D0,$07,$CD
-    .byte $73,$10,$90,$06,$F0,$04,$A9,$01,$D0,$02,$A9,$00,$A2,$00,$8D,$73
-    .byte $10,$8E,$74,$10,$A9,$00,$A2,$00,$EC,$74,$10,$D0,$05,$CD,$73,$10
-    .byte $F0,$03,$4C,$5D,$10,$A9,$03,$A2,$00,$8D,$77,$10,$8E,$78,$10,$8D
-    .byte $D1,$03,$8E,$D2,$03,$A9,$A5,$8D,$D0,$03,$A9,$00,$85,$02,$85,$03
-    .byte $A2,$02,$4C,$0F,$CF,$00,$00,$00,$00,$00,$00
-direct_prg_template_if_ge_end:
-
-direct_prg_template_if_ne:
-    .byte $00,$10,$A9,$02,$A2,$00,$8D,$61,$10,$8E,$62,$10,$A9,$01,$A2,$00
-    .byte $8D,$63,$10,$8E,$64,$10,$AD,$61,$10,$AE,$62,$10,$8D,$5F,$10,$8E
-    .byte $60,$10,$AD,$63,$10,$AE,$64,$10,$EC,$60,$10,$D0,$05,$CD,$5F,$10
-    .byte $F0,$04,$A9,$01,$D0,$02,$A9,$00,$A2,$00,$C9,$00,$D0,$03,$4C,$49
-    .byte $10,$A9,$03,$A2,$00,$8D,$63,$10,$8E,$64,$10,$8D,$D1,$03,$8E,$D2
-    .byte $03,$A9,$A5,$8D,$D0,$03,$A9,$00,$85,$02,$85,$03,$A2,$02,$4C,$0F
-    .byte $CF,$00,$00,$00,$00,$00,$00
-direct_prg_template_if_ne_end:
-
-direct_prg_template_if_le:
-    .byte $00,$10,$A9,$01,$A2,$00,$8D,$75,$10,$8E,$76,$10,$A9,$01,$A2,$00
-    .byte $8D,$77,$10,$8E,$78,$10,$AD,$75,$10,$AE,$76,$10,$8D,$73,$10,$8E
-    .byte $74,$10,$AD,$77,$10,$AE,$78,$10,$EC,$74,$10,$90,$07,$D0,$0D,$CD
-    .byte $73,$10,$90,$02,$F0,$04,$A9,$01,$D0,$02,$A9,$00,$A2,$00,$8D,$73
-    .byte $10,$8E,$74,$10,$A9,$00,$A2,$00,$EC,$74,$10,$D0,$05,$CD,$73,$10
-    .byte $F0,$03,$4C,$5D,$10,$A9,$03,$A2,$00,$8D,$77,$10,$8E,$78,$10,$8D
-    .byte $D1,$03,$8E,$D2,$03,$A9,$A5,$8D,$D0,$03,$A9,$00,$85,$02,$85,$03
-    .byte $A2,$02,$4C,$0F,$CF,$00,$00,$00,$00,$00,$00
-direct_prg_template_if_le_end:
-
-direct_prg_template_if_else:
-    .byte $00,$10,$A9,$07,$A2,$00,$8D,$56,$10,$8E,$57,$10,$AD,$56,$10,$AE
-    .byte $57,$10,$8D,$54,$10,$8E,$55,$10,$A9,$08,$A2,$00,$EC,$55,$10,$D0
-    .byte $05,$CD,$54,$10,$F0,$03,$4C,$34,$10,$A9,$01,$A2,$00,$8D,$58,$10
-    .byte $8E,$59,$10,$4C,$3E,$10,$A9,$02,$A2,$00,$8D,$58,$10,$8E,$59,$10
-    .byte $8D,$D1,$03,$8E,$D2,$03,$A9,$A5,$8D,$D0,$03,$A9,$00,$85,$02,$85
-    .byte $03,$A2,$02,$4C,$0F,$CF,$00,$00,$00,$00,$00,$00
-direct_prg_template_if_else_end:
-
-direct_prg_template_nested_if:
-    .byte $00,$10,$A9,$01,$A2,$00,$8D,$92,$10,$8E,$93,$10,$A9,$02,$A2,$00
-    .byte $8D,$94,$10,$8E,$95,$10,$AD,$92,$10,$AE,$93,$10,$8D,$90,$10,$8E
-    .byte $91,$10,$AD,$94,$10,$AE,$95,$10,$EC,$91,$10,$90,$0D,$D0,$07,$CD
-    .byte $90,$10,$90,$06,$F0,$04,$A9,$01,$D0,$02,$A9,$00,$A2,$00,$C9,$00
-    .byte $D0,$03,$4C,$7A,$10,$AD,$94,$10,$AE,$95,$10,$8D,$90,$10,$8E,$91
-    .byte $10,$A9,$01,$A2,$00,$EC,$91,$10,$90,$07,$D0,$0D,$CD,$90,$10,$90
-    .byte $02,$F0,$04,$A9,$01,$D0,$02,$A9,$00,$A2,$00,$C9,$00,$D0,$03,$4C
-    .byte $7A,$10,$A9,$03,$A2,$00,$8D,$96,$10,$8E,$97,$10,$8D,$D1,$03,$8E
-    .byte $D2,$03,$A9,$A5,$8D,$D0,$03,$A9,$00,$85,$02,$85,$03,$A2,$02,$4C
-    .byte $0F,$CF,$00,$00,$00,$00,$00,$00,$00,$00
-direct_prg_template_nested_if_end:
-
-direct_prg_template_nested_else:
-    .byte $00,$10,$A9,$01,$A2,$00,$8D,$9F,$10,$8E,$A0,$10,$A9,$02,$A2,$00
-    .byte $8D,$A1,$10,$8E,$A2,$10,$AD,$9F,$10,$AE,$A0,$10,$8D,$9D,$10,$8E
-    .byte $9E,$10,$AD,$A1,$10,$AE,$A2,$10,$EC,$9E,$10,$90,$0D,$D0,$07,$CD
-    .byte $9D,$10,$90,$06,$F0,$04,$A9,$01,$D0,$02,$A9,$00,$A2,$00,$C9,$00
-    .byte $D0,$03,$4C,$87,$10,$AD,$A1,$10,$AE,$A2,$10,$8D,$9D,$10,$8E,$9E
-    .byte $10,$A9,$02,$A2,$00,$EC,$9E,$10,$90,$07,$D0,$0D,$CD,$9D,$10,$90
-    .byte $02,$F0,$04,$A9,$01,$D0,$02,$A9,$00,$A2,$00,$C9,$00,$D0,$03,$4C
-    .byte $7D,$10,$A9,$03,$A2,$00,$8D,$A3,$10,$8E,$A4,$10,$4C,$87,$10,$A9
-    .byte $04,$A2,$00,$8D,$A3,$10,$8E,$A4,$10,$8D,$D1,$03,$8E,$D2,$03,$A9
-    .byte $A5,$8D,$D0,$03,$A9,$00,$85,$02,$85,$03,$A2,$02,$4C,$0F,$CF,$00
-    .byte $00,$00,$00,$00,$00,$00,$00
-direct_prg_template_nested_else_end:
-
-direct_prg_template_nested_do_until_eq:
-    .byte $00,$10,$A9,$00,$A2,$00,$8D,$7A,$10,$8E,$7B,$10,$A9,$00,$A2,$00
-    .byte $8D,$7C,$10,$8E,$7D,$10,$A9,$01,$A2,$00,$8D,$7A,$10,$8E,$7B,$10
-    .byte $A9,$02,$A2,$00,$8D,$7C,$10,$8E,$7D,$10,$AD,$7C,$10,$AE,$7D,$10
-    .byte $8D,$78,$10,$8E,$79,$10,$A9,$02,$A2,$00,$EC,$79,$10,$D0,$05,$CD
-    .byte $78,$10,$F0,$03,$4C,$1E,$10,$AD,$7A,$10,$AE,$7B,$10,$8D,$78,$10
-    .byte $8E,$79,$10,$A9,$01,$A2,$00,$EC,$79,$10,$D0,$05,$CD,$78,$10,$F0
-    .byte $03,$4C,$14,$10,$8D,$D1,$03,$8E,$D2,$03,$A9,$A5,$8D,$D0,$03,$A9
-    .byte $00,$85,$02,$85,$03,$A2,$02,$4C,$0F,$CF,$00,$00,$00,$00,$00,$00
-direct_prg_template_nested_do_until_eq_end:
-
-direct_prg_template_do_if_until_eq:
-    .byte $00,$10,$A9,$00,$A2,$00,$8D,$7A,$10,$8E,$7B,$10,$A9,$00,$A2,$00
-    .byte $8D,$7C,$10,$8E,$7D,$10,$A9,$01,$A2,$00,$8D,$7A,$10,$8E,$7B,$10
-    .byte $AD,$7A,$10,$AE,$7B,$10,$8D,$78,$10,$8E,$79,$10,$A9,$01,$A2,$00
-    .byte $EC,$79,$10,$D0,$05,$CD,$78,$10,$F0,$03,$4C,$45,$10,$A9,$02,$A2
-    .byte $00,$8D,$7C,$10,$8E,$7D,$10,$AD,$7C,$10,$AE,$7D,$10,$8D,$78,$10
-    .byte $8E,$79,$10,$A9,$02,$A2,$00,$EC,$79,$10,$D0,$05,$CD,$78,$10,$F0
-    .byte $03,$4C,$14,$10,$8D,$D1,$03,$8E,$D2,$03,$A9,$A5,$8D,$D0,$03,$A9
-    .byte $00,$85,$02,$85,$03,$A2,$02,$4C,$0F,$CF,$00,$00,$00,$00,$00,$00
-direct_prg_template_do_if_until_eq_end:
-
-direct_prg_template_do_if_else_until_eq:
-    .byte $00,$10,$A9,$00,$A2,$00,$8D,$87,$10,$8E,$88,$10,$A9,$00,$A2,$00
-    .byte $8D,$89,$10,$8E,$8A,$10,$A9,$01,$A2,$00,$8D,$87,$10,$8E,$88,$10
-    .byte $AD,$87,$10,$AE,$88,$10,$8D,$85,$10,$8E,$86,$10,$A9,$02,$A2,$00
-    .byte $EC,$86,$10,$D0,$05,$CD,$85,$10,$F0,$03,$4C,$48,$10,$A9,$03,$A2
-    .byte $00,$8D,$89,$10,$8E,$8A,$10,$4C,$52,$10,$A9,$04,$A2,$00,$8D,$89
-    .byte $10,$8E,$8A,$10,$AD,$89,$10,$AE,$8A,$10,$8D,$85,$10,$8E,$86,$10
-    .byte $A9,$04,$A2,$00,$EC,$86,$10,$D0,$05,$CD,$85,$10,$F0,$03,$4C,$14
-    .byte $10,$8D,$D1,$03,$8E,$D2,$03,$A9,$A5,$8D,$D0,$03,$A9,$00,$85,$02
-    .byte $85,$03,$A2,$02,$4C,$0F,$CF,$00,$00,$00,$00,$00,$00
-direct_prg_template_do_if_else_until_eq_end:
-
-direct_prg_template_if_do_until_eq:
-    .byte $00,$10,$A9,$01,$A2,$00,$8D,$70,$10,$8E,$71,$10,$A9,$00,$A2,$00
-    .byte $8D,$72,$10,$8E,$73,$10,$AD,$70,$10,$AE,$71,$10,$8D,$6E,$00,$8E
-    .byte $6F,$00,$A9,$01,$A2,$00,$EC,$6F,$00,$D0,$05,$CD,$6E,$00,$F0,$03
-    .byte $4C,$58,$10,$A9,$02,$A2,$00,$8D,$72,$10,$8E,$73,$10,$AD,$72,$10
-    .byte $AE,$73,$10,$8D,$6E,$00,$8E,$6F,$00,$A9,$02,$A2,$00,$EC,$6F,$00
-    .byte $D0,$05,$CD,$6E,$00,$F0,$03,$4C,$31,$10,$8D,$D1,$03,$8E,$D2,$03
-    .byte $A9,$A5,$8D,$D0,$03,$A9,$00,$85,$02,$85,$03,$A2,$02,$4C,$0F,$CF
-    .byte $00,$00,$00,$00,$00,$00
-direct_prg_template_if_do_until_eq_end:
-
-direct_prg_template_if_else_do_until_eq:
-    .byte $00,$10,$A9,$01,$A2,$00,$8D,$9A,$10,$8E,$9B,$10,$A9,$00,$A2,$00
-    .byte $8D,$9C,$10,$8E,$9D,$10,$AD,$9A,$10,$AE,$9B,$10,$8D,$98,$10,$8E
-    .byte $99,$10,$A9,$02,$A2,$00,$EC,$99,$10,$D0,$05,$CD,$98,$10,$F0,$03
-    .byte $4C,$5B,$10,$A9,$03,$A2,$00,$8D,$9C,$10,$8E,$9D,$10,$AD,$9C,$10
-    .byte $AE,$9D,$10,$8D,$98,$10,$8E,$99,$10,$A9,$03,$A2,$00,$EC,$99,$10
-    .byte $D0,$05,$CD,$98,$10,$F0,$03,$4C,$31,$10,$4C,$82,$10,$A9,$04,$A2
-    .byte $00,$8D,$9C,$10,$8E,$9D,$10,$AD,$9C,$10,$AE,$9D,$10,$8D,$98,$10
-    .byte $8E,$99,$10,$A9,$04,$A2,$00,$EC,$99,$10,$D0,$05,$CD,$98,$10,$F0
-    .byte $03,$4C,$5B,$10,$8D,$D1,$03,$8E,$D2,$03,$A9,$A5,$8D,$D0,$03,$A9
-    .byte $00,$85,$02,$85,$03,$A2,$02,$4C,$0F,$CF,$00,$00,$00,$00,$00,$00
-direct_prg_template_if_else_do_until_eq_end:
-
-direct_prg_template_if_local_call_do_until_eq:
-    .byte $00,$10,$A9,$01,$A2,$00,$8D,$74,$10,$8E,$75,$10,$A9,$00,$A2,$00
-    .byte $8D,$76,$10,$8E,$77,$10,$AD,$74,$10,$AE,$75,$10,$8D,$72,$00,$8E
-    .byte $73,$00,$A9,$01,$A2,$00,$EC,$73,$00,$D0,$05,$CD,$72,$00,$F0,$03
-    .byte $4C,$34,$10,$20,$4A,$10,$8D,$D1,$03,$8E,$D2,$03,$A9,$A5,$8D,$D0
-    .byte $03,$A9,$00,$85,$02,$85,$03,$A2,$02,$4C,$0F,$CF,$A9,$02,$A2,$00
-    .byte $8D,$76,$10,$8E,$77,$10,$AD,$76,$10,$AE,$77,$10,$8D,$4A,$00,$8E
-    .byte $4B,$00,$A9,$02,$A2,$00,$EC,$4B,$00,$D0,$05,$CD,$4A,$00,$F0,$03
-    .byte $4C,$00,$10,$60,$00,$00,$00,$00,$00,$00
-direct_prg_template_if_local_call_do_until_eq_end:
-
-direct_prg_template_if_else_local_call_do_until_eq:
-    .byte $00,$10,$A9,$01,$A2,$00,$8D,$81,$10,$8E,$82,$10,$A9,$00,$A2,$00
-    .byte $8D,$83,$10,$8E,$84,$10,$AD,$81,$10,$AE,$82,$10,$8D,$7F,$00,$8E
-    .byte $80,$00,$A9,$02,$A2,$00,$EC,$80,$00,$D0,$05,$CD,$7F,$00,$F0,$03
-    .byte $4C,$3E,$10,$A9,$03,$A2,$00,$8D,$83,$10,$8E,$84,$10,$4C,$41,$10
-    .byte $20,$57,$10,$8D,$D1,$03,$8E,$D2,$03,$A9,$A5,$8D,$D0,$03,$A9,$00
-    .byte $85,$02,$85,$03,$A2,$02,$4C,$0F,$CF,$A9,$04,$A2,$00,$8D,$83,$10
-    .byte $8E,$84,$10,$AD,$83,$10,$AE,$84,$10,$8D,$57,$00,$8E,$58,$00,$A9
-    .byte $04,$A2,$00,$EC,$58,$00,$D0,$05,$CD,$57,$00,$F0,$03,$4C,$00,$10
-    .byte $60,$00,$00,$00,$00,$00,$00
-direct_prg_template_if_else_local_call_do_until_eq_end:
-
-direct_prg_template_nested_if_local_call:
-    .byte $00,$10,$A9,$01,$A2,$00,$8D,$74,$10,$8E,$75,$10,$A9,$00,$A2,$00
-    .byte $8D,$76,$10,$8E,$77,$10,$AD,$74,$10,$AE,$75,$10,$8D,$72,$00,$8E
-    .byte $73,$00,$A9,$01,$A2,$00,$EC,$73,$00,$D0,$05,$CD,$72,$00,$F0,$03
-    .byte $4C,$51,$10,$AD,$76,$10,$AE,$77,$10,$8D,$72,$00,$8E,$73,$00,$A9
-    .byte $00,$A2,$00,$EC,$73,$00,$D0,$05,$CD,$72,$00,$F0,$03,$4C,$51,$10
-    .byte $20,$67,$10,$8D,$D1,$03,$8E,$D2,$03,$A9,$A5,$8D,$D0,$03,$A9,$00
-    .byte $85,$02,$85,$03,$A2,$02,$4C,$0F,$CF,$A9,$05,$A2,$00,$8D,$76,$10
-    .byte $8E,$77,$10,$60,$00,$00,$00,$00,$00,$00
-direct_prg_template_nested_if_local_call_end:
-
-direct_prg_template_nested_else_local_call:
-    .byte $00,$10,$A9,$01,$A2,$00,$8D,$81,$10,$8E,$82,$10,$A9,$00,$A2,$00
-    .byte $8D,$83,$10,$8E,$84,$10,$AD,$81,$10,$AE,$82,$10,$8D,$7F,$00,$8E
-    .byte $80,$00,$A9,$01,$A2,$00,$EC,$80,$00,$D0,$05,$CD,$7F,$00,$F0,$03
-    .byte $4C,$5E,$10,$AD,$83,$10,$AE,$84,$10,$8D,$7F,$00,$8E,$80,$00,$A9
-    .byte $01,$A2,$00,$EC,$80,$00,$D0,$05,$CD,$7F,$00,$F0,$03,$4C,$5B,$10
-    .byte $A9,$03,$A2,$00,$8D,$83,$10,$8E,$84,$10,$4C,$5E,$10,$20,$74,$10
-    .byte $8D,$D1,$03,$8E,$D2,$03,$A9,$A5,$8D,$D0,$03,$A9,$00,$85,$02,$85
-    .byte $03,$A2,$02,$4C,$0F,$CF,$A9,$06,$A2,$00,$8D,$83,$10,$8E,$84,$10
-    .byte $60,$00,$00,$00,$00,$00,$00
-direct_prg_template_nested_else_local_call_end:
-
-direct_prg_template_nested_do_local_call:
-    .byte $00,$10,$A9,$00,$A2,$00,$8D,$7E,$10,$8E,$7F,$10,$A9,$00,$A2,$00
-    .byte $8D,$80,$10,$8E,$81,$10,$A9,$01,$A2,$00,$8D,$7E,$10,$8E,$7F,$10
-    .byte $20,$71,$10,$AD,$80,$10,$AE,$81,$10,$8D,$71,$00,$8E,$72,$00,$A9
-    .byte $07,$A2,$00,$EC,$72,$00,$D0,$05,$CD,$71,$00,$F0,$03,$4C,$1E,$10
-    .byte $AD,$7E,$10,$AE,$7F,$10,$8D,$71,$00,$8E,$72,$00,$A9,$01,$A2,$00
-    .byte $EC,$72,$00,$D0,$05,$CD,$71,$00,$F0,$03,$4C,$14,$10,$8D,$D1,$03
-    .byte $8E,$D2,$03,$A9,$A5,$8D,$D0,$03,$A9,$00,$85,$02,$85,$03,$A2,$02
-    .byte $4C,$0F,$CF,$A9,$07,$A2,$00,$8D,$80,$10,$8E,$81,$10,$60,$00,$00
-    .byte $00,$00,$00,$00
-direct_prg_template_nested_do_local_call_end:
-
-direct_prg_template_nested_do_if_else_local_call:
-    .byte $00,$10,$A9,$00,$A2,$00,$8D,$A8,$10,$8E,$A9,$10,$A9,$00,$A2,$00
-    .byte $8D,$AA,$10,$8E,$AB,$10,$A9,$01,$A2,$00,$8D,$A8,$10,$8E,$A9,$10
-    .byte $AD,$A8,$10,$AE,$A9,$10,$8D,$A6,$00,$8E,$A7,$00,$A9,$02,$A2,$00
-    .byte $EC,$A7,$00,$D0,$05,$CD,$A6,$00,$F0,$03,$4C,$48,$10,$A9,$03,$A2
-    .byte $00,$8D,$AA,$10,$8E,$AB,$10,$4C,$4B,$10,$20,$9B,$10,$AD,$AA,$10
-    .byte $AE,$AB,$10,$8D,$9B,$00,$8E,$9C,$00,$A9,$08,$A2,$00,$EC,$9C,$00
-    .byte $D0,$05,$CD,$9B,$00,$F0,$03,$4C,$1E,$10,$AD,$A8,$10,$AE,$A9,$10
-    .byte $8D,$9B,$00,$8E,$9C,$00,$A9,$01,$A2,$00,$EC,$9C,$00,$D0,$05,$CD
-    .byte $9B,$00,$F0,$03,$4C,$14,$10,$8D,$D1,$03,$8E,$D2,$03,$A9,$A5,$8D
-    .byte $D0,$03,$A9,$00,$85,$02,$85,$03,$A2,$02,$4C,$0F,$CF,$A9,$08,$A2
-    .byte $00,$8D,$AA,$10,$8E,$AB,$10,$60,$00,$00,$00,$00,$00,$00
-direct_prg_template_nested_do_if_else_local_call_end:
-
-direct_prg_template_if_local_call_nested_do_if_else:
-    .byte $00,$10,$A9,$01,$A2,$00,$8D,$9E,$10,$8E,$9F,$10,$A9,$00,$A2,$00
-    .byte $8D,$A0,$10,$8E,$A1,$10,$AD,$9E,$10,$AE,$9F,$10,$8D,$9C,$00,$8E
-    .byte $9D,$00,$A9,$01,$A2,$00,$EC,$9D,$00,$D0,$05,$CD,$9C,$00,$F0,$03
-    .byte $4C,$34,$10,$20,$4A,$10,$8D,$D1,$03,$8E,$D2,$03,$A9,$A5,$8D,$D0
-    .byte $03,$A9,$00,$85,$02,$85,$03,$A2,$02,$4C,$0F,$CF,$AD,$A0,$10,$AE
-    .byte $A1,$10,$8D,$4A,$00,$8E,$4B,$00,$A9,$01,$A2,$00,$EC,$4B,$00,$D0
-    .byte $05,$CD,$4A,$00,$F0,$03,$4C,$74,$10,$A9,$03,$A2,$00,$8D,$A0,$10
-    .byte $8E,$A1,$10,$4C,$7E,$10,$A9,$09,$A2,$00,$8D,$A0,$10,$8E,$A1,$10
-    .byte $AD,$A0,$10,$AE,$A1,$10,$8D,$4A,$00,$8E,$4B,$00,$A9,$09,$A2,$00
-    .byte $EC,$4B,$00,$D0,$05,$CD,$4A,$00,$F0,$03,$4C,$4A,$10,$60,$00,$00
-    .byte $00,$00,$00,$00
-direct_prg_template_if_local_call_nested_do_if_else_end:
-
-direct_prg_template_if_else_local_call_nested_do_if_else:
-    .byte $00,$10,$A9,$01,$A2,$00,$8D,$AB,$10,$8E,$AC,$10,$A9,$00,$A2,$00
-    .byte $8D,$AD,$10,$8E,$AE,$10,$AD,$AB,$10,$AE,$AC,$10,$8D,$A9,$00,$8E
-    .byte $AA,$00,$A9,$02,$A2,$00,$EC,$AA,$00,$D0,$05,$CD,$A9,$00,$F0,$03
-    .byte $4C,$3E,$10,$A9,$04,$A2,$00,$8D,$AD,$10,$8E,$AE,$10,$4C,$41,$10
-    .byte $20,$57,$10,$8D,$D1,$03,$8E,$D2,$03,$A9,$A5,$8D,$D0,$03,$A9,$00
-    .byte $85,$02,$85,$03,$A2,$02,$4C,$0F,$CF,$AD,$AD,$10,$AE,$AE,$10,$8D
-    .byte $57,$00,$8E,$58,$00,$A9,$01,$A2,$00,$EC,$58,$00,$D0,$05,$CD,$57
-    .byte $00,$F0,$03,$4C,$81,$10,$A9,$03,$A2,$00,$8D,$AD,$10,$8E,$AE,$10
-    .byte $4C,$8B,$10,$A9,$0A,$A2,$00,$8D,$AD,$10,$8E,$AE,$10,$AD,$AD,$10
-    .byte $AE,$AE,$10,$8D,$57,$00,$8E,$58,$00,$A9,$0A,$A2,$00,$EC,$58,$00
-    .byte $D0,$05,$CD,$57,$00,$F0,$03,$4C,$57,$10,$60,$00,$00,$00,$00,$00
-    .byte $00
-direct_prg_template_if_else_local_call_nested_do_if_else_end:
-
-direct_prg_template_nested_else_local_call_nested_do_if_else:
-    .byte $00,$10,$A9,$01,$A2,$00,$8D,$C8,$10,$8E,$C9,$10,$A9,$00,$A2,$00
-    .byte $8D,$CA,$10,$8E,$CB,$10,$AD,$C8,$10,$AE,$C9,$10,$8D,$C6,$00,$8E
-    .byte $C7,$00,$A9,$01,$A2,$00,$EC,$C7,$00,$D0,$05,$CD,$C6,$00,$F0,$03
-    .byte $4C,$5E,$10,$AD,$CA,$10,$AE,$CB,$10,$8D,$00,$00,$8E,$01,$00,$A9
-    .byte $01,$A2,$00,$EC,$01,$00,$D0,$05,$CD,$00,$00,$F0,$03,$4C,$5B,$10
-    .byte $A9,$04,$A2,$00,$8D,$CA,$10,$8E,$CB,$10,$4C,$5E,$10,$20,$74,$10
-    .byte $8D,$D1,$03,$8E,$D2,$03,$A9,$A5,$8D,$D0,$03,$A9,$00,$85,$02,$85
-    .byte $03,$A2,$02,$4C,$0F,$CF,$AD,$CA,$10,$AE,$CB,$10,$8D,$74,$00,$8E
-    .byte $75,$00,$A9,$01,$A2,$00,$EC,$75,$00,$D0,$05,$CD,$74,$00,$F0,$03
-    .byte $4C,$9E,$10,$A9,$03,$A2,$00,$8D,$CA,$10,$8E,$CB,$10,$4C,$A8,$10
-    .byte $A9,$0B,$A2,$00,$8D,$CA,$10,$8E,$CB,$10,$AD,$CA,$10,$AE,$CB,$10
-    .byte $8D,$74,$00,$8E,$75,$00,$A9,$0B,$A2,$00,$EC,$75,$00,$D0,$05,$CD
-    .byte $74,$00,$F0,$03,$4C,$74,$10,$60,$00,$00,$00,$00,$00,$00
-direct_prg_template_nested_else_local_call_nested_do_if_else_end:
-
-direct_prg_template_if_else_local_call_chain_nested_do_if_else:
-    .byte $00,$10,$A9,$01,$A2,$00,$8D,$AF,$10,$8E,$B0,$10,$A9,$00,$A2,$00
-    .byte $8D,$B1,$10,$8E,$B2,$10,$AD,$AF,$10,$AE,$B0,$10,$8D,$AD,$00,$8E
-    .byte $AE,$00,$A9,$02,$A2,$00,$EC,$AE,$00,$D0,$05,$CD,$AD,$00,$F0,$03
-    .byte $4C,$3E,$10,$A9,$04,$A2,$00,$8D,$B1,$10,$8E,$B2,$10,$4C,$41,$10
-    .byte $20,$A9,$10,$8D,$D1,$03,$8E,$D2,$03,$A9,$A5,$8D,$D0,$03,$A9,$00
-    .byte $85,$02,$85,$03,$A2,$02,$4C,$0F,$CF,$AD,$B1,$10,$AE,$B2,$10,$8D
-    .byte $A9,$00,$8E,$AA,$00,$A9,$01,$A2,$00,$EC,$AA,$00,$D0,$05,$CD,$A9
-    .byte $00,$F0,$03,$4C,$81,$10,$A9,$03,$A2,$00,$8D,$B1,$10,$8E,$B2,$10
-    .byte $4C,$8B,$10,$A9,$0C,$A2,$00,$8D,$B1,$10,$8E,$B2,$10,$AD,$B1,$10
-    .byte $AE,$B2,$10,$8D,$57,$00,$8E,$58,$00,$A9,$0C,$A2,$00,$EC,$58,$00
-    .byte $D0,$05,$CD,$57,$00,$F0,$03,$4C,$57,$10,$60,$20,$57,$10,$60,$00
-    .byte $00,$00,$00,$00,$00
-direct_prg_template_if_else_local_call_chain_nested_do_if_else_end:
-
-direct_prg_template_nested_else_local_call_chain_nested_do_if_else:
-    .byte $00,$10,$A9,$01,$A2,$00,$8D,$CC,$10,$8E,$CD,$10,$A9,$00,$A2,$00
-    .byte $8D,$CE,$10,$8E,$CF,$10,$AD,$CC,$10,$AE,$CD,$10,$8D,$CA,$00,$8E
-    .byte $CB,$00,$A9,$01,$A2,$00,$EC,$CB,$00,$D0,$05,$CD,$CA,$00,$F0,$03
-    .byte $4C,$5E,$10,$AD,$CE,$10,$AE,$CF,$10,$8D,$00,$00,$8E,$01,$00,$A9
-    .byte $01,$A2,$00,$EC,$01,$00,$D0,$05,$CD,$00,$00,$F0,$03,$4C,$5B,$10
-    .byte $A9,$04,$A2,$00,$8D,$CE,$10,$8E,$CF,$10,$4C,$5E,$10,$20,$C6,$10
-    .byte $8D,$D1,$03,$8E,$D2,$03,$A9,$A5,$8D,$D0,$03,$A9,$00,$85,$02,$85
-    .byte $03,$A2,$02,$4C,$0F,$CF,$AD,$CE,$10,$AE,$CF,$10,$8D,$C6,$00,$8E
-    .byte $C7,$00,$A9,$01,$A2,$00,$EC,$C7,$00,$D0,$05,$CD,$C6,$00,$F0,$03
-    .byte $4C,$9E,$10,$A9,$03,$A2,$00,$8D,$CE,$10,$8E,$CF,$10,$4C,$A8,$10
-    .byte $A9,$0D,$A2,$00,$8D,$CE,$10,$8E,$CF,$10,$AD,$CE,$10,$AE,$CF,$10
-    .byte $8D,$74,$00,$8E,$75,$00,$A9,$0D,$A2,$00,$EC,$75,$00,$D0,$05,$CD
-    .byte $74,$00,$F0,$03,$4C,$74,$10,$60,$20,$74,$10,$60,$00,$00,$00,$00
-    .byte $00,$00
-direct_prg_template_nested_else_local_call_chain_nested_do_if_else_end:
-
-direct_prg_template_do_until_eq:
-    .byte $00,$10,$A9,$00,$A2,$00,$8D,$49,$10,$8E,$4A,$10,$A9,$01,$A2,$00
-    .byte $8D,$49,$10,$8E,$4A,$10,$AD,$49,$10,$AE,$4A,$10,$8D,$47,$10,$8E
-    .byte $48,$10,$A9,$01,$A2,$00,$EC,$48,$10,$D0,$05,$CD,$47,$10,$F0,$03
-    .byte $4C,$0A,$10,$8D,$D1,$03,$8E,$D2,$03,$A9,$A5,$8D,$D0,$03,$A9,$00
-    .byte $85,$02,$85,$03,$A2,$02,$4C,$0F,$CF,$00,$00,$00,$00
-direct_prg_template_do_until_eq_end:
-
-direct_prg_template_do_until_lt:
-    .byte $00,$10,$A9,$01,$A2,$00,$8D,$65,$10,$8E,$66,$10,$A9,$02,$A2,$00
-    .byte $8D,$67,$10,$8E,$68,$10,$A9,$01,$A2,$00,$8D,$65,$10,$8E,$66,$10
-    .byte $AD,$65,$10,$AE,$66,$10,$8D,$63,$10,$8E,$64,$10,$AD,$67,$10,$AE
-    .byte $68,$10,$EC,$64,$10,$90,$0D,$D0,$07,$CD,$63,$10,$90,$06,$F0,$04
-    .byte $A9,$01,$D0,$02,$A9,$00,$A2,$00,$C9,$00,$D0,$03,$4C,$14,$10,$8D
-    .byte $D1,$03,$8E,$D2,$03,$A9,$A5,$8D,$D0,$03,$A9,$00,$85,$02,$85,$03
-    .byte $A2,$02,$4C,$0F,$CF,$00,$00,$00,$00,$00,$00
-direct_prg_template_do_until_lt_end:
-
-direct_prg_template_seeded_runtime:
-    .byte $00,$10,$A9,$A5,$8D,$D0,$03,$A9,$00,$85,$02,$85,$03,$A2,$02,$4C
-    .byte $0F,$CF
-direct_prg_template_seeded_runtime_end:
-
 runtime_helper_prg_exit_template:
     .byte $A9,$A5,$8D,$D0,$03,$A9,$00,$85,$02,$85,$03,$A2,$02,$4C,$0F,$CF
 runtime_helper_prg_exit_template_end:

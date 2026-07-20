@@ -25,12 +25,19 @@ class TestRepoLayout(unittest.TestCase):
             "src/tools_udos/actc",
             "src/tools_udos/alink/alink.asm",
             "src/tools_udos/alink/direct_prg.inc",
+            "src/tools_udos/actdbg/actdbg.asm",
+            "src/tools_udos/actdbg/actdbg_native_exec.inc",
+            "src/tools_udos/actdbg/actdbg_overlay_exec.asm",
+            "src/tools_udos/actdbg/actdbg_overlay_optional_ui.asm",
             "src/tools_udos/common",
             "tools/object_format.py",
             "tools/vice_harness.py",
             "tools/export_udos_workspace.py",
             "tools/build_actc_udos.sh",
             "tools/build_alink_udos.sh",
+            "tools/build_actdbg_udos.sh",
+            "tools/build_actdbg_overlay_exec.sh",
+            "tools/build_actdbg_overlay_optional_ui.sh",
             "tools/build_tool_abi_harness.sh",
             "tools/generate_udos_service_inc.py",
             "pytest/__main__.py",
@@ -46,6 +53,7 @@ class TestRepoLayout(unittest.TestCase):
             "lib/math1.act",
             "tests/test_actc_capacity.py",
             "tests/test_actc_overlay.py",
+            "tests/test_actdbg.py",
             "tests/test_layout.py",
             "tests/test_udos_workspace_export.py",
         ]
@@ -56,7 +64,6 @@ class TestRepoLayout(unittest.TestCase):
             "src/vm",
             f"src/tools_udos/{legacy_tool}run",
             f"src/tools_udos/{legacy_tool}info",
-            "src/tools_udos/actdbg",
             "src/tools_cpm",
             "src/tools_cpm/actc",
             "src/tools_cpm/alink",
@@ -156,6 +163,8 @@ class TestRepoLayout(unittest.TestCase):
             "rt_f_mul",
             "rt_f_div",
             "rt_f_cmp",
+            "rt_f_min",
+            "rt_f_max",
             "rt_f_abs",
             "rt_f_sqrt",
             "rt_i_to_f",
@@ -167,7 +176,7 @@ class TestRepoLayout(unittest.TestCase):
         dotted = sorted(set(re.findall(r"`(rt\.[A-Za-z0-9_]+)`", docs)))
         documented = set(re.findall(r"`(rt_[A-Za-z0-9_]+)`", docs))
         runtime_modules = {
-            path.stem for path in (root / "src" / "runtime" / "udos_modules").glob("rt_*.obj")
+            path.stem for path in (root / "src" / "runtime" / "modules").glob("rt_*.obj")
         }
 
         self.assertFalse(

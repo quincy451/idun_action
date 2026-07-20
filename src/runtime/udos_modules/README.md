@@ -9,6 +9,15 @@ and UDOS object readers converge.
 
 Current status:
 
+- `rt_i_mul.obj` multiplies two unsigned 16-bit values. The left operand is in
+  `A` low and `X` high, the right operand is read through zero page `$02/$03`,
+  and the low 16 bits of the product are returned in `A`/`X`.
+- `rt_i_div.obj` divides an unsigned 16-bit value in `A`/`X` by the unsigned
+  16-bit divisor read through zero page `$02/$03`. It returns the quotient in
+  `A`/`X`; division by zero returns zero.
+- `rt_print_i.obj` prints a signed 16-bit value in `A` low and `X` high as
+  decimal text through UDOS's `$CF03` console ABI so mixed string and numeric
+  output shares the resident cursor.
 - `rt_i_to_f.obj` converts an unsigned 16-bit integer in `A` low and `X` high
   to a little-endian IEEE-754 binary32 value through the destination pointer in
   zero page `$02/$03`.

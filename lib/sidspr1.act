@@ -50,3 +50,6 @@ PROC SidRes(BYTE res)
 PROC SidMode(BYTE mode)
 PROC SidRoute(BYTE mask)
 PROC SidRst()
+
+; End declaration-only binding scope before returning to the including source.
+MODULE

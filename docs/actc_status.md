@@ -1,18 +1,29 @@
 # ACTC Status
 
-Current state:
+Linux `actc` is the active Idun compiler process. It reads
+`SRC/<MODULE>.ACT`, emits native 6502 machine/data records and relocations in
+`OBJ/<MODULE>.OBJ`, and has no CP/M-65 or UDOS dependency.
 
-- UDOS-native `ACTC.PRG` builds successfully.
-- The maintained compiler output is `OBJ/<MODULE>.OBJ`.
-- The active end-to-end proof is direct PRG launch through ALINK.
-- ACTC now emits real `m` machine-code records for the empty `MAIN` return
-  case and the first no-data local-call graph slices (`single_call`, `fanout`).
-- Legacy runner-oriented compiler paths have been removed from the maintained
-  source tree.
+Current verified surface:
 
-Current focus:
+- BYTE, CARD, signed INT, and REAL scalars, arrays, pointers, and functions
+- constant and dynamic word/REAL expressions
+- IF/ELSEIF/ELSE, DO/UNTIL, WHILE, FOR, and EXIT
+- local procedures plus direct and mutual recursion with frame preservation
+- strings, integer/REAL printing, address-bound C64 storage, REU declarations,
+  resident program-owned overlays, and the documented hardware/runtime builtins
+- source-line records for Linux `alink` and `actdbg`
 
-- widen source coverage
-- keep object metadata stable for ALINK
-- move large compiler working sets toward REU-backed streaming
-- keep `ACTC.PRG -> ALINK.PRG -> BIN/MAIN.PRG` green under UDOS/VICE
+The compiler diagnoses unsupported forms instead of silently emitting a partial
+object. Recursive frame preservation is emitted only on call-graph cycles; a
+single preserved frame is capped at 224 bytes to leave C64 stack headroom.
+
+Active proof:
+
+```sh
+python3 -m unittest -v tests.test_linux_workspace_tools
+python3 -m unittest -v tests.test_idun_prg_runtime
+```
+
+The second command executes generated recursive word, local-array, mutual, and
+REAL code in headless VICE when `x64sc` is available.

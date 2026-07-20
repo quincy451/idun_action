@@ -8,7 +8,7 @@ import unittest
 
 
 class TestActcDeadStrip(unittest.TestCase):
-    CTX_SIZE = 233
+    CTX_SIZE = 237
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -37,6 +37,7 @@ class TestActcDeadStrip(unittest.TestCase):
             "build_actc_overlay_runtime_imports.sh",
             "build_actc_overlay_payload_layout.sh",
             "build_actc_overlay_emit_object.sh",
+            "build_actc_overlay_emit_native_object.sh",
         ):
             cls.run_checked([str(cls.root / "tools" / script_name)])
 
@@ -95,7 +96,7 @@ class TestActcDeadStrip(unittest.TestCase):
             summary = json.loads(result.stdout)
             self.assertEqual(summary["exit_status"], 0, msg=result.stdout)
             self.assertFalse(summary["hit_limit"], msg=result.stdout)
-            self.assertEqual(summary["dumps"]["actc_overlay_requested_pass"], [5], msg=result.stdout)
+            self.assertIn(summary["dumps"]["actc_overlay_requested_pass"], ([5], [8]), msg=result.stdout)
             self.assertTrue(
                 any(op["kind"] == "rsta" and op["path"] == "!ACTC_OVL6.BIN" and op["status"] == 1 for op in summary["ops"]),
                 msg=result.stdout,

@@ -25,6 +25,8 @@ Current object records include:
   metadata
 - `m <hex bytes>` non-relocating machine-code bytes for the exported body
 - `r <offset> u<index>` machine-code relocation for an imported symbol operand
+- `r <offset> lo|hi x <symbol> [addend]` selected-byte relocation for an
+  ASMBLOCK address immediate
 
 Responsibilities
 
@@ -38,10 +40,10 @@ Responsibilities
 
 Current machine-code emission slices:
 
-- `PROC MAIN(); RETURN` emits `b M` plus an `m` record containing the UDOS
-  success-exit sequence.
+- `PROC MAIN(); RETURN` emits `b M` plus an `m` record containing native 6502
+  procedure return code.
 - A no-data single external call (`MAIN(): ExtCall(); RETURN`) emits `b u0M`,
-  one `u <symbol>` import, the `JSR` plus UDOS success-exit machine stream, and
+  one `u <symbol>` import, the `JSR` plus native return machine stream, and
   an `r 1 u0` relocation for ALINK.
 - A no-data repeated external call (`MAIN(): ExtCall(); ExtCall(); RETURN`)
   keeps one import and emits two relocation records targeting that import.
@@ -75,6 +77,20 @@ Current machine-code emission slices:
 - A no-data fanout call graph (`A(): RETURN`, `B(): A(); RETURN`,
   `MAIN(): A(); B(); RETURN`) emits one module-level `m` stream with `MAIN`
   first, then `B`, then `A`.
+- `PROC MAIN(CARD argc,CARD ARRAY argv)` copies Idun's 16-bit process values
+  from `$0F04-$0F07` into normal linked parameter cells at entry; other MAIN
+  parameter shapes are rejected.
+- `ASMBLOCK [ ... ]` assembles legal NMOS 6502 instructions, resolves scoped
+  Action storage/routine names, emits low/high/word relocations, and checks
+  block-local labels and relative-branch range.
+- A bodyless `PROC` or BYTE/CARD/INT `FUNC` may bind to a checked numeric
+  address expression. Calls emit a direct `JSR` and no declaration wrapper,
+  import, export, or runtime dependency.
+- A bodyless declaration may alias a local routine declared before or after it.
+  One side of a top-level plus is the routine symbol and the other is a checked
+  constant expression, for example `PROC A=WORKER+(2*3)()` or
+  `PROC B=(1 LSH 2)+WORKER()`. ACTC emits an ordinary named OBJ1 relocation
+  with the folded addend; the alias itself has no OBJ1 symbol.
 
 Non-responsibilities
 

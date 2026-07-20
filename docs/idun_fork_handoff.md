@@ -1,0 +1,243 @@
+# Idun Fork Handoff
+
+Status as of 2026-07-20: the active ActionC64U fork is a self-contained Linux
+toolchain for the Idun cartridge. Linux processes manage projects, edit and
+index source, provide external SQLite language help, compile Action source,
+link selected 6502 runtime modules, inspect debug sidecars, and emit native
+Commodore 64 `.PRG` files.
+
+The active build, test, export, and VICE paths have no CP/M-65 or UDOS runtime
+dependency. Historical sources remain in Git only as provenance and are not
+part of the active command inventory.
+
+This checkout is the Linux/Idun product repository, not a working branch of the
+native GitHub remote. Before release it must use its own `idun_action` remote.
+Shared target 6502 modules are synchronized from the native ActionC64U checkout
+with `make sync-native`; Linux tools, target transport, packaging, and the two
+OS-specific DBF adapters remain owned here.
+
+## Reproducible Builds
+
+Native host build, test, and workspace export:
+
+```sh
+make all
+```
+
+Static Alpine/aarch64 build on a larger Docker host:
+
+```sh
+make build-aarch64
+```
+
+The cross-build output is:
+
+```text
+build/linux_tools-aarch64/action-workspace-tools
+```
+
+Package and verify the complete deployable AArch64 workspace with
+`make verify-aarch64`; it writes `build/idun-action-aarch64/`.
+
+On a Pi with less than 512 MiB RAM, the native build automatically selects an
+installed versioned Clang executable. The current Pi Zero 2 W build completes
+the expanded source in roughly four minutes. A final system check showed the
+Pi's existing 2 GiB `/swapfile` active with about 29 MiB used; this work did
+not create it.
+GCC remains an intentionally slow fallback. Compiler temporaries stay off the
+RAM-backed `/tmp`, and executable replacement is atomic.
+
+## Verified Results
+
+- 151 active Linux/tool/target tests pass on the local x86-64 host. The prior
+  150-test baseline also passes natively on the Alpine/aarch64 Idun Pi; rerun
+  the new shared finite-REAL fixture there at the next source deployment.
+- 136 hardware-free tests also pass under AddressSanitizer and
+  UndefinedBehaviorSanitizer.
+- 21 direct-PRG tests pass in local VICE with the documented VICE 3.7 long-DBF
+  skip. The prior 20-test set passes on the Idun Pi; deploy and run the new
+  finite-REAL fixture there with the next source refresh.
+- Every one of the 31 exported command names dispatches through the native
+  multicall executable.
+- A forced native compile from synchronized source completed on the Pi in
+  roughly four minutes with `clang++-20`. The current static
+  Alpine/AArch64 cross-build also completes locally.
+- `actedit` always uses its built-in full-screen editor on a terminal and never
+  launches `$EDITOR`. Plain invocation is uncolored for C64-display
+  compatibility; explicit `tui` mode adds Action syntax colors. Both have an
+  inverse-video blinking-block cursor, atomic save, guarded quit, F1 contextual
+  help, an F2 keyboard/mouse command screen, an F3 language browser, and an F4
+  library/feature/example browser. F5 opens a definition, F6 formats the
+  unsaved buffer, and F7 selects a reference. Its internal block editor supports
+  keyboard/mouse selection, copy, cut, and paste. PTY integration tests exercise
+  both presentations, cursor control, and actual F1-F7 escape sequences.
+- `actspc` atomically and idempotently applies the same syntax-aware indentation
+  and spacing engine to one source or a deterministic wildcard set. It validates
+  all files before replacement, preserves permissions and string/comment text,
+  and matches uppercase `.ACT` files from quoted `*.act` specifications.
+- The export's installer exposes all 31 Linux commands through
+  `$HOME/.local/bin`. Current-directory `.ACT`/`.OBJ` files take precedence and
+  keep `.OBJ`/`.PRG`/`.DBG` outputs beside the source; otherwise the nearest
+  `ACTION.PROJ` supplies the structured `SRC/OBJ/BIN` layout. The exported
+  `PLAYGROUND/` provides every shipped example in flat form.
+- `PRIME_REAL.ACT` finds primes with REAL square-root bounds and is executed in
+  VICE; `REU_DBF_SORT.ACT` is a stable one-to-ten-key command-line DBF sorter
+  using DBF1's staged REU image plus an REU record-swap buffer;
+  `ASMBLOCK_DEMO.ACT` demonstrates scoped 6502 assembly and labels.
+- Idun programs may declare `PROC MAIN(CARD argc,CARD ARRAY argv)` to receive
+  the executable name and zero-terminated command-line strings. ACTDBG's live
+  `args` command and startup `--` separator publish the same ABI before upload.
+- `ASMBLOCK [ ... ]` accepts legal NMOS 6502 instructions, block-local labels,
+  branches and jumps, CPU registers, fixed memory, and relocatable references
+  to Action globals, locals, routine parameters, and declared routines.
+- The native UDOS compiler now shares Idun's fixed register-entry ABI through
+  native pass J for
+  ASMBLOCK and core raw-code `=*(...)` routines: up to 16 flattened BYTE/CARD/INT bytes use
+  A, X, Y, then `$A3+`, with BYTE returns in A and word returns in A/X. The
+  focused native ACTC/ALINK/VICE case passes all eight result bytes, including
+  hexadecimal and binary call arguments. Native selection and rejection tests
+  prevent unsupported signatures from falling back to an older emitter. Raw
+  character/signed/sum constants and storage/local-routine/current-address
+  relocations have focused native OBJ and live VICE coverage. Native UDOS ACTC
+  now also has bounded token-aware `DEFINE`, compatibility `SET`, recursive
+  project `SRC`/`LIB` `INCLUDE`, and storage-free typed BYTE/CHAR/CARD/INT
+  constants using Idun-compatible checked signed 64-bit expressions before or
+  after `MODULE`. Directive-free native sources keep their original streamed
+  REU layout and long-line behavior. Bodyless numeric absolute-address
+  procedure/function declarations now emit direct JSR calls through native
+  passes J/H and have exact OBJ, ALINK-closure, and live-VICE coverage. Forward
+  and backward local routine aliases now accept checked signed 16-bit constant
+  expressions on either side of the symbol and emit ordinary named OBJ1
+  relocations. The Linux parser and native pass I have matching grouped-address
+  regressions. Native `REAL CONST` now folds decimal and exponent forms,
+  radix-prefixed integers, prior constants, arithmetic and grouping, `REAL`,
+  `FABS`, `FSQRT`, infinity, and NaN at binary32 precision. Exact decimal
+  conversion and every operation use round-to-nearest, ties-to-even. A native
+  direct-PRG proof emits `7.5`, selects only the print helper, and passes in
+  VICE. The broader native type/REAL/library backlog remains tracked in
+  `docs/udos_feature_parity.md`.
+  Native preprocessing is isolated in base-36 pass `I`; pass 1 remains the
+  streamed module-header validator. Pass I retains its full 512-byte reserve by
+  invoking the resident evaluator through overlay ABI v5.
+- `REAL` now uses full-domain IEEE-754 binary32 helpers for signed arithmetic,
+  gradual underflow, infinities, NaNs, ordered comparison, integer conversion,
+  correctly rounded square root, exact minimum/maximum selection, and exact
+  decimal output. ACTC recognizes `INF`/`INFINITY` and `NAN` and folds every
+  operation at binary32 precision. The synchronized `RT_F_MIN.OBJ` and
+  `RT_F_MAX.OBJ` helpers preserve MATH1's one-NaN, two-NaN, equal-value, and
+  signed-zero selection policy for native direct-link consumers.
+- MATH1 supplies the completed portable utility, exponential/logarithmic,
+  trigonometric, inverse, hyperbolic, and conversion families. GFX1 supplies
+  tracked VIC setup, pixels, shapes, bitmap-resource operations, and staged
+  sprite-resource operations. `actsprite`, `actbitmap`, and ACTEDIT F8 manage
+  ASP1/ABM1 resources without placing pixel arrays in Action source.
+- The shipped MATH1 interface has 43 public routines and 8 constants, matching
+  its 51 help features. GFX1 has 67 public source routines and 16 constants;
+  its 76 help features contain 60 of those routines, while seven low-level
+  sprite aliases are documented in SIDSPR1 instead of duplicated in GFX1 help.
+- The external `action-help.sqlite3` contains 260 validated topics. Build-time
+  checks require coverage for every compiler builtin/constant, every shipped
+  library declaration, and every active language keyword/type.
+- Every successful ALINK run atomically rebuilds a semantic SQLite code map.
+  ACTEDIT uses it for F5 definitions, F7 references, navigation
+  history, and Ctrl-click lookup.
+- Linux ACTDBG has a live Idun console, and Linux ACTPROF supports imported and
+  live PC sampling with process/function/statement attribution in SQLite.
+- The export includes the UDOS-free `actsvc` C64 support tool. Its 3,970-byte
+  resident image occupies `$C000-$CF81`, inside the reserved `$C000-$CFFF`
+  service range.
+- The fake Idun socket target drives real ACTDBG and ACTPROF processes through
+  upload, register/memory access, persistent breakpoints, step, sampling, and
+  SQLite aggregation. A lib6502 harness also executes stepping helpers from the
+  actual assembled resident image.
+- Live target sessions restore all patched breakpoint bytes on graceful
+  detach, reject unsafe PRG and breakpoint ranges, and report PAL/NTSC sample
+  timing. ACTPROF periodically drains the bounded target buffer throughout a
+  long run instead of retaining only its first batch.
+- AddressSanitizer and UndefinedBehaviorSanitizer pass locally.
+- The complete 20-test direct-PRG gate passes on AArch64 VICE 3.9, including
+  five nonduplicate native ActionC64U control-flow programs plus REU and
+  DBF/D64 I/O. Local VICE 3.7.1 passes 19 tests and version-skips only the long
+  REU-plus-disk monitor case; all other KERNAL-output cases wait for emulated
+  BASIC readiness rather than relying on host-speed timing.
+- Direct and mutual recursive word, local-array, and REAL frames execute with
+  the expected C64 memory results.
+- The exported workspace is itself an Action project and compiles/links
+  `HELLO.ACT` on the Pi into a 116-byte C64 PRG.
+- Native Pi and local artifacts are rebuilt atomically; use
+  `tools/verify_idun_artifacts.py` to validate the current build instead of
+  relying on a stale recorded digest.
+
+## Current Boundaries
+
+The process-conversion inventory, target agent, Linux debugger, profiler,
+instruction stepping, and persistent-breakpoint reinstallation are
+implemented. Full IEEE-754, MATH1, GFX1, ASMBLOCK, graphics resources, resource
+editors, formatting, external help, direct-PRG execution, and signed Alpine
+packaging are implemented. Remaining Idun product work is attached-hardware
+validation and normal release integration. Cross-product UDOS parity is tracked
+separately in `docs/udos_feature_parity.md`.
+
+Cross-product parity is judged by portable Action source, normalized OBJ1
+meaning, reachable-only common-module selection, and direct-PRG results. It does
+not require native UDOS to copy Linux processes, SQLite, sockets, or APKs, and
+it does not require Idun to copy UDOS services, compiler overlays, REU
+workspace management, or DNP packaging.
+
+The 2026-07-19 native checkpoints add a bounded two-REAL-parameter function ABI
+and one finite comparison/select body without changing Idun syntax or the
+common runtime. Native ACTC preserves left-to-right argument order, copies both
+binary32 values by value, compares them through `RT_F_CMP.OBJ`, and returns the
+selected parameter by pointer in a direct PRG. The root closure selects only
+integer conversion, comparison, and comparison's special-value dependency.
+Exact OBJ, ALINK, and live VICE checks pass, raising the native inventories to
+1,327 broad and 171 source-backed shapes; the complete 171-case source-backed
+live matrix also passes. Idun already supports the general form. The exact
+source is now shared as a parity fixture: Idun folds its two
+constant conversions while native executes the reachable `RT_I_TO_F.OBJ`, and
+both select comparison and produce the same result. Arbitrary native REAL
+expressions and control flow, nested calls, full MATH1 source, and the remaining
+type/resource/workflow items remain cross-product work tracked in
+`docs/udos_feature_parity.md`.
+
+The 2026-07-20 shared selector refresh adds byte-identical 77-byte
+`RT_F_MIN.OBJ` and `RT_F_MAX.OBJ` modules to both checkouts. Native ACTC now
+recognizes their bounded source forms, while Linux ACTC continues to compile
+the general portable MATH1 bodies. Exact 2,304-pair host checks, focused native
+VICE launches, the 32-shape native MATH1 source matrix, and its eight full-range
+helper probes pass. The broad native link inventory is 1,329 shapes and its
+compiled-runtime object/relocation oracle covers 288 cases. The shared manifest
+and Idun export/standalone-link tests guard this snapshot. The current Idun
+host suite passes 151 tests, the sanitizer suite passes 136, and the 21-test
+direct-PRG gate passes with only the documented VICE 3.7 DBF/REU skip. Both
+host and static Alpine/AArch64 exports verify 31 commands and 260 help topics.
+This refresh is hardware-independent and has not yet been redeployed to the Pi;
+attached cartridge/C64 acceptance remains a release gate.
+
+For a two-checkout release, run:
+
+```sh
+make sync-native-check NATIVE_ACTION_ROOT=/path/to/actionc64u
+make all
+make test-sanitize
+make test-prg
+make verify-aarch64
+```
+
+The first command checks every shared module and generator against the native
+manifest. It deliberately ignores only `rt_dbf_create.obj` and
+`rt_dbf_file_open_write.obj`, whose filesystem behavior differs by operating
+system.
+
+The 2026-07-17 hardware attempt verified C64 Ultimate API access, corrected
+and persisted the required `$DE00`/turbo configuration, and proved that the Pi
+can flash both `init.binary` and `idun64.binary`. Validation then stopped below
+the Action tools: cartridge reset reported `i2c write failed`, I2C bus 1 had no
+control device, the C64 remained at BASIC, and `idunsh -o drives` timed out.
+The exact recovery preflight is in `docs/operator_guide.md`.
+
+The packaged milestone was synchronized to `/home/idun/idun_fork`, built,
+tested, exported, installed, and smoke-tested there. The later native
+cross-suite validation used an isolated Pi checkout so the separately managed
+primary Idun fork and the pre-existing `/home/idun/action` tree were not
+modified.

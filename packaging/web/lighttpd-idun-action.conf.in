@@ -1,0 +1,22 @@
+server.document-root = "@REPOSITORY@"
+server.bind = "0.0.0.0"
+server.port = @PORT@
+server.errorlog = "stderr"
+server.follow-symlink = "disable"
+
+server.modules = (
+    "mod_indexfile",
+    "mod_dirlisting",
+    "mod_staticfile"
+)
+
+index-file.names = ( "index.html" )
+dir-listing.activate = "enable"
+mimetype.assign = (
+    ".apk" => "application/octet-stream",
+    ".adb" => "application/octet-stream",
+    ".gz"  => "application/gzip",
+    ".pub" => "text/plain",
+    ".txt" => "text/plain",
+    ".html" => "text/html"
+)

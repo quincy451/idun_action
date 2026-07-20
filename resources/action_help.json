@@ -1,0 +1,691 @@
+{
+  "schema_version": 1,
+  "catalog": "ActionC64U Idun language and runtime help",
+  "topics": [
+    {
+      "token": "MODULE",
+      "kind": "keyword",
+      "signature": "MODULE [name]",
+      "summary": "Starts another group of global declarations.",
+      "details": "Bare MODULE follows the original Action syntax; an optional name is accepted for readable binding files. The project manifest and source filename determine the emitted object module.",
+      "example": "MODULE"
+    },
+    {
+      "token": "PROC",
+      "kind": "keyword",
+      "signature": "PROC name[=address](parameters)",
+      "summary": "Begins a procedure that does not return a value.",
+      "details": "Parameters may be BYTE, CARD, INT, record, ARRAY, or POINTER forms; source-language routines also accept REAL. A fixed address declares a resident machine-language routine; =* starts an inline code routine. Machine-routine argument bytes are flattened into A, X, Y, then $A3 upward. Procedure names are assignable, matching Action's redirectable entry semantics. MAIN may be parameterless or use PROC MAIN(CARD argc,CARD ARRAY argv) to receive Idun's process arguments. argc includes the executable name; argv contains pointers to zero-terminated strings.",
+      "example": "PROC Draw(BYTE x,BYTE y)"
+    },
+    {
+      "token": "ENDPROC",
+      "kind": "keyword",
+      "signature": "ENDPROC",
+      "summary": "Explicitly ends the current procedure.",
+      "details": "The terminator is optional before another routine declaration, but using it makes routine boundaries clear.",
+      "example": "ENDPROC"
+    },
+    {
+      "token": "FUNC",
+      "kind": "keyword",
+      "signature": "BYTE|CARD|INT|REAL FUNC name[=address](parameters)",
+      "summary": "Begins a typed function that returns a value.",
+      "details": "Action functions use RETURN(expression); an =* machine-code function may return directly from an inline code block. BYTE, CARD, and INT return in A/X (BYTE uses A and is zero-extended); REAL returns through a function-owned four-byte result cell. Machine/external REAL routines are not supported by the target ABI.",
+      "example": "CARD FUNC Twice(CARD value)"
+    },
+    {
+      "token": "ENDFUNC",
+      "kind": "keyword",
+      "signature": "ENDFUNC",
+      "summary": "Explicitly ends the current function.",
+      "details": "The next routine declaration also closes a function, but ENDFUNC is the clearest spelling.",
+      "example": "ENDFUNC"
+    },
+    {
+      "token": "RETURN",
+      "kind": "keyword",
+      "signature": "RETURN or RETURN(expression)",
+      "summary": "Returns from the current procedure or function.",
+      "details": "Procedures use bare RETURN. Typed functions use RETURN(expression) of a compatible type.",
+      "example": "RETURN(total)"
+    },
+    {
+      "token": "BYTE",
+      "kind": "type",
+      "signature": "BYTE name",
+      "summary": "Declares an unsigned 8-bit value.",
+      "details": "BYTE values range from 0 to 255. BYTE arrays also represent Action strings, with the length in element zero.",
+      "example": "BYTE color=[6]"
+    },
+    {
+      "token": "CHAR",
+      "kind": "type",
+      "signature": "CHAR name",
+      "summary": "Declares an 8-bit character value.",
+      "details": "CHAR is fully interchangeable with BYTE, as in the original Action language. Character constants use a leading apostrophe, for example 'A.",
+      "example": "CHAR key='A"
+    },
+    {
+      "token": "CARD",
+      "kind": "type",
+      "signature": "CARD name",
+      "summary": "Declares an unsigned 16-bit cardinal value.",
+      "details": "CARD values range from 0 to 65535 and are also used for C64 addresses passed to runtime helpers.",
+      "example": "CARD screen=$0400"
+    },
+    {
+      "token": "INT",
+      "kind": "type",
+      "signature": "INT name or INT(realExpression)",
+      "summary": "Declares a signed 16-bit value or converts REAL to INT.",
+      "details": "INT values range from -32768 to 32767. Multiplication, division, and MOD use Action's signed 16-bit result semantics. INT(realExpression) truncates toward zero and returns zero for NaN, infinity, or a truncated result outside the INT range.",
+      "example": "INT delta=[-2]"
+    },
+    {
+      "token": "REAL",
+      "kind": "type",
+      "signature": "REAL name or REAL(integerExpression)",
+      "summary": "Declares a four-byte REAL value or converts an integer to REAL.",
+      "details": "REAL is IEEE-754 binary32: signed finite values, signed zero, gradual-underflow subnormals, infinity, and NaN. Arithmetic and FSqrt round to nearest with ties to even. Comparisons are IEEE ordered comparisons; NaN is unequal to every value, including itself. Decimal constants round to binary32 after every operation.",
+      "example": "REAL ratio=[1.5]",
+      "target_notes": "REAL occupies four little-endian bytes. The standalone 6502 helpers cover the full binary32 value range; INT conversion is constrained only by the signed 16-bit destination type."
+    },
+    {
+      "token": "RESOURCE",
+      "kind": "keyword",
+      "signature": "SPRITE|MSPRITE|BITMAP|MBITMAP name=RESOURCE \"file\"",
+      "summary": "References a compiler-validated graphics file without putting its pixel bytes in Action source.",
+      "details": "ACTC searches beside the source, in project RES, and at the project root. Sprite files are compiled to aligned VIC-II blocks; bitmap files retain a compact ABM1 header used by GFX1 blitters. In ACTEDIT, F8 on the declaration launches the matching graphics editor.",
+      "example": "SPRITE Player=RESOURCE \"player.spr\""
+    },
+    {
+      "token": "SPRITE",
+      "kind": "type",
+      "signature": "SPRITE name=RESOURCE \"file.spr\"",
+      "summary": "Declares an aligned 24-by-21 high-resolution sprite resource.",
+      "details": "ACTSPRITE stores an ASP1 editing file. ACTC embeds its 63 VIC-II pattern bytes plus default-color metadata and exposes the resource name as a CARD address.",
+      "example": "SPRITE Player=RESOURCE \"player.spr\""
+    },
+    {
+      "token": "MSPRITE",
+      "kind": "type",
+      "signature": "MSPRITE name=RESOURCE \"file.msp\"",
+      "summary": "Declares an aligned 12-by-21 logical multicolor sprite resource.",
+      "details": "Each logical pixel has a value from zero through three. SpritePlace reads the embedded mode/default color; SpriteSharedColors configures the two colors shared by all VIC-II multicolor sprites.",
+      "example": "MSPRITE Enemy=RESOURCE \"enemy.msp\""
+    },
+    {
+      "token": "BITMAP",
+      "kind": "type",
+      "signature": "BITMAP name=RESOURCE \"file.abm\"",
+      "summary": "Declares a packed one-bit bitmap resource up to 320 by 200 pixels.",
+      "details": "ACTBITMAP edits the ABM1 file; ACTC validates dimensions, stride, mode, colors, and payload before embedding it. BitmapStamp treats zero pixels as transparent.",
+      "example": "BITMAP Ship=RESOURCE \"ship.abm\""
+    },
+    {
+      "token": "MBITMAP",
+      "kind": "type",
+      "signature": "MBITMAP name=RESOURCE \"file.abm\"",
+      "summary": "Declares a packed two-bit multicolor bitmap resource up to 160 by 200 logical pixels.",
+      "details": "Each logical pixel selects color slot zero through three. MBitmapStamp treats slot zero as transparent; MBitmapDrawResource draws every slot.",
+      "example": "MBITMAP Tile=RESOURCE \"tile.abm\""
+    },
+    {
+      "token": "INF",
+      "aliases": ["INFINITY"],
+      "kind": "constant",
+      "signature": "INF or INFINITY",
+      "summary": "The positive IEEE-754 REAL infinity literal.",
+      "details": "Use -INF for negative infinity. Finite overflow and nonzero division by signed zero also produce signed infinity.",
+      "example": "REAL limit=[INF]"
+    },
+    {
+      "token": "NAN",
+      "kind": "constant",
+      "signature": "NAN",
+      "summary": "An unordered IEEE-754 REAL not-a-number literal.",
+      "details": "Invalid arithmetic such as 0.0/0.0, INF-INF, or FSqrt(-1.0) produces NaN. Every ordered comparison with NaN is false; <> is true.",
+      "example": "REAL missing=[NAN]"
+    },
+    {
+      "token": "ARRAY",
+      "kind": "keyword",
+      "signature": "BYTE|CARD|INT|REAL ARRAY name(size)",
+      "summary": "Declares contiguous typed storage or an array-address cell.",
+      "details": "Subscripts are zero based and are not bounds checked on the C64. A dimension allocates storage; an undimensioned array is a pointer cell. An initializer determines the allocated element count, matching original Action even when the written dimension differs; (0) is therefore useful with inferred initializers. BYTE arrays may use quoted Action-string initializers. @array(index) obtains an element address.",
+      "example": "BYTE ARRAY message=\"HELLO\""
+    },
+    {
+      "token": "POINTER",
+      "kind": "keyword",
+      "signature": "BYTE|CARD|INT|REAL POINTER name",
+      "summary": "Declares a typed 16-bit C64 address.",
+      "details": "Use @variable to obtain an address and pointer^ to read or write the pointed-to value. The pointed-to type determines the transfer width.",
+      "example": "BYTE POINTER p=@color"
+    },
+    {
+      "token": "CONST",
+      "kind": "keyword",
+      "signature": "BYTE|CHAR|CARD|INT|REAL CONST name=value",
+      "summary": "Declares a typed compile-time constant.",
+      "details": "Constants may refer to earlier constants and are range checked for their declared type. Multiple comma-separated declarations and continued declaration lines are supported.",
+      "example": "BYTE CONST JOY_UP=$01",
+      "target_notes": "Constants allocate no C64 storage."
+    },
+    {
+      "token": "DEFINE",
+      "kind": "keyword",
+      "signature": "DEFINE name=\"replacement\" [, name=replacement]",
+      "summary": "Defines a compile-time token substitution.",
+      "details": "Replacement is recursive, case-insensitive, and skipped inside strings and comments. Original quoted replacements and compatible unquoted replacements are accepted; definitions apply through nested includes.",
+      "example": "DEFINE STRING=\"CHAR ARRAY\", ONE=1"
+    },
+    {
+      "token": "INCLUDE",
+      "kind": "keyword",
+      "signature": "INCLUDE \"file.act\"",
+      "summary": "Compiles another Action source file at this point.",
+      "details": "Includes may nest and definitions persist in source order. ACTC searches the including directory, project SRC and LIB, then the shared workspace LIB, using case-insensitive filename matching and cycle checks.",
+      "example": "INCLUDE \"gfx1.act\""
+    },
+    {
+      "token": "SET",
+      "kind": "keyword",
+      "signature": "SET compilerAddress=value",
+      "summary": "Accepts an original Action compile-time setting directive.",
+      "details": "SET is parsed and validated for source compatibility. The old cartridge compiler's RAM option addresses do not exist in the Linux compiler, so those memory pokes intentionally have no effect.",
+      "example": "SET $49A=1",
+      "target_notes": "Use Idun build options rather than Atari cartridge compiler-memory addresses."
+    },
+    {
+      "token": "TYPE",
+      "kind": "keyword",
+      "signature": "TYPE name=[BYTE|CHAR|CARD|INT fields...]",
+      "summary": "Declares a packed record type.",
+      "details": "Record instances may use compiler-owned storage or an absolute C64 address. Record values and record pointers may be routine parameters. Record pointers and instance.field references preserve packed field offsets.",
+      "example": "TYPE Pair=[BYTE tag CARD value]"
+    },
+    {
+      "token": "CODEBLOCK",
+      "kind": "keyword",
+      "signature": "[compilerConstant ...]",
+      "summary": "Emits raw 6502 bytes and words into a routine.",
+      "details": "Values through 255 emit one byte; wider constants and symbol addresses emit little-endian words. Adjacent hexadecimal constants may be packed without spaces, as in original Action. Symbol-plus-constant relocations and the current code address * are supported. No instruction validation is performed.",
+      "example": "[$A9 7 $60]  ; packed words such as [$FFA2$A686] are also valid"
+    },
+    {
+      "token": "ASMBLOCK",
+      "kind": "keyword",
+      "signature": "ASMBLOCK [ 6502 instructions and localLabel: definitions ]",
+      "summary": "Assembles validated NMOS 6502 instructions inside an Action routine.",
+      "details": "The assembler supports all legal NMOS 6502 opcodes and addressing modes, forward and backward block-local labels, relative branch checks, and absolute JSR/JMP relocation. Operands may name fixed C64 memory, Action globals, locals, normal procedure/function parameters, REAL storage, records, and declared routines. Use symbol+offset for a later byte and #<symbol or #>symbol for a relocated address byte. CPU registers are used through ordinary instructions such as LDA, TAX, and DEX. Labels are scoped to one ASMBLOCK.",
+      "example": "ASMBLOCK [\n    lda count\n    clc\n    adc amount\n    sta count\nloop:\n    dex\n    bne loop\n]",
+      "target_notes": "This emits C64 6502 code; it is not Linux host assembly. Parameters of ordinary Action routines have named storage. A =* machine routine receives its legacy flattened ABI directly in A, X, Y, and $A3 upward."
+    },
+    {
+      "token": "AND",
+      "kind": "keyword",
+      "signature": "condition AND condition",
+      "summary": "Combines conditions with short-circuit logical AND.",
+      "details": "The right condition is evaluated only when the left condition is true. Parentheses may group complex conditions.",
+      "example": "IF ready AND count>0 THEN"
+    },
+    {
+      "token": "OR",
+      "kind": "keyword",
+      "signature": "condition OR condition",
+      "summary": "Combines conditions with short-circuit logical OR.",
+      "details": "The right condition is evaluated only when the left condition is false. AND binds more tightly than OR.",
+      "example": "UNTIL key='Y OR key='N"
+    },
+    {
+      "token": "XOR",
+      "kind": "keyword",
+      "signature": "left XOR right",
+      "summary": "Computes a bitwise exclusive OR.",
+      "details": "XOR and ! are equivalent Action operators and operate over the active 16-bit expression value.",
+      "example": "mask=value XOR $00FF"
+    },
+    {
+      "token": "MOD",
+      "kind": "keyword",
+      "signature": "dividend MOD divisor",
+      "summary": "Returns the signed 16-bit division remainder.",
+      "details": "MOD follows Action's implied INT semantics; a negative dividend produces a negative remainder and division truncates toward zero.",
+      "example": "remainder=-13 MOD 5"
+    },
+    {
+      "token": "LSH",
+      "kind": "keyword",
+      "signature": "value LSH count",
+      "summary": "Shifts a 16-bit value left.",
+      "details": "Both constant and runtime shift counts are supported. Bits shifted beyond the 16-bit result are discarded.",
+      "example": "mask=1 LSH bit"
+    },
+    {
+      "token": "RSH",
+      "kind": "keyword",
+      "signature": "value RSH count",
+      "summary": "Shifts a 16-bit value right without sign extension.",
+      "details": "RSH matches Action's logical shift behavior even for INT values.",
+      "example": "byte=value RSH 8"
+    },
+    {
+      "token": "REU",
+      "kind": "keyword",
+      "signature": "REU BYTE ARRAY name(size)",
+      "summary": "Allocates a far BYTE array in C64 REU memory.",
+      "details": "The declaration stores an allocator handle in the named 16-bit value. Access the block with ReuPeek8/16 and ReuPoke8/16.",
+      "example": "REU BYTE ARRAY cache(50000)",
+      "target_notes": "Requires working REU-compatible hardware. Free, copy, and 32-bit operations are not active."
+    },
+    {
+      "token": "OVERLAY",
+      "kind": "keyword",
+      "signature": "OVERLAY name",
+      "summary": "Begins a named program-owned code section.",
+      "details": "Call the section with OverlayCall(name). ALINK currently places it resident in the same PRG; dynamic loading and unloading are not active.",
+      "example": "OVERLAY Physics"
+    },
+    {
+      "token": "ENDOVERLAY",
+      "kind": "keyword",
+      "signature": "ENDOVERLAY",
+      "summary": "Ends the current overlay section.",
+      "details": "The section is linked as resident code in the current Idun toolchain.",
+      "example": "ENDOVERLAY"
+    },
+    {
+      "token": "IF",
+      "kind": "keyword",
+      "signature": "IF condition THEN",
+      "summary": "Begins a conditional branch.",
+      "details": "Conditions support =, <>, #, !=, <, <=, >, and >=. Close the branch with FI and optionally add ELSEIF or ELSE clauses.",
+      "example": "IF score>=100 THEN"
+    },
+    {
+      "token": "THEN",
+      "kind": "keyword",
+      "signature": "IF condition THEN",
+      "summary": "Ends an IF or ELSEIF condition and begins its body.",
+      "details": "THEN is required on IF and ELSEIF lines.",
+      "example": "ELSEIF lives=0 THEN"
+    },
+    {
+      "token": "ELSEIF",
+      "kind": "keyword",
+      "signature": "ELSEIF condition THEN",
+      "summary": "Adds another tested branch to an IF block.",
+      "details": "ELSEIF is tested only when all earlier branches in the same IF block were false.",
+      "example": "ELSEIF score>=50 THEN"
+    },
+    {
+      "token": "ELSE",
+      "kind": "keyword",
+      "signature": "ELSE",
+      "summary": "Adds the fallback branch of an IF block.",
+      "details": "ELSE must be the final branch before FI.",
+      "example": "ELSE"
+    },
+    {
+      "token": "FI",
+      "kind": "keyword",
+      "signature": "FI",
+      "summary": "Ends an IF/ELSEIF/ELSE block.",
+      "details": "Every active IF block must close with FI.",
+      "example": "FI"
+    },
+    {
+      "token": "FOR",
+      "kind": "keyword",
+      "signature": "FOR counter=initial TO final [STEP expression]",
+      "summary": "Begins a counted loop.",
+      "details": "Initial value, final bound, and STEP expression are evaluated once on entry. STEP defaults to 1 and must evaluate to a nonzero value; negative steps count downward. Later changes to variables used by the bound or step do not alter the active loop. Close with OD.",
+      "example": "FOR i=first TO last STEP stride"
+    },
+    {
+      "token": "TO",
+      "kind": "keyword",
+      "signature": "FOR counter=initial TO final",
+      "summary": "Separates a FOR loop's initial and final values.",
+      "details": "The final expression is evaluated once when entering the loop.",
+      "example": "FOR row=0 TO height-1"
+    },
+    {
+      "token": "STEP",
+      "kind": "keyword",
+      "signature": "STEP expression",
+      "summary": "Sets a FOR loop's increment or decrement.",
+      "details": "The expression is captured once when the loop starts and must evaluate to a nonzero value. A negative result creates a descending loop.",
+      "example": "FOR x=10 TO 0 STEP delta"
+    },
+    {
+      "token": "WHILE",
+      "kind": "keyword",
+      "signature": "WHILE condition",
+      "summary": "Begins a pre-tested loop.",
+      "details": "The condition is tested before each iteration. Close the loop with OD.",
+      "example": "WHILE remaining>0"
+    },
+    {
+      "token": "DO",
+      "kind": "keyword",
+      "signature": "DO",
+      "summary": "Begins an unconditional loop.",
+      "details": "Use EXIT to leave the nearest loop and OD to mark its end.",
+      "example": "DO"
+    },
+    {
+      "token": "UNTIL",
+      "kind": "keyword",
+      "signature": "UNTIL condition",
+      "summary": "Ends a post-tested loop when its condition becomes true.",
+      "details": "The body executes before the condition is tested. UNTIL supplies the post-test and the loop then closes with OD.",
+      "example": "DO\n  key=GetD(7)\nUNTIL key<>0\nOD"
+    },
+    {
+      "token": "OD",
+      "kind": "keyword",
+      "signature": "OD",
+      "summary": "Ends a FOR, WHILE, or DO loop.",
+      "details": "Control returns to the loop's counter update or condition test.",
+      "example": "OD"
+    },
+    {
+      "token": "EXIT",
+      "kind": "keyword",
+      "signature": "EXIT",
+      "summary": "Leaves the nearest active loop.",
+      "details": "EXIT is valid inside FOR, WHILE, DO, and compatible post-tested loop bodies.",
+      "example": "IF done THEN\n  EXIT\nFI"
+    },
+    {
+      "token": "PrintE",
+      "kind": "builtin",
+      "signature": "PROC PrintE(BYTE ARRAY value)",
+      "summary": "Prints an Action length-prefixed string followed by a carriage return.",
+      "details": "Element zero supplies the length and following elements supply characters. Output goes directly through the C64 KERNAL CHROUT routine.",
+      "example": "PrintE(message)",
+      "library": "CORE"
+    },
+    {
+      "token": "PrintI",
+      "kind": "builtin",
+      "signature": "PROC PrintI(INT value)",
+      "summary": "Prints a signed 16-bit integer without a trailing newline.",
+      "details": "The linker selects the standalone integer formatting helper only when the program uses it.",
+      "example": "PrintI(score)",
+      "library": "CORE"
+    },
+    {
+      "token": "PrintIE",
+      "kind": "builtin",
+      "signature": "PROC PrintIE(INT value)",
+      "summary": "Prints a signed 16-bit integer followed by a carriage return.",
+      "details": "It uses the same formatter as PrintI and then writes CR through C64 KERNAL CHROUT.",
+      "example": "PrintIE(score)",
+      "library": "CORE"
+    },
+    {
+      "token": "OverlayCall",
+      "kind": "builtin",
+      "signature": "PROC OverlayCall(name)",
+      "summary": "Calls a named OVERLAY section.",
+      "details": "The name is resolved by ALINK. In the current implementation the section is resident in the generated PRG.",
+      "example": "OverlayCall(Physics)",
+      "library": "CORE"
+    }
+  ],
+  "libraries": [
+    {
+      "name": "MATH1",
+      "details": "MATH1 combines the full-domain IEEE-754 binary32 core with portable Action implementations of rounding, exponential, logarithmic, circular trigonometric, reciprocal trigonometric, hyperbolic, and angle-conversion functions. Angles are radians unless the function name says otherwise.",
+      "target_notes": "Core arithmetic, FAbs, and FSqrt use link-selected 6502 runtime modules. Higher functions use binary32 polynomial/range-reduction code from MATH1.ACT and therefore have binary32 approximation error, especially for very large trigonometric arguments.",
+      "topics": [
+        {"token": "MATH_PI", "kind": "constant", "signature": "REAL CONST MATH_PI", "summary": "The binary32 approximation of pi.", "example": "circumference=2.0*MATH_PI*radius"},
+        {"token": "MATH_TWO_PI", "kind": "constant", "signature": "REAL CONST MATH_TWO_PI", "summary": "The binary32 approximation of two pi.", "example": "phase=FMod(phase,MATH_TWO_PI)"},
+        {"token": "MATH_HALF_PI", "kind": "constant", "signature": "REAL CONST MATH_HALF_PI", "summary": "The binary32 approximation of pi divided by two.", "example": "quarterTurn=MATH_HALF_PI"},
+        {"token": "MATH_QUARTER_PI", "kind": "constant", "signature": "REAL CONST MATH_QUARTER_PI", "summary": "The binary32 approximation of pi divided by four.", "example": "diagonal=MATH_QUARTER_PI"},
+        {"token": "MATH_E", "kind": "constant", "signature": "REAL CONST MATH_E", "summary": "The binary32 approximation of Euler's number.", "example": "one=FLn(MATH_E)"},
+        {"token": "MATH_LN2", "kind": "constant", "signature": "REAL CONST MATH_LN2", "summary": "The binary32 approximation of the natural logarithm of two.", "example": "natural=bits*MATH_LN2"},
+        {"token": "MATH_LN10", "kind": "constant", "signature": "REAL CONST MATH_LN10", "summary": "The binary32 approximation of the natural logarithm of ten.", "example": "natural=decades*MATH_LN10"},
+        {"token": "MATH_SQRT2", "kind": "constant", "signature": "REAL CONST MATH_SQRT2", "summary": "The binary32 approximation of the square root of two.", "example": "diagonal=side*MATH_SQRT2"},
+        {"token": "PrintR", "signature": "PROC PrintR(REAL value)", "summary": "Prints the exact decimal value without a trailing newline.", "details": "Finite values are expanded exactly, without a magnitude or fractional-digit cutoff. Signed zero prints as 0 or -0; special values print as INF, -INF, or NAN.", "example": "PrintR(temperature)"},
+        {"token": "PrintRE", "signature": "PROC PrintRE(REAL value)", "summary": "Prints the exact decimal value followed by a carriage return.", "details": "It uses the same full-domain exact formatter as PrintR and then writes CR through C64 KERNAL CHROUT.", "example": "PrintRE(average)"},
+        {"token": "FAbs", "signature": "REAL FUNC FAbs(REAL value)", "summary": "Returns the absolute value of a REAL expression.", "example": "distance=FAbs(position-target)"},
+        {"token": "FSqrt", "signature": "REAL FUNC FSqrt(REAL value)", "summary": "Returns the correctly rounded binary32 square root.", "details": "Positive finite values use round-to-nearest, ties-to-even. Signed zero is preserved, positive infinity remains infinity, and a negative nonzero operand produces NAN.", "example": "root=FSqrt(REAL(candidate))"},
+        {"token": "FSign", "signature": "REAL FUNC FSign(REAL value)", "summary": "Returns -1, signed zero, 1, or NAN according to the operand.", "example": "direction=FSign(velocity)"},
+        {"token": "FMin", "signature": "REAL FUNC FMin(REAL left,right)", "summary": "Returns the smaller numeric operand, ignoring one NAN operand.", "example": "nearest=FMin(a,b)"},
+        {"token": "FMax", "signature": "REAL FUNC FMax(REAL left,right)", "summary": "Returns the larger numeric operand, ignoring one NAN operand.", "example": "furthest=FMax(a,b)"},
+        {"token": "FClamp", "signature": "REAL FUNC FClamp(REAL value,lower,upper)", "summary": "Constrains a value to an inclusive REAL interval.", "example": "speed=FClamp(speed,0.0,10.0)"},
+        {"token": "FTrunc", "signature": "REAL FUNC FTrunc(REAL value)", "summary": "Removes the fractional part toward zero and returns a REAL.", "example": "whole=FTrunc(position)"},
+        {"token": "FFloor", "signature": "REAL FUNC FFloor(REAL value)", "summary": "Rounds downward to an integral REAL value.", "example": "cell=FFloor(position/8.0)"},
+        {"token": "FCeil", "signature": "REAL FUNC FCeil(REAL value)", "summary": "Rounds upward to an integral REAL value.", "example": "pages=FCeil(bytes/256.0)"},
+        {"token": "FRound", "signature": "REAL FUNC FRound(REAL value)", "summary": "Rounds to the nearest integral REAL with halfway cases away from zero.", "example": "pixel=FRound(position)"},
+        {"token": "FFrac", "signature": "REAL FUNC FFrac(REAL value)", "summary": "Returns the signed fractional part of a REAL value.", "example": "phase=FFrac(time)"},
+        {"token": "FMod", "signature": "REAL FUNC FMod(REAL value,divisor)", "summary": "Returns a floating remainder with the dividend's sign.", "example": "phase=FMod(phase,MATH_TWO_PI)"},
+        {"token": "FExp", "signature": "REAL FUNC FExp(REAL value)", "summary": "Returns e raised to a REAL power.", "example": "growth=FExp(rate*time)"},
+        {"token": "FLn", "signature": "REAL FUNC FLn(REAL value)", "summary": "Returns the natural logarithm of a positive REAL value.", "example": "order=FLn(value)"},
+        {"token": "FLog2", "signature": "REAL FUNC FLog2(REAL value)", "summary": "Returns the base-two logarithm.", "example": "bits=FLog2(range)"},
+        {"token": "FLog10", "signature": "REAL FUNC FLog10(REAL value)", "summary": "Returns the base-ten logarithm.", "example": "decades=FLog10(value)"},
+        {"token": "FPow", "signature": "REAL FUNC FPow(REAL base,exponent)", "summary": "Raises a REAL base to a REAL exponent.", "details": "A negative base requires an integral exponent; otherwise the result is NAN.", "example": "area=FPow(radius,2.0)"},
+        {"token": "FHypot", "signature": "REAL FUNC FHypot(REAL x,y)", "summary": "Computes a scaled square root of x squared plus y squared.", "example": "distance=FHypot(dx,dy)"},
+        {"token": "FSin", "signature": "REAL FUNC FSin(REAL radians)", "summary": "Returns the sine of an angle in radians.", "example": "y=FSin(angle)"},
+        {"token": "FCos", "signature": "REAL FUNC FCos(REAL radians)", "summary": "Returns the cosine of an angle in radians.", "example": "x=FCos(angle)"},
+        {"token": "FTan", "signature": "REAL FUNC FTan(REAL radians)", "summary": "Returns the tangent of an angle in radians.", "example": "slope=FTan(angle)"},
+        {"token": "FASin", "signature": "REAL FUNC FASin(REAL value)", "summary": "Returns the inverse sine in the interval -pi/2 through pi/2.", "example": "angle=FASin(ratio)"},
+        {"token": "FACos", "signature": "REAL FUNC FACos(REAL value)", "summary": "Returns the inverse cosine in the interval zero through pi.", "example": "angle=FACos(dot)"},
+        {"token": "FATan", "signature": "REAL FUNC FATan(REAL value)", "summary": "Returns the inverse tangent in the interval -pi/2 through pi/2.", "example": "angle=FATan(slope)"},
+        {"token": "FATan2", "signature": "REAL FUNC FATan2(REAL y,x)", "summary": "Returns the quadrant-aware angle of a vector.", "example": "heading=FATan2(dy,dx)"},
+        {"token": "FSec", "signature": "REAL FUNC FSec(REAL radians)", "summary": "Returns the secant, one divided by cosine.", "example": "value=FSec(angle)"},
+        {"token": "FCsc", "signature": "REAL FUNC FCsc(REAL radians)", "summary": "Returns the cosecant, one divided by sine.", "example": "value=FCsc(angle)"},
+        {"token": "FCot", "signature": "REAL FUNC FCot(REAL radians)", "summary": "Returns the cotangent, cosine divided by sine.", "example": "value=FCot(angle)"},
+        {"token": "FASec", "signature": "REAL FUNC FASec(REAL value)", "summary": "Returns the inverse secant.", "example": "angle=FASec(value)"},
+        {"token": "FACsc", "signature": "REAL FUNC FACsc(REAL value)", "summary": "Returns the inverse cosecant.", "example": "angle=FACsc(value)"},
+        {"token": "FACot", "signature": "REAL FUNC FACot(REAL value)", "summary": "Returns the inverse cotangent using quadrant-aware atan2.", "example": "angle=FACot(value)"},
+        {"token": "FVersin", "signature": "REAL FUNC FVersin(REAL radians)", "summary": "Returns one minus the cosine of an angle.", "example": "value=FVersin(angle)"},
+        {"token": "FHaversin", "signature": "REAL FUNC FHaversin(REAL radians)", "summary": "Returns half the versine, useful in great-circle calculations.", "example": "arc=FHaversin(delta)"},
+        {"token": "FSinh", "signature": "REAL FUNC FSinh(REAL value)", "summary": "Returns the hyperbolic sine.", "example": "value=FSinh(x)"},
+        {"token": "FCosh", "signature": "REAL FUNC FCosh(REAL value)", "summary": "Returns the hyperbolic cosine.", "example": "value=FCosh(x)"},
+        {"token": "FTanh", "signature": "REAL FUNC FTanh(REAL value)", "summary": "Returns the hyperbolic tangent.", "example": "value=FTanh(x)"},
+        {"token": "FASinh", "signature": "REAL FUNC FASinh(REAL value)", "summary": "Returns the inverse hyperbolic sine.", "example": "value=FASinh(x)"},
+        {"token": "FACosh", "signature": "REAL FUNC FACosh(REAL value)", "summary": "Returns the inverse hyperbolic cosine for values at least one.", "example": "value=FACosh(x)"},
+        {"token": "FATanh", "signature": "REAL FUNC FATanh(REAL value)", "summary": "Returns the inverse hyperbolic tangent for values from -1 through 1.", "example": "value=FATanh(x)"},
+        {"token": "DegToRad", "signature": "REAL FUNC DegToRad(REAL degrees)", "summary": "Converts degrees to radians.", "example": "angle=DegToRad(90.0)"},
+        {"token": "RadToDeg", "signature": "REAL FUNC RadToDeg(REAL radians)", "summary": "Converts radians to degrees.", "example": "heading=RadToDeg(angle)"}
+      ]
+    },
+    {
+      "name": "REU",
+      "details": "These helpers resolve a REU allocation handle plus a 16-bit byte offset and then transfer directly through the C64 REU registers.",
+      "target_notes": "Invalid handles and out-of-range reads return zero; invalid writes leave REU memory unchanged. REU hardware is required.",
+      "topics": [
+        {"token": "ReuPeek8", "signature": "BYTE FUNC ReuPeek8(CARD handle,CARD offset)", "summary": "Reads one byte from an allocated REU block.", "example": "value=ReuPeek8(cache,index)"},
+        {"token": "ReuPeek16", "signature": "CARD FUNC ReuPeek16(CARD handle,CARD offset)", "summary": "Reads a little-endian 16-bit value from an allocated REU block.", "example": "word=ReuPeek16(cache,index*2)"},
+        {"token": "ReuPoke8", "signature": "PROC ReuPoke8(CARD handle,CARD offset,BYTE value)", "summary": "Writes one byte to an allocated REU block.", "example": "ReuPoke8(cache,index,value)"},
+        {"token": "ReuPoke16", "signature": "PROC ReuPoke16(CARD handle,CARD offset,CARD value)", "summary": "Writes a little-endian 16-bit value to an allocated REU block.", "example": "ReuPoke16(cache,index*2,value)"}
+      ]
+    },
+    {
+      "name": "GFX1",
+      "details": "GFX1 combines link-selected VIC-II helpers with clipped pixel, shape, sprite-resource, and bitmap-resource operations. High-resolution coordinates are 320 by 200; multicolor coordinates are logically 160 by 200.",
+      "target_notes": "Large programs should use VIC bank 2 with screen RAM at $8400, sprite staging at $8800, and bitmap RAM at $A000. The tracked high-level calls safely expose RAM beneath BASIC ROM. SPRITE resources compile to aligned 64-byte blocks; BITMAP resources retain their validated ABM1 header and packed pixels.",
+      "topics": [
+        {"token": "GFX_BLACK", "kind": "constant", "signature": "GFX_BLACK=0", "summary": "C64 black color index.", "example": "BgColor(GFX_BLACK)"},
+        {"token": "GFX_WHITE", "kind": "constant", "signature": "GFX_WHITE=1", "summary": "C64 white color index.", "example": "BorderColor(GFX_WHITE)"},
+        {"token": "GFX_RED", "kind": "constant", "signature": "GFX_RED=2", "summary": "C64 red color index.", "example": "SpriteColor(0,GFX_RED)"},
+        {"token": "GFX_CYAN", "kind": "constant", "signature": "GFX_CYAN=3", "summary": "C64 cyan color index.", "example": "BgColor(GFX_CYAN)"},
+        {"token": "GFX_PURPLE", "kind": "constant", "signature": "GFX_PURPLE=4", "summary": "C64 purple color index.", "example": "SpriteColor(0,GFX_PURPLE)"},
+        {"token": "GFX_GREEN", "kind": "constant", "signature": "GFX_GREEN=5", "summary": "C64 green color index.", "example": "GfxCellColors(0,0,GFX_GREEN,GFX_BLACK)"},
+        {"token": "GFX_BLUE", "kind": "constant", "signature": "GFX_BLUE=6", "summary": "C64 blue color index.", "example": "BorderColor(GFX_BLUE)"},
+        {"token": "GFX_YELLOW", "kind": "constant", "signature": "GFX_YELLOW=7", "summary": "C64 yellow color index.", "example": "SpriteColor(0,GFX_YELLOW)"},
+        {"token": "GFX_ORANGE", "kind": "constant", "signature": "GFX_ORANGE=8", "summary": "C64 orange color index.", "example": "SpriteSharedColors(GFX_ORANGE,GFX_BROWN)"},
+        {"token": "GFX_BROWN", "kind": "constant", "signature": "GFX_BROWN=9", "summary": "C64 brown color index.", "example": "SpriteSharedColors(GFX_ORANGE,GFX_BROWN)"},
+        {"token": "GFX_LIGHTRED", "kind": "constant", "signature": "GFX_LIGHTRED=10", "summary": "C64 light-red color index.", "example": "BgColor(GFX_LIGHTRED)"},
+        {"token": "GFX_DARKGRAY", "kind": "constant", "signature": "GFX_DARKGRAY=11", "summary": "C64 dark-gray color index.", "example": "BorderColor(GFX_DARKGRAY)"},
+        {"token": "GFX_GRAY", "kind": "constant", "signature": "GFX_GRAY=12", "summary": "C64 gray color index.", "example": "BgColor(GFX_GRAY)"},
+        {"token": "GFX_LIGHTGREEN", "kind": "constant", "signature": "GFX_LIGHTGREEN=13", "summary": "C64 light-green color index.", "example": "SpriteColor(0,GFX_LIGHTGREEN)"},
+        {"token": "GFX_LIGHTBLUE", "kind": "constant", "signature": "GFX_LIGHTBLUE=14", "summary": "C64 light-blue color index.", "example": "SpriteColor(0,GFX_LIGHTBLUE)"},
+        {"token": "GFX_LIGHTGRAY", "kind": "constant", "signature": "GFX_LIGHTGRAY=15", "summary": "C64 light-gray color index.", "example": "GfxCellColors(0,0,GFX_LIGHTGRAY,GFX_BLACK)"},
+        {"token": "VicBank", "signature": "PROC VicBank(BYTE bank)", "summary": "Selects VIC-II bank 0 through 3 while preserving unrelated CIA 2 bits.", "example": "VicBank(0)"},
+        {"token": "BgColor", "signature": "PROC BgColor(BYTE color)", "summary": "Sets the VIC-II background color register.", "example": "BgColor(6)"},
+        {"token": "BorderColor", "signature": "PROC BorderColor(BYTE color)", "summary": "Sets the VIC-II border color register.", "example": "BorderColor(14)"},
+        {"token": "ScreenBase", "signature": "PROC ScreenBase(CARD base)", "summary": "Selects the screen-memory base encoded in the VIC-II memory pointer register.", "example": "ScreenBase($0400)"},
+        {"token": "BitmapBase", "signature": "PROC BitmapBase(CARD base)", "summary": "Selects the VIC-II bitmap-memory base.", "example": "BitmapBase($2000)"},
+        {"token": "ScreenCell", "signature": "PROC ScreenCell(BYTE x,BYTE y,BYTE ch)", "summary": "Writes one character byte to the active 40-column screen cell.", "example": "ScreenCell(10,5,'A)"},
+        {"token": "ColorCell", "signature": "PROC ColorCell(BYTE x,BYTE y,BYTE color)", "summary": "Writes one color nibble to C64 color RAM for a screen cell.", "example": "ColorCell(10,5,1)"},
+        {"token": "ScreenCopy", "signature": "PROC ScreenCopy(CARD addr)", "summary": "Copies 1000 bytes from a C64 address to the active screen memory.", "example": "ScreenCopy(@savedScreen)"},
+        {"token": "ColorCopy", "signature": "PROC ColorCopy(CARD addr)", "summary": "Copies 1000 color values from a C64 address to color RAM.", "example": "ColorCopy(@savedColors)"},
+        {"token": "BitmapFill", "signature": "PROC BitmapFill(BYTE value)", "summary": "Fills the active 8000-byte bitmap with one byte value.", "example": "BitmapFill(0)"},
+        {"token": "BitmapCopy", "signature": "PROC BitmapCopy(CARD addr)", "summary": "Copies 8000 bytes from a C64 address to the active bitmap.", "example": "BitmapCopy(@picture)"},
+        {"token": "BitmapOn", "signature": "PROC BitmapOn()", "summary": "Enables standard VIC-II bitmap mode.", "example": "BitmapOn()"},
+        {"token": "BitmapOff", "signature": "PROC BitmapOff()", "summary": "Disables VIC-II bitmap mode.", "example": "BitmapOff()"},
+        {"token": "MBitmapOn", "signature": "PROC MBitmapOn()", "summary": "Enables multicolor bitmap mode.", "example": "MBitmapOn()"},
+        {"token": "MBitmapOff", "signature": "PROC MBitmapOff()", "summary": "Disables multicolor bitmap mode.", "example": "MBitmapOff()"},
+        {"token": "GfxUseBank", "signature": "PROC GfxUseBank(BYTE bank)", "summary": "Selects and records VIC-II bank zero through three for high-level drawing and sprite staging.", "example": "GfxUseBank(2)"},
+        {"token": "GfxUseScreen", "signature": "PROC GfxUseScreen(CARD base)", "summary": "Selects and records the screen-memory base for high-level drawing.", "example": "GfxUseScreen($8400)"},
+        {"token": "GfxUseBitmap", "signature": "PROC GfxUseBitmap(CARD base)", "summary": "Selects and records the bitmap-memory base for high-level drawing.", "example": "GfxUseBitmap($A000)"},
+        {"token": "GfxUseSprites", "signature": "PROC GfxUseSprites(CARD base)", "summary": "Selects the 64-byte-aligned VIC-bank destination where SpritePlace stages slots zero through seven.", "example": "GfxUseSprites($8800)"},
+        {"token": "GfxHires", "signature": "PROC GfxHires(CARD screen,bitmap)", "summary": "Configures tracked bank, screen, and bitmap addresses and enables hires bitmap mode.", "example": "GfxHires($8400,$A000)"},
+        {"token": "GfxMulticolor", "signature": "PROC GfxMulticolor(CARD screen,bitmap)", "summary": "Configures tracked bank, screen, and bitmap addresses and enables multicolor bitmap mode.", "example": "GfxMulticolor($8400,$A000)"},
+        {"token": "GfxBitmapClear", "signature": "PROC GfxBitmapClear(BYTE value)", "summary": "Fills the tracked 8000-byte bitmap, including RAM hidden beneath BASIC ROM.", "example": "GfxBitmapClear(0)"},
+        {"token": "GfxScreenClear", "signature": "PROC GfxScreenClear(BYTE value,color)", "summary": "Fills the tracked 1000-byte screen and all matching color-RAM cells.", "example": "GfxScreenClear(0,GFX_BLACK)"},
+        {"token": "ClipSet", "signature": "PROC ClipSet(CARD left,top,right,bottom)", "summary": "Sets the inclusive high-resolution pixel clipping rectangle.", "example": "ClipSet(16,16,303,183)"},
+        {"token": "ClipReset", "signature": "PROC ClipReset()", "summary": "Restores clipping to the complete 320-by-200 bitmap.", "example": "ClipReset()"},
+        {"token": "Plot", "signature": "PROC Plot(CARD x,BYTE y)", "summary": "Sets one clipped high-resolution bitmap pixel.", "example": "Plot(160,100)"},
+        {"token": "Unplot", "signature": "PROC Unplot(CARD x,BYTE y)", "summary": "Clears one clipped high-resolution bitmap pixel.", "example": "Unplot(160,100)"},
+        {"token": "PlotXor", "signature": "PROC PlotXor(CARD x,BYTE y)", "summary": "Toggles one clipped high-resolution bitmap pixel.", "example": "PlotXor(cursorX,cursorY)"},
+        {"token": "Point", "signature": "BYTE FUNC Point(CARD x,BYTE y)", "summary": "Returns zero or one for a high-resolution bitmap pixel.", "example": "occupied=Point(x,y)"},
+        {"token": "MPlot", "signature": "PROC MPlot(CARD x,BYTE y,BYTE color)", "summary": "Writes one logical multicolor pixel using color slot zero through three.", "example": "MPlot(80,100,2)"},
+        {"token": "MPoint", "signature": "BYTE FUNC MPoint(CARD x,BYTE y)", "summary": "Returns a logical multicolor pixel's color-slot value.", "example": "slot=MPoint(x,y)"},
+        {"token": "GfxCellColors", "signature": "PROC GfxCellColors(BYTE x,y,foreground,background)", "summary": "Sets the two colors for one hires 8-by-8 bitmap cell.", "example": "GfxCellColors(4,3,GFX_WHITE,GFX_BLACK)"},
+        {"token": "GfxMCellColors", "signature": "PROC GfxMCellColors(BYTE x,y,color1,color2,color3)", "summary": "Sets the three cell-local colors for one multicolor bitmap cell.", "example": "GfxMCellColors(4,3,2,7,1)"},
+        {"token": "HLineDraw", "signature": "PROC HLineDraw(INT x0,x1,y)", "summary": "Draws a clipped horizontal line with inclusive endpoints.", "example": "HLineDraw(10,100,40)"},
+        {"token": "HLineUnplot", "signature": "PROC HLineUnplot(INT x0,x1,y)", "summary": "Clears a clipped horizontal line with inclusive endpoints.", "example": "HLineUnplot(10,100,40)"},
+        {"token": "VLineDraw", "signature": "PROC VLineDraw(INT x,y0,y1)", "summary": "Draws a clipped vertical line with inclusive endpoints.", "example": "VLineDraw(40,10,100)"},
+        {"token": "LineDraw", "signature": "PROC LineDraw(INT x0,y0,x1,y1)", "summary": "Draws a clipped Bresenham line between arbitrary endpoints.", "example": "LineDraw(0,0,319,199)"},
+        {"token": "RectangleDraw", "signature": "PROC RectangleDraw(INT left,top,right,bottom)", "summary": "Draws an outlined rectangle.", "example": "RectangleDraw(20,20,100,80)"},
+        {"token": "RectangleFill", "signature": "PROC RectangleFill(INT left,top,right,bottom)", "summary": "Draws a filled rectangle.", "example": "RectangleFill(20,20,100,80)"},
+        {"token": "RectangleClear", "signature": "PROC RectangleClear(INT left,top,right,bottom)", "summary": "Clears every pixel in a rectangle.", "example": "RectangleClear(20,20,100,80)"},
+        {"token": "SquareDraw", "signature": "PROC SquareDraw(INT left,top,size)", "summary": "Draws an outlined square.", "example": "SquareDraw(40,40,32)"},
+        {"token": "SquareFill", "signature": "PROC SquareFill(INT left,top,size)", "summary": "Draws a filled square.", "example": "SquareFill(40,40,32)"},
+        {"token": "CircleDraw", "signature": "PROC CircleDraw(INT centerX,centerY,radius)", "summary": "Draws a midpoint-algorithm circle.", "example": "CircleDraw(160,100,50)"},
+        {"token": "CircleFill", "signature": "PROC CircleFill(INT centerX,centerY,radius)", "summary": "Draws a filled circle using horizontal spans.", "example": "CircleFill(160,100,50)"},
+        {"token": "TriangleDraw", "signature": "PROC TriangleDraw(INT x0,y0,x1,y1,x2,y2)", "summary": "Draws the three edges of a triangle.", "example": "TriangleDraw(10,190,160,10,310,190)"},
+        {"token": "BitmapStamp", "signature": "PROC BitmapStamp(CARD asset,originX,originY)", "summary": "OR-stamps nonzero pixels from a hires BITMAP resource.", "example": "BitmapStamp(Explosion,40,60)"},
+        {"token": "BitmapDrawResource", "signature": "PROC BitmapDrawResource(CARD asset,originX,originY)", "summary": "Opaque-draws both zero and one pixels from a hires BITMAP resource.", "example": "BitmapDrawResource(Logo,0,0)"},
+        {"token": "BitmapErase", "signature": "PROC BitmapErase(CARD asset,originX,originY)", "summary": "Clears the set-pixel mask of a hires BITMAP resource.", "example": "BitmapErase(Ship,oldX,oldY)"},
+        {"token": "BitmapMove", "signature": "PROC BitmapMove(CARD asset,oldX,oldY,newX,newY)", "summary": "Erases a hires resource at its old position and stamps it at a new one.", "example": "BitmapMove(Ship,x,y,x+1,y)"},
+        {"token": "MBitmapStamp", "signature": "PROC MBitmapStamp(CARD asset,originX,originY)", "summary": "Stamps nonzero pixels from an MBITMAP resource.", "example": "MBitmapStamp(Enemy,20,40)"},
+        {"token": "MBitmapDrawResource", "signature": "PROC MBitmapDrawResource(CARD asset,originX,originY)", "summary": "Opaque-draws every color slot from an MBITMAP resource.", "example": "MBitmapDrawResource(Tile,20,40)"},
+        {"token": "MBitmapErase", "signature": "PROC MBitmapErase(CARD asset,originX,originY)", "summary": "Clears the nonzero mask of an MBITMAP resource.", "example": "MBitmapErase(Enemy,oldX,oldY)"},
+        {"token": "MBitmapMove", "signature": "PROC MBitmapMove(CARD asset,oldX,oldY,newX,newY)", "summary": "Erases and re-stamps a multicolor bitmap resource.", "example": "MBitmapMove(Enemy,x,y,x+1,y)"},
+        {"token": "SpriteDefaultColor", "signature": "BYTE FUNC SpriteDefaultColor(CARD asset)", "summary": "Reads the default VIC-II color embedded with a SPRITE resource.", "example": "color=SpriteDefaultColor(Player)"},
+        {"token": "SpriteIsMulticolor", "signature": "BYTE FUNC SpriteIsMulticolor(CARD asset)", "summary": "Reports whether a compiled sprite resource is multicolor.", "example": "multi=SpriteIsMulticolor(Player)"},
+        {"token": "SpritePlace", "signature": "PROC SpritePlace(BYTE slot,CARD asset,x,BYTE y)", "summary": "Installs, colors, positions, configures, and enables a compiled sprite resource.", "example": "SpritePlace(0,Player,120,80)"},
+        {"token": "SpriteMove", "signature": "PROC SpriteMove(BYTE slot,CARD x,BYTE y)", "summary": "Moves an already configured hardware sprite.", "example": "SpriteMove(0,x,y)"},
+        {"token": "SpriteShow", "signature": "PROC SpriteShow(BYTE slot)", "summary": "Enables a hardware sprite without changing its resource or position.", "example": "SpriteShow(0)"},
+        {"token": "SpriteHide", "signature": "PROC SpriteHide(BYTE slot)", "summary": "Disables a hardware sprite without changing its state.", "example": "SpriteHide(0)"},
+        {"token": "SpriteSharedColors", "signature": "PROC SpriteSharedColors(BYTE color1,color2)", "summary": "Sets the two VIC-II colors shared by all multicolor sprites.", "example": "SpriteSharedColors(GFX_ORANGE,GFX_BROWN)"}
+      ]
+    },
+    {
+      "name": "INPUT1",
+      "details": "INPUT1 reads C64 joystick and 1351-style mouse state. Port values use normal C64 port numbers 1 or 2.",
+      "target_notes": "An idle passive joystick cannot be reliably detected. Mouse presence is inferred only after movement or button activity.",
+      "topics": [
+        {"token": "JOY_UP", "kind": "constant", "signature": "JOY_UP=$01", "summary": "Joystick up-direction bit mask.", "example": "movement=Joy(2) & JOY_UP"},
+        {"token": "JOY_DOWN", "kind": "constant", "signature": "JOY_DOWN=$02", "summary": "Joystick down-direction bit mask.", "example": "movement=Joy(2) & JOY_DOWN"},
+        {"token": "JOY_LEFT", "kind": "constant", "signature": "JOY_LEFT=$04", "summary": "Joystick left-direction bit mask.", "example": "movement=Joy(2) & JOY_LEFT"},
+        {"token": "JOY_RIGHT", "kind": "constant", "signature": "JOY_RIGHT=$08", "summary": "Joystick right-direction bit mask.", "example": "movement=Joy(2) & JOY_RIGHT"},
+        {"token": "JOY_BUTTON1", "kind": "constant", "signature": "JOY_BUTTON1=$10", "summary": "Primary joystick-button bit mask.", "example": "mask=JOY_UP+JOY_BUTTON1"},
+        {"token": "JOY_BUTTON2", "kind": "constant", "signature": "JOY_BUTTON2=$20", "summary": "Optional second joystick-button bit mask.", "example": "mask=JOY_BUTTON1+JOY_BUTTON2"},
+        {"token": "MOUSE_BUTTON1", "kind": "constant", "signature": "MOUSE_BUTTON1=$01", "summary": "Primary mouse-button bit mask.", "example": "pressed=MouseBtn() & MOUSE_BUTTON1"},
+        {"token": "MOUSE_BUTTON2", "kind": "constant", "signature": "MOUSE_BUTTON2=$02", "summary": "Secondary mouse-button bit mask.", "example": "pressed=MouseBtn() & MOUSE_BUTTON2"},
+        {"token": "Joy", "signature": "BYTE FUNC Joy(BYTE port)", "summary": "Polls a joystick and returns the active direction/button mask.", "example": "state=Joy(2)"},
+        {"token": "JoySeen", "signature": "BYTE FUNC JoySeen(BYTE port)", "summary": "Reports whether activity has been observed on a joystick port.", "example": "present=JoySeen(2)"},
+        {"token": "JoyBtn1", "signature": "BYTE FUNC JoyBtn1(BYTE port)", "summary": "Returns nonzero while the primary joystick button is pressed.", "example": "fire=JoyBtn1(2)"},
+        {"token": "JoyBtn2", "signature": "BYTE FUNC JoyBtn2(BYTE port)", "summary": "Returns nonzero while the supported second joystick button is pressed.", "example": "second=JoyBtn2(2)"},
+        {"token": "MousePoll", "signature": "BYTE FUNC MousePoll(BYTE port)", "summary": "Polls mouse position/buttons and updates the linked mouse state.", "example": "changed=MousePoll(1)"},
+        {"token": "MouseSeen", "signature": "BYTE FUNC MouseSeen()", "summary": "Reports whether mouse movement or button activity has been observed.", "example": "present=MouseSeen()"},
+        {"token": "MouseX", "signature": "BYTE FUNC MouseX()", "summary": "Returns the most recently polled mouse X value.", "example": "x=MouseX()"},
+        {"token": "MouseY", "signature": "BYTE FUNC MouseY()", "summary": "Returns the most recently polled mouse Y value.", "example": "y=MouseY()"},
+        {"token": "MouseBtn", "signature": "BYTE FUNC MouseBtn()", "summary": "Returns the current combined mouse-button mask.", "example": "buttons=MouseBtn()"},
+        {"token": "MouseBtn1", "signature": "BYTE FUNC MouseBtn1()", "summary": "Returns nonzero while mouse button 1 is pressed.", "example": "primary=MouseBtn1()"},
+        {"token": "MouseBtn2", "signature": "BYTE FUNC MouseBtn2()", "summary": "Returns nonzero while mouse button 2 is pressed.", "example": "secondary=MouseBtn2()"}
+      ]
+    },
+    {
+      "name": "SIDSPR1",
+      "details": "SIDSPR1 calls directly control VIC-II sprites and SID voices through link-selected 6502 helpers. Sprite numbers are 0 through 7 and SID voice numbers are 0 through 2.",
+      "target_notes": "Callers are responsible for valid sprite data placement, VIC bank setup, and musically appropriate SID register values.",
+      "topics": [
+        {"token": "SID_TRI", "kind": "constant", "signature": "SID_TRI=$10", "summary": "SID triangle-waveform control bit.", "example": "SidWave(0,SID_TRI)"},
+        {"token": "SID_SAW", "kind": "constant", "signature": "SID_SAW=$20", "summary": "SID sawtooth-waveform control bit.", "example": "SidWave(0,SID_SAW)"},
+        {"token": "SID_PULSE", "kind": "constant", "signature": "SID_PULSE=$40", "summary": "SID pulse-waveform control bit.", "example": "SidWave(0,SID_PULSE)"},
+        {"token": "SID_NOISE", "kind": "constant", "signature": "SID_NOISE=$80", "summary": "SID noise-waveform control bit.", "example": "SidWave(2,SID_NOISE)"},
+        {"token": "SID_LOW", "kind": "constant", "signature": "SID_LOW=$10", "summary": "SID low-pass filter-mode bit.", "example": "SidMode(SID_LOW)"},
+        {"token": "SID_BAND", "kind": "constant", "signature": "SID_BAND=$20", "summary": "SID band-pass filter-mode bit.", "example": "SidMode(SID_BAND)"},
+        {"token": "SID_HIGH", "kind": "constant", "signature": "SID_HIGH=$40", "summary": "SID high-pass filter-mode bit.", "example": "SidMode(SID_HIGH)"},
+        {"token": "SPR_FRONT", "kind": "constant", "signature": "SPR_FRONT=0", "summary": "Sprite-priority value placing a sprite in front of background graphics.", "example": "SpritePrio(0,SPR_FRONT)"},
+        {"token": "SPR_BACK", "kind": "constant", "signature": "SPR_BACK=1", "summary": "Sprite-priority value placing a sprite behind foreground graphics.", "example": "SpritePrio(0,SPR_BACK)"},
+        {"token": "SpriteHit", "signature": "BYTE FUNC SpriteHit()", "summary": "Returns and acknowledges the VIC-II sprite-to-sprite collision bits.", "example": "collisions=SpriteHit()"},
+        {"token": "SpriteHitBg", "signature": "BYTE FUNC SpriteHitBg()", "summary": "Returns and acknowledges the VIC-II sprite-to-background collision bits.", "example": "collisions=SpriteHitBg()"},
+        {"token": "SidOsc3", "signature": "BYTE FUNC SidOsc3()", "summary": "Reads the SID voice-3 oscillator output register.", "example": "random=SidOsc3()"},
+        {"token": "SidEnv3", "signature": "BYTE FUNC SidEnv3()", "summary": "Reads the SID voice-3 envelope output register.", "example": "envelope=SidEnv3()"},
+        {"token": "SpriteOn", "signature": "PROC SpriteOn(BYTE n)", "summary": "Enables one VIC-II sprite.", "example": "SpriteOn(0)"},
+        {"token": "SpriteOff", "signature": "PROC SpriteOff(BYTE n)", "summary": "Disables one VIC-II sprite.", "example": "SpriteOff(0)"},
+        {"token": "SpritePos", "signature": "PROC SpritePos(BYTE n,CARD x,BYTE y)", "summary": "Sets a sprite's 9-bit X coordinate and 8-bit Y coordinate.", "example": "SpritePos(0,160,100)"},
+        {"token": "SpritePtr", "signature": "PROC SpritePtr(BYTE n,BYTE ptr)", "summary": "Writes a sprite pointer into the active screen's sprite-pointer table.", "example": "SpritePtr(0,128)"},
+        {"token": "SpriteData", "signature": "PROC SpriteData(BYTE n,CARD addr)", "summary": "Derives and installs a sprite pointer from a C64 sprite-data address.", "example": "SpriteData(0,$2000)"},
+        {"token": "SpriteColor", "signature": "PROC SpriteColor(BYTE n,BYTE col)", "summary": "Sets one sprite's VIC-II color.", "example": "SpriteColor(0,1)"},
+        {"token": "SpriteMC", "signature": "PROC SpriteMC(BYTE n,BYTE on)", "summary": "Enables or disables multicolor mode for one sprite.", "example": "SpriteMC(0,1)"},
+        {"token": "SpriteXExp", "signature": "PROC SpriteXExp(BYTE n,BYTE on)", "summary": "Enables or disables horizontal expansion for one sprite.", "example": "SpriteXExp(0,1)"},
+        {"token": "SpriteYExp", "signature": "PROC SpriteYExp(BYTE n,BYTE on)", "summary": "Enables or disables vertical expansion for one sprite.", "example": "SpriteYExp(0,1)"},
+        {"token": "SpritePrio", "signature": "PROC SpritePrio(BYTE n,BYTE behind)", "summary": "Sets one sprite's foreground/background priority.", "example": "SpritePrio(0,SPR_BACK)"},
+        {"token": "SetSpriteMC", "signature": "PROC SetSpriteMC(BYTE c0,BYTE c1)", "summary": "Sets the two shared VIC-II sprite multicolor registers.", "example": "SetSpriteMC(5,10)"},
+        {"token": "SidFreq", "signature": "PROC SidFreq(BYTE v,CARD freq)", "summary": "Sets a SID voice's 16-bit oscillator frequency.", "example": "SidFreq(0,4400)"},
+        {"token": "SidPulse", "signature": "PROC SidPulse(BYTE v,CARD width)", "summary": "Sets a SID voice's 12-bit pulse width.", "example": "SidPulse(0,$0800)"},
+        {"token": "SidWave", "signature": "PROC SidWave(BYTE v,BYTE wave)", "summary": "Sets a SID voice's waveform control bits while preserving managed gate state.", "example": "SidWave(0,SID_TRI+SID_SAW)"},
+        {"token": "SidAD", "signature": "PROC SidAD(BYTE v,BYTE ad)", "summary": "Sets a SID voice's packed attack/decay value.", "example": "SidAD(0,$24)"},
+        {"token": "SidSR", "signature": "PROC SidSR(BYTE v,BYTE sr)", "summary": "Sets a SID voice's packed sustain/release value.", "example": "SidSR(0,$A6)"},
+        {"token": "SidOn", "signature": "PROC SidOn(BYTE v)", "summary": "Sets the gate bit for a SID voice.", "example": "SidOn(0)"},
+        {"token": "SidOff", "signature": "PROC SidOff(BYTE v)", "summary": "Clears the gate bit for a SID voice.", "example": "SidOff(0)"},
+        {"token": "SidVol", "signature": "PROC SidVol(BYTE vol)", "summary": "Sets the SID master volume nibble.", "example": "SidVol(15)"},
+        {"token": "SidCutoff", "signature": "PROC SidCutoff(CARD cutoff)", "summary": "Sets the SID filter cutoff value.", "example": "SidCutoff(1024)"},
+        {"token": "SidRes", "signature": "PROC SidRes(BYTE res)", "summary": "Sets the SID filter resonance nibble.", "example": "SidRes(8)"},
+        {"token": "SidMode", "signature": "PROC SidMode(BYTE mode)", "summary": "Sets the SID low-, band-, and high-pass filter mode bits.", "example": "SidMode(SID_LOW+SID_BAND)"},
+        {"token": "SidRoute", "signature": "PROC SidRoute(BYTE mask)", "summary": "Selects which SID voices are routed through the filter.", "example": "SidRoute(1)"},
+        {"token": "SidRst", "signature": "PROC SidRst()", "summary": "Resets the managed SID control and filter state.", "example": "SidRst()"}
+      ]
+    },
+    {
+      "name": "DBF1",
+      "details": "DBF1 operates on the currently staged DBF image in an allocator-owned REU block. Filename arguments point to zero-terminated C64 strings; explicit DbfSave writes changes back through C64 KERNAL device 8 I/O.",
+      "target_notes": "The current implementation supports one staged DBF image up to 65535 bytes. Its generated 6502 REU/KERNAL path is proven in headless VICE with a D64 image; physical Idun/C64/REU validation remains pending.",
+      "topics": [
+        {"token": "DbfCreate", "signature": "BYTE FUNC DbfCreate(CARD filename)", "summary": "Creates and opens an empty DBF image for the supplied C64 filename.", "example": "BYTE ARRAY name=[$4E $45 $57 $2E $44 $42 $46 0]\nhandle=DbfCreate(name)"},
+        {"token": "DbfOpen", "signature": "BYTE FUNC DbfOpen(CARD filename)", "summary": "Loads a DBF file into REU storage and returns its handle.", "example": "BYTE ARRAY name=[$44 $41 $54 $41 $2E $44 $42 $46 0]\nhandle=DbfOpen(name)"},
+        {"token": "DbfClose", "signature": "PROC DbfClose(BYTE handle)", "summary": "Closes the staged DBF handle and releases its active adapter state.", "example": "DbfClose(handle)"},
+        {"token": "DbfGo", "signature": "BYTE FUNC DbfGo(BYTE handle,BYTE recno)", "summary": "Moves the current-record cursor to a record number.", "example": "ok=DbfGo(handle,1)"},
+        {"token": "DbfFieldCount", "signature": "BYTE FUNC DbfFieldCount(BYTE handle)", "summary": "Returns the number of fields described by the DBF header.", "example": "fields=DbfFieldCount(handle)"},
+        {"token": "DbfFieldLen", "signature": "BYTE FUNC DbfFieldLen(BYTE handle,BYTE field)", "summary": "Returns one field's byte length.", "example": "width=DbfFieldLen(handle,1)"},
+        {"token": "DbfReadByte", "signature": "BYTE FUNC DbfReadByte(BYTE handle,BYTE offset)", "summary": "Reads a raw byte at an offset in the current record.", "example": "value=DbfReadByte(handle,10)"},
+        {"token": "DbfReadFieldByte", "signature": "BYTE FUNC DbfReadFieldByte(BYTE handle,BYTE field,BYTE offset)", "summary": "Reads a byte relative to a field in the current record.", "example": "value=DbfReadFieldByte(handle,1,0)"},
+        {"token": "DbfWriteFieldByte", "signature": "BYTE FUNC DbfWriteFieldByte(BYTE handle,BYTE field,BYTE offset,BYTE value)", "summary": "Writes a byte relative to a field in the current record.", "example": "ok=DbfWriteFieldByte(handle,1,0,'A)"},
+        {"token": "DbfWriteByte", "signature": "BYTE FUNC DbfWriteByte(BYTE handle,BYTE offset,BYTE value)", "summary": "Writes a raw byte at an offset in the current record.", "example": "ok=DbfWriteByte(handle,10,'A)"},
+        {"token": "DbfAppend", "signature": "BYTE FUNC DbfAppend(BYTE handle)", "summary": "Appends a blank record and selects it as current.", "example": "ok=DbfAppend(handle)"},
+        {"token": "DbfPack", "signature": "BYTE FUNC DbfPack(BYTE handle)", "summary": "Removes records marked deleted and compacts the staged image.", "example": "removed=DbfPack(handle)"},
+        {"token": "DbfSave", "signature": "BYTE FUNC DbfSave(BYTE handle)", "summary": "Writes the staged DBF image back to its filename.", "example": "ok=DbfSave(handle)"},
+        {"token": "DbfDelete", "signature": "BYTE FUNC DbfDelete(BYTE handle)", "summary": "Marks the current record as deleted.", "example": "ok=DbfDelete(handle)"},
+        {"token": "DbfUndelete", "signature": "BYTE FUNC DbfUndelete(BYTE handle)", "summary": "Clears the deleted marker on the current record.", "example": "ok=DbfUndelete(handle)"},
+        {"token": "DbfDeleted", "signature": "BYTE FUNC DbfDeleted(BYTE handle)", "summary": "Reports whether the current record is marked deleted.", "example": "deleted=DbfDeleted(handle)"},
+        {"token": "DbfHeaderLen", "signature": "BYTE FUNC DbfHeaderLen(BYTE handle)", "summary": "Returns the staged DBF header length used by the active adapter.", "example": "headerBytes=DbfHeaderLen(handle)"},
+        {"token": "DbfRecordLen", "signature": "BYTE FUNC DbfRecordLen(BYTE handle)", "summary": "Returns the byte length of each DBF record.", "example": "recordBytes=DbfRecordLen(handle)"},
+        {"token": "DbfTotalRecs", "signature": "BYTE FUNC DbfTotalRecs(BYTE handle)", "summary": "Returns the current record count exposed by the active adapter.", "example": "records=DbfTotalRecs(handle)"},
+        {"token": "DbfCurrRecNo", "signature": "BYTE FUNC DbfCurrRecNo(BYTE handle)", "summary": "Returns the selected current-record number.", "example": "current=DbfCurrRecNo(handle)"}
+      ]
+    }
+  ]
+}

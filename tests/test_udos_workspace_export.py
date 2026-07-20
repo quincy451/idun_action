@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 import tempfile
@@ -8,6 +9,46 @@ from pathlib import Path
 
 
 class TestUdosWorkspaceExport(unittest.TestCase):
+    def test_actc_overlay_export_specs_match_compiler_load_table(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        exporter_text = (root / "tools" / "export_udos_workspace.py").read_text(encoding="ascii")
+        actc_text = (root / "src" / "tools_udos" / "actc" / "actc.asm").read_text(encoding="ascii")
+        overlay_abi_text = (
+            root / "src" / "tools_udos" / "actc" / "actc_overlay_abi.inc"
+        ).read_text(encoding="ascii")
+
+        pass_count_match = re.search(
+            r"^ACTC_OVERLAY_PASS_COUNT\s*=\s*\$([0-9A-Fa-f]+)$",
+            overlay_abi_text,
+            re.MULTILINE,
+        )
+        self.assertIsNotNone(pass_count_match, "overlay ABI has no pass count")
+        assert pass_count_match is not None
+        pass_count = int(pass_count_match.group(1), 16)
+        pass_ids = {
+            int(match.group(1), 16)
+            for match in re.finditer(
+                r"^ACTC_OVERLAY_PASS_[A-Z0-9_]+\s*=\s*\$([0-9A-Fa-f]{2})$",
+                overlay_abi_text,
+                re.MULTILINE,
+            )
+            if int(match.group(1), 16) < pass_count
+        }
+        compiler_overlays = {f"ACTC_OVL{index}.BIN" for index in range(pass_count)}
+        exporter_specs = {
+            match.group(2).upper(): match.group(1)
+            for match in re.finditer(
+                r'\("(build_actc_overlay_[^"]+\.sh)",\s*"(ACTC_OVL\d+\.BIN)"\)',
+                exporter_text,
+            )
+        }
+        self.assertIn('.asciiz "!ACTC_OVL0.BIN"', actc_text)
+        self.assertEqual(pass_ids, set(range(pass_count)))
+        self.assertEqual(set(exporter_specs), compiler_overlays)
+        for overlay_name, script_name in sorted(exporter_specs.items()):
+            with self.subTest(overlay=overlay_name):
+                self.assertTrue((root / "tools" / script_name).is_file(), script_name)
+
     def test_export_creates_udos_tree_with_guides_examples_and_libs(self) -> None:
         root = Path(__file__).resolve().parents[1]
         tool = root / "tools" / "export_udos_workspace.py"
@@ -39,9 +80,13 @@ class TestUdosWorkspaceExport(unittest.TestCase):
             self.assertTrue((docs_dir / "LANGUAGE.TXT").is_file())
             self.assertTrue((docs_dir / "INPUT1.TXT").is_file())
             self.assertTrue((docs_dir / "DBF1.TXT").is_file())
+            self.assertTrue((docs_dir / "DEBUGGER.TXT").is_file())
             self.assertFalse((docs_dir / "VMABI.TXT").exists())
             self.assertFalse((docs_dir / "UDOSRESM.TXT").exists())
             self.assertIn("ActionC64U UDOS Operator Guide", (docs_dir / "OPERATOR.TXT").read_text(encoding="ascii"))
+            debugger_doc = (docs_dir / "DEBUGGER.TXT").read_text(encoding="ascii")
+            self.assertIn("ACTDBG Native Source Debugger", debugger_doc)
+            self.assertIn("F3: step into one native instruction", debugger_doc)
             input1_doc = (docs_dir / "INPUT1.TXT").read_text(encoding="ascii")
             self.assertIn("INPUT1 Joystick And Mouse Library", input1_doc)
             self.assertIn("Joy(port) returns an active-high bitfield", input1_doc)
@@ -140,8 +185,13 @@ class TestUdosWorkspaceExport(unittest.TestCase):
             self.assertTrue((lib_dir / "RT_F_MUL.OBJ").is_file())
             self.assertTrue((lib_dir / "RT_F_DIV.OBJ").is_file())
             self.assertTrue((lib_dir / "RT_F_CMP.OBJ").is_file())
+            self.assertTrue((lib_dir / "RT_F_MIN.OBJ").is_file())
+            self.assertTrue((lib_dir / "RT_F_MAX.OBJ").is_file())
             self.assertTrue((lib_dir / "RT_F_ABS.OBJ").is_file())
             self.assertTrue((lib_dir / "RT_F_SQRT.OBJ").is_file())
+            self.assertTrue((lib_dir / "RT_I_MUL.OBJ").is_file())
+            self.assertTrue((lib_dir / "RT_I_DIV.OBJ").is_file())
+            self.assertTrue((lib_dir / "RT_PRINT_I.OBJ").is_file())
             self.assertTrue((lib_dir / "RT_I_TO_F.OBJ").is_file())
             self.assertTrue((lib_dir / "RT_F_TO_I.OBJ").is_file())
             self.assertTrue((lib_dir / "MATH1.ACT").is_file())
@@ -242,6 +292,18 @@ class TestUdosWorkspaceExport(unittest.TestCase):
             self.assertIn("b M", i_to_f_contents)
             self.assertIn("m 85 04 86 05", i_to_f_contents)
             self.assertIn("n rt_i_to_f", i_to_f_contents)
+            i_mul_contents = (lib_dir / "RT_I_MUL.OBJ").read_text(encoding="ascii")
+            self.assertIn("x rt_i_mul 0 55", i_mul_contents)
+            self.assertIn("b M", i_mul_contents)
+            self.assertIn("n rt_i_mul", i_mul_contents)
+            i_div_contents = (lib_dir / "RT_I_DIV.OBJ").read_text(encoding="ascii")
+            self.assertIn("x rt_i_div 0 65", i_div_contents)
+            self.assertIn("b M", i_div_contents)
+            self.assertIn("n rt_i_div", i_div_contents)
+            print_i_contents = (lib_dir / "RT_PRINT_I.OBJ").read_text(encoding="ascii")
+            self.assertIn("x rt_print_i 0 334", print_i_contents)
+            self.assertIn("b M", print_i_contents)
+            self.assertIn("n rt_print_i", print_i_contents)
             s_to_f_contents = (lib_dir / "RT_S_TO_F.OBJ").read_text(encoding="ascii")
             self.assertIn("x rt_s_to_f 0 123", s_to_f_contents)
             self.assertIn("b M", s_to_f_contents)
@@ -289,6 +351,15 @@ class TestUdosWorkspaceExport(unittest.TestCase):
             self.assertNotIn("u rt_f_to_i", f_cmp_contents)
             self.assertNotIn("r ", f_cmp_contents)
             self.assertIn("n rt_f_cmp", f_cmp_contents)
+            for helper in ("min", "max"):
+                f_select_contents = (lib_dir / f"RT_F_{helper.upper()}.OBJ").read_text(
+                    encoding="ascii"
+                )
+                self.assertIn(f"x rt_f_{helper} 0 77", f_select_contents)
+                self.assertIn("b u0M", f_select_contents)
+                self.assertIn("u rt_f_cmp", f_select_contents)
+                self.assertIn("r 1 u0", f_select_contents)
+                self.assertIn(f"n rt_f_{helper}", f_select_contents)
             f_abs_contents = (lib_dir / "RT_F_ABS.OBJ").read_text(encoding="ascii")
             self.assertIn("x rt_f_abs 0 18", f_abs_contents)
             self.assertIn("b M", f_abs_contents)
@@ -392,6 +463,27 @@ class TestUdosWorkspaceExport(unittest.TestCase):
 
             image_root = output / "IMAGES" / "ACTION.DNP"
             self.assertTrue((image_root / "ACTDIR.PRG").is_file())
+            tree_overlay = (image_root / "TREE.OVL").read_bytes()
+            self.assertEqual(tree_overlay[:6], b"\x00\x09UDOV")
+            self.assertEqual(tree_overlay[6:10], bytes((1, 6, 20, 0)))
+            self.assertEqual(int.from_bytes(tree_overlay[10:12], "little"), 0x0900)
+            self.assertGreaterEqual(int.from_bytes(tree_overlay[12:14], "little"), 0x090E)
+            self.assertEqual(int.from_bytes(tree_overlay[14:16], "little"), len(tree_overlay) - 2)
+            xcopy_overlay = (image_root / "XCOPY.OVL").read_bytes()
+            self.assertEqual(xcopy_overlay[:6], b"\x00\x09UDOV")
+            self.assertEqual(xcopy_overlay[6:10], bytes((1, 6, 21, 0)))
+            self.assertEqual(int.from_bytes(xcopy_overlay[10:12], "little"), 0x0900)
+            self.assertGreaterEqual(int.from_bytes(xcopy_overlay[12:14], "little"), 0x090E)
+            self.assertEqual(int.from_bytes(xcopy_overlay[14:16], "little"), len(xcopy_overlay) - 2)
+            deltree_overlay = (image_root / "DELTREE.OVL").read_bytes()
+            self.assertEqual(deltree_overlay[:6], b"\x00\x09UDOV")
+            self.assertEqual(deltree_overlay[6:10], bytes((1, 6, 22, 0)))
+            self.assertEqual(int.from_bytes(deltree_overlay[10:12], "little"), 0x0900)
+            self.assertGreaterEqual(int.from_bytes(deltree_overlay[12:14], "little"), 0x090E)
+            self.assertEqual(
+                int.from_bytes(deltree_overlay[14:16], "little"),
+                len(deltree_overlay) - 2,
+            )
             self.assertTrue((image_root / "ACTADD.PRG").is_file())
             self.assertTrue((image_root / "ACT2SAVE.PRG").is_file())
             self.assertTrue((image_root / "ACTSAVE.PRG").is_file())
@@ -404,6 +496,8 @@ class TestUdosWorkspaceExport(unittest.TestCase):
             self.assertEqual((image_root / "ACTC_OVL5.BIN").read_bytes()[:4], b"ACOV")
             self.assertEqual((image_root / "ACTC_OVL6.BIN").read_bytes()[:4], b"ACOV")
             self.assertEqual((image_root / "ACTC_OVL7.BIN").read_bytes()[:4], b"ACOV")
+            self.assertEqual((image_root / "ACTC_OVL8.BIN").read_bytes()[:4], b"ACOV")
+            self.assertEqual((image_root / "ACTC_OVL9.BIN").read_bytes()[:4], b"ACOV")
             self.assertTrue((image_root / "ALINK.PRG").is_file())
             self.assertTrue((image_root / "ACTCHK.PRG").is_file())
             self.assertTrue((image_root / "ACTMON.PRG").is_file())
@@ -426,15 +520,16 @@ class TestUdosWorkspaceExport(unittest.TestCase):
             self.assertTrue((image_root / "ACTRMDIR.PRG").is_file())
             self.assertTrue((image_root / "ACTWRITE.PRG").is_file())
             self.assertTrue((image_root / "ACTEDIT.PRG").is_file())
+            self.assertEqual((image_root / "ACTEDIT_OVL1.BIN").read_bytes()[:5], b"AEOV\x02")
+            self.assertTrue((image_root / "ACTDBG.PRG").is_file())
+            self.assertEqual((image_root / "ACTDBG_OVL1.BIN").read_bytes()[:4], b"DGOV")
+            self.assertEqual((image_root / "ACTDBG_OVL2.BIN").read_bytes()[:4], b"DGOV")
             old_vm_prefix = "A" + "VM"
             old_runner = old_vm_prefix + "RUN"
             for name in [
                 old_vm_prefix + "INFO.PRG",
                 old_runner + ".PRG",
                 old_runner + "C.PRG",
-                "ACTDBG.PRG",
-                "ACTDBG_OVL1.BIN",
-                "ACTDBG_OVL2.BIN",
                 "RT_PRINT_STD_HELPER.BIN",
                 "RT_PRINT_F_HELPER.BIN",
                 "RT_GFX1_HELPER.BIN",
