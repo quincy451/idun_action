@@ -13,6 +13,8 @@ FAbs, FSqrt, FSign, FMin, FMax, FClamp, PrintR, and PrintRE. Its selected
 FSign/FMin/FMax/FClamp semantics match this source, while general REAL source
 lowering and the remaining 35 public routines are tracked in
 docs/udos_feature_parity.md.
+The native `INCLUDE "MATH1"` header now also exposes all 8 constants without
+allocating target storage or selecting a runtime object.
 
 The constants and routines below are public after INCLUDE "MATH1".  The
 transcendental routines are portable Action implementations over the binary32

@@ -209,6 +209,33 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 self.assertRegex(gfx_object, rf"(?m)^x {symbol} \d+ \d+$")
             self.run_tool(gfx_project, "alink", "main")
 
+    def test_math1_constant_include_matches_shared_native_fixture(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.run_tool(root, "actnew", "demo")
+            project = root / "DEMO"
+            (project / "LIB").mkdir()
+            (project / "LIB" / "MATH1.ACT").write_bytes(
+                (self.root / "lib" / "math1.act").read_bytes()
+            )
+            (project / "SRC" / "MAIN.ACT").write_bytes(
+                (
+                    self.root
+                    / "tests"
+                    / "parity"
+                    / "math1_constants_include.act"
+                ).read_bytes()
+            )
+
+            self.run_tool(project, "actc", "main")
+            object_text = (project / "OBJ" / "MAIN.OBJ").read_text(
+                encoding="ascii"
+            )
+            self.assertIn("MAIN_RESULT_B0", object_text)
+            self.assertNotIn("MAIN_MATH_PI_LO", object_text)
+            self.run_tool(project, "alink", "main")
+            self.assertTrue((project / "BIN" / "MAIN.PRG").is_file())
+
     def test_actfile_has_no_255_byte_limit(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

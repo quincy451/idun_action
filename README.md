@@ -112,6 +112,11 @@ ternary root through synchronized, independently selected target modules with
 complete MATH1
 NaN/signed-zero/bound-order semantics. General native REAL expressions/functions, the rest of
 MATH1, GFX1, resources, formatting, and help remain listed there explicitly.
+The native MATH1 include now supplies all eight constants without target code.
+Idun still compiles every body from its full-source MATH1 include into the root
+object, so call-graph pruning or dependency-sized generated modules remains a
+required reachable-only packaging task rather than an operating-system
+difference.
 
 Build them with:
 
@@ -246,8 +251,12 @@ an additional 255-byte REU record-swap buffer.
 
 The Linux process conversion inventory is complete. Historical 6502/UDOS
 sources remain in Git for provenance, are formally retired, and are not built.
-Remaining Idun work is optional runtime expansion or physical validation:
+Remaining Idun work includes one required library-packaging correction plus
+optional runtime expansion and physical validation:
 
+- prune unreachable routines from full-source library includes, or generate
+  dependency-sized library objects, so `INCLUDE "MATH1"` does not embed all
+  unused function bodies in the application object
 - add new REAL library functions only when a separate post-MATH1 API is specified
 - extend the direct REU surface beyond 16-bit-sized arrays and 8/16-bit
   peek/poke

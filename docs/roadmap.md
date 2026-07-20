@@ -1057,3 +1057,19 @@ Retired roadmap items for CP/M-era runner flows are no longer maintained.
   is 7,418 bytes with 774 bytes free under its 768-byte reserve.
 - General native REAL expression returns, local frames, nested/recursive calls,
   and portable MATH1 module compilation remain the next dependency.
+
+## 2026-07-20 Native MATH1 Include Constants
+
+- Native `LIB/MATH1.ACT` now exposes all eight portable constants through an
+  include-safe, zero-code header while retaining independently link-selected
+  builtin calls for its current eight-routine surface.
+- Added `math1_constants_include.act` to both parity trees. Native ACTC folds
+  `MATH_PI` without an OBJ import; Linux ACTC/ALINK compiles and links the same
+  source against Idun's complete portable library.
+- The complete native suite passes 799 tests, including 210 overlay tests; the
+  Idun active host suite passes 152 tests and its ASan/UBSan suite passes 137
+  tests with the new shared fixture.
+- The review also measured an Idun packaging gap: its full-source MATH1 include
+  currently emits every function body into the selected root object. This is
+  not an Alpine-versus-UDOS requirement. Call-graph pruning or dependency-sized
+  generated modules must restore referenced-only closure before full parity.

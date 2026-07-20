@@ -49,10 +49,10 @@ RAM-backed `/tmp`, and executable replacement is atomic.
 
 ## Verified Results
 
-- 151 active Linux/tool/target tests pass on the local x86-64 host. The prior
+- 152 active Linux/tool/target tests pass on the local x86-64 host. The prior
   150-test baseline also passes natively on the Alpine/aarch64 Idun Pi; rerun
   the new shared finite-REAL fixture there at the next source deployment.
-- 136 hardware-free tests also pass under AddressSanitizer and
+- 137 hardware-free tests also pass under AddressSanitizer and
   UndefinedBehaviorSanitizer.
 - 21 direct-PRG tests pass in local VICE with the documented VICE 3.7 long-DBF
   skip. The prior 20-test set passes on the Idun Pi; deploy and run the new
@@ -182,15 +182,24 @@ The process-conversion inventory, target agent, Linux debugger, profiler,
 instruction stepping, and persistent-breakpoint reinstallation are
 implemented. Full IEEE-754, MATH1, GFX1, ASMBLOCK, graphics resources, resource
 editors, formatting, external help, direct-PRG execution, and signed Alpine
-packaging are implemented. Remaining Idun product work is attached-hardware
-validation and normal release integration. Cross-product UDOS parity is tracked
-separately in `docs/udos_feature_parity.md`.
+  packaging are implemented. Required Idun work remains for reachable-only
+  packaging of full-source libraries: `INCLUDE "MATH1"` currently emits every
+  function body into the selected application object. Attached-hardware
+  validation and normal release integration also remain. Cross-product UDOS
+  parity is tracked separately in `docs/udos_feature_parity.md`.
 
 Cross-product parity is judged by portable Action source, normalized OBJ1
 meaning, reachable-only common-module selection, and direct-PRG results. It does
 not require native UDOS to copy Linux processes, SQLite, sockets, or APKs, and
 it does not require Idun to copy UDOS services, compiler overlays, REU
 workspace management, or DNP packaging.
+
+The native MATH1 header now exposes all eight constants as zero-code compile-
+time values and keeps each implemented call in an independently selected OBJ1
+module. The shared `math1_constants_include.act` fixture compiles and links in
+both products. Idun's current full-source implementation remains functionally
+correct but is not yet size-selective, so pruning that root object is required
+rather than treating its code growth as an operating-system difference.
 
 The 2026-07-19 native checkpoints add a bounded two-REAL-parameter function ABI
 and one finite comparison/select body without changing Idun syntax or the
@@ -216,7 +225,7 @@ VICE launches, the 32-shape native MATH1 source matrix, and its eight full-range
 helper probes pass. The broad native link inventory is 1,331 shapes and its
 compiled-runtime object/relocation oracle covers 290 cases. The shared manifest
 and Idun export/standalone-link tests guard this snapshot. The current Idun
-host suite passes 151 tests, the sanitizer suite passes 136, and the 21-test
+host suite passes 152 tests, the sanitizer suite passes 137, and the 21-test
 direct-PRG gate passes with only the documented VICE 3.7 DBF/REU skip. Both
 host and static Alpine/AArch64 exports verify 31 commands and 260 help topics.
 This refresh is hardware-independent and has not yet been redeployed to the Pi;
