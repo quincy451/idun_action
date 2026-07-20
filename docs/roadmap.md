@@ -973,7 +973,7 @@ Retired roadmap items for CP/M-era runner flows are no longer maintained.
 - Linux ACTC retains the general portable MATH1 implementation; it does not
   need to replace that source with compiler-specific selector lowering. Idun
   export and standalone-ALINK tests explicitly cover both synchronized modules.
-- Current native inventories are 1,330 broad direct-PRG shapes, 171
+- At this selector checkpoint, native inventories were 1,330 broad direct-PRG shapes, 171
   source-backed object-emission shapes, and 289 compiled-runtime relocation
   oracle cases. General native REAL expressions/calls/returns and the remaining
   dependency-sized MATH1 implementation remain the next cross-product work.
@@ -992,3 +992,20 @@ Retired roadmap items for CP/M-era runner flows are no longer maintained.
 - Idun keeps compiling the general portable `FSign` function body. The shared
   module is available for direct OBJ consumers and is guarded by generator,
   manifest, export, and standalone-link checks.
+
+## 2026-07-20 Shared MATH1 Clamp Refresh
+
+- Synchronized native-authoritative `RT_F_CLAMP.OBJ` into the Idun target
+  module set. The 199-byte helper imports comparison, maximum, and minimum only
+  when directly reachable.
+- Matched portable behavior: any NaN argument or inverted bounds produce
+  canonical quiet NaN; otherwise clamp preserves the exact selected operand,
+  including signed zero.
+- Native pass K owns the constrained three-initializer assignment-and-print
+  root without reducing pass A below its capacity reserve. Linux ACTC continues
+  to compile the general portable `FClamp` body.
+- Current native inventories are 1,331 broad direct-PRG shapes, 171
+  source-backed object-emission shapes, and 290 compiled-runtime relocation
+  oracle cases. The remaining cross-product work is general native REAL
+  lowering, 35 public MATH1 routines, and the later type/resource/workflow
+  items in `docs/udos_feature_parity.md`.

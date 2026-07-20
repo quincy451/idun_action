@@ -108,10 +108,9 @@ class TestRepoLayout(unittest.TestCase):
 
             export_lines = [line for line in lines if line.startswith("x ")]
             machine_lines = [line for line in lines if line.startswith("m ")]
-            self.assertEqual(len(export_lines), 1, f"{path} must have one export line")
+            self.assertGreaterEqual(len(export_lines), 1, f"{path} must have an export line")
             self.assertGreaterEqual(len(machine_lines), 1, f"{path} must have at least one machine record")
 
-            declared_size = int(export_lines[0].split()[3])
             machine_hex = "".join("".join(line.split()[1:]) for line in machine_lines)
             self.assertEqual(len(machine_hex) % 2, 0, f"{path} has an incomplete machine byte")
             self.assertRegex(machine_hex, r"^[0-9A-Fa-f]*$", f"{path} has non-hex machine bytes")
@@ -121,6 +120,29 @@ class TestRepoLayout(unittest.TestCase):
                 self.assertGreaterEqual(value, 0, f"{path} has invalid byte {byte_text}")
                 self.assertLessEqual(value, 0xFF, f"{path} has invalid byte {byte_text}")
             actual_size = len(machine_bytes)
+
+            exports = []
+            for line in export_lines:
+                parts = line.split()
+                self.assertEqual(len(parts), 4, f"{path} has malformed export: {line}")
+                name, offset, size = parts[1], int(parts[2]), int(parts[3])
+                self.assertGreater(size, 0, f"{path} has empty export {name}")
+                self.assertGreaterEqual(offset, 0, f"{path} has negative export offset {name}")
+                self.assertLessEqual(
+                    offset + size,
+                    actual_size,
+                    f"{path} export {name} exceeds its machine records",
+                )
+                exports.append((name.lower(), offset, size))
+
+            canonical = [export for export in exports if export[0] == path.stem.lower()]
+            self.assertEqual(
+                len(canonical),
+                1,
+                f"{path} must have one canonical export named {path.stem}",
+            )
+            _, declared_offset, declared_size = canonical[0]
+            self.assertEqual(declared_offset, 0, f"{path} canonical export must start at zero")
             if actual_size != declared_size:
                 mismatches.append(f"{path.name}: export={declared_size} machine={actual_size}")
 
@@ -166,6 +188,7 @@ class TestRepoLayout(unittest.TestCase):
             "rt_f_sign",
             "rt_f_min",
             "rt_f_max",
+            "rt_f_clamp",
             "rt_f_abs",
             "rt_f_sqrt",
             "rt_i_to_f",

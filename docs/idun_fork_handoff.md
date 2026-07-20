@@ -62,6 +62,10 @@ RAM-backed `/tmp`, and executable replacement is atomic.
 - A forced native compile from synchronized source completed on the Pi in
   roughly four minutes with `clang++-20`. The current static
   Alpine/AArch64 cross-build also completes locally.
+- The current static Alpine/AArch64 workspace verifies all 31 commands and 260
+  help topics. The signed repository rebuild installs both `idun_action` and
+  `idun_action_full` in a clean Alpine container and passes its workspace
+  helper smoke test.
 - `actedit` always uses its built-in full-screen editor on a terminal and never
   launches `$EDITOR`. Plain invocation is uncolored for C64-display
   compatibility; explicit `tui` mode adds Action syntax colors. Both have an
@@ -121,13 +125,15 @@ RAM-backed `/tmp`, and executable replacement is atomic.
   invoking the resident evaluator through overlay ABI v5.
 - `REAL` now uses full-domain IEEE-754 binary32 helpers for signed arithmetic,
   gradual underflow, infinities, NaNs, ordered comparison, integer conversion,
-  correctly rounded square root, exact sign/minimum/maximum selection, and exact
+  correctly rounded square root, exact sign/minimum/maximum/clamp selection, and exact
   decimal output. ACTC recognizes `INF`/`INFINITY` and `NAN` and folds every
   operation at binary32 precision. The synchronized `RT_F_MIN.OBJ` and
   `RT_F_MAX.OBJ` helpers preserve MATH1's one-NaN, two-NaN, equal-value, and
   signed-zero selection policy for native direct-link consumers. The
   dependency-free `RT_F_SIGN.OBJ` canonicalizes NaN, preserves signed zero, and
   returns signed one without selecting sibling math helpers.
+  `RT_F_CLAMP.OBJ` validates all three operands and bound order, then selects
+  only comparison, minimum, and maximum through ordinary ALINK closure.
 - MATH1 supplies the completed portable utility, exponential/logarithmic,
   trigonometric, inverse, hyperbolic, and conversion families. GFX1 supplies
   tracked VIC setup, pixels, shapes, bitmap-resource operations, and staged
@@ -157,11 +163,11 @@ RAM-backed `/tmp`, and executable replacement is atomic.
   timing. ACTPROF periodically drains the bounded target buffer throughout a
   long run instead of retaining only its first batch.
 - AddressSanitizer and UndefinedBehaviorSanitizer pass locally.
-- The complete 20-test direct-PRG gate passes on AArch64 VICE 3.9, including
-  five nonduplicate native ActionC64U control-flow programs plus REU and
-  DBF/D64 I/O. Local VICE 3.7.1 passes 19 tests and version-skips only the long
-  REU-plus-disk monitor case; all other KERNAL-output cases wait for emulated
-  BASIC readiness rather than relying on host-speed timing.
+- The prior 20-test direct-PRG gate passes on AArch64 VICE 3.9, including five
+  nonduplicate native ActionC64U control-flow programs plus REU and DBF/D64
+  I/O. The current local gate has 21 cases; VICE 3.7.1 version-skips only the
+  long REU-plus-disk monitor case. All other KERNAL-output cases wait for
+  emulated BASIC readiness rather than relying on host-speed timing.
 - Direct and mutual recursive word, local-array, and REAL frames execute with
   the expected C64 memory results.
 - The exported workspace is itself an Action project and compiles/links
@@ -207,8 +213,8 @@ The 2026-07-20 shared selector refresh adds byte-identical 77-byte
 recognizes their bounded source forms, while Linux ACTC continues to compile
 the general portable MATH1 bodies. Exact 2,304-pair host checks, focused native
 VICE launches, the 32-shape native MATH1 source matrix, and its eight full-range
-helper probes pass. The broad native link inventory is 1,330 shapes and its
-compiled-runtime object/relocation oracle covers 289 cases. The shared manifest
+helper probes pass. The broad native link inventory is 1,331 shapes and its
+compiled-runtime object/relocation oracle covers 290 cases. The shared manifest
 and Idun export/standalone-link tests guard this snapshot. The current Idun
 host suite passes 151 tests, the sanitizer suite passes 136, and the 21-test
 direct-PRG gate passes with only the documented VICE 3.7 DBF/REU skip. Both
@@ -223,6 +229,15 @@ general portable MATH1 source remains unchanged; the synchronized module is
 available to direct OBJ consumers and guarded by the manifest and standalone
 link tests.
 
+The following native `FClamp` slice adds the shared 199-byte
+`RT_F_CLAMP.OBJ`, the exact constrained native assignment/print root, an exact
+three-input oracle, and a focused direct-PRG closure launch. Any NaN or inverted
+bounds produce canonical quiet NaN; valid bounds preserve the selected operand
+through `FMin(FMax(value,lower),upper)`. Idun's general portable MATH1 source
+remains unchanged, while generator, manifest, export, and standalone-link tests
+guard the synchronized module. This hardware-independent refresh has not been
+accepted on an attached cartridge/C64.
+
 For a two-checkout release, run:
 
 ```sh
@@ -231,6 +246,8 @@ make all
 make test-sanitize
 make test-prg
 make verify-aarch64
+make apk-existing
+make apk-verify
 ```
 
 The first command checks every shared module and generator against the native

@@ -1,10 +1,10 @@
 OBJ1
-x rt_jp 0 25
+x rt_jp 0 21
 b u0u1M
 u rt_joy
 u rt_js
-m 85 03 20 00 00 C9 00 F0 09 A4 03 88 A9 01 99 00 00 60 A4 03 88 B9 00 00 60
+m 85 02 20 00 00 A6 02 CA C9 00 F0 05 A9 01 9D 00 00 BD 00 00 60
 r 3 u0
 r 15 u1
-r 22 u1
+r 18 u1
 n rt_jp

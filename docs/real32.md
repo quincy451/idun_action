@@ -26,7 +26,7 @@ The limits that remain are the intrinsic binary32 limits:
 
 Source forms include decimal and exponent literals, `INF`/`INFINITY`, `NAN`,
 `+`, `-`, `*`, `/`, comparisons, `REAL(integer)`, `INT(real)`, `FAbs`,
-`FSqrt`, `FSign`, `FMin`, `FMax`, `PrintR`, and `PrintRE`.
+`FSqrt`, `FSign`, `FMin`, `FMax`, `FClamp`, `PrintR`, and `PrintRE`.
 
 Rules:
 
@@ -41,6 +41,9 @@ Rules:
 - `FSqrt(-0.0)` preserves negative zero
 - `FSign` returns canonical NaN for NaN, preserves either signed zero, and
   returns `-1.0` or `1.0` for every other negative or positive value
+- `FClamp(value,lower,upper)` returns canonical quiet NaN if any argument is
+  NaN or if `lower>upper`; otherwise it returns
+  `FMin(FMax(value,lower),upper)` with selected operand bits preserved
 - ordered comparisons with NaN are false; `NAN<>value` is true, including
   `NAN<>NAN`
 - positive and negative zero compare equal
@@ -68,6 +71,7 @@ ALINK resolves the following standalone helper symbols:
 - `rt_f_sign`
 - `rt_f_min`
 - `rt_f_max`
+- `rt_f_clamp`
 - `rt_f_abs`
 - `rt_f_sqrt`
 - `rt_i_to_f`
@@ -95,6 +99,10 @@ Specific return conventions are:
 - `rt_f_min` and `rt_f_max` write through `$06/$07`, ignore one NaN, select the
   right operand when both inputs are NaN, and preserve the left operand's exact
   bits when ordered values compare equal; both import `rt_f_cmp`
+- `rt_f_clamp` reads value, lower, and upper through `$02/$03`, `$04/$05`, and
+  `$08/$09`, writes through `$06/$07`, and imports comparison, maximum, and
+  minimum. Any NaN or inverted bounds produce canonical quiet NaN; valid
+  bounds preserve the exact selected value, including signed zero
 - `rt_i_to_f` accepts an unsigned 16-bit value in `A` low and `X` high and
   writes through `$02/$03`
 - `rt_s_to_f` accepts a signed 16-bit value in `A` low and `X` high and writes
@@ -138,6 +146,9 @@ source:
   ordinary reachable code
 - `FMin(a,b)` and `FMax(a,b)` import only the selected helper plus its comparison
   closure
+- direct `FClamp(value,lower,upper)` imports `rt_f_clamp` plus its
+  comparison/minimum/maximum closure; portable MATH1 may compile the same
+  semantics into ordinary reachable code
 - `PrintR` and `PrintRE` import `rt_print_f`
 
 Programs that do not use REAL pay no REAL runtime code cost. Trigonometric and
@@ -152,7 +163,7 @@ remains a compatibility entry point and delegates to that generator plus the
 shared 6502 manifest check. The native manifest verifies that all checked-in OBJ1
 modules match their reviewed generator. Headless VICE tests execute raw binary32
 edge vectors and deterministic random vectors for arithmetic, sign,
-minimum/maximum, square root, comparison, conversion, signed zero, subnormal,
+minimum/maximum/clamp, square root, comparison, conversion, signed zero, subnormal,
 infinity, NaN, and ties-to-even behavior. A separate target test compares exact
 printed decimals at both finite extremes and across normal, subnormal,
 signed-zero, and special values.

@@ -123,8 +123,9 @@ Remaining product work:
    routine-address expressions with checked signed addends on either side. It
    also folds bounded `REAL CONST` expressions with exact decimal conversion
    and binary32 round-to-nearest, ties-to-even after every operation.
-   Native named-REAL `FSign`, `FMin`, and `FMax` calls now use synchronized,
-   independently selected target helpers with complete portable call semantics.
+   Native named-REAL `FSign`, `FMin`, and `FMax` calls plus its exact `FClamp`
+   ternary root now use synchronized, independently selected target helpers
+   with complete portable call semantics.
    Linked external symbol expressions inside unchecked
    raw `[...]` bodies, general REAL/function
    behavior, full MATH1/GFX1, resources, and workflow parity remain explicit
