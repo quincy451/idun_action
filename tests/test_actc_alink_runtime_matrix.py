@@ -308,7 +308,7 @@ class TestActcAlinkRuntimeMatrix(unittest.TestCase):
 
         self.assertEqual(
             self._library_call_names(action_root / "lib" / "math1.act"),
-            {"PRINTR", "PRINTRE", "FABS", "FSQRT"},
+            {"PRINTR", "PRINTRE", "FABS", "FSQRT", "FTRUNC"},
         )
         math_shapes = self._makefile_runtime_matrix_shape_groups(self.make_text).get(
             "ACTION_ACTC_ALINK_MATH_RUNTIME_SHAPES",
@@ -319,6 +319,7 @@ class TestActcAlinkRuntimeMatrix(unittest.TestCase):
             "actc_runtime_math1_printr_split_linked",
             "actc_runtime_math1_fabs_split_linked",
             "actc_runtime_math1_fsqrt_split_linked",
+            "actc_runtime_math1_ftrunc_split_linked",
         }:
             self.assertIn(shape, math_shapes)
 

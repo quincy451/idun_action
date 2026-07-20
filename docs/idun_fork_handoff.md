@@ -183,8 +183,9 @@ instruction stepping, and persistent-breakpoint reinstallation are
 implemented. Full IEEE-754, MATH1, GFX1, ASMBLOCK, graphics resources, resource
 editors, formatting, external help, direct-PRG execution, and signed Alpine
   packaging are implemented. Required Idun work remains for reachable-only
-  packaging of full-source libraries: `INCLUDE "MATH1"` currently emits every
-  function body into the selected application object. Attached-hardware
+  packaging of full-source libraries: `FTrunc` is independently selected, but
+  `INCLUDE "MATH1"` currently emits every other implementation body into the
+  selected application object. Attached-hardware
   validation and normal release integration also remain. Cross-product UDOS
   parity is tracked separately in `docs/udos_feature_parity.md`.
 
@@ -197,9 +198,10 @@ workspace management, or DNP packaging.
 The native MATH1 header now exposes all eight constants as zero-code compile-
 time values and keeps each implemented call in an independently selected OBJ1
 module. The shared `math1_constants_include.act` fixture compiles and links in
-both products. Idun's current full-source implementation remains functionally
-correct but is not yet size-selective, so pruning that root object is required
-rather than treating its code growth as an operating-system difference.
+both products. Idun now lowers `FTrunc` to the same shared dependency-free
+object. Its remaining full-source implementation is functionally correct but
+is not yet size-selective, so pruning that root object is required rather than
+treating its code growth as an operating-system difference.
 
 The 2026-07-19 native checkpoints add a bounded two-REAL-parameter function ABI
 and one finite comparison/select body without changing Idun syntax or the
@@ -255,10 +257,20 @@ two-REAL-parameter select. The new permuted shared fixture also compiles, links,
 and executes through Linux ACTC/ALINK without an Idun implementation change.
 The next pass-A slice separates the bounded two-parameter return selector from
 caller argument storage. A reordered shared fixture returns its second parameter
-as 2.0 through both products. Current native inventories are 1,334 broad, 173
-non-runtime source-backed, and 291 compiled-runtime relocation-oracle cases;
+as 2.0 through both products. At that checkpoint native inventories were 1,334
+broad, 173 non-runtime source-backed, and 291 compiled-runtime relocation-oracle cases;
 pass A is 7,418 bytes with 774 bytes free and pass K is 4,594 bytes with 3,598
 bytes free.
+
+The following shared `FTrunc` slice adds a 107-byte dependency-free OBJ1 module
+to both products. Native ACTC handles its bounded named-REAL assignment,
+direct-print, and condition positions. Linux ACTC now parses and constant-folds
+the intrinsic, emits `RT_F_TRUNC` for dynamic values, and no longer emits a
+portable FTrunc function body from MATH1. Exact host and Idun VICE vectors cover
+all binary32 exponent classes and deterministic random inputs. Current native
+inventories are 1,335 broad, 173 non-runtime source-backed, and 292
+compiled-runtime relocation-oracle cases. The other MATH1 implementation bodies
+still require call-graph pruning or dependency-sized object generation.
 
 For a two-checkout release, run:
 

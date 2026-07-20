@@ -3609,6 +3609,7 @@ struct RealExprNode {
         Cast,
         Absolute,
         SquareRoot,
+        Truncate,
     };
 
     Kind kind = Kind::Constant;
@@ -3831,7 +3832,8 @@ private:
             return add_node(std::move(node));
         }
 
-        if (name != "REAL" && name != "FABS" && name != "FSQRT") {
+        if (name != "REAL" && name != "FABS" && name != "FSQRT" &&
+            name != "FTRUNC") {
             RealExprNode node;
             node.kind = RealExprNode::Kind::Call;
             node.name = std::move(name);
@@ -3856,6 +3858,8 @@ private:
             node.kind = RealExprNode::Kind::Absolute;
         } else if (name == "FSQRT") {
             node.kind = RealExprNode::Kind::SquareRoot;
+        } else if (name == "FTRUNC") {
+            node.kind = RealExprNode::Kind::Truncate;
         }
         node.left = argument;
         return add_node(std::move(node));
@@ -3900,6 +3904,9 @@ std::optional<double> evaluate_real_expr_node(
     }
     if (node.kind == RealExprNode::Kind::SquareRoot) {
         return static_cast<double>(std::sqrt(static_cast<float>(*lhs)));
+    }
+    if (node.kind == RealExprNode::Kind::Truncate) {
+        return static_cast<double>(std::trunc(static_cast<float>(*lhs)));
     }
     auto rhs = evaluate_real_expr_node(expr, node.right, constants);
     if (!rhs) {
@@ -8123,6 +8130,7 @@ int cmd_actc(const std::vector<std::string>& args) {
             if (upper.find("REAL(") != std::string::npos ||
                 upper.find("FABS(") != std::string::npos ||
                 upper.find("FSQRT(") != std::string::npos ||
+                upper.find("FTRUNC(") != std::string::npos ||
                 upper.find('.') != std::string::npos) {
                 return true;
             }
@@ -9331,11 +9339,17 @@ int cmd_actc(const std::vector<std::string>& args) {
                 return destination;
             }
             if (node.kind == RealExprNode::Kind::Absolute ||
-                node.kind == RealExprNode::Kind::SquareRoot) {
+                node.kind == RealExprNode::Kind::SquareRoot ||
+                node.kind == RealExprNode::Kind::Truncate) {
                 emit_set_real_pointer(lhs, 0x02);
                 emit_set_real_pointer(destination, 0x06);
-                emit_jsr_import(
-                    node.kind == RealExprNode::Kind::Absolute ? "RT_F_ABS" : "RT_F_SQRT");
+                const char* helper = "RT_F_TRUNC";
+                if (node.kind == RealExprNode::Kind::Absolute) {
+                    helper = "RT_F_ABS";
+                } else if (node.kind == RealExprNode::Kind::SquareRoot) {
+                    helper = "RT_F_SQRT";
+                }
+                emit_jsr_import(helper);
                 return destination;
             }
 

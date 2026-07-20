@@ -106,17 +106,19 @@ generic ALINK closure, and live VICE. Its bounded caller and callee storage
 roles now follow captured names, and both canonical and permuted shared fixtures
 compile, link, and execute in this fork. Native pass A also returns either named
 parameter in its bounded two-REAL-parameter identity form; a shared reordered
-second-return fixture writes 2.0 through both products. Native ACTC now lowers `FSign`, `FMin`,
-and `FMax` for named REAL operands and a bounded, storage-capturing `FClamp`
+second-return fixture writes 2.0 through both products. Native ACTC now lowers
+`FSign`, `FTrunc`, `FMin`, and `FMax` for named REAL operands and a bounded,
+storage-capturing `FClamp`
 ternary root through synchronized, independently selected target modules with
 complete MATH1
 NaN/signed-zero/bound-order semantics. General native REAL expressions/functions, the rest of
 MATH1, GFX1, resources, formatting, and help remain listed there explicitly.
 The native MATH1 include now supplies all eight constants without target code.
-Idun still compiles every body from its full-source MATH1 include into the root
-object, so call-graph pruning or dependency-sized generated modules remains a
-required reachable-only packaging task rather than an operating-system
-difference.
+Idun now lowers `FTrunc` to the same independently selected target object, but
+still compiles all remaining implementation bodies from its full-source MATH1
+include into the root object. Call-graph pruning or dependency-sized generated
+modules therefore remains a required reachable-only packaging task rather than
+an operating-system difference.
 
 Build them with:
 
@@ -256,7 +258,8 @@ optional runtime expansion and physical validation:
 
 - prune unreachable routines from full-source library includes, or generate
   dependency-sized library objects, so `INCLUDE "MATH1"` does not embed all
-  unused function bodies in the application object
+  remaining unused function bodies in the application object; `FTrunc` is the
+  first body moved to an independently selected shared OBJ
 - add new REAL library functions only when a separate post-MATH1 API is specified
 - extend the direct REU surface beyond 16-bit-sized arrays and 8/16-bit
   peek/poke

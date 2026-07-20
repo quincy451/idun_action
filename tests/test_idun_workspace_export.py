@@ -162,12 +162,19 @@ class TestIdunWorkspaceExport(unittest.TestCase):
                 "RT_F_SIGN.OBJ",
                 "RT_F_SQRT.OBJ",
                 "RT_F_SUB.OBJ",
+                "RT_F_TRUNC.OBJ",
                 "RT_F_TO_I.OBJ",
                 "RT_I_TO_F.OBJ",
                 "RT_PRINT_F.OBJ",
                 "RT_S_TO_F.OBJ",
             ):
                 self.assertTrue((out / "LIB" / name).is_file())
+            trunc_object = (out / "LIB" / "RT_F_TRUNC.OBJ").read_text(
+                encoding="ascii"
+            )
+            self.assertIn("x rt_f_trunc 0 107", trunc_object)
+            self.assertIn("b M", trunc_object)
+            self.assertIn("n rt_f_trunc", trunc_object)
             self.assertFalse(any((out / "LIB").glob("*.MOD")))
             self.assertTrue((out / "LIB" / "DBF1.ACT").is_file())
             self.assertTrue((out / "LIB" / "MATH1.ACT").is_file())

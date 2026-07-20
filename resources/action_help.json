@@ -441,7 +441,7 @@
     {
       "name": "MATH1",
       "details": "MATH1 combines the full-domain IEEE-754 binary32 core with portable Action implementations of rounding, exponential, logarithmic, circular trigonometric, reciprocal trigonometric, hyperbolic, and angle-conversion functions. Angles are radians unless the function name says otherwise.",
-      "target_notes": "Core arithmetic, FAbs, and FSqrt use link-selected 6502 runtime modules. Higher functions use binary32 polynomial/range-reduction code from MATH1.ACT and therefore have binary32 approximation error, especially for very large trigonometric arguments.",
+      "target_notes": "Core arithmetic, FAbs, FSqrt, and FTrunc use link-selected 6502 runtime modules. Higher functions use binary32 polynomial/range-reduction code from MATH1.ACT and therefore have binary32 approximation error, especially for very large trigonometric arguments.",
       "topics": [
         {"token": "MATH_PI", "kind": "constant", "signature": "REAL CONST MATH_PI", "summary": "The binary32 approximation of pi.", "example": "circumference=2.0*MATH_PI*radius"},
         {"token": "MATH_TWO_PI", "kind": "constant", "signature": "REAL CONST MATH_TWO_PI", "summary": "The binary32 approximation of two pi.", "example": "phase=FMod(phase,MATH_TWO_PI)"},
@@ -459,7 +459,7 @@
         {"token": "FMin", "signature": "REAL FUNC FMin(REAL left,right)", "summary": "Returns the smaller numeric operand, ignoring one NAN operand.", "example": "nearest=FMin(a,b)"},
         {"token": "FMax", "signature": "REAL FUNC FMax(REAL left,right)", "summary": "Returns the larger numeric operand, ignoring one NAN operand.", "example": "furthest=FMax(a,b)"},
         {"token": "FClamp", "signature": "REAL FUNC FClamp(REAL value,lower,upper)", "summary": "Constrains a value to an inclusive REAL interval.", "example": "speed=FClamp(speed,0.0,10.0)"},
-        {"token": "FTrunc", "signature": "REAL FUNC FTrunc(REAL value)", "summary": "Removes the fractional part toward zero and returns a REAL.", "example": "whole=FTrunc(position)"},
+        {"token": "FTrunc", "signature": "REAL FUNC FTrunc(REAL value)", "summary": "Removes the fractional part toward zero and returns a REAL.", "details": "The link-selected helper preserves signed zero, infinities, NaN payloads, and values that are already integral.", "example": "whole=FTrunc(position)"},
         {"token": "FFloor", "signature": "REAL FUNC FFloor(REAL value)", "summary": "Rounds downward to an integral REAL value.", "example": "cell=FFloor(position/8.0)"},
         {"token": "FCeil", "signature": "REAL FUNC FCeil(REAL value)", "summary": "Rounds upward to an integral REAL value.", "example": "pages=FCeil(bytes/256.0)"},
         {"token": "FRound", "signature": "REAL FUNC FRound(REAL value)", "summary": "Rounds to the nearest integral REAL with halfway cases away from zero.", "example": "pixel=FRound(position)"},

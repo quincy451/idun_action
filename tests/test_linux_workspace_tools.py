@@ -182,6 +182,8 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 "FATANH",
             ):
                 self.assertRegex(math_object, rf"(?m)^x {symbol} \d+ \d+$")
+            self.assertNotRegex(math_object, r"(?m)^x FTRUNC \d+ \d+$")
+            self.assertIn("\nu RT_F_TRUNC\n", math_object)
             self.run_tool(math_project, "alink", "main")
 
             self.run_tool(root, "actnew", "gfxdemo")
@@ -1334,6 +1336,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 "rt_f_sign.obj",
                 "rt_f_sqrt.obj",
                 "rt_f_sub.obj",
+                "rt_f_trunc.obj",
                 "rt_f_to_i.obj",
                 "rt_i_to_f.obj",
                 "rt_print_f.obj",
@@ -1358,7 +1361,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                     [
                         "PROC MAIN()",
                         "CARD n",
-                        "REAL a=[1.5],b=[2.0],sum,difference,product,quotient,root,absolute,fromint",
+                        "REAL a=[1.5],b=[2.0],sum,difference,product,quotient,root,absolute,truncated,fromint",
                         "n = 3",
                         "sum = a + b",
                         "difference = a - b",
@@ -1366,6 +1369,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                         "quotient = a / b",
                         "root = FSqrt(b)",
                         "absolute = FAbs(difference)",
+                        "truncated = FTrunc(difference)",
                         "fromint = REAL(n)",
                         "IF sum > a THEN",
                         "PrintRE(sum)",
@@ -1387,6 +1391,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 "RT_F_DIV",
                 "RT_F_SQRT",
                 "RT_F_ABS",
+                "RT_F_TRUNC",
                 "RT_I_TO_F",
                 "RT_F_CMP",
                 "RT_PRINT_F",
@@ -1405,6 +1410,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 "RT_F_DIV",
                 "RT_F_SQRT",
                 "RT_F_ABS",
+                "RT_F_TRUNC",
                 "RT_I_TO_F",
                 "RT_F_CMP",
                 "RT_PRINT_F",
@@ -1435,6 +1441,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                         "REAL invalid=[0.0 / 0.0]",
                         "REAL literalinf=[INF]",
                         "REAL literalnan=[NAN]",
+                        "REAL truncated=[FTrunc(-1.75)]",
                         "IF 1.0 < 2.0 THEN",
                         "PrintRE(x)",
                         "FI",
@@ -1452,7 +1459,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
             self.run_tool(project, "actc", "main")
             obj_text = (project / "OBJ" / "MAIN.OBJ").read_text(encoding="ascii")
             self.assertIn("\nu RT_PRINT_F\n", obj_text)
-            for symbol in ("RT_F_ADD", "RT_F_MUL", "RT_F_CMP"):
+            for symbol in ("RT_F_ADD", "RT_F_MUL", "RT_F_CMP", "RT_F_TRUNC"):
                 self.assertNotIn(f"\nu {symbol}\n", obj_text)
             lines = obj_text.splitlines()
             image = bytes.fromhex(
@@ -1470,6 +1477,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 "MAIN_INVALID_B0": bytes.fromhex("0000C07F"),
                 "MAIN_LITERALINF_B0": bytes.fromhex("0000807F"),
                 "MAIN_LITERALNAN_B0": bytes.fromhex("0000C07F"),
+                "MAIN_TRUNCATED_B0": bytes.fromhex("000080BF"),
             }
             for symbol, value in expected.items():
                 offset = exports[symbol]
@@ -1840,6 +1848,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
             "rt_f_sign.obj",
             "rt_f_sqrt.obj",
             "rt_f_sub.obj",
+            "rt_f_trunc.obj",
             "rt_f_to_i.obj",
             "rt_i_to_f.obj",
             "rt_print_f.obj",
@@ -2153,6 +2162,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
             "rt_f_sign.obj",
             "rt_f_sqrt.obj",
             "rt_f_sub.obj",
+            "rt_f_trunc.obj",
             "rt_f_to_i.obj",
             "rt_i_to_f.obj",
             "rt_print_f.obj",
@@ -2923,7 +2933,14 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
 
             self.run_tool(project, "actc", "main")
             obj_text = (project / "OBJ" / "MAIN.OBJ").read_text(encoding="ascii")
-            for declaration in ("JOY", "VICBANK", "DBFCREATE", "FABS", "SIDFREQ"):
+            for declaration in (
+                "JOY",
+                "VICBANK",
+                "DBFCREATE",
+                "FABS",
+                "FTRUNC",
+                "SIDFREQ",
+            ):
                 self.assertNotIn(f"\nx {declaration} ", obj_text)
             self.run_tool(project, "alink", "main")
 

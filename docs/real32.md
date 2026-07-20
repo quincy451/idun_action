@@ -26,7 +26,7 @@ The limits that remain are the intrinsic binary32 limits:
 
 Source forms include decimal and exponent literals, `INF`/`INFINITY`, `NAN`,
 `+`, `-`, `*`, `/`, comparisons, `REAL(integer)`, `INT(real)`, `FAbs`,
-`FSqrt`, `FSign`, `FMin`, `FMax`, `FClamp`, `PrintR`, and `PrintRE`.
+`FSqrt`, `FSign`, `FTrunc`, `FMin`, `FMax`, `FClamp`, `PrintR`, and `PrintRE`.
 
 Rules:
 
@@ -41,6 +41,8 @@ Rules:
 - `FSqrt(-0.0)` preserves negative zero
 - `FSign` returns canonical NaN for NaN, preserves either signed zero, and
   returns `-1.0` or `1.0` for every other negative or positive value
+- `FTrunc` truncates finite values toward zero, preserves signed zero,
+  infinities, NaN payloads, and values that are already integral
 - `FClamp(value,lower,upper)` returns canonical quiet NaN if any argument is
   NaN or if `lower>upper`; otherwise it returns
   `FMin(FMax(value,lower),upper)` with selected operand bits preserved
@@ -69,6 +71,7 @@ ALINK resolves the following standalone helper symbols:
 - `rt_f_div`
 - `rt_f_cmp`
 - `rt_f_sign`
+- `rt_f_trunc`
 - `rt_f_min`
 - `rt_f_max`
 - `rt_f_clamp`
@@ -96,6 +99,9 @@ Specific return conventions are:
 - `rt_f_sign` writes canonical quiet NaN for NaN input, copies signed zero
   exactly, and writes signed one for every other finite or infinite input; it
   has no imported helper dependency
+- `rt_f_trunc` clears only fractional significand bits, preserves NaN payloads,
+  infinities, signed zero, and integral values, and has no imported helper
+  dependency
 - `rt_f_min` and `rt_f_max` write through `$06/$07`, ignore one NaN, select the
   right operand when both inputs are NaN, and preserve the left operand's exact
   bits when ordered values compare equal; both import `rt_f_cmp`
@@ -141,9 +147,9 @@ source:
 - comparisons import `rt_f_cmp`
 - `REAL(x)` imports the matching signed or unsigned integer bridge
 - `INT(r)` imports `rt_f_to_i`
-- `FAbs(r)`, `FSqrt(r)`, and direct `FSign(r)` runtime imports use only their
-  respective unary helpers; the portable MATH1 body may instead compile into
-  ordinary reachable code
+- `FAbs(r)`, `FSqrt(r)`, direct `FSign(r)`, and `FTrunc(r)` runtime imports use
+  only their respective unary helpers; portable MATH1 bodies may instead
+  compile into ordinary reachable code where they remain source-defined
 - `FMin(a,b)` and `FMax(a,b)` import only the selected helper plus its comparison
   closure
 - direct `FClamp(value,lower,upper)` imports `rt_f_clamp` plus its
@@ -160,9 +166,9 @@ remain separate from the implemented binary32 core operations.
 `tools/generate_math_runtime.py --check --output src/runtime/modules` verifies
 the generated compact OBJ1 core. `tools/generate_real_runtime.py --check`
 remains a compatibility entry point and delegates to that generator plus the
-shared 6502 manifest check. The native manifest verifies that all checked-in OBJ1
+shared 6502 manifest check. The shared manifest verifies that all checked-in OBJ1
 modules match their reviewed generator. Headless VICE tests execute raw binary32
-edge vectors and deterministic random vectors for arithmetic, sign,
+edge vectors and deterministic random vectors for arithmetic, sign, truncation,
 minimum/maximum/clamp, square root, comparison, conversion, signed zero, subnormal,
 infinity, NaN, and ties-to-even behavior. A separate target test compares exact
 printed decimals at both finite extremes and across normal, subnormal,

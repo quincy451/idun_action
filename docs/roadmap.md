@@ -1069,7 +1069,24 @@ Retired roadmap items for CP/M-era runner flows are no longer maintained.
 - The complete native suite passes 799 tests, including 210 overlay tests; the
   Idun active host suite passes 152 tests and its ASan/UBSan suite passes 137
   tests with the new shared fixture.
-- The review also measured an Idun packaging gap: its full-source MATH1 include
-  currently emits every function body into the selected root object. This is
-  not an Alpine-versus-UDOS requirement. Call-graph pruning or dependency-sized
-  generated modules must restore referenced-only closure before full parity.
+- The review also measured an Idun packaging gap: at that checkpoint its
+  full-source MATH1 include emitted every function body into the selected root
+  object. This is not an Alpine-versus-UDOS requirement. The later FTrunc slice
+  removes one body; call-graph pruning or dependency-sized generated modules
+  must restore referenced-only closure for the remainder before full parity.
+
+## 2026-07-20 Shared MATH1 Truncation
+
+- Added the generated 107-byte `RT_F_TRUNC.OBJ` to the shared 6502 manifest.
+  It has no helper imports and truncates finite binary32 values toward zero
+  while preserving NaN payloads, infinities, signed zero, and integral values.
+- Native ACTC recognizes bounded assignment, direct-print, and condition forms.
+  The focused direct PRG selects only conversion, truncation, and printing and
+  raises the native inventories to 1,335 broad and 292 compiled-runtime cases.
+- Linux ACTC now parses, constant-folds, and emits dynamic `FTrunc` expressions
+  through the same helper. `lib/math1.act` declares the intrinsic instead of
+  embedding its former portable function body.
+- This is one dependency-sized packaging conversion, not completion of MATH1
+  pruning. Idun still emits all remaining implementation bodies from a MATH1
+  include, and native UDOS still lacks 34 public MATH1 routines plus general
+  REAL source lowering.

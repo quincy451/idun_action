@@ -9,9 +9,10 @@ Implementation status: complete in the Idun/Alpine fork. The source has 8
 public constants, 43 public routines, and 1 private helper. The resulting 51
 public help features are compiled and linked by the Linux ACTC/ALINK path and
 have generated-PRG VICE coverage. The native UDOS compiler currently exposes
-FAbs, FSqrt, FSign, FMin, FMax, FClamp, PrintR, and PrintRE. Its selected
-FSign/FMin/FMax/FClamp semantics match this source, while general REAL source
-lowering and the remaining 35 public routines are tracked in
+FAbs, FSqrt, FSign, FTrunc, FMin, FMax, FClamp, PrintR, and PrintRE. Both
+compilers lower FTrunc to the shared dependency-free RT_F_TRUNC.OBJ; the native
+selected FSign/FMin/FMax/FClamp semantics also match this source. General
+native REAL source lowering and the remaining 34 public routines are tracked in
 docs/udos_feature_parity.md.
 The native `INCLUDE "MATH1"` header now also exposes all 8 constants without
 allocating target storage or selecting a runtime object.
@@ -106,6 +107,8 @@ IEEE and domain behavior
 - FACosh requires a value at least 1.
 - FATanh accepts -1 through 1; endpoints return signed infinity.
 - FPow accepts a negative base only when the exponent is an exact integer.
+- FTrunc preserves NaN payloads, infinities, signed zero, and integral values;
+  finite nonintegers truncate toward zero.
 - Division-based functions naturally return infinity or NaN at poles according
   to the binary32 runtime.
 - Core IEEE arithmetic is correctly rounded.  Transcendental results use
@@ -115,10 +118,11 @@ IEEE and domain behavior
 Porting checklist for the native C64U tree
 -----------------------------------------
 
-1. Port lib/math1.act as source, retaining the public signatures above.
+1. Keep the public signatures above synchronized; FTrunc is now a declaration
+   backed by the shared link-selected runtime object in both products.
 2. Supply the same link-selected binary32 primitives for PrintR, PrintRE,
-   FAbs, FSqrt, add, subtract, multiply, divide, compare, INT conversion, and
-   REAL conversion.
+   FAbs, FSqrt, FTrunc, add, subtract, multiply, divide, compare, INT
+   conversion, and REAL conversion.
 3. Keep _MathWrapPi private; help/catalog builders intentionally ignore names
    beginning with an underscore.
 4. Add the constants and all public signatures to ACTEDIT/ACTHELP library help.
