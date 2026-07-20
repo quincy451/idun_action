@@ -181,7 +181,7 @@ class TestIdunPrgRuntime(unittest.TestCase):
             finally:
                 vice_context.stop()
 
-    def test_native_finite_real_min_parity_fixture_executes(self) -> None:
+    def _assert_finite_real_min_fixture_executes(self, fixture_name: str) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             workspace = Path(tmp)
             shared_lib = workspace / "LIB"
@@ -203,7 +203,7 @@ class TestIdunPrgRuntime(unittest.TestCase):
             self.assertEqual(create.returncode, 0, msg=create.stdout + create.stderr)
             project = workspace / "DEMO"
             shutil.copy2(
-                ROOT / "tests" / "parity" / "finite_real_min.act",
+                ROOT / "tests" / "parity" / fixture_name,
                 project / "SRC" / "MAIN.ACT",
             )
             self.run_tool(project, "actc", "main")
@@ -244,6 +244,14 @@ class TestIdunPrgRuntime(unittest.TestCase):
                 self.assertEqual(actual, expected, "finite MIN2 returned the wrong value")
             finally:
                 vice_context.stop()
+
+    def test_native_finite_real_min_parity_fixture_executes(self) -> None:
+        for fixture_name in (
+            "finite_real_min.act",
+            "finite_real_min_permuted.act",
+        ):
+            with self.subTest(fixture=fixture_name):
+                self._assert_finite_real_min_fixture_executes(fixture_name)
 
     def test_math1_transcendental_functions_execute_on_6502(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

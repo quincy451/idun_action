@@ -1084,13 +1084,13 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
             for function in ("SQUARE", "LIMIT", "NEGATE", "TWICE"):
                 self.assertIn(function, debug)
 
-    def test_native_finite_real_min_parity_fixture_compiles_and_links(self) -> None:
+    def _compile_and_link_finite_real_min_fixture(self, fixture_name: str) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             self.run_tool(root, "actnew", "demo")
             project = root / "DEMO"
             (project / "SRC" / "MAIN.ACT").write_bytes(
-                (self.root / "tests" / "parity" / "finite_real_min.act").read_bytes()
+                (self.root / "tests" / "parity" / fixture_name).read_bytes()
             )
 
             self.run_tool(project, "actc", "main")
@@ -1104,6 +1104,14 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 (project / "BIN" / "MAIN.PRG").read_bytes()[:2],
                 bytes([0x00, 0x10]),
             )
+
+    def test_native_finite_real_min_parity_fixture_compiles_and_links(self) -> None:
+        for fixture_name in (
+            "finite_real_min.act",
+            "finite_real_min_permuted.act",
+        ):
+            with self.subTest(fixture=fixture_name):
+                self._compile_and_link_finite_real_min_fixture(fixture_name)
 
     def test_actc_reentrant_routine_frames_compile_and_link(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -1018,9 +1018,25 @@ Retired roadmap items for CP/M-era runner flows are no longer maintained.
 - Exact object checks and a source-backed direct VICE launch initialize slots
   1/3/2, clamp slots 3/2/1 into slot 0, print slot 0, and produce 5.0 while
   preserving generic reachable-only ALINK closure.
-- Current native inventories are 1,332 broad direct-PRG shapes, 171 non-runtime
+- At that checkpoint native inventories were 1,332 broad direct-PRG shapes, 171 non-runtime
   source-backed object-emission shapes, and 291 compiled-runtime relocation
   oracle cases. Native pass K is 4,359 bytes with 3,833 bytes free.
 - Idun requires no implementation change because Linux ACTC already supports
   general portable `FClamp` calls. Shared runtime modules are unchanged; the
   next parity dependency remains general native REAL lowering.
+
+## 2026-07-20 Native Finite REAL Function Storage Mapping
+
+- Native pass K now captures the bounded finite function's initializer, call,
+  result, reverse stack-bind, comparison, and return storage roles instead of
+  assuming fixed module and parameter slots.
+- Added `finite_real_min_permuted.act` to both parity trees. Linux ACTC/ALINK
+  compiles and links both fixtures, and the Idun VICE subtest confirms each
+  writes binary32 1.0 to `RESULT`; no compiler or runtime change was required.
+- Native exact OBJ and live UDOS/VICE checks cover all five reordered REAL
+  cells. Current native inventories are 1,333 broad direct-PRG shapes, 172
+  non-runtime source-backed shapes, and 291 compiled-runtime relocation-oracle
+  cases. Pass K is 4,594 bytes with 3,598 bytes free.
+- The bounded source skeleton remains intentional. General native REAL
+  expressions, locals, arbitrary calls/returns, recursive frames, and portable
+  MATH1 module compilation are still the next cross-product dependency.

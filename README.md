@@ -102,13 +102,13 @@ relocations. Native `REAL CONST` now folds decimal/radix literals, dependent
 constants, arithmetic, `REAL`, `FABS`, `FSQRT`, infinity, and NaN with binary32
 nearest-even semantics and no target arithmetic imports. Native pass K also
 proves one finite two-REAL-parameter comparison/select function through OBJ1,
-generic ALINK closure, and live VICE. Native ACTC now lowers `FSign`, `FMin`,
+generic ALINK closure, and live VICE. Its bounded caller and callee storage
+roles now follow captured names, and both canonical and permuted shared fixtures
+compile, link, and execute in this fork. Native ACTC now lowers `FSign`, `FMin`,
 and `FMax` for named REAL operands and a bounded, storage-capturing `FClamp`
 ternary root through synchronized, independently selected target modules with
 complete MATH1
-NaN/signed-zero/bound-order semantics. The finite
-function source remains a shared fixture and also compiles, links, and executes
-with Linux ACTC/ALINK. General native REAL expressions/functions, the rest of
+NaN/signed-zero/bound-order semantics. General native REAL expressions/functions, the rest of
 MATH1, GFX1, resources, formatting, and help remain listed there explicitly.
 
 Build them with:

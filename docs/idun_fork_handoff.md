@@ -240,9 +240,13 @@ accepted on an attached cartridge/C64. The follow-up native-only compiler
 widening captures all initializer, argument, destination, and print storage
 roles in that fixed root. Its permuted source-backed PRG prints 5.0 through
 generic ALINK closure. No Idun compiler or target-runtime change is required;
-Linux ACTC already compiles the general portable call. Current native
-inventories are 1,332 broad, 171 non-runtime source-backed, and 291
-compiled-runtime relocation-oracle cases.
+Linux ACTC already compiles the general portable call. The next native-only
+widening captures every caller and callee storage role in the bounded finite
+two-REAL-parameter select. The new permuted shared fixture also compiles, links,
+and executes through Linux ACTC/ALINK without an Idun implementation change.
+Current native inventories are 1,333 broad, 172 non-runtime source-backed, and
+291 compiled-runtime relocation-oracle cases; pass K is 4,594 bytes with 3,598
+bytes free.
 
 For a two-checkout release, run:
 

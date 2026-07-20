@@ -128,6 +128,9 @@ Remaining product work:
    selected target helpers with complete portable call semantics. The root can
    permute initializer, argument, destination, and print slots but remains a
    fixed statement skeleton rather than general REAL lowering.
+   Pass K's bounded finite two-parameter function also captures module,
+   parameter-bind, comparison, and return storage roles. Canonical and permuted
+   fixtures execute identically with native and Linux ACTC/ALINK.
    Linked external symbol expressions inside unchecked
    raw `[...]` bodies, general REAL/function
    behavior, full MATH1/GFX1, resources, and workflow parity remain explicit
