@@ -278,10 +278,21 @@ intrinsic, and MATH1 no longer emits its portable floor body. Native ACTC owns
 bounded assignment, direct-print, and REAL-condition forms. Exact host checks,
 116 Idun VICE vectors, and a focused native direct-PRG launch prove binary32
 semantics, aliased-pointer safety, transitive dependency closure, and sibling
-pruning. Current native inventories are 1,336 broad, 173 non-runtime
+pruning. At that checkpoint native inventories were 1,336 broad, 173 non-runtime
 source-backed, and 293 compiled-runtime relocation-oracle cases. The native
-MATH1 gap is 33 public routines; remaining Idun source bodies still need
+MATH1 gap was 33 public routines; remaining Idun source bodies still need
 reachable-only packaging.
+
+The next shared `FCeil` slice adds a 42-byte OBJ1 module that imports
+`RT_F_FLOOR.OBJ` and transitively `RT_F_TRUNC.OBJ`. Linux ACTC parses,
+constant-folds, and emits the intrinsic, and MATH1 no longer emits its portable
+ceiling body. Native ACTC owns bounded assignment, direct-print, and
+REAL-condition forms. Exact host checks, 116 Idun VICE vectors, and a focused
+native direct-PRG launch prove binary32 semantics, aliased-pointer safety,
+`ceil -> floor -> trunc` closure, and sibling pruning. Current native
+inventories are 1,337 broad, 173 non-runtime source-backed, and 294
+compiled-runtime relocation-oracle cases. Native pass 6 is 8,062 bytes with
+130 bytes free; the native MATH1 gap is 32 public routines.
 
 For a two-checkout release, run:
 

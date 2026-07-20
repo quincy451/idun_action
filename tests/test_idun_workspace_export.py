@@ -157,6 +157,7 @@ class TestIdunWorkspaceExport(unittest.TestCase):
                 "RT_F_CLAMP.OBJ",
                 "RT_F_DIV.OBJ",
                 "RT_F_FLOOR.OBJ",
+                "RT_F_CEIL.OBJ",
                 "RT_F_MAX.OBJ",
                 "RT_F_MIN.OBJ",
                 "RT_F_MUL.OBJ",
@@ -182,6 +183,12 @@ class TestIdunWorkspaceExport(unittest.TestCase):
             self.assertIn("x rt_f_floor 0 135", floor_object)
             self.assertIn("u rt_f_trunc", floor_object)
             self.assertIn("n rt_f_floor", floor_object)
+            ceil_object = (out / "LIB" / "RT_F_CEIL.OBJ").read_text(
+                encoding="ascii"
+            )
+            self.assertIn("x rt_f_ceil 0 42", ceil_object)
+            self.assertIn("u rt_f_floor", ceil_object)
+            self.assertIn("n rt_f_ceil", ceil_object)
             self.assertFalse(any((out / "LIB").glob("*.MOD")))
             self.assertTrue((out / "LIB" / "DBF1.ACT").is_file())
             self.assertTrue((out / "LIB" / "MATH1.ACT").is_file())

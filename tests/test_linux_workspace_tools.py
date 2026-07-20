@@ -184,8 +184,10 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 self.assertRegex(math_object, rf"(?m)^x {symbol} \d+ \d+$")
             self.assertNotRegex(math_object, r"(?m)^x FTRUNC \d+ \d+$")
             self.assertNotRegex(math_object, r"(?m)^x FFLOOR \d+ \d+$")
+            self.assertNotRegex(math_object, r"(?m)^x FCEIL \d+ \d+$")
             self.assertIn("\nu RT_F_TRUNC\n", math_object)
             self.assertIn("\nu RT_F_FLOOR\n", math_object)
+            self.assertIn("\nu RT_F_CEIL\n", math_object)
             self.run_tool(math_project, "alink", "main")
 
             self.run_tool(root, "actnew", "gfxdemo")
@@ -1335,6 +1337,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 "rt_f_cmp.obj",
                 "rt_f_div.obj",
                 "rt_f_floor.obj",
+                "rt_f_ceil.obj",
                 "rt_f_mul.obj",
                 "rt_f_sign.obj",
                 "rt_f_sqrt.obj",
@@ -1364,7 +1367,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                     [
                         "PROC MAIN()",
                         "CARD n",
-                        "REAL a=[1.5],b=[2.0],sum,difference,product,quotient,root,absolute,truncated,floored,fromint",
+                        "REAL a=[1.5],b=[2.0],sum,difference,product,quotient,root,absolute,truncated,floored,ceiled,fromint",
                         "n = 3",
                         "sum = a + b",
                         "difference = a - b",
@@ -1374,6 +1377,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                         "absolute = FAbs(difference)",
                         "truncated = FTrunc(difference)",
                         "floored = FFloor(difference)",
+                        "ceiled = FCeil(difference)",
                         "fromint = REAL(n)",
                         "IF sum > a THEN",
                         "PrintRE(sum)",
@@ -1397,6 +1401,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 "RT_F_ABS",
                 "RT_F_TRUNC",
                 "RT_F_FLOOR",
+                "RT_F_CEIL",
                 "RT_I_TO_F",
                 "RT_F_CMP",
                 "RT_PRINT_F",
@@ -1417,6 +1422,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 "RT_F_ABS",
                 "RT_F_TRUNC",
                 "RT_F_FLOOR",
+                "RT_F_CEIL",
                 "RT_I_TO_F",
                 "RT_F_CMP",
                 "RT_PRINT_F",
@@ -1449,6 +1455,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                         "REAL literalnan=[NAN]",
                         "REAL truncated=[FTrunc(-1.75)]",
                         "REAL floored=[FFloor(-1.25)]",
+                        "REAL ceiled=[FCeil(1.25)]",
                         "IF 1.0 < 2.0 THEN",
                         "PrintRE(x)",
                         "FI",
@@ -1466,7 +1473,14 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
             self.run_tool(project, "actc", "main")
             obj_text = (project / "OBJ" / "MAIN.OBJ").read_text(encoding="ascii")
             self.assertIn("\nu RT_PRINT_F\n", obj_text)
-            for symbol in ("RT_F_ADD", "RT_F_MUL", "RT_F_CMP", "RT_F_TRUNC", "RT_F_FLOOR"):
+            for symbol in (
+                "RT_F_ADD",
+                "RT_F_MUL",
+                "RT_F_CMP",
+                "RT_F_TRUNC",
+                "RT_F_FLOOR",
+                "RT_F_CEIL",
+            ):
                 self.assertNotIn(f"\nu {symbol}\n", obj_text)
             lines = obj_text.splitlines()
             image = bytes.fromhex(
@@ -1486,6 +1500,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 "MAIN_LITERALNAN_B0": bytes.fromhex("0000C07F"),
                 "MAIN_TRUNCATED_B0": bytes.fromhex("000080BF"),
                 "MAIN_FLOORED_B0": bytes.fromhex("000000C0"),
+                "MAIN_CEILED_B0": bytes.fromhex("00000040"),
             }
             for symbol, value in expected.items():
                 offset = exports[symbol]
@@ -2947,6 +2962,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 "DBFCREATE",
                 "FABS",
                 "FTRUNC",
+                "FCEIL",
                 "SIDFREQ",
             ):
                 self.assertNotIn(f"\nx {declaration} ", obj_text)
