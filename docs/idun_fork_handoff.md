@@ -244,8 +244,11 @@ Linux ACTC already compiles the general portable call. The next native-only
 widening captures every caller and callee storage role in the bounded finite
 two-REAL-parameter select. The new permuted shared fixture also compiles, links,
 and executes through Linux ACTC/ALINK without an Idun implementation change.
-Current native inventories are 1,333 broad, 172 non-runtime source-backed, and
-291 compiled-runtime relocation-oracle cases; pass K is 4,594 bytes with 3,598
+The next pass-A slice separates the bounded two-parameter return selector from
+caller argument storage. A reordered shared fixture returns its second parameter
+as 2.0 through both products. Current native inventories are 1,334 broad, 173
+non-runtime source-backed, and 291 compiled-runtime relocation-oracle cases;
+pass A is 7,418 bytes with 774 bytes free and pass K is 4,594 bytes with 3,598
 bytes free.
 
 For a two-checkout release, run:

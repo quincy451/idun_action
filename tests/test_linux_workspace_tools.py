@@ -1084,7 +1084,12 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
             for function in ("SQUARE", "LIMIT", "NEGATE", "TWICE"):
                 self.assertIn(function, debug)
 
-    def _compile_and_link_finite_real_min_fixture(self, fixture_name: str) -> None:
+    def _compile_and_link_real_function_fixture(
+        self,
+        fixture_name: str,
+        export_name: str,
+        expected_import: str | None,
+    ) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             self.run_tool(root, "actnew", "demo")
@@ -1095,8 +1100,11 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
 
             self.run_tool(project, "actc", "main")
             obj_text = (project / "OBJ" / "MAIN.OBJ").read_text(encoding="ascii")
-            self.assertRegex(obj_text, r"(?m)^x MIN2 \d+ \d+$")
-            self.assertIn("\nu RT_F_CMP\n", obj_text)
+            self.assertRegex(obj_text, rf"(?m)^x {export_name} \d+ \d+$")
+            if expected_import is None:
+                self.assertNotIn("\nu RT_F_CMP\n", obj_text)
+            else:
+                self.assertIn(f"\nu {expected_import}\n", obj_text)
             self.assertNotIn("\nu RT_I_TO_F\n", obj_text)
 
             self.run_tool(project, "alink", "main")
@@ -1105,13 +1113,18 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 bytes([0x00, 0x10]),
             )
 
-    def test_native_finite_real_min_parity_fixture_compiles_and_links(self) -> None:
-        for fixture_name in (
-            "finite_real_min.act",
-            "finite_real_min_permuted.act",
+    def test_native_real_function_parity_fixtures_compile_and_link(self) -> None:
+        for fixture_name, export_name, expected_import in (
+            ("finite_real_min.act", "MIN2", "RT_F_CMP"),
+            ("finite_real_min_permuted.act", "MIN2", "RT_F_CMP"),
+            ("two_real_second_return_permuted.act", "SECOND", None),
         ):
             with self.subTest(fixture=fixture_name):
-                self._compile_and_link_finite_real_min_fixture(fixture_name)
+                self._compile_and_link_real_function_fixture(
+                    fixture_name,
+                    export_name,
+                    expected_import,
+                )
 
     def test_actc_reentrant_routine_frames_compile_and_link(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -1034,9 +1034,26 @@ Retired roadmap items for CP/M-era runner flows are no longer maintained.
   compiles and links both fixtures, and the Idun VICE subtest confirms each
   writes binary32 1.0 to `RESULT`; no compiler or runtime change was required.
 - Native exact OBJ and live UDOS/VICE checks cover all five reordered REAL
-  cells. Current native inventories are 1,333 broad direct-PRG shapes, 172
+  cells. At that checkpoint native inventories were 1,333 broad direct-PRG shapes, 172
   non-runtime source-backed shapes, and 291 compiled-runtime relocation-oracle
   cases. Pass K is 4,594 bytes with 3,598 bytes free.
 - The bounded source skeleton remains intentional. General native REAL
   expressions, locals, arbitrary calls/returns, recursive frames, and portable
   MATH1 module compilation are still the next cross-product dependency.
+
+## 2026-07-20 Native Two-REAL-Parameter Return Mapping
+
+- Native pass A now keeps the bounded two-parameter function's named return
+  selector independent from caller argument storage and preserves the first
+  parameter selector outside relocation scratch.
+- Added `two_real_second_return_permuted.act` to both parity trees. It declares
+  `RESULT/RIGHT/LEFT`, binds parameters `B/A`, returns second parameter `A`, and
+  writes binary32 2.0.
+- Linux ACTC/ALINK compiles and links the fixture through its existing general
+  implementation. The Idun direct-PRG subtest executes it in VICE alongside the
+  two finite-MIN fixtures; no Idun compiler or shared runtime change was needed.
+- Current native inventories are 1,334 broad direct-PRG shapes, 173 non-runtime
+  source-backed shapes, and 291 compiled-runtime relocation-oracle cases. Pass A
+  is 7,418 bytes with 774 bytes free under its 768-byte reserve.
+- General native REAL expression returns, local frames, nested/recursive calls,
+  and portable MATH1 module compilation remain the next dependency.

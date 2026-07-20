@@ -181,7 +181,11 @@ class TestIdunPrgRuntime(unittest.TestCase):
             finally:
                 vice_context.stop()
 
-    def _assert_finite_real_min_fixture_executes(self, fixture_name: str) -> None:
+    def _assert_real_function_fixture_executes(
+        self,
+        fixture_name: str,
+        expected_value: float,
+    ) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             workspace = Path(tmp)
             shared_lib = workspace / "LIB"
@@ -219,7 +223,7 @@ class TestIdunPrgRuntime(unittest.TestCase):
                 and parts[0] == "y"
                 and parts[3] == "MAIN_RESULT_B0"
             )
-            expected = struct.pack("<f", 1.0)
+            expected = struct.pack("<f", expected_value)
 
             try:
                 vice_context = ViceHarness(timeout=5.0)
@@ -241,17 +245,21 @@ class TestIdunPrgRuntime(unittest.TestCase):
                     )
                     if actual == expected:
                         break
-                self.assertEqual(actual, expected, "finite MIN2 returned the wrong value")
+                self.assertEqual(actual, expected, "REAL function returned the wrong value")
             finally:
                 vice_context.stop()
 
-    def test_native_finite_real_min_parity_fixture_executes(self) -> None:
-        for fixture_name in (
-            "finite_real_min.act",
-            "finite_real_min_permuted.act",
+    def test_native_real_function_parity_fixtures_execute(self) -> None:
+        for fixture_name, expected_value in (
+            ("finite_real_min.act", 1.0),
+            ("finite_real_min_permuted.act", 1.0),
+            ("two_real_second_return_permuted.act", 2.0),
         ):
             with self.subTest(fixture=fixture_name):
-                self._assert_finite_real_min_fixture_executes(fixture_name)
+                self._assert_real_function_fixture_executes(
+                    fixture_name,
+                    expected_value,
+                )
 
     def test_math1_transcendental_functions_execute_on_6502(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
