@@ -9,6 +9,13 @@ The active product and cross-product status documents were reconciled on
 features still missing from the native product; Linux/UDOS mechanisms are not
 parity requirements.
 
+At this checkpoint the Idun hardware-free toolchain, full MATH1/GFX1 source
+behavior, resources, editors, debugger/profiler, export, and Alpine packaging
+are implemented. Required Idun work is reachable-only packaging for the
+remaining full-source MATH1 bodies, synchronization after common 6502 changes,
+and attached-cartridge acceptance. Native compiler/library/workflow gaps are
+tracked separately and must use UDOS-appropriate implementations.
+
 ## Authoritative Product Documents
 
 - `../README.md`: product overview, commands, builds, and verification.

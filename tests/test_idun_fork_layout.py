@@ -46,6 +46,11 @@ class TestIdunForkLayout(unittest.TestCase):
             encoding="ascii"
         )
 
+        self.assertIn("## Executive Status", parity)
+        self.assertIn("five portable groups", parity)
+        self.assertIn("Passes 6 and 7 now have\nbounded recursive operand traversal", parity)
+        self.assertIn("machine-object emitter still owns fixed shapes", parity)
+        self.assertIn("intentional Idun mechanisms", parity)
         self.assertIn("The constant foundation is complete", parity)
         self.assertIn("round-to-nearest, ties-to-even", parity)
         self.assertIn("Dedicated pass K", parity)
@@ -76,8 +81,18 @@ class TestIdunForkLayout(unittest.TestCase):
         )
         self.assertIn("Current native\ninventories are 1,342 broad", handoff)
         self.assertIn("298\ncompiled-runtime relocation-oracle cases", handoff)
-        self.assertIn("Native pass 6 is 8,093 bytes with 99\nbytes free", handoff)
-        self.assertIn("native MATH1 gap remains 28 public routines", handoff)
+        self.assertIn(
+            "pass 6 is 8,094 bytes with 98 bytes free",
+            " ".join(handoff.split()),
+        )
+        self.assertIn(
+            "pass 7 is 6,587 bytes with 1,605 bytes free",
+            " ".join(handoff.split()),
+        )
+        self.assertIn(
+            "native MATH1 gap remains 28 public routines",
+            " ".join(handoff.split()),
+        )
         self.assertIn("RT_F_HYPOT.OBJ", handoff)
 
     def test_retirement_manifest_covers_every_preserved_udos_directory(self) -> None:
