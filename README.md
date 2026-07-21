@@ -107,14 +107,14 @@ roles now follow captured names, and both canonical and permuted shared fixtures
 compile, link, and execute in this fork. Native pass A also returns either named
 parameter in its bounded two-REAL-parameter identity form; a shared reordered
 second-return fixture writes 2.0 through both products. Native ACTC now lowers
-`FSign`, `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMin`, and `FMax` for named REAL operands and a bounded,
+`FSign`, `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`, `FMin`, and `FMax` for named REAL operands and a bounded,
 storage-capturing `FClamp`
 ternary root through synchronized, independently selected target modules with
 complete MATH1
 NaN/signed-zero/bound-order semantics. General native REAL expressions/functions, the rest of
 MATH1, GFX1, resources, formatting, and help remain listed there explicitly.
 The native MATH1 include now supplies all eight constants without target code.
-Idun now lowers `FTrunc`, `FFloor`, `FCeil`, `FRound`, and `FFrac` to the same independently selected target objects, but
+Idun now lowers `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, and `FMod` to the same independently selected target objects, but
 still compiles all remaining implementation bodies from its full-source MATH1
 include into the root object. Call-graph pruning or dependency-sized generated
 modules therefore remains a required reachable-only packaging task rather than
@@ -259,7 +259,7 @@ optional runtime expansion and physical validation:
 - prune unreachable routines from full-source library includes, or generate
   dependency-sized library objects, so `INCLUDE "MATH1"` does not embed all
   remaining unused function bodies in the application object; `FTrunc`,
-  `FFloor`, `FCeil`, `FRound`, and `FFrac` are the first five routines moved to
+  `FFloor`, `FCeil`, `FRound`, `FFrac`, and `FMod` are the first six routines moved to
   independently selected shared OBJs
 - add new REAL library functions only when a separate post-MATH1 API is specified
 - extend the direct REU surface beyond 16-bit-sized arrays and 8/16-bit

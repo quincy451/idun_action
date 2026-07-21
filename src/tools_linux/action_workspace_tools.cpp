@@ -1404,11 +1404,7 @@ std::vector<ParsedDeclaration> declarations_from_line(const std::string& line) {
     }
 
     std::vector<ParsedDeclaration> declarations;
-    std::size_t start = 0;
-    while (start < rest.size()) {
-        const std::size_t comma = rest.find(',', start);
-        std::string declarator = trim(std::string_view(rest).substr(
-            start, comma == std::string::npos ? std::string::npos : comma - start));
+    for (const std::string& declarator : split_declarators(rest)) {
         const std::size_t equals = declarator.find('=');
         std::string name = trim(std::string_view(declarator).substr(0, equals));
         std::string mode = "STORAGE";
@@ -1432,10 +1428,6 @@ std::vector<ParsedDeclaration> declarations_from_line(const std::string& line) {
             mode,
             expression,
         });
-        if (comma == std::string::npos) {
-            break;
-        }
-        start = comma + 1;
     }
     if (declarations.empty()) {
         throw ToolError("BAD DECL");
@@ -3614,6 +3606,7 @@ struct RealExprNode {
         Ceiling,
         Round,
         Fraction,
+        Modulus,
     };
 
     Kind kind = Kind::Constant;
@@ -3838,7 +3831,7 @@ private:
 
         if (name != "REAL" && name != "FABS" && name != "FSQRT" &&
             name != "FTRUNC" && name != "FFLOOR" && name != "FCEIL" &&
-            name != "FROUND" && name != "FFRAC") {
+            name != "FROUND" && name != "FFRAC" && name != "FMOD") {
             RealExprNode node;
             node.kind = RealExprNode::Kind::Call;
             node.name = std::move(name);
@@ -3852,6 +3845,15 @@ private:
         ++pos_;
         const std::size_t argument = parse_expr();
         skip_ws();
+        std::optional<std::size_t> second_argument;
+        if (name == "FMOD") {
+            if (pos_ >= text_.size() || text_[pos_] != ',') {
+                throw ToolError("BAD REAL CALL");
+            }
+            ++pos_;
+            second_argument = parse_expr();
+            skip_ws();
+        }
         if (pos_ >= text_.size() || text_[pos_] != ')') {
             throw ToolError("BAD REAL CALL");
         }
@@ -3873,8 +3875,13 @@ private:
             node.kind = RealExprNode::Kind::Round;
         } else if (name == "FFRAC") {
             node.kind = RealExprNode::Kind::Fraction;
+        } else if (name == "FMOD") {
+            node.kind = RealExprNode::Kind::Modulus;
         }
         node.left = argument;
+        if (second_argument) {
+            node.right = *second_argument;
+        }
         return add_node(std::move(node));
     }
 
@@ -3948,6 +3955,15 @@ std::optional<double> evaluate_real_expr_node(
     }
     if (node.kind == RealExprNode::Kind::Multiply) {
         return static_cast<double>(left * right);
+    }
+    if (node.kind == RealExprNode::Kind::Modulus) {
+        if (std::isinf(right) && std::isfinite(left)) {
+            return static_cast<double>(left);
+        }
+        const float quotient = left / right;
+        const float truncated = std::trunc(quotient);
+        const float product = truncated * right;
+        return static_cast<double>(left - product);
     }
     return static_cast<double>(left / right);
 }
@@ -8161,6 +8177,7 @@ int cmd_actc(const std::vector<std::string>& args) {
                 upper.find("FCEIL(") != std::string::npos ||
                 upper.find("FROUND(") != std::string::npos ||
                 upper.find("FFRAC(") != std::string::npos ||
+                upper.find("FMOD(") != std::string::npos ||
                 upper.find('.') != std::string::npos) {
                 return true;
             }
@@ -9408,6 +9425,8 @@ int cmd_actc(const std::vector<std::string>& args) {
                 helper = "RT_F_MUL";
             } else if (node.kind == RealExprNode::Kind::Divide) {
                 helper = "RT_F_DIV";
+            } else if (node.kind == RealExprNode::Kind::Modulus) {
+                helper = "RT_F_MOD";
             } else {
                 throw ToolError("BAD REAL EXPR");
             }

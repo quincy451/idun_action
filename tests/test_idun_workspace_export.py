@@ -160,6 +160,7 @@ class TestIdunWorkspaceExport(unittest.TestCase):
                 "RT_F_CEIL.OBJ",
                 "RT_F_ROUND.OBJ",
                 "RT_F_FRAC.OBJ",
+                "RT_F_MOD.OBJ",
                 "RT_F_MAX.OBJ",
                 "RT_F_MIN.OBJ",
                 "RT_F_MUL.OBJ",
@@ -206,6 +207,17 @@ class TestIdunWorkspaceExport(unittest.TestCase):
             self.assertIn("r 43 u0", frac_object)
             self.assertIn("r 76 u1", frac_object)
             self.assertIn("n rt_f_frac", frac_object)
+            mod_object = (out / "LIB" / "RT_F_MOD.OBJ").read_text(
+                encoding="ascii"
+            )
+            self.assertIn("x rt_f_mod 0 245", mod_object)
+            self.assertIn("u rt_f_div", mod_object)
+            self.assertIn("u rt_f_trunc", mod_object)
+            self.assertIn("u rt_f_mul", mod_object)
+            self.assertIn("u rt_f_sub", mod_object)
+            self.assertIn("r 121 u0", mod_object)
+            self.assertIn("r 210 u3", mod_object)
+            self.assertIn("n rt_f_mod", mod_object)
             self.assertFalse(any((out / "LIB").glob("*.MOD")))
             self.assertTrue((out / "LIB" / "DBF1.ACT").is_file())
             self.assertTrue((out / "LIB" / "MATH1.ACT").is_file())

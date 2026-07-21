@@ -1152,7 +1152,25 @@ Retired roadmap items for CP/M-era runner flows are no longer maintained.
 - Exact host checks, 116 Idun VICE vectors, and a focused native direct PRG
   prove signed finite fractions, integral cancellation, exceptional-value
   behavior, full dependency closure, and sibling pruning.
-- Current native inventories are 1,339 broad and 296 compiled-runtime cases;
-  native pass 6 is 8,085 bytes with 107 bytes free. The native MATH1 gap is 30
+- At that checkpoint native inventories were 1,339 broad and 296 compiled-runtime cases;
+  native pass 6 was 8,085 bytes with 107 bytes free. The native MATH1 gap was 30
   public routines, and the remaining Idun source bodies still need reachable-
   only packaging.
+
+## 2026-07-20 Shared MATH1 Remainder
+
+- Added the 245-byte `RT_F_MOD.OBJ` to the shared manifest. It imports
+  division, truncation, multiplication, and subtraction, computes
+  `value-FTrunc(value/divisor)*divisor`, and supports either source aliasing the
+  destination.
+- Linux ACTC parses and constant-folds `FMod`, emits `RT_F_MOD` only for
+  dynamic expressions, and no longer compiles the portable MATH1 FMod body.
+  Native ACTC recognizes assignment, direct-print, and REAL-condition forms.
+- Exact host checks cover 332 vectors in each of the ordinary, left-alias, and
+  right-alias modes. The 116-pair Idun
+  VICE fixture and focused native direct PRG prove full semantics, complete
+  dependency closure, and sibling pruning.
+- Current native inventories are 1,340 broad and 297 compiled-runtime cases;
+  native pass 6 is 8,094 bytes with 98 bytes free. The native MATH1 gap is 29
+  public routines, and remaining Idun source bodies still need reachable-only
+  packaging.

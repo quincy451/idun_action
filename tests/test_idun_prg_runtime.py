@@ -502,6 +502,7 @@ class TestIdunPrgRuntime(unittest.TestCase):
             "rt_f_ceil.obj",
             "rt_f_round.obj",
             "rt_f_frac.obj",
+            "rt_f_mod.obj",
             "rt_f_mul.obj",
             "rt_f_sqrt.obj",
             "rt_f_sub.obj",
@@ -547,6 +548,7 @@ class TestIdunPrgRuntime(unittest.TestCase):
                 "REAL ceilresult=$C03D\n"
                 "REAL roundresult=$C041\n"
                 "REAL fracresult=$C045\n"
+                "REAL modresult=$C049\n"
                 "PROC MAIN()\n"
                 "addresult=a+b\n"
                 "subresult=a-b\n"
@@ -562,6 +564,7 @@ class TestIdunPrgRuntime(unittest.TestCase):
                 "ceilresult=FCeil(a)\n"
                 "roundresult=FRound(a)\n"
                 "fracresult=FFrac(a)\n"
+                "modresult=FMod(a,b)\n"
                 "eqresult=0\n"
                 "neresult=0\n"
                 "ltresult=0\n"
@@ -658,6 +661,69 @@ class TestIdunPrgRuntime(unittest.TestCase):
                     return sign
                 return float32_bits(left / right)
 
+            def reference_truncate(value_bits: int) -> int:
+                exponent = (value_bits >> 23) & 0xFF
+                if exponent >= 150:
+                    return value_bits
+                if exponent < 127:
+                    return value_bits & 0x80000000
+                return value_bits & ~((1 << (150 - exponent)) - 1)
+
+            def reference_multiply(left_bits: int, right_bits: int) -> int:
+                if binary32_is_nan(left_bits) or binary32_is_nan(right_bits):
+                    return 0x7FC00000
+                sign = (left_bits ^ right_bits) & 0x80000000
+                left_zero = left_bits & 0x7FFFFFFF == 0
+                right_zero = right_bits & 0x7FFFFFFF == 0
+                left_infinite = left_bits & 0x7FFFFFFF == 0x7F800000
+                right_infinite = right_bits & 0x7FFFFFFF == 0x7F800000
+                if (left_infinite and right_zero) or (
+                    right_infinite and left_zero
+                ):
+                    return 0x7FC00000
+                if left_infinite or right_infinite:
+                    return sign | 0x7F800000
+                if left_zero or right_zero:
+                    return sign
+                return float32_bits(
+                    float32_from_bits(left_bits) * float32_from_bits(right_bits)
+                )
+
+            def reference_subtract(left_bits: int, right_bits: int) -> int:
+                effective_right = right_bits ^ 0x80000000
+                if binary32_is_nan(left_bits) or binary32_is_nan(effective_right):
+                    return 0x7FC00000
+                left_infinite = left_bits & 0x7FFFFFFF == 0x7F800000
+                right_infinite = effective_right & 0x7FFFFFFF == 0x7F800000
+                if left_infinite:
+                    if right_infinite and (left_bits ^ effective_right) & 0x80000000:
+                        return 0x7FC00000
+                    return left_bits & 0xFF800000
+                if right_infinite:
+                    return effective_right & 0xFF800000
+                return float32_bits(
+                    float32_from_bits(left_bits) - float32_from_bits(right_bits)
+                )
+
+            def reference_mod(left_bits: int, right_bits: int) -> int:
+                if binary32_is_nan(left_bits) or binary32_is_nan(right_bits):
+                    return 0x7FC00000
+                if right_bits & 0x7FFFFFFF == 0:
+                    return 0x7FC00000
+                if left_bits & 0x7FFFFFFF == 0x7F800000:
+                    return 0x7FC00000
+                if right_bits & 0x7FFFFFFF == 0x7F800000:
+                    return left_bits
+                quotient = reference_divide(
+                    left_bits,
+                    right_bits,
+                    float32_from_bits(left_bits),
+                    float32_from_bits(right_bits),
+                )
+                truncated = reference_truncate(quotient)
+                product = reference_multiply(truncated, right_bits)
+                return reference_subtract(left_bits, product)
+
             def same_binary32(actual: int, expected: int) -> bool:
                 return actual == expected or (
                     binary32_is_nan(actual) and binary32_is_nan(expected)
@@ -679,7 +745,7 @@ class TestIdunPrgRuntime(unittest.TestCase):
                         right = float32_from_bits(right_bits)
                         card_input = (index * 997) & 0xFFFF
                         int_input = ((index * 613) & 0xFFFF) - 32768
-                        memory = bytearray(0x49)
+                        memory = bytearray(0x4D)
                         struct.pack_into("<II", memory, 0, left_bits, right_bits)
                         struct.pack_into("<Hh", memory, 0x30, card_input, int_input)
                         vice_context.load_prg(project / "BIN" / "MAIN.PRG")
@@ -695,7 +761,7 @@ class TestIdunPrgRuntime(unittest.TestCase):
                             1,
                             "generated IEEE runtime probe did not finish",
                         )
-                        output = vice_context.monitor.memory_get(0xC008, 0xC048)
+                        output = vice_context.monitor.memory_get(0xC008, 0xC04C)
                         actual_reals = [
                             struct.unpack_from("<I", output, offset)[0]
                             for offset in range(0, 32, 4)
@@ -745,14 +811,7 @@ class TestIdunPrgRuntime(unittest.TestCase):
                             ],
                         )
                         exponent = (left_bits >> 23) & 0xFF
-                        if exponent >= 150:
-                            expected_trunc = left_bits
-                        elif exponent < 127:
-                            expected_trunc = left_bits & 0x80000000
-                        else:
-                            expected_trunc = left_bits & ~(
-                                (1 << (150 - exponent)) - 1
-                            )
+                        expected_trunc = reference_truncate(left_bits)
                         self.assertEqual(
                             struct.unpack_from("<I", output, 0x2D)[0],
                             expected_trunc,
@@ -808,6 +867,10 @@ class TestIdunPrgRuntime(unittest.TestCase):
                         self.assertEqual(
                             struct.unpack_from("<I", output, 0x3D)[0],
                             expected_frac,
+                        )
+                        self.assertEqual(
+                            struct.unpack_from("<I", output, 0x41)[0],
+                            reference_mod(left_bits, right_bits),
                         )
             finally:
                 vice_context.stop()

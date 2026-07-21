@@ -26,7 +26,7 @@ The limits that remain are the intrinsic binary32 limits:
 
 Source forms include decimal and exponent literals, `INF`/`INFINITY`, `NAN`,
 `+`, `-`, `*`, `/`, comparisons, `REAL(integer)`, `INT(real)`, `FAbs`,
-`FSqrt`, `FSign`, `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMin`, `FMax`, `FClamp`, `PrintR`, and `PrintRE`.
+`FSqrt`, `FSign`, `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`, `FMin`, `FMax`, `FClamp`, `PrintR`, and `PrintRE`.
 
 Rules:
 
@@ -52,6 +52,9 @@ Rules:
   integral values
 - `FFrac` returns `value-FTrunc(value)`; finite nonzero fractional parts keep
   their sign, while exceptional values follow ordinary REAL subtraction
+- `FMod(value,divisor)` returns `value-FTrunc(value/divisor)*divisor`; NaN,
+  zero divisor, and infinite dividend return canonical quiet NaN, while a
+  finite dividend with an infinite divisor is returned bit-for-bit
 - `FClamp(value,lower,upper)` returns canonical quiet NaN if any argument is
   NaN or if `lower>upper`; otherwise it returns
   `FMin(FMax(value,lower),upper)` with selected operand bits preserved
@@ -85,6 +88,7 @@ ALINK resolves the following standalone helper symbols:
 - `rt_f_ceil`
 - `rt_f_round`
 - `rt_f_frac`
+- `rt_f_mod`
 - `rt_f_min`
 - `rt_f_max`
 - `rt_f_clamp`
@@ -126,6 +130,10 @@ Specific return conventions are:
   and imports only `rt_f_trunc`
 - `rt_f_frac` computes `value-FTrunc(value)`, supports aliased source and
   destination pointers, and imports `rt_f_trunc` plus `rt_f_sub`
+- `rt_f_mod` reads value and divisor through `$02/$03` and `$04/$05`, writes
+  through `$06/$07`, supports destination aliasing either operand, and imports
+  `rt_f_div`, `rt_f_trunc`, `rt_f_mul`, and `rt_f_sub` to implement
+  `value-FTrunc(value/divisor)*divisor`
 - `rt_f_min` and `rt_f_max` write through `$06/$07`, ignore one NaN, select the
   right operand when both inputs are NaN, and preserve the left operand's exact
   bits when ordered values compare equal; both import `rt_f_cmp`
@@ -178,6 +186,8 @@ source:
 - `FCeil(r)` imports `rt_f_ceil` plus transitive `rt_f_floor` and `rt_f_trunc`
 - `FRound(r)` imports `rt_f_round` plus transitive `rt_f_trunc`
 - `FFrac(r)` imports `rt_f_frac` plus its truncation and subtraction closure
+- `FMod(a,b)` imports `rt_f_mod` plus its division, truncation,
+  multiplication, subtraction, and special-value closure
 - `FMin(a,b)` and `FMax(a,b)` import only the selected helper plus its comparison
   closure
 - direct `FClamp(value,lower,upper)` imports `rt_f_clamp` plus its
@@ -196,7 +206,7 @@ the generated compact OBJ1 core. `tools/generate_real_runtime.py --check`
 remains a compatibility entry point and delegates to that generator plus the
 shared 6502 manifest check. The shared manifest verifies that all checked-in OBJ1
 modules match their reviewed generator. Headless VICE tests execute raw binary32
-edge vectors and deterministic random vectors for arithmetic, sign, truncation,
+edge vectors and deterministic random vectors for arithmetic, sign, truncation, remainder,
 minimum/maximum/clamp, square root, comparison, conversion, signed zero, subnormal,
 infinity, NaN, and ties-to-even behavior. A separate target test compares exact
 printed decimals at both finite extremes and across normal, subnormal,

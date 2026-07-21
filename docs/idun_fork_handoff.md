@@ -311,10 +311,23 @@ ACTC constant-folds constant calls and selects `RT_F_FRAC` only for dynamic
 calls; native ACTC owns bounded assignment, direct-print, and REAL-condition
 forms. Exact host checks, 116 Idun VICE vectors, and the focused native direct
 PRG prove alias safety, signed finite fractions, integral cancellation,
-exceptional-value behavior, complete closure, and sibling pruning. Current
-native inventories are 1,339 broad, 173 non-runtime source-backed, and 296
-compiled-runtime relocation-oracle cases. Native pass 6 is 8,085 bytes with
-107 bytes free; the native MATH1 gap is 30 public routines.
+exceptional-value behavior, complete closure, and sibling pruning. At that
+checkpoint native inventories were 1,339 broad, 173 non-runtime source-backed,
+and 296 compiled-runtime relocation-oracle cases. Native pass 6 was 8,085 bytes
+with 107 bytes free; the native MATH1 gap was 30 public routines.
+
+The following shared `FMod` slice adds a 245-byte OBJ1 module that imports
+`RT_F_DIV.OBJ`, `RT_F_TRUNC.OBJ`, `RT_F_MUL.OBJ`, and `RT_F_SUB.OBJ` and
+computes `value-FTrunc(value/divisor)*divisor`. Linux ACTC constant-folds
+constant calls and selects `RT_F_MOD` only for dynamic calls; native ACTC owns
+bounded assignment, direct-print, and REAL-condition forms. Exact host checks
+cover 332 vectors in each of the ordinary, left-alias, and right-alias modes.
+The 116-pair Idun VICE fixture and
+focused native direct PRG prove full exceptional-value behavior, complete
+closure, and sibling pruning. Current native inventories are 1,340 broad, 173
+non-runtime source-backed, and 297 compiled-runtime relocation-oracle cases.
+Native pass 6 is 8,094 bytes with 98 bytes free; the native MATH1 gap is 29
+public routines.
 
 For a two-checkout release, run:
 

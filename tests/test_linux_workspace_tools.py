@@ -187,11 +187,13 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
             self.assertNotRegex(math_object, r"(?m)^x FCEIL \d+ \d+$")
             self.assertNotRegex(math_object, r"(?m)^x FROUND \d+ \d+$")
             self.assertNotRegex(math_object, r"(?m)^x FFRAC \d+ \d+$")
+            self.assertNotRegex(math_object, r"(?m)^x FMOD \d+ \d+$")
             self.assertIn("\nu RT_F_TRUNC\n", math_object)
             self.assertIn("\nu RT_F_FLOOR\n", math_object)
             self.assertNotIn("\nu RT_F_CEIL\n", math_object)
             self.assertNotIn("\nu RT_F_ROUND\n", math_object)
             self.assertNotIn("\nu RT_F_FRAC\n", math_object)
+            self.assertIn("\nu RT_F_MOD\n", math_object)
             self.run_tool(math_project, "alink", "main")
 
             self.run_tool(root, "actnew", "gfxdemo")
@@ -1344,6 +1346,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 "rt_f_ceil.obj",
                 "rt_f_round.obj",
                 "rt_f_frac.obj",
+                "rt_f_mod.obj",
                 "rt_f_mul.obj",
                 "rt_f_sign.obj",
                 "rt_f_sqrt.obj",
@@ -1373,7 +1376,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                     [
                         "PROC MAIN()",
                         "CARD n",
-                        "REAL a=[1.5],b=[2.0],sum,difference,product,quotient,root,absolute,truncated,floored,ceiled,rounded,fractional,fromint",
+                        "REAL a=[1.5],b=[2.0],sum,difference,product,quotient,root,absolute,truncated,floored,ceiled,rounded,fractional,modulus,fromint",
                         "n = 3",
                         "sum = a + b",
                         "difference = a - b",
@@ -1386,6 +1389,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                         "ceiled = FCeil(difference)",
                         "rounded = FRound(difference)",
                         "fractional = FFrac(difference)",
+                        "modulus = FMod(a,b)",
                         "fromint = REAL(n)",
                         "IF sum > a THEN",
                         "PrintRE(sum)",
@@ -1412,6 +1416,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 "RT_F_CEIL",
                 "RT_F_ROUND",
                 "RT_F_FRAC",
+                "RT_F_MOD",
                 "RT_I_TO_F",
                 "RT_F_CMP",
                 "RT_PRINT_F",
@@ -1435,6 +1440,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 "RT_F_CEIL",
                 "RT_F_ROUND",
                 "RT_F_FRAC",
+                "RT_F_MOD",
                 "RT_I_TO_F",
                 "RT_F_CMP",
                 "RT_PRINT_F",
@@ -1470,6 +1476,8 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                         "REAL ceiled=[FCeil(1.25)]",
                         "REAL callrounded=[FRound(2.5)]",
                         "REAL callfraction=[FFrac(-1.75)]",
+                        "REAL callmod=[FMod(7.5,2.0)]",
+                        "REAL callmodinf=[FMod(-1.75,INF)]",
                         "IF 1.0 < 2.0 THEN",
                         "PrintRE(x)",
                         "FI",
@@ -1496,6 +1504,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 "RT_F_CEIL",
                 "RT_F_ROUND",
                 "RT_F_FRAC",
+                "RT_F_MOD",
             ):
                 self.assertNotIn(f"\nu {symbol}\n", obj_text)
             lines = obj_text.splitlines()
@@ -1519,6 +1528,8 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 "MAIN_CEILED_B0": bytes.fromhex("00000040"),
                 "MAIN_CALLROUNDED_B0": bytes.fromhex("00004040"),
                 "MAIN_CALLFRACTION_B0": bytes.fromhex("000040BF"),
+                "MAIN_CALLMOD_B0": bytes.fromhex("0000C03F"),
+                "MAIN_CALLMODINF_B0": bytes.fromhex("0000E0BF"),
             }
             for symbol, value in expected.items():
                 offset = exports[symbol]
@@ -2983,6 +2994,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 "FCEIL",
                 "FROUND",
                 "FFRAC",
+                "FMOD",
                 "SIDFREQ",
             ):
                 self.assertNotIn(f"\nx {declaration} ", obj_text)
