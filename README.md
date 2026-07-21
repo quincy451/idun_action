@@ -113,7 +113,10 @@ returns one selected binary expression over two REAL parameters through a
 hidden non-aliasing result cell. The shared `RETURN(FHypot(A,B))` fixture
 compiles and links in both products; native ALINK selects only its reachable
 closure and the direct PRG writes binary32 5.0 in VICE. This remains a bounded
-checkpoint rather than general native REAL lowering. Native ACTC now lowers
+checkpoint rather than general native REAL lowering. Native pass L additionally
+accepts two bounded REAL functions and one declaration-order edge; the shared
+`MAIN -> CHAIN -> LENGTH` fixture returns binary32 5.0 under both toolchains,
+while native forward/cyclic edges are rejected. Native ACTC now lowers
 `FSign`, `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`, `FHypot`, `FMin`, and `FMax` for named REAL operands and a bounded,
 storage-capturing `FClamp`
 ternary root through synchronized, independently selected target modules with

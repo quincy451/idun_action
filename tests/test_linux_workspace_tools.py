@@ -1261,6 +1261,11 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 ("LENGTH", "SHORTER"),
                 ("RT_F_HYPOT", "RT_F_MIN"),
             ),
+            (
+                "real_function_call_chain_postfix.act",
+                ("LENGTH", "CHAIN"),
+                ("RT_F_HYPOT", "RT_F_MAX"),
+            ),
         ):
             with self.subTest(fixture=fixture_name):
                 self._compile_and_link_real_function_fixture(

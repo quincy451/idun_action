@@ -1293,3 +1293,18 @@ Retired roadmap items for CP/M-era runner flows are no longer maintained.
   with 2,556 bytes free. Function-to-function calls, reentrant local frames,
   control flow, mixed types, arbitrary signatures, and recursive frames remain
   native gaps.
+
+## 2026-07-21 Native Declaration-Order REAL Call Parity
+
+- Native pass L now permits one safe function-to-function edge: `MAIN` may call
+  either bounded REAL function, and the later function may assign the earlier
+  function's result to a REAL local. Forward, self, and cyclic edges are hard
+  errors because native parameter/local storage remains static and nonreentrant.
+- Added `real_function_call_chain_postfix.act` to both parity trees. Native ACTC
+  emits ordinary `MAIN -> CHAIN` and `CHAIN -> LENGTH` OBJ1 relocations; ALINK
+  needs no function-specific behavior. Native VICE verifies binary32 5.0 in
+  both `RESULT` and `CHAIN.BASE`.
+- Idun ACTC/ALINK compiles, links, and executes the same fixture through its
+  general frame-capable compiler. Current native inventories are 1,348 broad
+  direct-PRG and 180 non-runtime source-backed shapes; the compiled-runtime
+  oracle remains 298. Native pass L is 5,667 bytes with 2,525 bytes free.

@@ -24,13 +24,13 @@ acceptance. It is the completion checklist. Portable syntax, OBJ1 meaning,
 link-selected target behavior, and direct-PRG results must agree; Alpine process
 architecture and UDOS resident/REU mechanics intentionally do not.
 
-The latest shared compiler fixtures exercise one nonrecursive
-two-REAL-parameter function with a nested REAL return and its bounded
-all-REAL-local extension. Linux ACTC/ALINK and native ACTC/ALINK accept the same
-sources; the local-storage native PRG prints `5` and verifies both its result
-and local value in VICE. This is a bounded ABI checkpoint, not general
-function/frame parity; the remaining work is listed in
-`udos_feature_parity.md`.
+The latest shared compiler fixtures exercise two nonrecursive
+two-REAL-parameter functions, bounded all-REAL locals, and one declaration-order
+function edge. Linux ACTC/ALINK and native ACTC/ALINK accept the same call-chain
+source; `MAIN -> CHAIN -> LENGTH` returns binary32 5.0 in both products through
+ordinary OBJ1 relocations. The native static-frame form rejects forward and
+cyclic edges. This is a bounded ABI checkpoint, not general function/frame
+parity; the remaining work is listed in `udos_feature_parity.md`.
 
 ## Authoritative Product Documents
 

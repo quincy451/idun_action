@@ -284,6 +284,7 @@ class TestIdunPrgRuntime(unittest.TestCase):
                 "real_two_function_nested_postfix.act",
                 {"LONGRESULT": 5.0, "SHORTRESULT": 3.0},
             ),
+            ("real_function_call_chain_postfix.act", {"RESULT": 5.0}),
         ):
             with self.subTest(fixture=fixture_name):
                 self._assert_real_function_fixture_executes(
