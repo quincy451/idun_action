@@ -365,18 +365,23 @@ mixed unary/binary/ternary tree. Native pass L now lowers that bounded postfix
 stream for a straight-line module-REAL subset. Direct native ALINK/VICE cases
 execute nested binary and unary/binary/ternary trees, print `2`, preserve DBG1
 source-variable records through `__idata`, and prune unreferenced helpers. Pass
-L now also lowers one nonrecursive two-REAL-parameter function called by
-`MAIN`; the shared `real_function_nested_postfix.act` fixture compiles and
-links with Linux ACTC, while native ACTC/ALINK emits and launches the pointer
-call ABI and prints `5` in VICE. The follow-up shared
+L also lowers nonrecursive two-REAL-parameter functions called directly by
+`MAIN`; the shared `real_function_nested_postfix.act` fixture compiles and links
+with Linux ACTC, while native ACTC/ALINK emits and launches the pointer call ABI
+and prints `5` in VICE. The follow-up shared
 `real_function_local_nested_postfix.act` fixture adds bounded static REAL local
 storage with a DBG1 local record; native VICE verifies binary32 5.0 in the
 result and 3.0 in the local while preserving the same reachable helper closure.
-Current native inventories are 1,346 broad, 178 non-runtime source-backed, and
-298 compiled-runtime relocation-oracle cases; pass L is 5,455 bytes with 2,737
-bytes free. The native MATH1 gap remains 28 public routines, and general call
-graphs, reentrant local frames, control flow, mixed types, arbitrary signatures,
-and recursive frames remain pending.
+Pass L now accepts two independent functions in that bounded form. The shared
+`real_two_function_nested_postfix.act` fixture emits separate exports, storage,
+and DBG1 banks; native VICE verifies results 5.0 and 3.0 plus both locals. Idun
+ACTC now lowers direct `FMin` and `FMax` expressions to their standalone runtime
+objects and executes the same fixture with identical results. Current native
+inventories are 1,347 broad, 179 non-runtime source-backed, and 298
+compiled-runtime relocation-oracle cases; pass L is 5,636 bytes with 2,556
+bytes free. The native MATH1 gap remains 28 public routines, and
+function-to-function calls, reentrant local frames, control flow, mixed types,
+arbitrary signatures, and recursive frames remain pending.
 
 For a two-checkout release, run:
 

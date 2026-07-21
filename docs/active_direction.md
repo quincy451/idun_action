@@ -138,14 +138,14 @@ Remaining product work:
    parameters through a hidden result cell. The shared FHypot fixture compiles
    and links in both products and produces binary32 5.0. Native pass L now
    consumes the recursive child-first postfix stream for bounded nested unary,
-   binary, and `FClamp` trees. It also crosses one procedure boundary for a
-   nonrecursive two-REAL-parameter function called by `MAIN`, now including
-   bounded all-REAL static locals with DBG1 local records. General call graphs,
-   reentrant local frames, control flow, mixed types, arbitrary signatures, and
-   recursive frames remain pending.
+   binary, and `FClamp` trees. It also supports up to two independent
+   nonrecursive two-REAL-parameter functions called directly by `MAIN`, each
+   with bounded all-REAL static locals and DBG1 local records. General call
+   graphs, reentrant local frames, control flow, mixed types, arbitrary
+   signatures, and recursive frames remain pending.
    Linux ACTC now lowers `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`,
-   and `FHypot` to the same shared objects instead of embedding those MATH1
-   bodies. It retains all project routines and prunes unreachable MATH1/GFX1
+   `FHypot`, `FMin`, and `FMax` to the same shared objects instead of embedding
+   those MATH1 bodies. It retains all project routines and prunes unreachable MATH1/GFX1
    library bodies from their transitive project-rooted call graph while
    preserving bare routine-address and `OverlayCall` references. Linked
    external symbol expressions inside unchecked

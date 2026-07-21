@@ -1216,8 +1216,8 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
     def _compile_and_link_real_function_fixture(
         self,
         fixture_name: str,
-        export_name: str,
-        expected_import: str | None,
+        export_names: str | tuple[str, ...],
+        expected_imports: str | tuple[str, ...] | None,
     ) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -1229,11 +1229,17 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
 
             self.run_tool(project, "actc", "main")
             obj_text = (project / "OBJ" / "MAIN.OBJ").read_text(encoding="ascii")
-            self.assertRegex(obj_text, rf"(?m)^x {export_name} \d+ \d+$")
-            if expected_import is None:
+            if isinstance(export_names, str):
+                export_names = (export_names,)
+            for export_name in export_names:
+                self.assertRegex(obj_text, rf"(?m)^x {export_name} \d+ \d+$")
+            if expected_imports is None:
                 self.assertNotIn("\nu RT_F_CMP\n", obj_text)
             else:
-                self.assertIn(f"\nu {expected_import}\n", obj_text)
+                if isinstance(expected_imports, str):
+                    expected_imports = (expected_imports,)
+                for expected_import in expected_imports:
+                    self.assertIn(f"\nu {expected_import}\n", obj_text)
             self.assertNotIn("\nu RT_I_TO_F\n", obj_text)
 
             self.run_tool(project, "alink", "main")
@@ -1243,19 +1249,24 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
             )
 
     def test_native_real_function_parity_fixtures_compile_and_link(self) -> None:
-        for fixture_name, export_name, expected_import in (
+        for fixture_name, export_names, expected_imports in (
             ("finite_real_min.act", "MIN2", "RT_F_CMP"),
             ("finite_real_min_permuted.act", "MIN2", "RT_F_CMP"),
             ("two_real_second_return_permuted.act", "SECOND", None),
             ("real_function_binary_hypot.act", "LENGTH", "RT_F_HYPOT"),
             ("real_function_nested_postfix.act", "LENGTH", "RT_F_HYPOT"),
             ("real_function_local_nested_postfix.act", "LENGTH", "RT_F_HYPOT"),
+            (
+                "real_two_function_nested_postfix.act",
+                ("LENGTH", "SHORTER"),
+                ("RT_F_HYPOT", "RT_F_MIN"),
+            ),
         ):
             with self.subTest(fixture=fixture_name):
                 self._compile_and_link_real_function_fixture(
                     fixture_name,
-                    export_name,
-                    expected_import,
+                    export_names,
+                    expected_imports,
                 )
 
     def test_actc_reentrant_routine_frames_compile_and_link(self) -> None:
@@ -1474,7 +1485,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                     [
                         "PROC MAIN()",
                         "CARD n",
-                        "REAL a=[1.5],b=[2.0],sum,difference,product,quotient,root,absolute,truncated,floored,ceiled,rounded,fractional,modulus,hypotenuse,fromint",
+                        "REAL a=[1.5],b=[2.0],sum,difference,product,quotient,root,absolute,truncated,floored,ceiled,rounded,fractional,modulus,hypotenuse,minimum,maximum,fromint",
                         "n = 3",
                         "sum = a + b",
                         "difference = a - b",
@@ -1489,6 +1500,8 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                         "fractional = FFrac(difference)",
                         "modulus = FMod(a,b)",
                         "hypotenuse = FHypot(a,b)",
+                        "minimum = FMin(a,b)",
+                        "maximum = FMax(a,b)",
                         "fromint = REAL(n)",
                         "IF sum > a THEN",
                         "PrintRE(sum)",
@@ -1517,6 +1530,8 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 "RT_F_FRAC",
                 "RT_F_MOD",
                 "RT_F_HYPOT",
+                "RT_F_MIN",
+                "RT_F_MAX",
                 "RT_I_TO_F",
                 "RT_F_CMP",
                 "RT_PRINT_F",
@@ -1542,6 +1557,8 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 "RT_F_FRAC",
                 "RT_F_MOD",
                 "RT_F_HYPOT",
+                "RT_F_MIN",
+                "RT_F_MAX",
                 "RT_I_TO_F",
                 "RT_F_CMP",
                 "RT_PRINT_F",
@@ -1588,6 +1605,12 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                         "REAL callhypotnanfinite=[FHypot(NAN,3.0)]",
                         "REAL callhypotfinitenan=[FHypot(3.0,NAN)]",
                         "REAL callhypotnegzero=[FHypot(-0.0,0.0)]",
+                        "REAL callminleftzero=[FMin(0.0,-0.0)]",
+                        "REAL callminleftnegzero=[FMin(-0.0,0.0)]",
+                        "REAL callmaxleftzero=[FMax(0.0,-0.0)]",
+                        "REAL callmaxleftnegzero=[FMax(-0.0,0.0)]",
+                        "REAL callminleftnan=[FMin(NAN,-2.0)]",
+                        "REAL callmaxrightnan=[FMax(2.0,NAN)]",
                         "IF 1.0 < 2.0 THEN",
                         "PrintRE(x)",
                         "FI",
@@ -1616,6 +1639,8 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 "RT_F_FRAC",
                 "RT_F_MOD",
                 "RT_F_HYPOT",
+                "RT_F_MIN",
+                "RT_F_MAX",
             ):
                 self.assertNotIn(f"\nu {symbol}\n", obj_text)
             lines = obj_text.splitlines()
@@ -1650,6 +1675,12 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 "MAIN_CALLHYPOTNANFINITE_B0": bytes.fromhex("B6C38740"),
                 "MAIN_CALLHYPOTFINITENAN_B0": bytes.fromhex("B6C38740"),
                 "MAIN_CALLHYPOTNEGZERO_B0": bytes.fromhex("00000000"),
+                "MAIN_CALLMINLEFTZERO_B0": bytes.fromhex("00000000"),
+                "MAIN_CALLMINLEFTNEGZERO_B0": bytes.fromhex("00000080"),
+                "MAIN_CALLMAXLEFTZERO_B0": bytes.fromhex("00000000"),
+                "MAIN_CALLMAXLEFTNEGZERO_B0": bytes.fromhex("00000080"),
+                "MAIN_CALLMINLEFTNAN_B0": bytes.fromhex("000000C0"),
+                "MAIN_CALLMAXRIGHTNAN_B0": bytes.fromhex("00000040"),
             }
             for symbol, value in expected.items():
                 offset = exports[symbol]

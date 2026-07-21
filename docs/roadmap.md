@@ -1273,3 +1273,23 @@ Retired roadmap items for CP/M-era runner flows are no longer maintained.
   138 hardware-free tests. This changes compiler packaging only; ALINK remains
   responsible for ordinary object/import closure and no runtime launcher was
   introduced.
+
+## 2026-07-21 Native Two-Function REAL Parity
+
+- Native pass L now accepts up to two independent nonrecursive
+  two-REAL-parameter functions called directly by `MAIN`. Each function has
+  disjoint static parameter/local storage and a separate DBG1 procedure bank;
+  function-to-function calls and recursion remain outside this bounded slice.
+- Added `real_two_function_nested_postfix.act` to both shared fixture sets.
+  Native ACTC emits `length` and `shorter` exports and ALINK links them through
+  ordinary selection, placement, and relocation. Native VICE verifies result
+  values 5.0 and 3.0 plus local values 3.0 and 4.0.
+- Linux ACTC now recognizes direct `FMin` and `FMax` REAL expression nodes,
+  folds constant forms with shared NaN/signed-zero operand selection, and
+  imports `RT_F_MIN` or `RT_F_MAX` for dynamic forms. Idun ACTC/ALINK executes
+  the shared fixture with the same two result values.
+- Current native inventories are 1,347 broad and 179 non-runtime source-backed
+  shapes; the compiled-runtime oracle remains 298. Native pass L is 5,636 bytes
+  with 2,556 bytes free. Function-to-function calls, reentrant local frames,
+  control flow, mixed types, arbitrary signatures, and recursive frames remain
+  native gaps.

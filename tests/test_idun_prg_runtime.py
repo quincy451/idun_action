@@ -184,7 +184,7 @@ class TestIdunPrgRuntime(unittest.TestCase):
     def _assert_real_function_fixture_executes(
         self,
         fixture_name: str,
-        expected_value: float,
+        expected_values: dict[str, float],
     ) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             workspace = Path(tmp)
@@ -202,6 +202,7 @@ class TestIdunPrgRuntime(unittest.TestCase):
                 "rt_f_mul.obj",
                 "rt_f_special.obj",
                 "rt_f_sqrt.obj",
+                "rt_print_f.obj",
             ):
                 shutil.copy2(
                     ROOT / "src" / "runtime" / "modules" / name,
@@ -228,14 +229,20 @@ class TestIdunPrgRuntime(unittest.TestCase):
             debug_lines = (project / "BIN" / "MAIN.DBG").read_text(
                 encoding="ascii"
             ).splitlines()
-            result_address = next(
-                int(parts[1])
-                for line in debug_lines
-                if len(parts := line.split()) == 4
-                and parts[0] == "y"
-                and parts[3] == "MAIN_RESULT_B0"
-            )
-            expected = struct.pack("<f", expected_value)
+            result_addresses = {
+                name: next(
+                    int(parts[1])
+                    for line in debug_lines
+                    if len(parts := line.split()) == 4
+                    and parts[0] == "y"
+                    and parts[3] == f"MAIN_{name}_B0"
+                )
+                for name in expected_values
+            }
+            expected_bytes = {
+                name: struct.pack("<f", value)
+                for name, value in expected_values.items()
+            }
 
             try:
                 vice_context = ViceHarness(timeout=5.0)
@@ -245,33 +252,43 @@ class TestIdunPrgRuntime(unittest.TestCase):
             try:
                 time.sleep(1.0)
                 vice_context.load_prg(project / "BIN" / "MAIN.PRG")
-                vice_context.monitor.memory_set(result_address, b"\x55" * 4)
+                for result_address in result_addresses.values():
+                    vice_context.monitor.memory_set(result_address, b"\x55" * 4)
                 vice_context.monitor.resume()
 
                 deadline = time.monotonic() + 5.0
-                actual = b""
+                actual = {}
                 while time.monotonic() < deadline:
                     time.sleep(0.02)
-                    actual = vice_context.monitor.memory_get(
-                        result_address, result_address + 3
-                    )
-                    if actual == expected:
+                    actual = {
+                        name: vice_context.monitor.memory_get(address, address + 3)
+                        for name, address in result_addresses.items()
+                    }
+                    if actual == expected_bytes:
                         break
-                self.assertEqual(actual, expected, "REAL function returned the wrong value")
+                self.assertEqual(
+                    actual,
+                    expected_bytes,
+                    "REAL function returned the wrong value",
+                )
             finally:
                 vice_context.stop()
 
     def test_native_real_function_parity_fixtures_execute(self) -> None:
-        for fixture_name, expected_value in (
-            ("finite_real_min.act", 1.0),
-            ("finite_real_min_permuted.act", 1.0),
-            ("two_real_second_return_permuted.act", 2.0),
-            ("real_function_binary_hypot.act", 5.0),
+        for fixture_name, expected_values in (
+            ("finite_real_min.act", {"RESULT": 1.0}),
+            ("finite_real_min_permuted.act", {"RESULT": 1.0}),
+            ("two_real_second_return_permuted.act", {"RESULT": 2.0}),
+            ("real_function_binary_hypot.act", {"RESULT": 5.0}),
+            (
+                "real_two_function_nested_postfix.act",
+                {"LONGRESULT": 5.0, "SHORTRESULT": 3.0},
+            ),
         ):
             with self.subTest(fixture=fixture_name):
                 self._assert_real_function_fixture_executes(
                     fixture_name,
-                    expected_value,
+                    expected_values,
                 )
 
     def test_math1_transcendental_functions_execute_on_6502(self) -> None:
