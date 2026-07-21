@@ -10,11 +10,13 @@ The active build, test, export, and VICE paths have no CP/M-65 or UDOS runtime
 dependency. Historical sources remain in Git only as provenance and are not
 part of the active command inventory.
 
-This checkout is the Linux/Idun product repository, not a working branch of the
-native GitHub remote. Before release it must use its own `idun_action` remote.
-Shared target 6502 modules are synchronized from the native ActionC64U checkout
-with `make sync-native`; Linux tools, target transport, packaging, and the two
-OS-specific DBF adapters remain owned here.
+This checkout is the Linux/Idun product repository at
+`https://github.com/quincy451/idun_action`, not a working branch of the native
+GitHub remote. Its `origin` points to `idun_action`; the native ActionC64U
+repository is retained as the `native` remote. Shared target 6502 modules are
+synchronized from the native checkout with `make sync-native`; Linux tools,
+target transport, packaging, and the two OS-specific DBF adapters remain owned
+here.
 
 ## Reproducible Builds
 
@@ -49,10 +51,10 @@ RAM-backed `/tmp`, and executable replacement is atomic.
 
 ## Verified Results
 
-- 152 active Linux/tool/target tests pass on the local x86-64 host. The prior
+- 153 active Linux/tool/target tests pass on the local x86-64 host. The prior
   150-test baseline also passes natively on the Alpine/aarch64 Idun Pi; rerun
   the new shared finite-REAL fixture there at the next source deployment.
-- 137 hardware-free tests also pass under AddressSanitizer and
+- 138 hardware-free tests also pass under AddressSanitizer and
   UndefinedBehaviorSanitizer.
 - 21 direct-PRG tests pass in local VICE with the documented VICE 3.7 long-DBF
   skip. The prior 20-test set passes on the Idun Pi; deploy and run the new
@@ -182,13 +184,13 @@ The process-conversion inventory, target agent, Linux debugger, profiler,
 instruction stepping, and persistent-breakpoint reinstallation are
 implemented. Full IEEE-754, MATH1, GFX1, ASMBLOCK, graphics resources, resource
 editors, formatting, external help, direct-PRG execution, and signed Alpine
-  packaging are implemented. Required Idun work remains for reachable-only
-  packaging of full-source libraries: `FTrunc`, `FFloor`, `FCeil`, `FRound`,
-  `FFrac`, `FMod`, and `FHypot` are independently selected, but
-  `INCLUDE "MATH1"` currently emits every other implementation body into the
-  selected application object. Attached-hardware
-  validation and normal release integration also remain. Cross-product UDOS
-  parity is tracked separately in `docs/udos_feature_parity.md`.
+packaging are implemented. Linux ACTC now retains every project routine and
+prunes full-source library routines to their transitive project-rooted call
+graph; routine-address, `OverlayCall`, global, and declaration-time references
+conservatively preserve their targets.
+Attached-hardware validation and normal release integration remain.
+Cross-product UDOS parity is tracked separately in
+`docs/udos_feature_parity.md`.
 
 Cross-product parity is judged by portable Action source, normalized OBJ1
 meaning, reachable-only common-module selection, and direct-PRG results. It does
@@ -201,9 +203,9 @@ time values and keeps each implemented call in an independently selected OBJ1
 module. The shared `math1_constants_include.act` fixture compiles and links in
 both products. Idun now lowers `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`,
 `FMod`, and `FHypot` to shared independently selected objects. Its remaining
-full-source implementation is functionally correct but
-is not yet size-selective, so pruning that root object is required rather than
-treating its code growth as an operating-system difference.
+full-source implementation is now size-selective: Linux ACTC emits only the
+transitive library-routine closure referenced by retained project routines and
+module-level addresses, excluding unreferenced siblings.
 
 The 2026-07-19 native checkpoints add a bounded two-REAL-parameter function ABI
 and one finite comparison/select body without changing Idun syntax or the
@@ -229,7 +231,7 @@ VICE launches, the 32-shape native MATH1 source matrix, and its eight full-range
 helper probes pass. The broad native link inventory is 1,331 shapes and its
 compiled-runtime object/relocation oracle covers 290 cases. The shared manifest
 and Idun export/standalone-link tests guard this snapshot. The current Idun
-host suite passes 152 tests, the sanitizer suite passes 137, and the 21-test
+host suite passes 153 tests, the sanitizer suite passes 138, and the 21-test
 direct-PRG gate passes with only the documented VICE 3.7 DBF/REU skip. Both
 host and static Alpine/AArch64 exports verify 31 commands and 260 help topics.
 This refresh is hardware-independent and has not yet been redeployed to the Pi;
@@ -360,14 +362,21 @@ traverse bounded REAL operands while retaining their capacity gates: pass 6 is
 8,094 bytes with 98 bytes free, and pass 7 is 6,587 bytes with 1,605 bytes free.
 A regression also crosses the production 1,280-byte source window inside a
 mixed unary/binary/ternary tree. Native pass L now lowers that bounded postfix
-stream for a one-procedure, module-REAL-only, straight-line subset. Direct
-native ALINK/VICE cases execute nested binary and unary/binary/ternary trees,
-print `2`, preserve DBG1 source-variable records through `__idata`, and prune
-unreferenced helpers. Current native inventories are 1,344 broad, 176
-non-runtime source-backed, and 298 compiled-runtime relocation-oracle cases;
-pass L is 4,195 bytes with 3,997 bytes free. The native MATH1 gap remains 28
-public routines, and general functions, locals, control flow, mixed types,
-nested calls, and frames remain pending.
+stream for a straight-line module-REAL subset. Direct native ALINK/VICE cases
+execute nested binary and unary/binary/ternary trees, print `2`, preserve DBG1
+source-variable records through `__idata`, and prune unreferenced helpers. Pass
+L now also lowers one nonrecursive two-REAL-parameter function called by
+`MAIN`; the shared `real_function_nested_postfix.act` fixture compiles and
+links with Linux ACTC, while native ACTC/ALINK emits and launches the pointer
+call ABI and prints `5` in VICE. The follow-up shared
+`real_function_local_nested_postfix.act` fixture adds bounded static REAL local
+storage with a DBG1 local record; native VICE verifies binary32 5.0 in the
+result and 3.0 in the local while preserving the same reachable helper closure.
+Current native inventories are 1,346 broad, 178 non-runtime source-backed, and
+298 compiled-runtime relocation-oracle cases; pass L is 5,455 bytes with 2,737
+bytes free. The native MATH1 gap remains 28 public routines, and general call
+graphs, reentrant local frames, control flow, mixed types, arbitrary signatures,
+and recursive frames remain pending.
 
 For a two-checkout release, run:
 

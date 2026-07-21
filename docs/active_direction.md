@@ -136,11 +136,20 @@ Remaining product work:
    identically in both products.
    Native pass K now also returns one selected binary operation over two REAL
    parameters through a hidden result cell. The shared FHypot fixture compiles
-   and links in both products and produces binary32 5.0; arbitrary native REAL
-   trees and nested calls remain pending.
-   Linux ACTC now lowers `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`, and `FHypot` to the same shared objects
-   instead of embedding those MATH1 bodies. Remaining MATH1 source bodies still
-   require reachable-only packaging. Linked external symbol expressions inside unchecked
-   raw `[...]` bodies, general REAL/function
-   behavior, full MATH1/GFX1, resources, and workflow parity remain explicit
-   native work rather than Idun regressions.
+   and links in both products and produces binary32 5.0. Native pass L now
+   consumes the recursive child-first postfix stream for bounded nested unary,
+   binary, and `FClamp` trees. It also crosses one procedure boundary for a
+   nonrecursive two-REAL-parameter function called by `MAIN`, now including
+   bounded all-REAL static locals with DBG1 local records. General call graphs,
+   reentrant local frames, control flow, mixed types, arbitrary signatures, and
+   recursive frames remain pending.
+   Linux ACTC now lowers `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`,
+   and `FHypot` to the same shared objects instead of embedding those MATH1
+   bodies. It retains all project routines and prunes unreachable MATH1/GFX1
+   library bodies from their transitive project-rooted call graph while
+   preserving bare routine-address and `OverlayCall` references. Linked
+   external symbol expressions inside unchecked
+   raw `[...]` bodies, general REAL/function behavior, full MATH1/GFX1,
+   resources, and workflow parity remain explicit native work rather than Idun
+   regressions. The OS-aware delivery ledger and acceptance gates are maintained
+   in `docs/udos_feature_parity.md`.

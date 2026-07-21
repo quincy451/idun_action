@@ -6079,10 +6079,19 @@ std::vector<fs::path> library_search_directories(const fs::path& root) {
 class ActionSourcePreprocessor {
 public:
     explicit ActionSourcePreprocessor(fs::path project_root)
-        : project_root_(fs::weakly_canonical(std::move(project_root))) {}
+        : project_root_(fs::weakly_canonical(std::move(project_root))) {
+        for (const fs::path& directory :
+             library_search_directories(project_root_)) {
+            library_directories_.push_back(fs::weakly_canonical(directory));
+        }
+    }
 
     std::string process(const fs::path& source) {
         return process_file(fs::weakly_canonical(source));
+    }
+
+    const std::set<std::string>& project_routine_names() const {
+        return project_routine_names_;
     }
 
 private:
@@ -6273,6 +6282,40 @@ private:
         throw ToolError("DEFINE EXPANSION LIMIT");
     }
 
+    bool is_library_source(const fs::path& source) const {
+        for (const fs::path& directory : library_directories_) {
+            const fs::path relative = source.lexically_relative(directory);
+            if (relative.empty() || relative.is_absolute()) {
+                continue;
+            }
+            if (*relative.begin() != "..") {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void record_project_routine(
+        const fs::path& source,
+        const std::string& source_line) {
+        if (is_library_source(source)) {
+            return;
+        }
+        static const std::regex procedure_declaration(
+            R"(^\s*(?:PROC|OVERLAY)\s+([A-Za-z_][A-Za-z0-9_]*))",
+            std::regex_constants::icase);
+        static const std::regex function_declaration(
+            R"(^\s*(?:BYTE|CHAR|CARD|INT|REAL)\s+FUNC\s+([A-Za-z_][A-Za-z0-9_]*))",
+            std::regex_constants::icase);
+        const std::string line = strip_source_comment(source_line);
+        std::smatch match;
+        if ((std::regex_search(line, match, procedure_declaration) ||
+             std::regex_search(line, match, function_declaration)) &&
+            match.position() == 0) {
+            project_routine_names_.insert(module_from_arg(match[1].str()));
+        }
+    }
+
     void process_line(
         const fs::path& source,
         const std::string& source_line,
@@ -6340,6 +6383,7 @@ private:
             const std::string expanded = substitute_defines(line);
             const std::vector<std::string> expanded_lines = split_lines(expanded);
             for (const std::string& expanded_line : expanded_lines) {
+                record_project_routine(source, expanded_line);
                 process_line(source, expanded_line, output);
             }
         }
@@ -6348,6 +6392,8 @@ private:
     }
 
     fs::path project_root_;
+    std::vector<fs::path> library_directories_;
+    std::set<std::string> project_routine_names_;
     std::map<std::string, std::string> defines_;
     std::vector<fs::path> include_stack_;
 };
@@ -6494,8 +6540,8 @@ int cmd_actc(const std::vector<std::string>& args) {
         throw ToolError("NO FILE");
     }
 
-    ParsedSource source = parse_source(
-        ActionSourcePreprocessor(fs::current_path()).process(src));
+    ActionSourcePreprocessor preprocessor(fs::current_path());
+    ParsedSource source = parse_source(preprocessor.process(src));
     std::vector<SourceProc>& procs = source.procs;
     auto main_it = std::find_if(procs.begin(), procs.end(), [](const SourceProc& proc) {
         return upper_ascii(proc.name) == "MAIN" && !proc.declaration_only;
@@ -6571,13 +6617,9 @@ int cmd_actc(const std::vector<std::string>& args) {
                 ++i;
             }
             const std::string name = upper_ascii(text.substr(start, i - start));
-            std::size_t suffix = i;
-            while (suffix < text.size() &&
-                   std::isspace(static_cast<unsigned char>(text[suffix]))) {
-                ++suffix;
-            }
-            if (suffix < text.size() && text[suffix] == '(' &&
-                local_names.count(name) != 0) {
+            // Routine values and OverlayCall targets are references even when
+            // they are not followed by a source-level call parenthesis.
+            if (local_names.count(name) != 0) {
                 calls.insert(name);
             }
         }
@@ -6636,6 +6678,47 @@ int cmd_actc(const std::vector<std::string>& args) {
             }
         }
     }
+
+    std::set<std::string> reachable_routines =
+        preprocessor.project_routine_names();
+    reachable_routines.insert("MAIN");
+    auto add_root_references = [&](std::string_view text) {
+        const std::set<std::string> references = local_calls_in_text(text);
+        reachable_routines.insert(references.begin(), references.end());
+    };
+    for (const SourceConstant& constant : source.constants) {
+        add_root_references(constant.expression);
+    }
+    for (const SourceGlobal& global : source.globals) {
+        add_root_references(global.expression);
+        add_root_references(global.size_expression);
+    }
+    for (const SourceProc& proc : source.procs) {
+        if (proc.declaration_only) {
+            add_root_references(proc.address_expression);
+        }
+    }
+    std::vector<std::string> pending_reachable(
+        reachable_routines.begin(), reachable_routines.end());
+    while (!pending_reachable.empty()) {
+        const std::string current = pending_reachable.back();
+        pending_reachable.pop_back();
+        auto edges = local_call_graph.find(current);
+        if (edges == local_call_graph.end()) {
+            continue;
+        }
+        for (const std::string& target : edges->second) {
+            if (reachable_routines.insert(target).second) {
+                pending_reachable.push_back(target);
+            }
+        }
+    }
+    ordered.erase(
+        std::remove_if(
+            ordered.begin(), ordered.end(), [&](const SourceProc& proc) {
+                return reachable_routines.count(upper_ascii(proc.name)) == 0;
+            }),
+        ordered.end());
 
     std::vector<ObjExport> exports;
     std::vector<std::string> imports;

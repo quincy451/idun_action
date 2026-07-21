@@ -11,10 +11,26 @@ parity requirements.
 
 At this checkpoint the Idun hardware-free toolchain, full MATH1/GFX1 source
 behavior, resources, editors, debugger/profiler, export, and Alpine packaging
-are implemented. Required Idun work is reachable-only packaging for the
-remaining full-source MATH1 bodies, synchronization after common 6502 changes,
-and attached-cartridge acceptance. Native compiler/library/workflow gaps are
-tracked separately and must use UDOS-appropriate implementations.
+are implemented. Linux ACTC retains every project routine and packages included
+library routines by their transitive project-rooted call graph, while shared
+intrinsic modules remain independently selected. Required Idun work is
+synchronization after common 6502 changes and attached-cartridge acceptance.
+Native compiler/library/workflow gaps are tracked separately and must use
+UDOS-appropriate implementations.
+
+The cross-product document includes a delivery ledger for compiler lowering,
+MATH1, GFX1, resources, application entry/storage, workflows, and product
+acceptance. It is the completion checklist. Portable syntax, OBJ1 meaning,
+link-selected target behavior, and direct-PRG results must agree; Alpine process
+architecture and UDOS resident/REU mechanics intentionally do not.
+
+The latest shared compiler fixtures exercise one nonrecursive
+two-REAL-parameter function with a nested REAL return and its bounded
+all-REAL-local extension. Linux ACTC/ALINK and native ACTC/ALINK accept the same
+sources; the local-storage native PRG prints `5` and verifies both its result
+and local value in VICE. This is a bounded ABI checkpoint, not general
+function/frame parity; the remaining work is listed in
+`udos_feature_parity.md`.
 
 ## Authoritative Product Documents
 

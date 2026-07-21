@@ -1,6 +1,8 @@
 # ActionC64U - Action! Commodore 64 Ultimate Edition
 
 ActionC64U is a clean-room Action-style toolchain project for the Commodore 64.
+This Linux/Idun product is published as
+[`quincy451/idun_action`](https://github.com/quincy451/idun_action).
 
 The active fork target is the Idun cartridge Linux environment. Development
 tools run as normal Linux processes on the Raspberry Pi side of the cartridge.
@@ -119,11 +121,13 @@ complete MATH1
 NaN/signed-zero/bound-order semantics. General native REAL expressions/functions, the rest of
 MATH1, GFX1, resources, formatting, and help remain listed there explicitly.
 The native MATH1 include now supplies all eight constants without target code.
-Idun now lowers `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`, and `FHypot` to the same independently selected target objects, but
-still compiles all remaining implementation bodies from its full-source MATH1
-include into the root object. Call-graph pruning or dependency-sized generated
-modules therefore remains a required reachable-only packaging task rather than
-an operating-system difference.
+Idun now lowers `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`, and
+`FHypot` to the same independently selected target objects. Linux ACTC retains
+and validates every project routine, then prunes full-source MATH1/GFX1 library
+routines to the transitive graph those project routines reference. Bare routine
+addresses, `OverlayCall` targets, globals, and declaration-time address
+expressions also keep their referenced library routines alive. Unused library
+siblings no longer enter the application object.
 
 Build them with:
 

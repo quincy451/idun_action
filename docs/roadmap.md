@@ -1224,3 +1224,52 @@ Retired roadmap items for CP/M-era runner flows are no longer maintained.
   shapes; the compiled-runtime oracle remains 298. Native pass L is 4,195 bytes
   with 3,997 bytes free. No Idun runtime change was required; native functions,
   locals, control flow, mixed types, arbitrary calls, and frames remain gaps.
+
+## 2026-07-21 Native Nested REAL Function Call Parity
+
+- Native pass L now crosses one bounded procedure boundary: `MAIN` calls one
+  nonrecursive function with exactly two REAL parameters, no locals, and one
+  nested straight-line REAL return expression.
+- Its OBJ1 ABI uses caller-pushed low/high pointers, reverse-bound static
+  parameter cells, and an A/X result pointer. ALINK continues to perform only
+  ordinary export selection, dependency closure, placement, and relocation.
+- The shared `real_function_nested_postfix.act` fixture compiles and links with
+  Linux ACTC/ALINK. Native ACTC/ALINK runs the same source in VICE and prints
+  `5` for `FHypot(FAbs(A),FAbs(B))` while pruning unrelated helpers.
+- At that checkpoint native inventories were 1,345 broad and 177 non-runtime source-backed
+  shapes; the compiled-runtime oracle remains 298. Native pass L is 5,443 bytes
+  with 2,749 bytes free. General call graphs, locals, control flow, mixed types,
+  arbitrary signatures, and recursive frames remain native gaps.
+
+## 2026-07-21 Native REAL Function Local Parity
+
+- Native pass L now accepts bounded all-REAL local declarations in its existing
+  nonrecursive two-REAL-parameter callee. Locals remain ordinary static OBJ1
+  data with DBG1 procedure-local records; this does not claim reentrant frames.
+- Added `real_function_local_nested_postfix.act` to the shared fixture set.
+  Linux ACTC/ALINK compiles and links it; native ACTC emits exact local
+  load/store relocations, and its direct PRG prints `5` while VICE verifies
+  binary32 5.0 in the result and 3.0 in `ABSLEFT`.
+- Current native inventories are 1,346 broad and 178 non-runtime source-backed
+  shapes; the compiled-runtime oracle remains 298. Native pass L is 5,455 bytes
+  with 2,737 bytes free. General call graphs, reentrant local frames, control
+  flow, mixed types, arbitrary signatures, and recursive frames remain native
+  gaps.
+
+## 2026-07-21 Idun Source Call-Graph Pruning
+
+- Linux ACTC retains every routine from project source files and follows their
+  transitive references into included library routines before allocating or
+  emitting application OBJ records.
+- Bare routine addresses, `OverlayCall` targets, global initializers, and
+  declaration-time address expressions conservatively preserve referenced
+  routines; ordinary call syntax remains covered by the same scanner.
+- Focused full-source MATH1/GFX1 and synthetic library tests prove that reachable
+  chains are emitted while unused sibling routines are absent. The synthetic
+  case also proves an uncalled project routine remains compiled and retains its
+  referenced library chain. Shared intrinsic helpers remain independent OBJ
+  modules selected by ALINK.
+- The active host suite now contains 153 tests and the sanitizer suite contains
+  138 hardware-free tests. This changes compiler packaging only; ALINK remains
+  responsible for ordinary object/import closure and no runtime launcher was
+  introduced.

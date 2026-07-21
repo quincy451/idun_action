@@ -172,16 +172,22 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 encoding="ascii"
             )
             for symbol in (
-                "FSIN",
-                "FCOS",
-                "FATAN2",
                 "FEXP",
                 "FLN",
                 "FPOW",
-                "FASINH",
-                "FATANH",
+                "_MATHWRAPPI",
+                "FSIN",
+                "FCOS",
+                "FATAN",
+                "FATAN2",
+                "DEGTORAD",
+                "RADTODEG",
             ):
                 self.assertRegex(math_object, rf"(?m)^x {symbol} \d+ \d+$")
+            for symbol in ("FLOG2", "FASIN", "FASINH", "FATANH"):
+                self.assertNotRegex(
+                    math_object, rf"(?m)^x {symbol} \d+ \d+$"
+                )
             self.assertNotRegex(math_object, r"(?m)^x FTRUNC \d+ \d+$")
             self.assertNotRegex(math_object, r"(?m)^x FFLOOR \d+ \d+$")
             self.assertNotRegex(math_object, r"(?m)^x FCEIL \d+ \d+$")
@@ -211,16 +217,99 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 encoding="ascii"
             )
             for symbol in (
+                "GFXHIRES",
+                "GFXUSESPRITES",
+                "GFXBITMAPCLEAR",
+                "GFXSCREENCLEAR",
+                "GFXCELLCOLORS",
                 "PLOT",
-                "UNPLOT",
+                "HLINEDRAW",
+                "VLINEDRAW",
                 "LINEDRAW",
                 "CIRCLEDRAW",
+                "RECTANGLEDRAW",
+                "SQUAREDRAW",
+                "TRIANGLEDRAW",
+                "_GFXIABS",
+                "_GFXINSIDE",
+            ):
+                self.assertRegex(gfx_object, rf"(?m)^x {symbol} \d+ \d+$")
+            for symbol in (
+                "UNPLOT",
                 "RECTANGLEFILL",
+                "CIRCLEFILL",
                 "BITMAPMOVE",
                 "SPRITEPLACE",
             ):
-                self.assertRegex(gfx_object, rf"(?m)^x {symbol} \d+ \d+$")
+                self.assertNotRegex(
+                    gfx_object, rf"(?m)^x {symbol} \d+ \d+$"
+                )
             self.run_tool(gfx_project, "alink", "main")
+
+    def test_actc_prunes_unreachable_included_source_routines(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.run_tool(root, "actnew", "prunedemo")
+            project = root / "PRUNEDEMO"
+            (project / "LIB").mkdir()
+            (project / "LIB" / "CHAIN.ACT").write_text(
+                "MODULE CHAIN\n"
+                "PROC USEDLEAF()\n"
+                "PrintE(\"LEAF\")\n"
+                "RETURN\n"
+                "ENDPROC\n"
+                "PROC USED()\n"
+                "USEDLEAF()\n"
+                "RETURN\n"
+                "ENDPROC\n"
+                "PROC UNUSED()\n"
+                "PrintE(\"UNUSED\")\n"
+                "RETURN\n"
+                "ENDPROC\n"
+                "PROC ADDRESSONLY()\n"
+                "PrintE(\"ADDRESS\")\n"
+                "RETURN\n"
+                "ENDPROC\n"
+                "OVERLAY USEDOVERLAY\n"
+                "PrintE(\"OVERLAY\")\n"
+                "ENDOVERLAY\n"
+                "OVERLAY UNUSEDOVERLAY\n"
+                "PrintE(\"UNUSED OVERLAY\")\n"
+                "ENDOVERLAY\n"
+                "MODULE\n",
+                encoding="ascii",
+            )
+            (project / "SRC" / "MAIN.ACT").write_text(
+                'INCLUDE "CHAIN"\n'
+                "MODULE MAIN\n"
+                "CARD ARRAY CALLBACKS(0)=[ADDRESSONLY]\n"
+                "PROC PROJECTLOCAL()\n"
+                "USED()\n"
+                "OverlayCall(USEDOVERLAY)\n"
+                "RETURN\n"
+                "ENDPROC\n"
+                "PROC MAIN()\n"
+                "RETURN\n"
+                "ENDPROC\n",
+                encoding="ascii",
+            )
+
+            self.run_tool(project, "actc", "main")
+            object_text = (project / "OBJ" / "MAIN.OBJ").read_text(
+                encoding="ascii"
+            )
+            self.assertRegex(object_text, r"(?m)^x MAIN \d+ \d+$")
+            self.assertRegex(object_text, r"(?m)^x PROJECTLOCAL \d+ \d+$")
+            self.assertRegex(object_text, r"(?m)^x USED \d+ \d+$")
+            self.assertRegex(object_text, r"(?m)^x USEDLEAF \d+ \d+$")
+            self.assertRegex(object_text, r"(?m)^x ADDRESSONLY \d+ \d+$")
+            self.assertRegex(object_text, r"(?m)^x USEDOVERLAY \d+ \d+$")
+            self.assertNotRegex(object_text, r"(?m)^x UNUSED \d+ \d+$")
+            self.assertNotRegex(
+                object_text, r"(?m)^x UNUSEDOVERLAY \d+ \d+$"
+            )
+            self.run_tool(project, "alink", "main")
+            self.assertTrue((project / "BIN" / "MAIN.PRG").is_file())
 
     def test_math1_constant_include_matches_shared_native_fixture(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1159,6 +1248,8 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
             ("finite_real_min_permuted.act", "MIN2", "RT_F_CMP"),
             ("two_real_second_return_permuted.act", "SECOND", None),
             ("real_function_binary_hypot.act", "LENGTH", "RT_F_HYPOT"),
+            ("real_function_nested_postfix.act", "LENGTH", "RT_F_HYPOT"),
+            ("real_function_local_nested_postfix.act", "LENGTH", "RT_F_HYPOT"),
         ):
             with self.subTest(fixture=fixture_name):
                 self._compile_and_link_real_function_fixture(
