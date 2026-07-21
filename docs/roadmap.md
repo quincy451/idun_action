@@ -1189,7 +1189,21 @@ Retired roadmap items for CP/M-era runner flows are no longer maintained.
 - Native ALINK now stabilizes paged body-selector records before recursive
   import lookups; an 11-import object regression crosses that source-window
   boundary.
-- Current native inventories are 1,341 broad and 298 compiled-runtime cases;
+- At that checkpoint native inventories were 1,341 broad and 298 compiled-runtime cases;
   native pass 6 is 8,093 bytes with 99 bytes free. The native MATH1 gap is 28
   public routines, and remaining Idun source bodies still need reachable-only
   packaging.
+
+## 2026-07-21 Native Binary REAL Function Return Parity
+
+- Native body collection now routes REAL return expressions through the same
+  bounded parser used by assignments and conditions without expanding pass 6.
+- Pass K emits a selected binary helper call over two REAL parameters into a
+  hidden four-byte result cell, then returns its pointer. Supported bounded
+  operations are arithmetic, min/max, remainder, and hypotenuse.
+- Added the shared `real_function_binary_hypot.act` fixture to Linux compile,
+  link, and VICE coverage. The same source produces binary32 5.0 in native VICE
+  while ALINK excludes staged sibling modules.
+- Current native inventories are 1,342 broad and 174 non-runtime source-backed
+  shapes; the compiled-runtime oracle remains 298. Native pass K is 5,877 bytes
+  with 2,315 bytes free. No Idun runtime change was required.

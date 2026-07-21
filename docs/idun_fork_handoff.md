@@ -1,6 +1,6 @@
 # Idun Fork Handoff
 
-Status as of 2026-07-20: the active ActionC64U fork is a self-contained Linux
+Status as of 2026-07-21: the active ActionC64U fork is a self-contained Linux
 toolchain for the Idun cartridge. Linux processes manage projects, edit and
 index source, provide external SQLite language help, compile Action source,
 link selected 6502 runtime modules, inspect debug sidecars, and emit native
@@ -183,7 +183,8 @@ instruction stepping, and persistent-breakpoint reinstallation are
 implemented. Full IEEE-754, MATH1, GFX1, ASMBLOCK, graphics resources, resource
 editors, formatting, external help, direct-PRG execution, and signed Alpine
   packaging are implemented. Required Idun work remains for reachable-only
-  packaging of full-source libraries: `FTrunc` is independently selected, but
+  packaging of full-source libraries: `FTrunc`, `FFloor`, `FCeil`, `FRound`,
+  `FFrac`, `FMod`, and `FHypot` are independently selected, but
   `INCLUDE "MATH1"` currently emits every other implementation body into the
   selected application object. Attached-hardware
   validation and normal release integration also remain. Cross-product UDOS
@@ -198,8 +199,9 @@ workspace management, or DNP packaging.
 The native MATH1 header now exposes all eight constants as zero-code compile-
 time values and keeps each implemented call in an independently selected OBJ1
 module. The shared `math1_constants_include.act` fixture compiles and links in
-both products. Idun now lowers `FTrunc` to the same shared dependency-free
-object. Its remaining full-source implementation is functionally correct but
+both products. Idun now lowers `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`,
+`FMod`, and `FHypot` to shared independently selected objects. Its remaining
+full-source implementation is functionally correct but
 is not yet size-selective, so pruning that root object is required rather than
 treating its code growth as an operating-system difference.
 
@@ -339,10 +341,23 @@ assignment, direct-print, and REAL-condition forms. Exact host checks cover
 116-pair Idun VICE fixture, focused native direct PRG, and complete native
 MATH1 matrix prove end-to-end behavior, complete closure, and sibling pruning.
 The same slice fixes native ALINK paged-object import discovery, with an
-11-import regression crossing the source-window boundary. Current native
-inventories are 1,341 broad, 173 non-runtime source-backed, and 298
+11-import regression crossing the source-window boundary. At that checkpoint native
+inventories were 1,341 broad, 173 non-runtime source-backed, and 298
 compiled-runtime relocation-oracle cases. Native pass 6 is 8,093 bytes with 99
 bytes free; the native MATH1 gap is 28 public routines.
+
+The 2026-07-21 native selected-binary return slice routes REAL `RETURN(...)`
+through the body overlay's bounded value parser. Pass K accepts a two-REAL-
+parameter function returning one selected arithmetic, min/max, remainder, or
+hypotenuse expression and writes it through a hidden non-aliasing result cell.
+The shared `real_function_binary_hypot.act` fixture compiles and links with
+Linux ACTC/ALINK and native ACTC/ALINK; the native direct PRG selects only the
+twelve-module conversion/hypotenuse closure and writes binary32 5.0 in VICE.
+Current native
+inventories are 1,342 broad, 174 non-runtime source-backed, and 298
+compiled-runtime relocation-oracle cases. Pass K is 5,877 bytes with 2,315
+bytes free. The native MATH1 gap remains 28 public routines, and general native
+REAL trees, locals, nested calls, and frames remain pending.
 
 For a two-checkout release, run:
 

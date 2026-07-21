@@ -134,6 +134,10 @@ Remaining product work:
    Pass A's bounded identity form now captures its named return independently
    and can return either REAL parameter; the reordered shared fixture executes
    identically in both products.
+   Native pass K now also returns one selected binary operation over two REAL
+   parameters through a hidden result cell. The shared FHypot fixture compiles
+   and links in both products and produces binary32 5.0; arbitrary native REAL
+   trees and nested calls remain pending.
    Linux ACTC now lowers `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`, and `FHypot` to the same shared objects
    instead of embedding those MATH1 bodies. Remaining MATH1 source bodies still
    require reachable-only packaging. Linked external symbol expressions inside unchecked

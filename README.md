@@ -106,7 +106,12 @@ generic ALINK closure, and live VICE. Its bounded caller and callee storage
 roles now follow captured names, and both canonical and permuted shared fixtures
 compile, link, and execute in this fork. Native pass A also returns either named
 parameter in its bounded two-REAL-parameter identity form; a shared reordered
-second-return fixture writes 2.0 through both products. Native ACTC now lowers
+second-return fixture writes 2.0 through both products. Native pass K now also
+returns one selected binary expression over two REAL parameters through a
+hidden non-aliasing result cell. The shared `RETURN(FHypot(A,B))` fixture
+compiles and links in both products; native ALINK selects only its reachable
+closure and the direct PRG writes binary32 5.0 in VICE. This remains a bounded
+checkpoint rather than general native REAL lowering. Native ACTC now lowers
 `FSign`, `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`, `FHypot`, `FMin`, and `FMax` for named REAL operands and a bounded,
 storage-capturing `FClamp`
 ternary root through synchronized, independently selected target modules with

@@ -1158,6 +1158,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
             ("finite_real_min.act", "MIN2", "RT_F_CMP"),
             ("finite_real_min_permuted.act", "MIN2", "RT_F_CMP"),
             ("two_real_second_return_permuted.act", "SECOND", None),
+            ("real_function_binary_hypot.act", "LENGTH", "RT_F_HYPOT"),
         ):
             with self.subTest(fixture=fixture_name):
                 self._compile_and_link_real_function_fixture(

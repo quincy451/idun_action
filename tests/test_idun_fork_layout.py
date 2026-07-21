@@ -49,8 +49,8 @@ class TestIdunForkLayout(unittest.TestCase):
         self.assertIn("The constant foundation is complete", parity)
         self.assertIn("round-to-nearest, ties-to-even", parity)
         self.assertIn("Dedicated pass K", parity)
-        self.assertIn("1,341 broad", parity)
-        self.assertIn("173 non-runtime source-backed object-emission shapes", parity)
+        self.assertIn("1,342 broad", parity)
+        self.assertIn("174 non-runtime source-backed object-emission shapes", parity)
         self.assertIn("298 compiled-runtime relocation-oracle cases", parity)
         self.assertIn("fifteen link-selected callable builtins", parity)
         self.assertIn("remaining 28 MATH1 routines", parity)
@@ -60,11 +60,11 @@ class TestIdunForkLayout(unittest.TestCase):
         self.assertIn("RT_F_FRAC.OBJ", parity)
         self.assertIn("RT_F_MOD.OBJ", parity)
         self.assertIn("RT_F_HYPOT.OBJ", parity)
-        self.assertIn("799 native ActionC64U unittests", parity)
+        self.assertIn("801 native ActionC64U unittests", parity)
         self.assertIn("152 Idun/Alpine unittests", parity)
         self.assertIn("137 Idun ASan/UBSan tests", parity)
         self.assertIn("21 Idun direct-PRG tests", parity)
-        self.assertIn("210-test overlay suite and 198-test source-cache suite", parity)
+        self.assertIn("211-test overlay suite and 198-test source-cache suite", parity)
         self.assertIn("Generalize native REAL", parity)
         self.assertIn("MATH1 reachable-only packaging", parity)
         self.assertIn("call-graph pruning", parity)
@@ -74,10 +74,10 @@ class TestIdunForkLayout(unittest.TestCase):
         handoff = (self.root / "docs" / "idun_fork_handoff.md").read_text(
             encoding="ascii"
         )
-        self.assertIn("Current native\ninventories are 1,341 broad", handoff)
+        self.assertIn("Current native\ninventories are 1,342 broad", handoff)
         self.assertIn("298\ncompiled-runtime relocation-oracle cases", handoff)
         self.assertIn("Native pass 6 is 8,093 bytes with 99\nbytes free", handoff)
-        self.assertIn("native MATH1 gap is 28 public routines", handoff)
+        self.assertIn("native MATH1 gap remains 28 public routines", handoff)
         self.assertIn("RT_F_HYPOT.OBJ", handoff)
 
     def test_retirement_manifest_covers_every_preserved_udos_directory(self) -> None:

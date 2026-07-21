@@ -4,6 +4,11 @@ The Idun fork runs its development tools as Alpine Linux processes and emits
 directly runnable C64 PRGs. This index separates the active Idun product
 contract from preserved native-UDOS design material.
 
+The active product and cross-product status documents were reconciled on
+2026-07-21. `udos_feature_parity.md` is the authoritative list of portable
+features still missing from the native product; Linux/UDOS mechanisms are not
+parity requirements.
+
 ## Authoritative Product Documents
 
 - `../README.md`: product overview, commands, builds, and verification.

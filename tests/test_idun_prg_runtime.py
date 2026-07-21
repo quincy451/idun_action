@@ -190,7 +190,19 @@ class TestIdunPrgRuntime(unittest.TestCase):
             workspace = Path(tmp)
             shared_lib = workspace / "LIB"
             shared_lib.mkdir()
-            for name in ("rt_f_cmp.obj", "rt_f_special.obj"):
+            for name in (
+                "rt_f_abs.obj",
+                "rt_f_add.obj",
+                "rt_f_addsub_core.obj",
+                "rt_f_cmp.obj",
+                "rt_f_div.obj",
+                "rt_f_hypot.obj",
+                "rt_f_max.obj",
+                "rt_f_min.obj",
+                "rt_f_mul.obj",
+                "rt_f_special.obj",
+                "rt_f_sqrt.obj",
+            ):
                 shutil.copy2(
                     ROOT / "src" / "runtime" / "modules" / name,
                     shared_lib / name.upper(),
@@ -254,6 +266,7 @@ class TestIdunPrgRuntime(unittest.TestCase):
             ("finite_real_min.act", 1.0),
             ("finite_real_min_permuted.act", 1.0),
             ("two_real_second_return_permuted.act", 2.0),
+            ("real_function_binary_hypot.act", 5.0),
         ):
             with self.subTest(fixture=fixture_name):
                 self._assert_real_function_fixture_executes(
