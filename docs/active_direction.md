@@ -141,9 +141,11 @@ Remaining product work:
    binary, and `FClamp` trees. It also supports up to two nonrecursive
    two-REAL-parameter functions, each with bounded all-REAL static locals and
    DBG1 local records. `MAIN` may call either function, and a later function may
-   assign an earlier function's result. The shared call-chain fixture produces
-   binary32 5.0 under both toolchains. General call graphs, reentrant local
-   frames, control flow, nested call expressions, mixed types, arbitrary
+   assign an earlier function's result or use that call directly in a supported
+   intrinsic return tree. The shared call-chain and nested local-call-expression
+   fixtures produce binary32 5.0 under both toolchains. General call graphs,
+   reentrant local frames, control flow, user calls as arguments to other user
+   calls, unrestricted nested call expressions, mixed types, arbitrary
    signatures, and recursive frames remain pending.
    Linux ACTC now lowers `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`,
    `FHypot`, `FMin`, and `FMax` to the same shared objects instead of embedding

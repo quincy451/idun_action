@@ -26,11 +26,12 @@ architecture and UDOS resident/REU mechanics intentionally do not.
 
 The latest shared compiler fixtures exercise two nonrecursive
 two-REAL-parameter functions, bounded all-REAL locals, and one declaration-order
-function edge. Linux ACTC/ALINK and native ACTC/ALINK accept the same call-chain
-source; `MAIN -> CHAIN -> LENGTH` returns binary32 5.0 in both products through
-ordinary OBJ1 relocations. The native static-frame form rejects forward and
-cyclic edges. This is a bounded ABI checkpoint, not general function/frame
-parity; the remaining work is listed in `udos_feature_parity.md`.
+function edge. Linux ACTC/ALINK and native ACTC/ALINK accept both the assignment
+call-chain source and a form that feeds `LENGTH(A,B)` directly into `FMax`;
+`MAIN -> CHAIN -> LENGTH` returns binary32 5.0 in both products through ordinary
+OBJ1 relocations. The native static-frame form rejects forward and cyclic edges.
+This is a bounded ABI checkpoint, not general function/frame parity; the
+remaining work is listed in `udos_feature_parity.md`.
 
 ## Authoritative Product Documents
 

@@ -1308,3 +1308,22 @@ Retired roadmap items for CP/M-era runner flows are no longer maintained.
   general frame-capable compiler. Current native inventories are 1,348 broad
   direct-PRG and 180 non-runtime source-backed shapes; the compiled-runtime
   oracle remains 298. Native pass L is 5,667 bytes with 2,525 bytes free.
+
+## 2026-07-21 Native Nested Local REAL Call Expression Parity
+
+- Native ACTC now recognizes an earlier two-REAL-parameter function as an
+  operand inside a supported intrinsic return tree while retaining the existing
+  `C` body opcode, OBJ1 export relocation, and A/X result-pointer ABI.
+- Native pass 7 traverses the local call arguments for helper dependencies
+  without introducing a phantom unresolved import. ALINK therefore continues to
+  select only the transitive runtime closure referenced by emitted relocations.
+- Added byte-identical `real_function_nested_local_call_postfix.act` fixtures.
+  The later function returns `FMax(LENGTH(A,B),FAbs(A))`; both toolchains produce
+  binary32 5.0, and native VICE verifies both the module result and nested-call
+  temporary while selecting only `FAbs`, `FHypot`, `FMax`, conversion, and
+  printing.
+- Current native inventories are 1,349 broad direct-PRG and 181 non-runtime
+  source-backed shapes; the compiled-runtime oracle remains 298. Native pass L
+  remains 5,667 bytes with 2,525 bytes free, while native pass 7 is 6,678 bytes
+  with 1,514 bytes free. General/reentrant call graphs remain native work; the
+  Linux compiler already supports them.
