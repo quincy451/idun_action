@@ -1120,7 +1120,22 @@ Retired roadmap items for CP/M-era runner flows are no longer maintained.
 - Exact host checks, 116 Idun VICE vectors, and a focused native VICE PRG prove
   complete binary32 behavior, `ceil -> floor -> trunc` ALINK closure, and
   sibling pruning.
-- Current native inventories are 1,337 broad and 294 compiled-runtime cases;
-  native pass 6 is 8,062 bytes with 130 bytes free. The native MATH1 gap is 32
+- At that checkpoint native inventories were 1,337 broad and 294
+  compiled-runtime cases; native pass 6 was 8,062 bytes with 130 bytes free.
+
+## 2026-07-20 Shared MATH1 Round
+
+- Added the 152-byte `RT_F_ROUND.OBJ` to the shared manifest. It imports only
+  `RT_F_TRUNC.OBJ`, supports aliased source/destination pointers, preserves NaN
+  payloads, infinities, signed zero, and integral values, and rounds nearest
+  with halfway cases away from zero.
+- Linux ACTC parses and constant-folds `FRound`, emits `RT_F_ROUND` only for
+  dynamic expressions, and no longer compiles a portable MATH1 round body.
+  Native ACTC recognizes assignment, direct-print, and REAL-condition forms.
+- Exact host checks, 116 Idun VICE vectors, and a focused native direct PRG
+  prove large-integral preservation, `round -> trunc` ALINK closure, and sibling
+  pruning.
+- Current native inventories are 1,338 broad and 295 compiled-runtime cases;
+  native pass 6 is 8,074 bytes with 118 bytes free. The native MATH1 gap is 31
   public routines, and the remaining Idun source bodies still need reachable-
   only packaging.

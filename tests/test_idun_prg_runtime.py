@@ -500,6 +500,7 @@ class TestIdunPrgRuntime(unittest.TestCase):
             "rt_f_div.obj",
             "rt_f_floor.obj",
             "rt_f_ceil.obj",
+            "rt_f_round.obj",
             "rt_f_mul.obj",
             "rt_f_sqrt.obj",
             "rt_f_sub.obj",
@@ -543,6 +544,7 @@ class TestIdunPrgRuntime(unittest.TestCase):
                 "REAL truncresult=$C035\n"
                 "REAL floorresult=$C039\n"
                 "REAL ceilresult=$C03D\n"
+                "REAL roundresult=$C041\n"
                 "PROC MAIN()\n"
                 "addresult=a+b\n"
                 "subresult=a-b\n"
@@ -556,6 +558,7 @@ class TestIdunPrgRuntime(unittest.TestCase):
                 "truncresult=FTrunc(a)\n"
                 "floorresult=FFloor(a)\n"
                 "ceilresult=FCeil(a)\n"
+                "roundresult=FRound(a)\n"
                 "eqresult=0\n"
                 "neresult=0\n"
                 "ltresult=0\n"
@@ -610,6 +613,16 @@ class TestIdunPrgRuntime(unittest.TestCase):
                 (0x3F800001, 0x33800000),
                 (float32_bits(-32768.5), 0x3F800000),
                 (float32_bits(32767.75), 0x3F800000),
+                (float32_bits(0.25), 0x3F800000),
+                (float32_bits(-0.25), 0x3F800000),
+                (float32_bits(0.5), 0x3F800000),
+                (float32_bits(-0.5), 0x3F800000),
+                (float32_bits(1.5), 0x3F800000),
+                (float32_bits(-1.5), 0x3F800000),
+                (float32_bits(2.5), 0x3F800000),
+                (float32_bits(-2.5), 0x3F800000),
+                (float32_bits(8388607.5), 0x3F800000),
+                (float32_bits(8388609.0), 0x3F800000),
             ]
             random_source = random.Random(0x754)
             while len(vectors) < 116:
@@ -663,7 +676,7 @@ class TestIdunPrgRuntime(unittest.TestCase):
                         right = float32_from_bits(right_bits)
                         card_input = (index * 997) & 0xFFFF
                         int_input = ((index * 613) & 0xFFFF) - 32768
-                        memory = bytearray(0x41)
+                        memory = bytearray(0x45)
                         struct.pack_into("<II", memory, 0, left_bits, right_bits)
                         struct.pack_into("<Hh", memory, 0x30, card_input, int_input)
                         vice_context.load_prg(project / "BIN" / "MAIN.PRG")
@@ -679,7 +692,7 @@ class TestIdunPrgRuntime(unittest.TestCase):
                             1,
                             "generated IEEE runtime probe did not finish",
                         )
-                        output = vice_context.monitor.memory_get(0xC008, 0xC040)
+                        output = vice_context.monitor.memory_get(0xC008, 0xC044)
                         actual_reals = [
                             struct.unpack_from("<I", output, offset)[0]
                             for offset in range(0, 32, 4)
@@ -764,6 +777,23 @@ class TestIdunPrgRuntime(unittest.TestCase):
                         self.assertEqual(
                             struct.unpack_from("<I", output, 0x35)[0],
                             expected_ceil,
+                        )
+                        if binary32_is_nan(left_bits) or math.isinf(left):
+                            expected_round = left_bits
+                        elif expected_trunc == left_bits:
+                            expected_round = left_bits
+                        elif abs(left) < 0.5:
+                            expected_round = left_bits & 0x80000000
+                        else:
+                            magnitude = math.floor(abs(left) + 0.5)
+                            expected_round = float32_bits(
+                                -float(magnitude)
+                                if left_bits & 0x80000000
+                                else float(magnitude)
+                            )
+                        self.assertEqual(
+                            struct.unpack_from("<I", output, 0x39)[0],
+                            expected_round,
                         )
             finally:
                 vice_context.stop()

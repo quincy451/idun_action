@@ -185,9 +185,11 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
             self.assertNotRegex(math_object, r"(?m)^x FTRUNC \d+ \d+$")
             self.assertNotRegex(math_object, r"(?m)^x FFLOOR \d+ \d+$")
             self.assertNotRegex(math_object, r"(?m)^x FCEIL \d+ \d+$")
+            self.assertNotRegex(math_object, r"(?m)^x FROUND \d+ \d+$")
             self.assertIn("\nu RT_F_TRUNC\n", math_object)
             self.assertIn("\nu RT_F_FLOOR\n", math_object)
-            self.assertIn("\nu RT_F_CEIL\n", math_object)
+            self.assertNotIn("\nu RT_F_CEIL\n", math_object)
+            self.assertNotIn("\nu RT_F_ROUND\n", math_object)
             self.run_tool(math_project, "alink", "main")
 
             self.run_tool(root, "actnew", "gfxdemo")
@@ -1338,6 +1340,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 "rt_f_div.obj",
                 "rt_f_floor.obj",
                 "rt_f_ceil.obj",
+                "rt_f_round.obj",
                 "rt_f_mul.obj",
                 "rt_f_sign.obj",
                 "rt_f_sqrt.obj",
@@ -1367,7 +1370,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                     [
                         "PROC MAIN()",
                         "CARD n",
-                        "REAL a=[1.5],b=[2.0],sum,difference,product,quotient,root,absolute,truncated,floored,ceiled,fromint",
+                        "REAL a=[1.5],b=[2.0],sum,difference,product,quotient,root,absolute,truncated,floored,ceiled,rounded,fromint",
                         "n = 3",
                         "sum = a + b",
                         "difference = a - b",
@@ -1378,6 +1381,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                         "truncated = FTrunc(difference)",
                         "floored = FFloor(difference)",
                         "ceiled = FCeil(difference)",
+                        "rounded = FRound(difference)",
                         "fromint = REAL(n)",
                         "IF sum > a THEN",
                         "PrintRE(sum)",
@@ -1402,6 +1406,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 "RT_F_TRUNC",
                 "RT_F_FLOOR",
                 "RT_F_CEIL",
+                "RT_F_ROUND",
                 "RT_I_TO_F",
                 "RT_F_CMP",
                 "RT_PRINT_F",
@@ -1423,6 +1428,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 "RT_F_TRUNC",
                 "RT_F_FLOOR",
                 "RT_F_CEIL",
+                "RT_F_ROUND",
                 "RT_I_TO_F",
                 "RT_F_CMP",
                 "RT_PRINT_F",
@@ -1456,6 +1462,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                         "REAL truncated=[FTrunc(-1.75)]",
                         "REAL floored=[FFloor(-1.25)]",
                         "REAL ceiled=[FCeil(1.25)]",
+                        "REAL callrounded=[FRound(2.5)]",
                         "IF 1.0 < 2.0 THEN",
                         "PrintRE(x)",
                         "FI",
@@ -1480,6 +1487,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 "RT_F_TRUNC",
                 "RT_F_FLOOR",
                 "RT_F_CEIL",
+                "RT_F_ROUND",
             ):
                 self.assertNotIn(f"\nu {symbol}\n", obj_text)
             lines = obj_text.splitlines()
@@ -1501,6 +1509,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 "MAIN_TRUNCATED_B0": bytes.fromhex("000080BF"),
                 "MAIN_FLOORED_B0": bytes.fromhex("000000C0"),
                 "MAIN_CEILED_B0": bytes.fromhex("00000040"),
+                "MAIN_CALLROUNDED_B0": bytes.fromhex("00004040"),
             }
             for symbol, value in expected.items():
                 offset = exports[symbol]
@@ -2963,6 +2972,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 "FABS",
                 "FTRUNC",
                 "FCEIL",
+                "FROUND",
                 "SIDFREQ",
             ):
                 self.assertNotIn(f"\nx {declaration} ", obj_text)

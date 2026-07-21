@@ -26,7 +26,7 @@ The limits that remain are the intrinsic binary32 limits:
 
 Source forms include decimal and exponent literals, `INF`/`INFINITY`, `NAN`,
 `+`, `-`, `*`, `/`, comparisons, `REAL(integer)`, `INT(real)`, `FAbs`,
-`FSqrt`, `FSign`, `FTrunc`, `FFloor`, `FCeil`, `FMin`, `FMax`, `FClamp`, `PrintR`, and `PrintRE`.
+`FSqrt`, `FSign`, `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FMin`, `FMax`, `FClamp`, `PrintR`, and `PrintRE`.
 
 Rules:
 
@@ -47,6 +47,9 @@ Rules:
   signed zero, infinities, NaN payloads, and integral values
 - `FCeil` rounds finite nonintegers toward positive infinity and preserves
   signed zero, infinities, NaN payloads, and integral values
+- `FRound` rounds finite nonintegers to the nearest integer with halfway cases
+  away from zero and preserves signed zero, infinities, NaN payloads, and
+  integral values
 - `FClamp(value,lower,upper)` returns canonical quiet NaN if any argument is
   NaN or if `lower>upper`; otherwise it returns
   `FMin(FMax(value,lower),upper)` with selected operand bits preserved
@@ -76,6 +79,9 @@ ALINK resolves the following standalone helper symbols:
 - `rt_f_cmp`
 - `rt_f_sign`
 - `rt_f_trunc`
+- `rt_f_floor`
+- `rt_f_ceil`
+- `rt_f_round`
 - `rt_f_min`
 - `rt_f_max`
 - `rt_f_clamp`
@@ -106,6 +112,15 @@ Specific return conventions are:
 - `rt_f_trunc` clears only fractional significand bits, preserves NaN payloads,
   infinities, signed zero, and integral values, and has no imported helper
   dependency
+- `rt_f_floor` rounds finite nonintegers toward negative infinity, preserves
+  NaN payloads, infinities, signed zero, and integral values, and imports only
+  `rt_f_trunc`
+- `rt_f_ceil` rounds finite nonintegers toward positive infinity, preserves
+  NaN payloads, infinities, signed zero, and integral values, and imports
+  `rt_f_floor` plus its transitive `rt_f_trunc` dependency
+- `rt_f_round` rounds finite nonintegers nearest with halfway cases away from
+  zero, preserves NaN payloads, infinities, signed zero, and integral values,
+  and imports only `rt_f_trunc`
 - `rt_f_min` and `rt_f_max` write through `$06/$07`, ignore one NaN, select the
   right operand when both inputs are NaN, and preserve the left operand's exact
   bits when ordered values compare equal; both import `rt_f_cmp`
@@ -156,6 +171,7 @@ source:
   compile into ordinary reachable code where they remain source-defined
 - `FFloor(r)` imports `rt_f_floor` plus its transitive `rt_f_trunc` dependency
 - `FCeil(r)` imports `rt_f_ceil` plus transitive `rt_f_floor` and `rt_f_trunc`
+- `FRound(r)` imports `rt_f_round` plus transitive `rt_f_trunc`
 - `FMin(a,b)` and `FMax(a,b)` import only the selected helper plus its comparison
   closure
 - direct `FClamp(value,lower,upper)` imports `rt_f_clamp` plus its

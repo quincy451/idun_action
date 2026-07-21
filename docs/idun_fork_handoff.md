@@ -289,10 +289,21 @@ constant-folds, and emits the intrinsic, and MATH1 no longer emits its portable
 ceiling body. Native ACTC owns bounded assignment, direct-print, and
 REAL-condition forms. Exact host checks, 116 Idun VICE vectors, and a focused
 native direct-PRG launch prove binary32 semantics, aliased-pointer safety,
-`ceil -> floor -> trunc` closure, and sibling pruning. Current native
-inventories are 1,337 broad, 173 non-runtime source-backed, and 294
-compiled-runtime relocation-oracle cases. Native pass 6 is 8,062 bytes with
-130 bytes free; the native MATH1 gap is 32 public routines.
+`ceil -> floor -> trunc` closure, and sibling pruning. At that checkpoint native
+inventories were 1,337 broad, 173 non-runtime source-backed, and 294
+compiled-runtime relocation-oracle cases.
+
+The following shared `FRound` slice adds a 152-byte OBJ1 module that imports
+only `RT_F_TRUNC.OBJ`. It rounds nearest with halfway cases away from zero,
+preserves NaN payloads, infinities, signed zero, and integral values, and avoids
+the large-integral error caused by adding or subtracting 0.5. Linux ACTC
+constant-folds constant calls and selects `RT_F_ROUND` only for dynamic calls;
+native ACTC owns bounded assignment, direct-print, and REAL-condition forms.
+Exact host checks, 116 Idun VICE vectors, and the focused native direct PRG
+prove alias safety, `round -> trunc` closure, and sibling pruning. Current
+native inventories are 1,338 broad, 173 non-runtime source-backed, and 295
+compiled-runtime relocation-oracle cases. Native pass 6 is 8,074 bytes with
+118 bytes free; the native MATH1 gap is 31 public routines.
 
 For a two-checkout release, run:
 
