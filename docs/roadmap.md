@@ -1135,7 +1135,24 @@ Retired roadmap items for CP/M-era runner flows are no longer maintained.
 - Exact host checks, 116 Idun VICE vectors, and a focused native direct PRG
   prove large-integral preservation, `round -> trunc` ALINK closure, and sibling
   pruning.
-- Current native inventories are 1,338 broad and 295 compiled-runtime cases;
-  native pass 6 is 8,074 bytes with 118 bytes free. The native MATH1 gap is 31
+- At that checkpoint native inventories were 1,338 broad and 295
+  compiled-runtime cases; native pass 6 was 8,074 bytes with 118 bytes free.
+  The native MATH1 gap was 31 public routines, and the remaining Idun source
+  bodies still needed reachable-only packaging.
+
+## 2026-07-20 Shared MATH1 Fractional Part
+
+- Added the 93-byte `RT_F_FRAC.OBJ` to the shared manifest. It imports
+  `RT_F_TRUNC.OBJ` and `RT_F_SUB.OBJ`, computes `value-FTrunc(value)`, and is
+  safe for aliased source/destination pointers.
+- Linux ACTC parses and constant-folds `FFrac`, emits `RT_F_FRAC` only for
+  dynamic expressions, and no longer compiles a portable MATH1 fractional-part
+  body. Native ACTC recognizes assignment, direct-print, and REAL-condition
+  forms.
+- Exact host checks, 116 Idun VICE vectors, and a focused native direct PRG
+  prove signed finite fractions, integral cancellation, exceptional-value
+  behavior, full dependency closure, and sibling pruning.
+- Current native inventories are 1,339 broad and 296 compiled-runtime cases;
+  native pass 6 is 8,085 bytes with 107 bytes free. The native MATH1 gap is 30
   public routines, and the remaining Idun source bodies still need reachable-
   only packaging.

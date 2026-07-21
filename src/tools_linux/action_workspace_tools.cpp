@@ -3613,6 +3613,7 @@ struct RealExprNode {
         Floor,
         Ceiling,
         Round,
+        Fraction,
     };
 
     Kind kind = Kind::Constant;
@@ -3837,7 +3838,7 @@ private:
 
         if (name != "REAL" && name != "FABS" && name != "FSQRT" &&
             name != "FTRUNC" && name != "FFLOOR" && name != "FCEIL" &&
-            name != "FROUND") {
+            name != "FROUND" && name != "FFRAC") {
             RealExprNode node;
             node.kind = RealExprNode::Kind::Call;
             node.name = std::move(name);
@@ -3870,6 +3871,8 @@ private:
             node.kind = RealExprNode::Kind::Ceiling;
         } else if (name == "FROUND") {
             node.kind = RealExprNode::Kind::Round;
+        } else if (name == "FFRAC") {
+            node.kind = RealExprNode::Kind::Fraction;
         }
         node.left = argument;
         return add_node(std::move(node));
@@ -3926,6 +3929,10 @@ std::optional<double> evaluate_real_expr_node(
     }
     if (node.kind == RealExprNode::Kind::Round) {
         return static_cast<double>(std::round(static_cast<float>(*lhs)));
+    }
+    if (node.kind == RealExprNode::Kind::Fraction) {
+        const float value = static_cast<float>(*lhs);
+        return static_cast<double>(static_cast<float>(value - std::trunc(value)));
     }
     auto rhs = evaluate_real_expr_node(expr, node.right, constants);
     if (!rhs) {
@@ -8153,6 +8160,7 @@ int cmd_actc(const std::vector<std::string>& args) {
                 upper.find("FFLOOR(") != std::string::npos ||
                 upper.find("FCEIL(") != std::string::npos ||
                 upper.find("FROUND(") != std::string::npos ||
+                upper.find("FFRAC(") != std::string::npos ||
                 upper.find('.') != std::string::npos) {
                 return true;
             }
@@ -9365,7 +9373,8 @@ int cmd_actc(const std::vector<std::string>& args) {
                 node.kind == RealExprNode::Kind::Truncate ||
                 node.kind == RealExprNode::Kind::Floor ||
                 node.kind == RealExprNode::Kind::Ceiling ||
-                node.kind == RealExprNode::Kind::Round) {
+                node.kind == RealExprNode::Kind::Round ||
+                node.kind == RealExprNode::Kind::Fraction) {
                 emit_set_real_pointer(lhs, 0x02);
                 emit_set_real_pointer(destination, 0x06);
                 const char* helper = "RT_F_TRUNC";
@@ -9379,6 +9388,8 @@ int cmd_actc(const std::vector<std::string>& args) {
                     helper = "RT_F_CEIL";
                 } else if (node.kind == RealExprNode::Kind::Round) {
                     helper = "RT_F_ROUND";
+                } else if (node.kind == RealExprNode::Kind::Fraction) {
+                    helper = "RT_F_FRAC";
                 }
                 emit_jsr_import(helper);
                 return destination;

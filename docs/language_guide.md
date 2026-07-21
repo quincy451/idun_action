@@ -125,7 +125,7 @@ storage size and the stack already in use by the surrounding program.
 
 REAL expressions support decimal/exponent literals, `INF`/`INFINITY`, `NAN`,
 `+`, `-`, `*`, `/`, comparisons, `REAL(integer)`, `INT(real)`, `FAbs`,
-`FSqrt`, `FTrunc`, `FFloor`, `FCeil`, `FRound`, `PrintR`, and `PrintRE`. Integer operands in REAL expressions are
+`FSqrt`, `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `PrintR`, and `PrintRE`. Integer operands in REAL expressions are
 promoted through the signed or unsigned conversion helper selected from their
 declaration. ACTC folds constant REAL trees with a binary32 rounding boundary
 after every operation and imports only the standalone 6502 helpers needed by

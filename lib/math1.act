@@ -1,6 +1,6 @@
 ; MATH1 IEEE-754 REAL32 library.
 ;
-; The core operators, FAbs, FSqrt, FTrunc, FFloor, FCeil, FRound, and REAL printing are
+; The core operators, FAbs, FSqrt, FTrunc, FFloor, FCeil, FRound, FFrac, and REAL printing are
 ; compiler/runtime primitives.  The routines below are ordinary Action
 ; functions so the same source can be copied to the native C64U branch.  Angles
 ; are in radians unless a function name explicitly mentions degrees.
@@ -24,6 +24,7 @@ REAL FUNC FTrunc(REAL value)
 REAL FUNC FFloor(REAL value)
 REAL FUNC FCeil(REAL value)
 REAL FUNC FRound(REAL value)
+REAL FUNC FFrac(REAL value)
 
 REAL FUNC FSign(REAL value)
     IF value<>value THEN
@@ -66,9 +67,6 @@ REAL FUNC FClamp(REAL value,lower,upper)
         RETURN(NAN)
     FI
     RETURN(FMin(FMax(value,lower),upper))
-
-REAL FUNC FFrac(REAL value)
-    RETURN(value-FTrunc(value))
 
 REAL FUNC FMod(REAL value,divisor)
     IF value<>value OR divisor<>divisor OR divisor=0.0 OR value=INF OR value=-INF THEN

@@ -300,10 +300,21 @@ the large-integral error caused by adding or subtracting 0.5. Linux ACTC
 constant-folds constant calls and selects `RT_F_ROUND` only for dynamic calls;
 native ACTC owns bounded assignment, direct-print, and REAL-condition forms.
 Exact host checks, 116 Idun VICE vectors, and the focused native direct PRG
-prove alias safety, `round -> trunc` closure, and sibling pruning. Current
-native inventories are 1,338 broad, 173 non-runtime source-backed, and 295
-compiled-runtime relocation-oracle cases. Native pass 6 is 8,074 bytes with
-118 bytes free; the native MATH1 gap is 31 public routines.
+prove alias safety, `round -> trunc` closure, and sibling pruning. At that
+checkpoint native inventories were 1,338 broad, 173 non-runtime source-backed,
+and 295 compiled-runtime relocation-oracle cases. Native pass 6 was 8,074 bytes
+with 118 bytes free; the native MATH1 gap was 31 public routines.
+
+The next shared `FFrac` slice adds a 93-byte OBJ1 module that imports
+`RT_F_TRUNC.OBJ` and `RT_F_SUB.OBJ` and computes `value-FTrunc(value)`. Linux
+ACTC constant-folds constant calls and selects `RT_F_FRAC` only for dynamic
+calls; native ACTC owns bounded assignment, direct-print, and REAL-condition
+forms. Exact host checks, 116 Idun VICE vectors, and the focused native direct
+PRG prove alias safety, signed finite fractions, integral cancellation,
+exceptional-value behavior, complete closure, and sibling pruning. Current
+native inventories are 1,339 broad, 173 non-runtime source-backed, and 296
+compiled-runtime relocation-oracle cases. Native pass 6 is 8,085 bytes with
+107 bytes free; the native MATH1 gap is 30 public routines.
 
 For a two-checkout release, run:
 
