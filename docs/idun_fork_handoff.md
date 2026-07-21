@@ -353,17 +353,21 @@ hypotenuse expression and writes it through a hidden non-aliasing result cell.
 The shared `real_function_binary_hypot.act` fixture compiles and links with
 Linux ACTC/ALINK and native ACTC/ALINK; the native direct PRG selects only the
 twelve-module conversion/hypotenuse closure and writes binary32 5.0 in VICE.
-Current native
-inventories are 1,342 broad, 174 non-runtime source-backed, and 298
+At that checkpoint native inventories were 1,342 broad, 174 non-runtime source-backed, and 298
 compiled-runtime relocation-oracle cases. Pass K is 5,877 bytes with 2,315
 bytes free. The following compiler preparation lets native passes 6 and 7
 traverse bounded REAL operands while retaining their capacity gates: pass 6 is
 8,094 bytes with 98 bytes free, and pass 7 is 6,587 bytes with 1,605 bytes free.
 A regression also crosses the production 1,280-byte source window inside a
-mixed unary/binary/ternary tree. Native machine emission remains fixed-shape,
-so no nested-source parity claim is made yet. The native MATH1 gap remains 28
-public routines, and general native REAL trees, locals, nested calls, and frames
-remain pending.
+mixed unary/binary/ternary tree. Native pass L now lowers that bounded postfix
+stream for a one-procedure, module-REAL-only, straight-line subset. Direct
+native ALINK/VICE cases execute nested binary and unary/binary/ternary trees,
+print `2`, preserve DBG1 source-variable records through `__idata`, and prune
+unreferenced helpers. Current native inventories are 1,344 broad, 176
+non-runtime source-backed, and 298 compiled-runtime relocation-oracle cases;
+pass L is 4,195 bytes with 3,997 bytes free. The native MATH1 gap remains 28
+public routines, and general functions, locals, control flow, mixed types,
+nested calls, and frames remain pending.
 
 For a two-checkout release, run:
 

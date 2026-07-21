@@ -1204,6 +1204,23 @@ Retired roadmap items for CP/M-era runner flows are no longer maintained.
 - Added the shared `real_function_binary_hypot.act` fixture to Linux compile,
   link, and VICE coverage. The same source produces binary32 5.0 in native VICE
   while ALINK excludes staged sibling modules.
-- Current native inventories are 1,342 broad and 174 non-runtime source-backed
-  shapes; the compiled-runtime oracle remains 298. Native pass K is 5,877 bytes
+- At that checkpoint native inventories were 1,342 broad and 174 non-runtime
+  source-backed shapes; the compiled-runtime oracle remained 298. Native pass K is 5,877 bytes
   with 2,315 bytes free. No Idun runtime change was required.
+
+## 2026-07-21 Native Nested REAL Postfix Parity
+
+- Native pass L, `ACTC_OVLL.BIN`, lowers the bounded child-first stream from
+  passes 6 and 7 into ordinary machine/data/export/import, relocation, line,
+  and variable OBJ1 records for a one-procedure module-REAL subset.
+- The supported straight-line surface includes integer conversion, REAL
+  assignment and printing, maintained unary/binary helpers, and nested ternary
+  `FClamp`; the general Linux compiler already accepts the same expressions.
+- Native direct ALINK/VICE probes execute `FMin(FMax(A,B),C)` and
+  `FClamp(FAbs(A),FMin(B,C),FMax(A,C))`, print `2`, retain DBG1 variables, and
+  prove reachable-only runtime closure. The second case also exercises
+  internal exports beyond offset 255.
+- Current native inventories are 1,344 broad and 176 non-runtime source-backed
+  shapes; the compiled-runtime oracle remains 298. Native pass L is 4,195 bytes
+  with 3,997 bytes free. No Idun runtime change was required; native functions,
+  locals, control flow, mixed types, arbitrary calls, and frames remain gaps.
