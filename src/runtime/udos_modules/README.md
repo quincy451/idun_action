@@ -77,6 +77,38 @@ Current status:
   `$06/$07`. It returns `-1.0` or `1.0` for nonzero values, maps any NaN to
   canonical quiet NaN, and preserves positive or negative zero bit-for-bit.
   It has no imports, so it remains independently link-selected.
+- `rt_f_trunc.obj` reads a REAL32 value through `$02/$03` and writes its
+  truncation toward zero through `$06/$07`. It preserves signed zero,
+  infinities, NaN payloads, and already integral values bit-for-bit, and has no
+  imports.
+- `rt_f_floor.obj` reads a REAL32 value through `$02/$03`, writes its floor
+  through `$06/$07`, and imports `rt_f_trunc.obj`. It preserves signed zero,
+  infinities, NaN payloads, and integral values; finite nonintegers round toward
+  negative infinity. Source and destination may alias.
+- `rt_f_ceil.obj` reads a REAL32 value through `$02/$03`, writes its ceiling
+  through `$06/$07`, and imports `rt_f_floor.obj` (and therefore transitively
+  `rt_f_trunc.obj`). It preserves signed zero, infinities, NaN payloads, and
+  integral values; finite nonintegers round toward positive infinity. Source
+  and destination may alias.
+- `rt_f_round.obj` reads a REAL32 value through `$02/$03`, writes the nearest
+  integral REAL32 through `$06/$07`, and imports `rt_f_trunc.obj`. Halfway cases
+  round away from zero; NaN payloads, infinities, signed zero, and integral
+  values are preserved. Source and destination may alias.
+- `rt_f_frac.obj` reads a REAL32 value through `$02/$03`, writes its signed
+  fractional part through `$06/$07`, and imports `rt_f_trunc.obj` plus
+  `rt_f_sub.obj`. It implements `value-FTrunc(value)`, is safe when source and
+  destination alias, and inherits the shared IEEE subtraction policy for
+  exceptional values.
+- `rt_f_mod.obj` reads REAL32 value and divisor pointers through `$02/$03` and
+  `$04/$05`, writes through `$06/$07`, and computes
+  `value-FTrunc(value/divisor)*divisor`. It preserves both operands privately,
+  so the destination may alias either input, and imports only the divide,
+  truncation, multiply, and subtraction closure when referenced.
+- `rt_f_hypot.obj` reads two REAL32 values through `$02/$03` and `$04/$05`,
+  writes through `$06/$07`, and computes a scaled hypotenuse through absolute
+  value, minimum, maximum, division, multiplication, addition, and square root.
+  The destination may alias either input. Two zero inputs produce positive
+  zero, and infinity takes precedence when paired with NaN.
 - `rt_f_sqrt.obj` reads a REAL32 value through zero page `$02/$03`, writes the
   result through `$06/$07`, and handles every non-negative normal,
   subnormal, and signed-zero value using an exact 48-bit scaled radicand and

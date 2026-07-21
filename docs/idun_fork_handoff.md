@@ -324,10 +324,25 @@ bounded assignment, direct-print, and REAL-condition forms. Exact host checks
 cover 332 vectors in each of the ordinary, left-alias, and right-alias modes.
 The 116-pair Idun VICE fixture and
 focused native direct PRG prove full exceptional-value behavior, complete
-closure, and sibling pruning. Current native inventories are 1,340 broad, 173
-non-runtime source-backed, and 297 compiled-runtime relocation-oracle cases.
-Native pass 6 is 8,094 bytes with 98 bytes free; the native MATH1 gap is 29
-public routines.
+closure, and sibling pruning. At that checkpoint native inventories were 1,340
+broad, 173 non-runtime source-backed, and 297 compiled-runtime
+relocation-oracle cases. Native pass 6 was 8,094 bytes with 98 bytes free; the
+native MATH1 gap was 29 public routines.
+
+The next shared `FHypot` slice adds the 503-byte `RT_F_HYPOT.OBJ`. It is safe
+when either source aliases its destination and uses a scaled maximum/minimum
+calculation through absolute value, minimum, maximum, division,
+multiplication, addition, and square root. Linux ACTC constant-folds constant
+calls and selects `RT_F_HYPOT` only for dynamic calls; native ACTC owns bounded
+assignment, direct-print, and REAL-condition forms. Exact host checks cover
+2,316 vectors in each of the ordinary, left-alias, and right-alias modes. The
+116-pair Idun VICE fixture, focused native direct PRG, and complete native
+MATH1 matrix prove end-to-end behavior, complete closure, and sibling pruning.
+The same slice fixes native ALINK paged-object import discovery, with an
+11-import regression crossing the source-window boundary. Current native
+inventories are 1,341 broad, 173 non-runtime source-backed, and 298
+compiled-runtime relocation-oracle cases. Native pass 6 is 8,093 bytes with 99
+bytes free; the native MATH1 gap is 28 public routines.
 
 For a two-checkout release, run:
 

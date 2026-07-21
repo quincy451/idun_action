@@ -186,6 +186,7 @@ class TestRepoLayout(unittest.TestCase):
             "rt_f_div",
             "rt_f_cmp",
             "rt_f_sign",
+            "rt_f_hypot",
             "rt_f_min",
             "rt_f_max",
             "rt_f_clamp",

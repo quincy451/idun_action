@@ -26,7 +26,7 @@ The limits that remain are the intrinsic binary32 limits:
 
 Source forms include decimal and exponent literals, `INF`/`INFINITY`, `NAN`,
 `+`, `-`, `*`, `/`, comparisons, `REAL(integer)`, `INT(real)`, `FAbs`,
-`FSqrt`, `FSign`, `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`, `FMin`, `FMax`, `FClamp`, `PrintR`, and `PrintRE`.
+`FSqrt`, `FSign`, `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`, `FHypot`, `FMin`, `FMax`, `FClamp`, `PrintR`, and `PrintRE`.
 
 Rules:
 
@@ -55,6 +55,9 @@ Rules:
 - `FMod(value,divisor)` returns `value-FTrunc(value/divisor)*divisor`; NaN,
   zero divisor, and infinite dividend return canonical quiet NaN, while a
   finite dividend with an infinite divisor is returned bit-for-bit
+- `FHypot(left,right)` uses a scaled maximum/minimum calculation to avoid
+  avoidable intermediate overflow and underflow; two zero inputs return
+  positive zero, and infinity takes precedence when paired with NaN
 - `FClamp(value,lower,upper)` returns canonical quiet NaN if any argument is
   NaN or if `lower>upper`; otherwise it returns
   `FMin(FMax(value,lower),upper)` with selected operand bits preserved
@@ -188,6 +191,8 @@ source:
 - `FFrac(r)` imports `rt_f_frac` plus its truncation and subtraction closure
 - `FMod(a,b)` imports `rt_f_mod` plus its division, truncation,
   multiplication, subtraction, and special-value closure
+- `FHypot(a,b)` imports `rt_f_hypot` plus its absolute-value,
+  minimum/maximum, division, multiplication, addition, and square-root closure
 - `FMin(a,b)` and `FMax(a,b)` import only the selected helper plus its comparison
   closure
 - direct `FClamp(value,lower,upper)` imports `rt_f_clamp` plus its

@@ -188,6 +188,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
             self.assertNotRegex(math_object, r"(?m)^x FROUND \d+ \d+$")
             self.assertNotRegex(math_object, r"(?m)^x FFRAC \d+ \d+$")
             self.assertNotRegex(math_object, r"(?m)^x FMOD \d+ \d+$")
+            self.assertNotRegex(math_object, r"(?m)^x FHYPOT \d+ \d+$")
             self.assertIn("\nu RT_F_TRUNC\n", math_object)
             self.assertIn("\nu RT_F_FLOOR\n", math_object)
             self.assertNotIn("\nu RT_F_CEIL\n", math_object)
@@ -1347,6 +1348,11 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 "rt_f_round.obj",
                 "rt_f_frac.obj",
                 "rt_f_mod.obj",
+                "rt_f_hypot.obj",
+                "rt_f_min.obj",
+                "rt_f_max.obj",
+                "rt_f_addsub_core.obj",
+                "rt_f_special.obj",
                 "rt_f_mul.obj",
                 "rt_f_sign.obj",
                 "rt_f_sqrt.obj",
@@ -1376,7 +1382,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                     [
                         "PROC MAIN()",
                         "CARD n",
-                        "REAL a=[1.5],b=[2.0],sum,difference,product,quotient,root,absolute,truncated,floored,ceiled,rounded,fractional,modulus,fromint",
+                        "REAL a=[1.5],b=[2.0],sum,difference,product,quotient,root,absolute,truncated,floored,ceiled,rounded,fractional,modulus,hypotenuse,fromint",
                         "n = 3",
                         "sum = a + b",
                         "difference = a - b",
@@ -1390,6 +1396,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                         "rounded = FRound(difference)",
                         "fractional = FFrac(difference)",
                         "modulus = FMod(a,b)",
+                        "hypotenuse = FHypot(a,b)",
                         "fromint = REAL(n)",
                         "IF sum > a THEN",
                         "PrintRE(sum)",
@@ -1417,6 +1424,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 "RT_F_ROUND",
                 "RT_F_FRAC",
                 "RT_F_MOD",
+                "RT_F_HYPOT",
                 "RT_I_TO_F",
                 "RT_F_CMP",
                 "RT_PRINT_F",
@@ -1441,6 +1449,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 "RT_F_ROUND",
                 "RT_F_FRAC",
                 "RT_F_MOD",
+                "RT_F_HYPOT",
                 "RT_I_TO_F",
                 "RT_F_CMP",
                 "RT_PRINT_F",
@@ -1478,6 +1487,15 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                         "REAL callfraction=[FFrac(-1.75)]",
                         "REAL callmod=[FMod(7.5,2.0)]",
                         "REAL callmodinf=[FMod(-1.75,INF)]",
+                        "REAL callhypot=[FHypot(3.0,4.0)]",
+                        "REAL callhypotsub=[FHypot(1.401298464324817E-45,0.0)]",
+                        "REAL callhypotlarge=[FHypot(3.0E38,3.0E38)]",
+                        "REAL callhypottiny=[FHypot(1.401298464324817E-45,1.401298464324817E-45)]",
+                        "REAL callhypotinfnan=[FHypot(INF,NAN)]",
+                        "REAL callhypotnaninf=[FHypot(NAN,INF)]",
+                        "REAL callhypotnanfinite=[FHypot(NAN,3.0)]",
+                        "REAL callhypotfinitenan=[FHypot(3.0,NAN)]",
+                        "REAL callhypotnegzero=[FHypot(-0.0,0.0)]",
                         "IF 1.0 < 2.0 THEN",
                         "PrintRE(x)",
                         "FI",
@@ -1505,6 +1523,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 "RT_F_ROUND",
                 "RT_F_FRAC",
                 "RT_F_MOD",
+                "RT_F_HYPOT",
             ):
                 self.assertNotIn(f"\nu {symbol}\n", obj_text)
             lines = obj_text.splitlines()
@@ -1530,6 +1549,15 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 "MAIN_CALLFRACTION_B0": bytes.fromhex("000040BF"),
                 "MAIN_CALLMOD_B0": bytes.fromhex("0000C03F"),
                 "MAIN_CALLMODINF_B0": bytes.fromhex("0000E0BF"),
+                "MAIN_CALLHYPOT_B0": bytes.fromhex("0000A040"),
+                "MAIN_CALLHYPOTSUB_B0": bytes.fromhex("01000000"),
+                "MAIN_CALLHYPOTLARGE_B0": bytes.fromhex("0000807F"),
+                "MAIN_CALLHYPOTTINY_B0": bytes.fromhex("01000000"),
+                "MAIN_CALLHYPOTINFNAN_B0": bytes.fromhex("0000807F"),
+                "MAIN_CALLHYPOTNANINF_B0": bytes.fromhex("0000807F"),
+                "MAIN_CALLHYPOTNANFINITE_B0": bytes.fromhex("B6C38740"),
+                "MAIN_CALLHYPOTFINITENAN_B0": bytes.fromhex("B6C38740"),
+                "MAIN_CALLHYPOTNEGZERO_B0": bytes.fromhex("00000000"),
             }
             for symbol, value in expected.items():
                 offset = exports[symbol]
@@ -2995,6 +3023,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 "FROUND",
                 "FFRAC",
                 "FMOD",
+                "FHYPOT",
                 "SIDFREQ",
             ):
                 self.assertNotIn(f"\nx {declaration} ", obj_text)

@@ -161,6 +161,7 @@ class TestIdunWorkspaceExport(unittest.TestCase):
                 "RT_F_ROUND.OBJ",
                 "RT_F_FRAC.OBJ",
                 "RT_F_MOD.OBJ",
+                "RT_F_HYPOT.OBJ",
                 "RT_F_MAX.OBJ",
                 "RT_F_MIN.OBJ",
                 "RT_F_MUL.OBJ",
@@ -218,6 +219,24 @@ class TestIdunWorkspaceExport(unittest.TestCase):
             self.assertIn("r 121 u0", mod_object)
             self.assertIn("r 210 u3", mod_object)
             self.assertIn("n rt_f_mod", mod_object)
+            hypot_object = (out / "LIB" / "RT_F_HYPOT.OBJ").read_text(
+                encoding="ascii"
+            )
+            self.assertIn("x rt_f_hypot 0 503", hypot_object)
+            self.assertIn("b u0u1u2u3u4u5u6M", hypot_object)
+            for dependency in (
+                "rt_f_abs",
+                "rt_f_max",
+                "rt_f_min",
+                "rt_f_div",
+                "rt_f_mul",
+                "rt_f_add",
+                "rt_f_sqrt",
+            ):
+                self.assertIn(f"u {dependency}", hypot_object)
+            self.assertIn("r 57 u0", hypot_object)
+            self.assertIn("r 432 u4", hypot_object)
+            self.assertIn("n rt_f_hypot", hypot_object)
             self.assertFalse(any((out / "LIB").glob("*.MOD")))
             self.assertTrue((out / "LIB" / "DBF1.ACT").is_file())
             self.assertTrue((out / "LIB" / "MATH1.ACT").is_file())

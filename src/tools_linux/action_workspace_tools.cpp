@@ -3607,6 +3607,7 @@ struct RealExprNode {
         Round,
         Fraction,
         Modulus,
+        Hypotenuse,
     };
 
     Kind kind = Kind::Constant;
@@ -3831,7 +3832,8 @@ private:
 
         if (name != "REAL" && name != "FABS" && name != "FSQRT" &&
             name != "FTRUNC" && name != "FFLOOR" && name != "FCEIL" &&
-            name != "FROUND" && name != "FFRAC" && name != "FMOD") {
+            name != "FROUND" && name != "FFRAC" && name != "FMOD" &&
+            name != "FHYPOT") {
             RealExprNode node;
             node.kind = RealExprNode::Kind::Call;
             node.name = std::move(name);
@@ -3846,7 +3848,7 @@ private:
         const std::size_t argument = parse_expr();
         skip_ws();
         std::optional<std::size_t> second_argument;
-        if (name == "FMOD") {
+        if (name == "FMOD" || name == "FHYPOT") {
             if (pos_ >= text_.size() || text_[pos_] != ',') {
                 throw ToolError("BAD REAL CALL");
             }
@@ -3877,6 +3879,8 @@ private:
             node.kind = RealExprNode::Kind::Fraction;
         } else if (name == "FMOD") {
             node.kind = RealExprNode::Kind::Modulus;
+        } else if (name == "FHYPOT") {
+            node.kind = RealExprNode::Kind::Hypotenuse;
         }
         node.left = argument;
         if (second_argument) {
@@ -3964,6 +3968,24 @@ std::optional<double> evaluate_real_expr_node(
         const float truncated = std::trunc(quotient);
         const float product = truncated * right;
         return static_cast<double>(left - product);
+    }
+    if (node.kind == RealExprNode::Kind::Hypotenuse) {
+        const float left_abs = std::fabs(left);
+        const float right_abs = std::fabs(right);
+        const float largest = std::isnan(left_abs)
+            ? right_abs
+            : ((std::isnan(right_abs) || left_abs >= right_abs) ? left_abs : right_abs);
+        const float smallest = std::isnan(left_abs)
+            ? right_abs
+            : ((std::isnan(right_abs) || left_abs <= right_abs) ? left_abs : right_abs);
+        if (std::isinf(largest) || largest == 0.0F) {
+            return static_cast<double>(largest);
+        }
+        const float ratio = smallest / largest;
+        const float square = ratio * ratio;
+        const float total = 1.0F + square;
+        const float root = std::sqrt(total);
+        return static_cast<double>(largest * root);
     }
     return static_cast<double>(left / right);
 }
@@ -8178,6 +8200,7 @@ int cmd_actc(const std::vector<std::string>& args) {
                 upper.find("FROUND(") != std::string::npos ||
                 upper.find("FFRAC(") != std::string::npos ||
                 upper.find("FMOD(") != std::string::npos ||
+                upper.find("FHYPOT(") != std::string::npos ||
                 upper.find('.') != std::string::npos) {
                 return true;
             }
@@ -9427,6 +9450,8 @@ int cmd_actc(const std::vector<std::string>& args) {
                 helper = "RT_F_DIV";
             } else if (node.kind == RealExprNode::Kind::Modulus) {
                 helper = "RT_F_MOD";
+            } else if (node.kind == RealExprNode::Kind::Hypotenuse) {
+                helper = "RT_F_HYPOT";
             } else {
                 throw ToolError("BAD REAL EXPR");
             }

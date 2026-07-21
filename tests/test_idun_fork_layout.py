@@ -49,16 +49,17 @@ class TestIdunForkLayout(unittest.TestCase):
         self.assertIn("The constant foundation is complete", parity)
         self.assertIn("round-to-nearest, ties-to-even", parity)
         self.assertIn("Dedicated pass K", parity)
-        self.assertIn("1,340 broad", parity)
+        self.assertIn("1,341 broad", parity)
         self.assertIn("173 non-runtime source-backed object-emission shapes", parity)
-        self.assertIn("297 compiled-runtime relocation-oracle cases", parity)
-        self.assertIn("fourteen link-selected callable builtins", parity)
-        self.assertIn("remaining 29 MATH1 routines", parity)
+        self.assertIn("298 compiled-runtime relocation-oracle cases", parity)
+        self.assertIn("fifteen link-selected callable builtins", parity)
+        self.assertIn("remaining 28 MATH1 routines", parity)
         self.assertIn("RT_F_FLOOR.OBJ", parity)
         self.assertIn("RT_F_CEIL.OBJ", parity)
         self.assertIn("RT_F_ROUND.OBJ", parity)
         self.assertIn("RT_F_FRAC.OBJ", parity)
         self.assertIn("RT_F_MOD.OBJ", parity)
+        self.assertIn("RT_F_HYPOT.OBJ", parity)
         self.assertIn("799 native ActionC64U unittests", parity)
         self.assertIn("152 Idun/Alpine unittests", parity)
         self.assertIn("137 Idun ASan/UBSan tests", parity)
@@ -69,6 +70,15 @@ class TestIdunForkLayout(unittest.TestCase):
         self.assertIn("call-graph pruning", parity)
         self.assertIn("The portable products are therefore not yet at full feature parity", parity)
         self.assertNotIn("binary32 folding remains", parity)
+
+        handoff = (self.root / "docs" / "idun_fork_handoff.md").read_text(
+            encoding="ascii"
+        )
+        self.assertIn("Current native\ninventories are 1,341 broad", handoff)
+        self.assertIn("298\ncompiled-runtime relocation-oracle cases", handoff)
+        self.assertIn("Native pass 6 is 8,093 bytes with 99\nbytes free", handoff)
+        self.assertIn("native MATH1 gap is 28 public routines", handoff)
+        self.assertIn("RT_F_HYPOT.OBJ", handoff)
 
     def test_retirement_manifest_covers_every_preserved_udos_directory(self) -> None:
         manifest_path = self.root / "resources" / "retired_udos_tools.json"

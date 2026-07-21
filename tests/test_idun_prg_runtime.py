@@ -503,6 +503,9 @@ class TestIdunPrgRuntime(unittest.TestCase):
             "rt_f_round.obj",
             "rt_f_frac.obj",
             "rt_f_mod.obj",
+            "rt_f_hypot.obj",
+            "rt_f_min.obj",
+            "rt_f_max.obj",
             "rt_f_mul.obj",
             "rt_f_sqrt.obj",
             "rt_f_sub.obj",
@@ -549,6 +552,7 @@ class TestIdunPrgRuntime(unittest.TestCase):
                 "REAL roundresult=$C041\n"
                 "REAL fracresult=$C045\n"
                 "REAL modresult=$C049\n"
+                "REAL hypotresult=$C04D\n"
                 "PROC MAIN()\n"
                 "addresult=a+b\n"
                 "subresult=a-b\n"
@@ -565,6 +569,7 @@ class TestIdunPrgRuntime(unittest.TestCase):
                 "roundresult=FRound(a)\n"
                 "fracresult=FFrac(a)\n"
                 "modresult=FMod(a,b)\n"
+                "hypotresult=FHypot(a,b)\n"
                 "eqresult=0\n"
                 "neresult=0\n"
                 "ltresult=0\n"
@@ -724,6 +729,29 @@ class TestIdunPrgRuntime(unittest.TestCase):
                 product = reference_multiply(truncated, right_bits)
                 return reference_subtract(left_bits, product)
 
+            def reference_hypot(left_bits: int, right_bits: int) -> int:
+                left_abs = left_bits & 0x7FFFFFFF
+                right_abs = right_bits & 0x7FFFFFFF
+                if binary32_is_nan(left_abs):
+                    largest = smallest = right_abs
+                elif binary32_is_nan(right_abs):
+                    largest = smallest = left_abs
+                else:
+                    largest = max(left_abs, right_abs)
+                    smallest = min(left_abs, right_abs)
+                if largest in (0, 0x7F800000):
+                    return largest
+                ratio = reference_divide(
+                    smallest,
+                    largest,
+                    float32_from_bits(smallest),
+                    float32_from_bits(largest),
+                )
+                square = reference_multiply(ratio, ratio)
+                total = float32_bits(1.0 + float32_from_bits(square))
+                root = float32_bits(math.sqrt(float32_from_bits(total)))
+                return reference_multiply(largest, root)
+
             def same_binary32(actual: int, expected: int) -> bool:
                 return actual == expected or (
                     binary32_is_nan(actual) and binary32_is_nan(expected)
@@ -745,7 +773,7 @@ class TestIdunPrgRuntime(unittest.TestCase):
                         right = float32_from_bits(right_bits)
                         card_input = (index * 997) & 0xFFFF
                         int_input = ((index * 613) & 0xFFFF) - 32768
-                        memory = bytearray(0x4D)
+                        memory = bytearray(0x51)
                         struct.pack_into("<II", memory, 0, left_bits, right_bits)
                         struct.pack_into("<Hh", memory, 0x30, card_input, int_input)
                         vice_context.load_prg(project / "BIN" / "MAIN.PRG")
@@ -761,7 +789,7 @@ class TestIdunPrgRuntime(unittest.TestCase):
                             1,
                             "generated IEEE runtime probe did not finish",
                         )
-                        output = vice_context.monitor.memory_get(0xC008, 0xC04C)
+                        output = vice_context.monitor.memory_get(0xC008, 0xC050)
                         actual_reals = [
                             struct.unpack_from("<I", output, offset)[0]
                             for offset in range(0, 32, 4)
@@ -871,6 +899,12 @@ class TestIdunPrgRuntime(unittest.TestCase):
                         self.assertEqual(
                             struct.unpack_from("<I", output, 0x41)[0],
                             reference_mod(left_bits, right_bits),
+                        )
+                        self.assertTrue(
+                            same_binary32(
+                                struct.unpack_from("<I", output, 0x45)[0],
+                                reference_hypot(left_bits, right_bits),
+                            )
                         )
             finally:
                 vice_context.stop()

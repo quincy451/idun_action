@@ -1170,7 +1170,26 @@ Retired roadmap items for CP/M-era runner flows are no longer maintained.
   right-alias modes. The 116-pair Idun
   VICE fixture and focused native direct PRG prove full semantics, complete
   dependency closure, and sibling pruning.
-- Current native inventories are 1,340 broad and 297 compiled-runtime cases;
-  native pass 6 is 8,094 bytes with 98 bytes free. The native MATH1 gap is 29
+- At that checkpoint native inventories were 1,340 broad and 297 compiled-runtime cases;
+  native pass 6 was 8,094 bytes with 98 bytes free. The native MATH1 gap was 29
+  public routines, and remaining Idun source bodies still need reachable-only
+  packaging.
+
+## 2026-07-20 Shared MATH1 Hypotenuse
+
+- Added the 503-byte alias-safe `RT_F_HYPOT.OBJ`, which computes a scaled
+  hypotenuse through seven independently selected direct dependencies and a
+  3,617-byte linked closure.
+- Linux ACTC parses and constant-folds `FHypot`, emits `RT_F_HYPOT` only for
+  dynamic calls, and no longer compiles the portable MATH1 FHypot body. Native
+  ACTC recognizes assignment, direct-print, and REAL-condition forms.
+- Exact host verification covers 2,316 vectors in ordinary, left-alias, and
+  right-alias modes. The 116-pair Idun VICE fixture, focused native launch, and
+  complete native MATH1 matrix pass.
+- Native ALINK now stabilizes paged body-selector records before recursive
+  import lookups; an 11-import object regression crosses that source-window
+  boundary.
+- Current native inventories are 1,341 broad and 298 compiled-runtime cases;
+  native pass 6 is 8,093 bytes with 99 bytes free. The native MATH1 gap is 28
   public routines, and remaining Idun source bodies still need reachable-only
   packaging.
