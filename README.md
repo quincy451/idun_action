@@ -122,7 +122,9 @@ arguments, and `FIRST -> SECOND` proves frame-preserved forward calls while an
 intrinsic temporary remains live. Native pass M additionally accepts one
 nonnested REAL-function `IF`/`ELSE`; the shared `PICK` fixture executes both
 arms and produces 3.0 then 4.0 in both toolchains through ordinary OBJ1
-relocations. Self and mutual cycles remain rejected.
+relocations. Native pass N accepts a second conditional, either sequentially
+or nested to depth two; the shared fixtures produce `43` and `143` in both
+toolchains. Self and mutual cycles remain rejected.
 Native ACTC now lowers
 `FSign`, `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`, `FHypot`, `FMin`, and `FMax` for named REAL operands and a bounded,
 storage-capturing `FClamp`

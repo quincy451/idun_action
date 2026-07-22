@@ -148,9 +148,11 @@ Remaining product work:
    3.0 under both toolchains. Native pass M now lowers one nonnested
    `IF`/`ELSE` per supported REAL function through `rt_f_cmp` and relocatable
    internal code labels; the shared fixture executes both arms and prints `34`
+   under both toolchains. Native pass N accepts a second conditional,
+   sequentially or nested to depth two; shared fixtures print `43` and `143`
    under both toolchains. General or recursive call graphs,
-   recursive/reentrant local frames, sequential/nested function controls,
-   loops, early returns, unrestricted user-call argument trees and nested call
+   recursive/reentrant local frames, loops, early returns, more than two
+   controls, deeper nesting, unrestricted user-call argument trees and nested call
    expressions, mixed types, arbitrary
    signatures, and recursive frames remain pending.
    Linux ACTC now lowers `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`,

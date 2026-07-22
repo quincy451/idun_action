@@ -1382,3 +1382,21 @@ Retired roadmap items for CP/M-era runner flows are no longer maintained.
   gate. Sequential/nested controls, loops, early returns, and recursive or
   reentrant native frames remain pending; Idun's general compiler remains the
   reference behavior.
+
+## 2026-07-22 Native Sequential/Nested REAL Control Parity
+
+- Native ActionC64U added pass N, `ACTC_OVLN.BIN`, for at most two controls per
+  supported REAL function. The controls may be sequential or nested to depth
+  two, and each uses independent relocatable false/end code exports.
+- Added byte-identical `real_function_sequential_if_else_postfix.act` and
+  `real_function_nested_if_else_postfix.act` fixtures. Native ACTC/ALINK/VICE
+  and Idun ACTC/ALINK's generated-6502 execution path both produce `43` and
+  `143`; the nested case covers inner true, inner false, and outer false paths.
+- Native passes L and M remain byte-identical. Pass N is 7,120 bytes with 1,072
+  bytes free under its dedicated 1 KiB capacity gate.
+- Current native inventories are 1,354 broad direct-PRG and 186 non-runtime
+  source-backed shapes; the native unittest inventory is 830, the overlay suite
+  is 228 tests, the source-cache suite is 198 tests, and the compiled-runtime
+  oracle remains 298. Loops, early returns, more than two controls, deeper
+  nesting, recursive/reentrant frames, mixed types, arbitrary signatures, and
+  recursion remain pending; Idun's general compiler remains the reference.

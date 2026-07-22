@@ -5,7 +5,7 @@ directly runnable C64 PRGs. This index separates the active Idun product
 contract from preserved native-UDOS design material.
 
 The active product and cross-product status documents were reconciled on
-2026-07-21. `udos_feature_parity.md` is the authoritative list of portable
+2026-07-22. `udos_feature_parity.md` is the authoritative list of portable
 features still missing from the native product; Linux/UDOS mechanisms are not
 parity requirements.
 
@@ -30,10 +30,12 @@ either declaration direction. Linux ACTC/ALINK and native ACTC/ALINK accept the
 assignment call chain, a form that feeds `LENGTH(A,B)` directly into `FMax`, and
 the frame-preserved `FIRST -> SECOND` forward edge. A further shared fixture
 executes both arms of one nonnested REAL-function `IF`/`ELSE`, producing 3.0
-then 4.0 in both products. The call cases and conditional use ordinary OBJ1
-relocations. Native self and mutual cycles remain rejected. This is a
-bounded ABI checkpoint, not general recursive/reentrant frame parity; the
-remaining work is listed in `udos_feature_parity.md`.
+then 4.0 in both products. Two additional shared fixtures execute two
+sequential controls and a depth-two nested pair, producing `43` and `143`.
+The call and control cases use ordinary OBJ1 relocations. Native self and mutual
+cycles remain rejected. This is a bounded ABI checkpoint, not general
+recursive/reentrant frame parity; the remaining work is listed in
+`udos_feature_parity.md`.
 
 ## Authoritative Product Documents
 

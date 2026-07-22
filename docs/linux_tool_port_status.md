@@ -26,7 +26,7 @@ programs and their selected runtime helpers remain native 6502 code.
 | ACT2SAVE / ACTSAVE | `act2save` / `actsave` | Compatibility aliases for `alink` |
 
 `STAGEINFO` is not an unfinished port. Its 6502 source was deleted with the
-retired AVM runner path; only an orphan historical linker configuration remains.
+retired bytecode runner path; only an orphan historical linker configuration remains.
 Its old REU staging diagnostics have no role in a Linux filesystem workflow.
 
 The multicall sources are under `src/tools_linux/`; the target service is
