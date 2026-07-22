@@ -1364,3 +1364,21 @@ Retired roadmap items for CP/M-era runner flows are no longer maintained.
   source-backed shapes; the native unittest inventory is 821 and the
   compiled-runtime oracle remains 298. Native pass L is 6,124 bytes with 2,068
   bytes free, while native pass 7 remains 6,678 bytes with 1,514 bytes free.
+
+## 2026-07-21 Native REAL Function IF/ELSE Parity
+
+- Native ActionC64U added pass M, `ACTC_OVLM.BIN`, for one nonnested
+  `IF`/`ELSE` per supported REAL function. It maps all six relations through
+  `rt_f_cmp` and relocates absolute long branches to internal `__rfN` and
+  `__reN` OBJ1 code exports, leaving ALINK source-agnostic.
+- Added byte-identical `real_function_if_else_postfix.act` fixtures. `PICK(3,4)`
+  takes the then arm and `PICK(4,3)` takes the `FMax` else arm. Native
+  ACTC/ALINK/VICE and Idun ACTC/ALINK's 6502 execution path both produce FIRST
+  3.0 and SECOND 4.0, displayed as `34` by the native direct PRG.
+- Current native inventories are 1,352 broad direct-PRG and 184 non-runtime
+  source-backed shapes; the native unittest inventory is 825 and the
+  compiled-runtime oracle remains 298. Native pass L stays 6,124 bytes with
+  2,068 bytes free; pass M is 6,998 bytes with 1,194 bytes free under its 1 KiB
+  gate. Sequential/nested controls, loops, early returns, and recursive or
+  reentrant native frames remain pending; Idun's general compiler remains the
+  reference behavior.

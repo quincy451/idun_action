@@ -145,9 +145,13 @@ Remaining product work:
    caller parameters, locals, and live temporaries across those edges. The
    shared backward call-chain and nested local-call-expression fixtures produce
    binary32 5.0; the nested user-call-argument and forward-call fixtures produce
-   3.0 under both toolchains. General or recursive call graphs,
-   recursive/reentrant local frames, control flow, unrestricted user-call
-   argument trees and nested call expressions, mixed types, arbitrary
+   3.0 under both toolchains. Native pass M now lowers one nonnested
+   `IF`/`ELSE` per supported REAL function through `rt_f_cmp` and relocatable
+   internal code labels; the shared fixture executes both arms and prints `34`
+   under both toolchains. General or recursive call graphs,
+   recursive/reentrant local frames, sequential/nested function controls,
+   loops, early returns, unrestricted user-call argument trees and nested call
+   expressions, mixed types, arbitrary
    signatures, and recursive frames remain pending.
    Linux ACTC now lowers `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`,
    `FHypot`, `FMin`, and `FMax` to the same shared objects instead of embedding

@@ -119,7 +119,10 @@ direction. The shared `MAIN -> CHAIN -> LENGTH` fixture returns binary32 5.0,
 the later function may use `LENGTH(A,B)` directly inside `FMax`, the shared
 `LOWER(LOWER(A,A),LOWER(B,B))` fixture proves independently spilled user-call
 arguments, and `FIRST -> SECOND` proves frame-preserved forward calls while an
-intrinsic temporary remains live. Self and mutual cycles remain rejected.
+intrinsic temporary remains live. Native pass M additionally accepts one
+nonnested REAL-function `IF`/`ELSE`; the shared `PICK` fixture executes both
+arms and produces 3.0 then 4.0 in both toolchains through ordinary OBJ1
+relocations. Self and mutual cycles remain rejected.
 Native ACTC now lowers
 `FSign`, `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`, `FHypot`, `FMin`, and `FMax` for named REAL operands and a bounded,
 storage-capturing `FClamp`
