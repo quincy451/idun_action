@@ -1468,3 +1468,31 @@ Retired roadmap items for CP/M-era runner flows are no longer maintained.
   trees, recursive/reentrant frames, mixed types, arbitrary signatures, and
   recursion remain native gaps; Idun's general compiler remains the behavioral
   reference.
+
+## 2026-07-22 Native REAL Function Plain-Loop And EXIT Parity
+
+- Native ActionC64U added pass R, `ACTC_OVLR.BIN` (id 27), for plain
+  `DO ... OD` and unconditional `EXIT` within the existing four-loop bound.
+  The collector's base-36 nearest-loop selector is decoded without changing
+  OBJ1; exits relocate to the active loop's `__rzNN` post-loop export and every
+  `OD` retains its independent `__rbNN` back edge.
+- Added the byte-identical `real_function_loop_exit_postfix.act` fixture.
+  Native ACTC/ALINK/VICE and this fork's ACTC/ALINK generated-6502 execution
+  path both exit one plain and one guarded loop, produce FIRST=4.0 and
+  SECOND=3.0, and display `43`. Idun already supports the general source form;
+  this fixture locks cross-product behavior while preserving OS-specific tool
+  implementations.
+- Native pass Q remains 7,151 bytes with SHA-256
+  `40273408c14c54a618e92d60d5fae12370820a8ea9a60cddc3c508fb4ac67507`.
+  Pass R is 7,334 bytes with 858 bytes free under its dedicated 768-byte gate
+  and SHA-256
+  `1ef9ff4c164ee353025da5e3f4d02dceadfadd0a833ea244e7c798f88f72db15`;
+  native passes L through Q remain byte-identical.
+- Current native inventories are 1,360 broad direct-PRG and 192 non-runtime
+  source-backed shapes; the native unittest inventory is 848, the overlay suite
+  is 240 tests, the source-cache suite is 198 tests, and the compiled-runtime
+  oracle remains 298.
+- Native REAL-function `FOR`, mixed loop/conditional nesting, returns inside
+  loops, controls beyond four or depth four, unrestricted call trees,
+  recursive/reentrant frames, mixed types, arbitrary signatures, and recursion
+  remain gaps; Idun's general compiler remains the behavioral reference.
