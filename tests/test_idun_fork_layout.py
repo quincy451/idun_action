@@ -55,8 +55,8 @@ class TestIdunForkLayout(unittest.TestCase):
         self.assertIn("The constant foundation is complete", parity)
         self.assertIn("round-to-nearest, ties-to-even", parity)
         self.assertIn("Dedicated pass K", parity)
-        self.assertIn("inventories are 1,350 broad direct-PRG shapes", flat_parity)
-        self.assertIn("182 non-runtime source-backed object-emission shapes", flat_parity)
+        self.assertIn("inventories are 1,351 broad direct-PRG shapes", flat_parity)
+        self.assertIn("183 non-runtime source-backed object-emission shapes", flat_parity)
         self.assertIn("298 compiled-runtime relocation-oracle cases", parity)
         self.assertIn("fifteen link-selected callable builtins", parity)
         self.assertIn("remaining 28 MATH1 routines", parity)
@@ -66,7 +66,7 @@ class TestIdunForkLayout(unittest.TestCase):
         self.assertIn("RT_F_FRAC.OBJ", parity)
         self.assertIn("RT_F_MOD.OBJ", parity)
         self.assertIn("RT_F_HYPOT.OBJ", parity)
-        self.assertIn("819 native ActionC64U unittests", parity)
+        self.assertIn("821 native ActionC64U unittests", parity)
         self.assertIn("153 Idun/Alpine unittests", parity)
         self.assertIn("138 Idun ASan/UBSan tests", parity)
         self.assertIn("21 Idun direct-PRG tests", parity)
@@ -79,7 +79,8 @@ class TestIdunForkLayout(unittest.TestCase):
         self.assertIn("real_function_call_chain_postfix.act", parity)
         self.assertIn("real_function_nested_local_call_postfix.act", parity)
         self.assertIn("real_function_user_call_arguments_postfix.act", parity)
-        self.assertIn("pass L is 5,670 bytes with 2,522 bytes free", flat_parity)
+        self.assertIn("real_function_forward_frame_postfix.act", parity)
+        self.assertIn("pass L is 6,124 bytes with 2,068 bytes free", flat_parity)
         self.assertIn("complete ACTC compiler, passes 0 through L", parity)
         self.assertIn("The portable products are therefore not yet at full feature parity", parity)
         self.assertNotIn("binary32 folding remains", parity)
@@ -88,8 +89,8 @@ class TestIdunForkLayout(unittest.TestCase):
             encoding="ascii"
         )
         flat_handoff = " ".join(handoff.split())
-        self.assertIn("Current native inventories are 1,350 broad", flat_handoff)
-        self.assertIn("182 non-runtime source-backed", flat_handoff)
+        self.assertIn("Current native inventories are 1,351 broad", flat_handoff)
+        self.assertIn("183 non-runtime source-backed", flat_handoff)
         self.assertIn("298 compiled-runtime relocation-oracle cases", flat_handoff)
         self.assertIn("real_function_nested_postfix.act", handoff)
         self.assertIn("real_function_local_nested_postfix.act", handoff)
@@ -97,6 +98,7 @@ class TestIdunForkLayout(unittest.TestCase):
         self.assertIn("real_function_call_chain_postfix.act", handoff)
         self.assertIn("real_function_nested_local_call_postfix.act", handoff)
         self.assertIn("real_function_user_call_arguments_postfix.act", handoff)
+        self.assertIn("real_function_forward_frame_postfix.act", handoff)
         self.assertIn(
             "pass 6 is 8,094 bytes with 98 bytes free",
             " ".join(handoff.split()),

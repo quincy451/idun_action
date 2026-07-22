@@ -25,12 +25,13 @@ link-selected target behavior, and direct-PRG results must agree; Alpine process
 architecture and UDOS resident/REU mechanics intentionally do not.
 
 The latest shared compiler fixtures exercise two nonrecursive
-two-REAL-parameter functions, bounded all-REAL locals, and one declaration-order
-function edge. Linux ACTC/ALINK and native ACTC/ALINK accept both the assignment
-call-chain source and a form that feeds `LENGTH(A,B)` directly into `FMax`;
-`MAIN -> CHAIN -> LENGTH` returns binary32 5.0 in both products through ordinary
-OBJ1 relocations. The native static-frame form rejects forward and cyclic edges.
-This is a bounded ABI checkpoint, not general function/frame parity; the
+two-REAL-parameter functions, bounded all-REAL locals, and acyclic calls in
+either declaration direction. Linux ACTC/ALINK and native ACTC/ALINK accept the
+assignment call chain, a form that feeds `LENGTH(A,B)` directly into `FMax`, and
+the frame-preserved `FIRST -> SECOND` forward edge. The backward cases return
+binary32 5.0 and the forward case returns 3.0 in both products through ordinary
+OBJ1 relocations. Native self and mutual cycles remain rejected. This is a
+bounded ABI checkpoint, not general recursive/reentrant frame parity; the
 remaining work is listed in `udos_feature_parity.md`.
 
 ## Authoritative Product Documents

@@ -386,9 +386,13 @@ VICE also checks the nested-call temporary and reachable-only helper closure.
 The shared `real_function_user_call_arguments_postfix.act` fixture returns
 `LOWER(LOWER(A,A),LOWER(B,B))`. Native pass L spills all three call results to
 distinct temporaries; native VICE and Idun both produce 3.0 without static-cell
-aliasing. Native ACTC rejects forward, self, and cyclic static-frame edges.
-Current native inventories are 1,350 broad, 182 non-runtime source-backed, and 298
-compiled-runtime relocation-oracle cases; pass L is 5,670 bytes with 2,522
+aliasing. The shared `real_function_forward_frame_postfix.act` fixture reverses
+the declaration direction with `FIRST -> SECOND` while `FAbs(A)` remains live.
+Native ACTC stack-preserves the caller's static cells, stages the A/X result,
+and restores the caller before producing 3.0; Idun produces the same result.
+Native self and mutual cycles remain rejected.
+Current native inventories are 1,351 broad, 183 non-runtime source-backed, and 298
+compiled-runtime relocation-oracle cases; pass L is 6,124 bytes with 2,068
 bytes free, while pass 7 is 6,678 bytes with 1,514 bytes free. The native MATH1
 gap remains 28 public routines, and reentrant local frames, control flow,
 unrestricted user-call argument trees and nested call expressions, mixed types,

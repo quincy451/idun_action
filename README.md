@@ -114,11 +114,13 @@ hidden non-aliasing result cell. The shared `RETURN(FHypot(A,B))` fixture
 compiles and links in both products; native ALINK selects only its reachable
 closure and the direct PRG writes binary32 5.0 in VICE. This remains a bounded
 checkpoint rather than general native REAL lowering. Native pass L additionally
-accepts two bounded REAL functions and one declaration-order edge; the shared
-`MAIN -> CHAIN -> LENGTH` fixture returns binary32 5.0 under both toolchains,
-the later function may use `LENGTH(A,B)` directly inside `FMax`, and the shared
+accepts two bounded REAL functions and acyclic calls in either declaration
+direction. The shared `MAIN -> CHAIN -> LENGTH` fixture returns binary32 5.0,
+the later function may use `LENGTH(A,B)` directly inside `FMax`, the shared
 `LOWER(LOWER(A,A),LOWER(B,B))` fixture proves independently spilled user-call
-arguments. Native forward/cyclic edges are rejected. Native ACTC now lowers
+arguments, and `FIRST -> SECOND` proves frame-preserved forward calls while an
+intrinsic temporary remains live. Self and mutual cycles remain rejected.
+Native ACTC now lowers
 `FSign`, `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`, `FHypot`, `FMin`, and `FMax` for named REAL operands and a bounded,
 storage-capturing `FClamp`
 ternary root through synchronized, independently selected target modules with

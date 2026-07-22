@@ -140,14 +140,14 @@ Remaining product work:
    consumes the recursive child-first postfix stream for bounded nested unary,
    binary, and `FClamp` trees. It also supports up to two nonrecursive
    two-REAL-parameter functions, each with bounded all-REAL static locals and
-   DBG1 local records. `MAIN` may call either function, and a later function may
-   assign an earlier function's result, use that call directly in a supported
-   intrinsic return tree, or use bounded calls to the earlier function as
-   arguments to another such call. The shared call-chain and nested
-   local-call-expression fixtures produce binary32 5.0, while the nested
-   user-call-argument fixture produces 3.0 under both toolchains. General call
-   graphs, reentrant local frames, control flow, unrestricted user-call argument
-   trees and nested call expressions, mixed types, arbitrary
+   DBG1 local records. `MAIN` may call either function, and either function may
+   call the other while the graph remains acyclic. Native ACTC stack-preserves
+   caller parameters, locals, and live temporaries across those edges. The
+   shared backward call-chain and nested local-call-expression fixtures produce
+   binary32 5.0; the nested user-call-argument and forward-call fixtures produce
+   3.0 under both toolchains. General or recursive call graphs,
+   recursive/reentrant local frames, control flow, unrestricted user-call
+   argument trees and nested call expressions, mixed types, arbitrary
    signatures, and recursive frames remain pending.
    Linux ACTC now lowers `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`,
    `FHypot`, `FMin`, and `FMax` to the same shared objects instead of embedding
