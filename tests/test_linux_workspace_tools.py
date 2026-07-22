@@ -1296,6 +1296,16 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 ("PICK",),
                 ("RT_F_CMP", "RT_F_MAX", "RT_F_MIN"),
             ),
+            (
+                "real_function_four_sequential_if_postfix.act",
+                ("PICK",),
+                ("RT_F_CMP",),
+            ),
+            (
+                "real_function_four_deep_if_postfix.act",
+                ("PICK",),
+                ("RT_F_CMP",),
+            ),
         ):
             with self.subTest(fixture=fixture_name):
                 self._compile_and_link_real_function_fixture(

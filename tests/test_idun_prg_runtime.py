@@ -300,6 +300,14 @@ class TestIdunPrgRuntime(unittest.TestCase):
                 "real_function_nested_if_else_postfix.act",
                 {"FIRST": 1.0, "SECOND": 4.0, "THIRD": 3.0},
             ),
+            (
+                "real_function_four_sequential_if_postfix.act",
+                {"FIRST": 4.0, "SECOND": 3.0},
+            ),
+            (
+                "real_function_four_deep_if_postfix.act",
+                {"FIRST": 1.0, "SECOND": 5.0, "THIRD": 4.0},
+            ),
         ):
             with self.subTest(fixture=fixture_name):
                 self._assert_real_function_fixture_executes(

@@ -1400,3 +1400,26 @@ Retired roadmap items for CP/M-era runner flows are no longer maintained.
   oracle remains 298. Loops, early returns, more than two controls, deeper
   nesting, recursive/reentrant frames, mixed types, arbitrary signatures, and
   recursion remain pending; Idun's general compiler remains the reference.
+
+## 2026-07-22 Native Four-Control REAL Function Parity
+
+- Native ActionC64U added pass O, `ACTC_OVLO.BIN` (id 24), for up to four
+  controls per supported REAL function, either sequentially or nested to depth
+  four. It claims a function containing a third conditional and leaves passes
+  L, M, and N byte-identical.
+- Added byte-identical `real_function_four_sequential_if_postfix.act` and
+  `real_function_four_deep_if_postfix.act` fixtures. Native direct PRGs and
+  Idun ACTC/ALINK's generated-6502 execution path both produce `43` and `154`,
+  covering all four slots plus depth-four deep-true, deep-false, and
+  outer-false paths.
+- Native pass O is 7,123 bytes with 1,069 bytes free under its 1 KiB gate. Its
+  SHA-256 is
+  `dd71aaa1d07600ce5e8004376879746ee046a56c33a49d5db727563feade0211`.
+- Current native inventories are 1,356 broad direct-PRG and 188 non-runtime
+  source-backed shapes; the native unittest inventory is 835, the overlay suite
+  is 231 tests, the source-cache suite is 198 tests, and the compiled-runtime
+  oracle remains 298. Idun shell entrypoints are tracked executable so a fresh
+  GitHub clone preserves the documented build workflow.
+- Loops, early returns, controls beyond four or depth four,
+  recursive/reentrant frames, mixed types, arbitrary signatures, and recursion
+  remain native gaps; Idun's general compiler remains the behavioral reference.

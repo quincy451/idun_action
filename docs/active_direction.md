@@ -150,8 +150,10 @@ Remaining product work:
    internal code labels; the shared fixture executes both arms and prints `34`
    under both toolchains. Native pass N accepts a second conditional,
    sequentially or nested to depth two; shared fixtures print `43` and `143`
-   under both toolchains. General or recursive call graphs,
-   recursive/reentrant local frames, loops, early returns, more than two
+   under both toolchains. Native pass O accepts a third and fourth control or
+   nesting to depth four; shared fixtures print `43` and `154`. General or
+   recursive call graphs, recursive/reentrant local frames, loops, early
+   returns, more than four
    controls, deeper nesting, unrestricted user-call argument trees and nested call
    expressions, mixed types, arbitrary
    signatures, and recursive frames remain pending.
