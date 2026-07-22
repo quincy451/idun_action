@@ -1327,3 +1327,20 @@ Retired roadmap items for CP/M-era runner flows are no longer maintained.
   remains 5,667 bytes with 2,525 bytes free, while native pass 7 is 6,678 bytes
   with 1,514 bytes free. General/reentrant call graphs remain native work; the
   Linux compiler already supports them.
+
+## 2026-07-21 Native Nested REAL User-Call Argument Parity
+
+- Native pass L now claims a body when a local-call temporary feeds another
+  local call. It copies every returned A/X pointer into a distinct four-byte
+  temporary, preserving each argument across later calls to the same
+  static-storage callee.
+- Added byte-identical `real_function_user_call_arguments_postfix.act` fixtures.
+  The later function returns `LOWER(LOWER(A,A),LOWER(B,B))`; native VICE verifies
+  3.0 and 4.0 in the inner spills and 3.0 in the outer spill and module result.
+  Idun's general frame-capable ACTC/ALINK path executes the same source as 3.0.
+- Current native inventories are 1,350 broad direct-PRG and 182 non-runtime
+  source-backed shapes; the native unittest inventory is 819 and the
+  compiled-runtime oracle remains 298. Native pass L is 5,670 bytes with 2,522
+  bytes free, while native pass 7 remains 6,678 bytes with 1,514 bytes free.
+  General/reentrant call graphs remain native work; the Linux compiler already
+  supports them.

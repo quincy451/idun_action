@@ -116,8 +116,9 @@ closure and the direct PRG writes binary32 5.0 in VICE. This remains a bounded
 checkpoint rather than general native REAL lowering. Native pass L additionally
 accepts two bounded REAL functions and one declaration-order edge; the shared
 `MAIN -> CHAIN -> LENGTH` fixture returns binary32 5.0 under both toolchains,
-and the later function may use `LENGTH(A,B)` directly inside `FMax`. Native
-forward/cyclic edges are rejected. Native ACTC now lowers
+the later function may use `LENGTH(A,B)` directly inside `FMax`, and the shared
+`LOWER(LOWER(A,A),LOWER(B,B))` fixture proves independently spilled user-call
+arguments. Native forward/cyclic edges are rejected. Native ACTC now lowers
 `FSign`, `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`, `FHypot`, `FMin`, and `FMax` for named REAL operands and a bounded,
 storage-capturing `FClamp`
 ternary root through synchronized, independently selected target modules with

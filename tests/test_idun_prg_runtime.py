@@ -286,6 +286,7 @@ class TestIdunPrgRuntime(unittest.TestCase):
             ),
             ("real_function_call_chain_postfix.act", {"RESULT": 5.0}),
             ("real_function_nested_local_call_postfix.act", {"RESULT": 5.0}),
+            ("real_function_user_call_arguments_postfix.act", {"RESULT": 3.0}),
         ):
             with self.subTest(fixture=fixture_name):
                 self._assert_real_function_fixture_executes(

@@ -383,13 +383,16 @@ the module result and `CHAIN.BASE`; Idun executes the same source with the same
 result. The follow-up `real_function_nested_local_call_postfix.act` feeds
 `LENGTH(A,B)` directly into `FMax`; both toolchains produce 5.0, while native
 VICE also checks the nested-call temporary and reachable-only helper closure.
-Native ACTC rejects forward, self, and cyclic static-frame edges. Current native
-inventories are 1,349 broad, 181 non-runtime source-backed, and 298
-compiled-runtime relocation-oracle cases; pass L is 5,667 bytes with 2,525
+The shared `real_function_user_call_arguments_postfix.act` fixture returns
+`LOWER(LOWER(A,A),LOWER(B,B))`. Native pass L spills all three call results to
+distinct temporaries; native VICE and Idun both produce 3.0 without static-cell
+aliasing. Native ACTC rejects forward, self, and cyclic static-frame edges.
+Current native inventories are 1,350 broad, 182 non-runtime source-backed, and 298
+compiled-runtime relocation-oracle cases; pass L is 5,670 bytes with 2,522
 bytes free, while pass 7 is 6,678 bytes with 1,514 bytes free. The native MATH1
-gap remains 28 public routines, and reentrant local frames, control flow, user
-calls as arguments to other user calls, unrestricted nested call expressions,
-mixed types, arbitrary signatures, and recursive frames remain pending.
+gap remains 28 public routines, and reentrant local frames, control flow,
+unrestricted user-call argument trees and nested call expressions, mixed types,
+arbitrary signatures, and recursive frames remain pending.
 
 For a two-checkout release, run:
 
