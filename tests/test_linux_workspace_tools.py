@@ -1316,6 +1316,11 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 ("PICK",),
                 ("RT_F_CMP",),
             ),
+            (
+                "real_function_loops_postfix.act",
+                ("UP", "DOWN"),
+                ("RT_F_CMP",),
+            ),
         ):
             with self.subTest(fixture=fixture_name):
                 self._compile_and_link_real_function_fixture(

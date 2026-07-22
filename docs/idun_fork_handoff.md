@@ -402,15 +402,18 @@ products print `43` and `143`, respectively. Pass O adds shared
 `real_function_four_deep_if_postfix.act`; both products print `43` and `154`.
 Pass P adds shared `real_function_early_return_if_postfix.act` and
 `real_function_early_return_four_deep_postfix.act`; both products print `33`
-and `154`. Current native inventories are 1,358 broad, 190 non-runtime
-source-backed, and 298
+and `154`. Pass Q adds shared `real_function_loops_postfix.act`; its post-test
+and pre-test REAL-function loops produce 4.0 and 3.0 in both native VICE and
+Idun's generated-6502 execution path. Current native inventories are 1,359
+broad, 191 non-runtime source-backed, and 298
 compiled-runtime relocation-oracle cases; pass L is 6,124 bytes with 2,068
 bytes free, pass M is 6,998 bytes with 1,194 bytes free, pass N is 7,120 bytes
 with 1,072 bytes free, pass O is 7,123 bytes with 1,069 bytes free, pass P is
-7,147 bytes with 1,045 bytes free, and pass 7 is 6,678 bytes with 1,514 bytes
-free. The
-native MATH1 gap remains 28 public routines, and reentrant local frames, loops,
-more than four controls, deeper nesting, unrestricted user-call
+7,147 bytes with 1,045 bytes free, pass Q is 7,151 bytes with 1,041 bytes free,
+and pass 7 is 6,678 bytes with 1,514 bytes free. The native MATH1 gap remains
+28 public routines, and reentrant local frames, plain infinite `DO`, loop
+`EXIT`, mixed loop/conditional nesting, returns from inside loops, more than
+four controls, deeper nesting, unrestricted user-call
 argument trees and nested call expressions, mixed types, arbitrary signatures,
 and recursive frames remain pending.
 

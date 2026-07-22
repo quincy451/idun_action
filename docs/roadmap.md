@@ -1445,3 +1445,26 @@ Retired roadmap items for CP/M-era runner flows are no longer maintained.
   trees, recursive/reentrant frames, mixed types, arbitrary signatures, and
   recursion remain native gaps; Idun's general compiler remains the behavioral
   reference.
+
+## 2026-07-22 Native REAL Function Loop Parity
+
+- Native ActionC64U added pass Q, `ACTC_OVLQ.BIN` (id 26), for up to four
+  bounded `DO ... UNTIL ... OD` and `WHILE ... DO ... OD` loops per supported
+  REAL function. Back edges and pre-test exits use ordinary relocatable
+  `__rbNN` and `__rzNN` OBJ1 code exports.
+- Added the byte-identical `real_function_loops_postfix.act` fixture. Native
+  ACTC/ALINK/VICE and this fork's ACTC/ALINK generated-6502 execution path both
+  produce FIRST=4.0 and SECOND=3.0; the native direct PRG displays `43`.
+- Native pass Q is 7,151 bytes with 1,041 bytes free under its 1 KiB gate. Its
+  SHA-256 is
+  `40273408c14c54a618e92d60d5fae12370820a8ea9a60cddc3c508fb4ac67507`.
+  Native passes L through P remain byte-identical.
+- Current native inventories are 1,359 broad direct-PRG and 191 non-runtime
+  source-backed shapes; the native unittest inventory is 844, the overlay suite
+  is 237 tests, the source-cache suite is 198 tests, and the compiled-runtime
+  oracle remains 298.
+- Plain infinite `DO`, loop `EXIT`, mixed loop/conditional nesting, returns
+  from inside loops, controls beyond four or depth four, unrestricted call
+  trees, recursive/reentrant frames, mixed types, arbitrary signatures, and
+  recursion remain native gaps; Idun's general compiler remains the behavioral
+  reference.
