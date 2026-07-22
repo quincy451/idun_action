@@ -308,6 +308,14 @@ class TestIdunPrgRuntime(unittest.TestCase):
                 "real_function_four_deep_if_postfix.act",
                 {"FIRST": 1.0, "SECOND": 5.0, "THIRD": 4.0},
             ),
+            (
+                "real_function_early_return_if_postfix.act",
+                {"FIRST": 3.0, "SECOND": 3.0},
+            ),
+            (
+                "real_function_early_return_four_deep_postfix.act",
+                {"FIRST": 1.0, "SECOND": 5.0, "THIRD": 4.0},
+            ),
         ):
             with self.subTest(fixture=fixture_name):
                 self._assert_real_function_fixture_executes(

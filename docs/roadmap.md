@@ -1423,3 +1423,25 @@ Retired roadmap items for CP/M-era runner flows are no longer maintained.
 - Loops, early returns, controls beyond four or depth four,
   recursive/reentrant frames, mixed types, arbitrary signatures, and recursion
   remain native gaps; Idun's general compiler remains the behavioral reference.
+
+## 2026-07-22 Native REAL Function Early-Return Parity
+
+- Native ActionC64U added pass P, `ACTC_OVLP.BIN` (id 25), for immediate
+  `RETURN(expr)` exits inside the existing four-control/depth-four bound. It
+  requires a terminal fallback return and leaves passes L through O
+  byte-identical.
+- Added byte-identical `real_function_early_return_if_postfix.act` and
+  `real_function_early_return_four_deep_postfix.act` fixtures. Native direct
+  PRGs and Idun ACTC/ALINK's generated-6502 execution path both produce `33`
+  and `154`, covering immediate true/else exits and the fallback path.
+- Native pass P is 7,147 bytes with 1,045 bytes free under its 1 KiB gate. Its
+  SHA-256 is
+  `7b32fc5bd2e84120572ae25e097ec6004297e3d502922d32d5384e17ad29394e`.
+- Current native inventories are 1,358 broad direct-PRG and 190 non-runtime
+  source-backed shapes; the native unittest inventory is 840, the overlay suite
+  is 234 tests, the source-cache suite is 198 tests, and the compiled-runtime
+  oracle remains 298.
+- Loops, controls beyond four or depth four, unrestricted call-expression
+  trees, recursive/reentrant frames, mixed types, arbitrary signatures, and
+  recursion remain native gaps; Idun's general compiler remains the behavioral
+  reference.

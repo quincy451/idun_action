@@ -125,8 +125,10 @@ arms and produces 3.0 then 4.0 in both toolchains through ordinary OBJ1
 relocations. Native pass N accepts a second conditional, either sequentially
 or nested to depth two; the shared fixtures produce `43` and `143` in both
 toolchains. Native pass O accepts up to four controls or nesting depth four;
-the shared extended fixtures produce `43` and `154` in both toolchains. Self
-and mutual cycles remain rejected.
+the shared extended fixtures produce `43` and `154` in both toolchains. Native
+pass P accepts immediate returns inside those controls when the function also
+has a terminal fallback return; the shared fixtures produce `33` and `154` in
+both toolchains. Self and mutual cycles remain rejected.
 Native ACTC now lowers
 `FSign`, `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`, `FHypot`, `FMin`, and `FMax` for named REAL operands and a bounded,
 storage-capturing `FClamp`

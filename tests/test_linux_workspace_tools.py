@@ -1306,6 +1306,16 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 ("PICK",),
                 ("RT_F_CMP",),
             ),
+            (
+                "real_function_early_return_if_postfix.act",
+                ("PICK",),
+                ("RT_F_CMP",),
+            ),
+            (
+                "real_function_early_return_four_deep_postfix.act",
+                ("PICK",),
+                ("RT_F_CMP",),
+            ),
         ):
             with self.subTest(fixture=fixture_name):
                 self._compile_and_link_real_function_fixture(

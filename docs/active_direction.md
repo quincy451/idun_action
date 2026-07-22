@@ -151,9 +151,10 @@ Remaining product work:
    under both toolchains. Native pass N accepts a second conditional,
    sequentially or nested to depth two; shared fixtures print `43` and `143`
    under both toolchains. Native pass O accepts a third and fourth control or
-   nesting to depth four; shared fixtures print `43` and `154`. General or
-   recursive call graphs, recursive/reentrant local frames, loops, early
-   returns, more than four
+   nesting to depth four; shared fixtures print `43` and `154`. Native pass P
+   accepts immediate returns inside those bounded controls when a terminal
+   fallback return is present; shared fixtures print `33` and `154`. General or
+   recursive call graphs, recursive/reentrant local frames, loops, more than four
    controls, deeper nesting, unrestricted user-call argument trees and nested call
    expressions, mixed types, arbitrary
    signatures, and recursive frames remain pending.
