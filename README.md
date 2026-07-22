@@ -131,8 +131,10 @@ has a terminal fallback return; the shared fixtures produce `33` and `154` in
 both toolchains. Native pass Q accepts up to four post-test or pre-test REAL
 function loops, and pass R adds plain `DO ... OD` plus unconditional
 nearest-loop `EXIT`. The byte-identical loop and loop-exit fixtures each
-produce 4.0 and 3.0 in both products; their linked PRGs display `43`. Self and
-mutual cycles remain rejected.
+produce 4.0 and 3.0 in both products; their linked PRGs display `43`. Pass S
+adds constant-bound local CARD-counter `FOR` loops; the shared ascending and
+descending fixture produces 4.0 and 7.0 in both products, and its native linked
+PRG displays `47`. Self and mutual cycles remain rejected.
 Native ACTC now lowers
 `FSign`, `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`, `FHypot`, `FMin`, and `FMax` for named REAL operands and a bounded,
 storage-capturing `FClamp`

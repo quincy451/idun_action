@@ -1326,6 +1326,11 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 ("PLAIN", "GUARDED"),
                 ("RT_F_CMP",),
             ),
+            (
+                "real_function_for_postfix.act",
+                ("ASCEND", "DESCEND"),
+                ("RT_F_ADD",),
+            ),
         ):
             with self.subTest(fixture=fixture_name):
                 self._compile_and_link_real_function_fixture(

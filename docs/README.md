@@ -34,8 +34,10 @@ then 4.0 in both products. Two additional shared fixtures execute two
 sequential controls and a depth-two nested pair, producing `43` and `143`.
 The loop fixture then covers one post-test and one pre-test REAL-function loop;
 the loop-exit fixture covers plain `DO ... OD` and nearest-loop `EXIT`. Both
-produce 4.0 and 3.0 in each product. The call and control cases use ordinary
-OBJ1 relocations. Native self and mutual cycles remain rejected. This is a
+produce 4.0 and 3.0 in each product. The `FOR` fixture covers ascending default
+step and descending `STEP -2` CARD-counter loops and produces 4.0 and 7.0 in
+each product. The call and control cases use ordinary OBJ1 relocations. Native
+self and mutual cycles remain rejected. This is a
 bounded ABI checkpoint, not general recursive/reentrant frame parity; the
 remaining work is listed in `udos_feature_parity.md`.
 
