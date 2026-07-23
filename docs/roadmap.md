@@ -1562,3 +1562,29 @@ Retired roadmap items for CP/M-era runner flows are no longer maintained.
 - Native dependency-sized packaging for these two public MATH1 routines and
   the other 26 missing routines remains work; this fixture closes compiler
   lowering parity only.
+
+## 2026-07-22 Shared MATH1 Angle Intrinsics
+
+- Synchronized separate 20-byte `RT_F_DEG_TO_RAD.OBJ` and
+  `RT_F_RAD_TO_DEG.OBJ` modules from native ActionC64U. Each imports only
+  `RT_F_MUL`, embeds one exact binary32 factor, and permits source/destination
+  aliasing.
+- Linux ACTC now treats `DegToRad` and `RadToDeg` as unary REAL intrinsics.
+  Constant calls fold to binary32 literals without runtime imports; dynamic
+  calls import only the referenced wrapper and its ordinary dependency closure.
+  The MATH1 source now declares these routines instead of carrying duplicate
+  portable bodies.
+- Native ACTC recognizes the same public calls in pass U. Focused live VICE
+  launches execute each independently selected path, and the complete native
+  math-runtime gate passes all 45 ACTC-backed cases plus 8 full-range direct
+  helper cases.
+- Native pass U is 6,514 bytes with 1,678 bytes free and SHA-256
+  `a28fa04d67df80246b662b82800b9bd62f74f9830ef329a8c7f6b8aa4bae10de`.
+  Current native inventories are 1,365 broad direct-PRG, 195 non-runtime
+  source-backed, and 300 compiled-runtime relocation-oracle cases.
+- The active Idun suite now contains 154 tests and the sanitizer gate contains
+  139 tests; direct-PRG coverage remains 21 tests. The native suite contains
+  860 tests, including 248 overlay and 198 source-cache tests.
+- The native public MATH1 gap is now 26 routines. Idun keeps its complete
+  source-library behavior as the reference while both products retain
+  reachable-only target packaging.

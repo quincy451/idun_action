@@ -162,6 +162,8 @@ class TestIdunWorkspaceExport(unittest.TestCase):
                 "RT_F_FRAC.OBJ",
                 "RT_F_MOD.OBJ",
                 "RT_F_HYPOT.OBJ",
+                "RT_F_DEG_TO_RAD.OBJ",
+                "RT_F_RAD_TO_DEG.OBJ",
                 "RT_F_MAX.OBJ",
                 "RT_F_MIN.OBJ",
                 "RT_F_MUL.OBJ",
@@ -237,6 +239,29 @@ class TestIdunWorkspaceExport(unittest.TestCase):
             self.assertIn("r 57 u0", hypot_object)
             self.assertIn("r 432 u4", hypot_object)
             self.assertIn("n rt_f_hypot", hypot_object)
+            deg_to_rad_object = (
+                out / "LIB" / "RT_F_DEG_TO_RAD.OBJ"
+            ).read_text(encoding="ascii")
+            self.assertIn("x rt_f_deg_to_rad 0 20", deg_to_rad_object)
+            self.assertIn("u rt_f_mul", deg_to_rad_object)
+            self.assertIn("35 FA 8E 3C", deg_to_rad_object)
+            self.assertIn("n rt_f_deg_to_rad", deg_to_rad_object)
+            rad_to_deg_object = (
+                out / "LIB" / "RT_F_RAD_TO_DEG.OBJ"
+            ).read_text(encoding="ascii")
+            self.assertIn("x rt_f_rad_to_deg 0 20", rad_to_deg_object)
+            self.assertIn("u rt_f_mul", rad_to_deg_object)
+            self.assertIn("E0 2E 65 42", rad_to_deg_object)
+            self.assertIn("n rt_f_rad_to_deg", rad_to_deg_object)
+            math_header = (out / "LIB" / "MATH1.ACT").read_text(
+                encoding="ascii"
+            )
+            self.assertIn("REAL FUNC DegToRad(REAL degrees)", math_header)
+            self.assertIn("REAL FUNC RadToDeg(REAL radians)", math_header)
+            self.assertNotIn(
+                "RETURN(degrees*(MATH_PI/180.0))",
+                math_header,
+            )
             self.assertFalse(any((out / "LIB").glob("*.MOD")))
             self.assertTrue((out / "LIB" / "DBF1.ACT").is_file())
             self.assertTrue((out / "LIB" / "MATH1.ACT").is_file())

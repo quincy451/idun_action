@@ -138,10 +138,13 @@ PRG displays `47`. Pass T adds named CARD initial/final bounds; the shared
 nested-loop fixture produces 7.0 twice and its native linked PRG displays `77`.
 Pass U adds folded binary32 literals and one-parameter REAL functions; the
 shared `DegToRad`/`RadToDeg` fixture compiles and links in both products, and
-the native direct PRG displays pi followed by `180`.
+the native direct PRG displays pi followed by `180`. Both names are now public
+intrinsics: constant calls fold in Linux ACTC, dynamic calls select one shared
+angle-conversion OBJ, and native ACTC selects the same module only when used.
 Self and mutual cycles remain rejected.
 Native ACTC now lowers
-`FSign`, `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`, `FHypot`, `FMin`, and `FMax` for named REAL operands and a bounded,
+`FSign`, `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`, `FHypot`,
+`FMin`, `FMax`, `DegToRad`, and `RadToDeg` for named REAL operands and a bounded,
 storage-capturing `FClamp`
 ternary root through synchronized, independently selected target modules with
 complete MATH1

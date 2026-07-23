@@ -26,7 +26,9 @@ The limits that remain are the intrinsic binary32 limits:
 
 Source forms include decimal and exponent literals, `INF`/`INFINITY`, `NAN`,
 `+`, `-`, `*`, `/`, comparisons, `REAL(integer)`, `INT(real)`, `FAbs`,
-`FSqrt`, `FSign`, `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`, `FHypot`, `FMin`, `FMax`, `FClamp`, `PrintR`, and `PrintRE`.
+`FSqrt`, `FSign`, `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`,
+`FHypot`, `FMin`, `FMax`, `FClamp`, `DegToRad`, `RadToDeg`, `PrintR`, and
+`PrintRE`.
 
 Rules:
 
@@ -58,6 +60,9 @@ Rules:
 - `FHypot(left,right)` uses a scaled maximum/minimum calculation to avoid
   avoidable intermediate overflow and underflow; two zero inputs return
   positive zero, and infinity takes precedence when paired with NaN
+- `DegToRad(value)` multiplies by binary32 `0x3C8EFA35` (`pi/180`);
+  `RadToDeg(value)` multiplies by binary32 `0x42652EE0` (`180/pi`). Both use
+  ordinary binary32 multiplication behavior
 - `FClamp(value,lower,upper)` returns canonical quiet NaN if any argument is
   NaN or if `lower>upper`; otherwise it returns
   `FMin(FMax(value,lower),upper)` with selected operand bits preserved
@@ -92,6 +97,9 @@ ALINK resolves the following standalone helper symbols:
 - `rt_f_round`
 - `rt_f_frac`
 - `rt_f_mod`
+- `rt_f_hypot`
+- `rt_f_deg_to_rad`
+- `rt_f_rad_to_deg`
 - `rt_f_min`
 - `rt_f_max`
 - `rt_f_clamp`
@@ -137,6 +145,12 @@ Specific return conventions are:
   through `$06/$07`, supports destination aliasing either operand, and imports
   `rt_f_div`, `rt_f_trunc`, `rt_f_mul`, and `rt_f_sub` to implement
   `value-FTrunc(value/divisor)*divisor`
+- `rt_f_hypot` reads through `$02/$03` and `$04/$05`, writes through
+  `$06/$07`, supports destination aliasing either operand, and imports the
+  scaled absolute-value/minimum/maximum/divide/multiply/add/square-root closure
+- `rt_f_deg_to_rad` and `rt_f_rad_to_deg` read through `$02/$03`, write through
+  `$06/$07`, and import `rt_f_mul`; each alias-safe 20-byte wrapper points
+  `$04/$05` at its embedded scale factor
 - `rt_f_min` and `rt_f_max` write through `$06/$07`, ignore one NaN, select the
   right operand when both inputs are NaN, and preserve the left operand's exact
   bits when ordered values compare equal; both import `rt_f_cmp`
@@ -193,6 +207,8 @@ source:
   multiplication, subtraction, and special-value closure
 - `FHypot(a,b)` imports `rt_f_hypot` plus its absolute-value,
   minimum/maximum, division, multiplication, addition, and square-root closure
+- `DegToRad(r)` and `RadToDeg(r)` each import only the selected angle wrapper
+  plus its multiplication and special-value closure
 - `FMin(a,b)` and `FMax(a,b)` import only the selected helper plus its comparison
   closure
 - direct `FClamp(value,lower,upper)` imports `rt_f_clamp` plus its
@@ -211,8 +227,9 @@ the generated compact OBJ1 core. `tools/generate_real_runtime.py --check`
 remains a compatibility entry point and delegates to that generator plus the
 shared 6502 manifest check. The shared manifest verifies that all checked-in OBJ1
 modules match their reviewed generator. Headless VICE tests execute raw binary32
-edge vectors and deterministic random vectors for arithmetic, sign, truncation, remainder,
-minimum/maximum/clamp, square root, comparison, conversion, signed zero, subnormal,
-infinity, NaN, and ties-to-even behavior. A separate target test compares exact
+edge vectors and deterministic random vectors for arithmetic, sign, truncation,
+remainder, angle conversion, minimum/maximum/clamp, square root, comparison,
+conversion, signed zero, subnormal, infinity, NaN, and ties-to-even behavior.
+A separate target test compares exact
 printed decimals at both finite extremes and across normal, subnormal,
 signed-zero, and special values.

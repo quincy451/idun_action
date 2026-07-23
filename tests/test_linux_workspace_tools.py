@@ -180,11 +180,16 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 "FCOS",
                 "FATAN",
                 "FATAN2",
+            ):
+                self.assertRegex(math_object, rf"(?m)^x {symbol} \d+ \d+$")
+            for symbol in (
+                "FLOG2",
+                "FASIN",
+                "FASINH",
+                "FATANH",
                 "DEGTORAD",
                 "RADTODEG",
             ):
-                self.assertRegex(math_object, rf"(?m)^x {symbol} \d+ \d+$")
-            for symbol in ("FLOG2", "FASIN", "FASINH", "FATANH"):
                 self.assertNotRegex(
                     math_object, rf"(?m)^x {symbol} \d+ \d+$"
                 )
@@ -201,6 +206,8 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
             self.assertNotIn("\nu RT_F_ROUND\n", math_object)
             self.assertNotIn("\nu RT_F_FRAC\n", math_object)
             self.assertIn("\nu RT_F_MOD\n", math_object)
+            self.assertNotIn("\nu RT_F_DEG_TO_RAD\n", math_object)
+            self.assertIn("\nu RT_F_RAD_TO_DEG\n", math_object)
             self.run_tool(math_project, "alink", "main")
 
             self.run_tool(root, "actnew", "gfxdemo")
@@ -1338,7 +1345,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
             ),
             (
                 "math1_angle_conversions_postfix.act",
-                ("DEGTORAD", "RADTODEG"),
+                ("LOCALD2R", "LOCALR2D"),
                 ("RT_F_DIV", "RT_F_MUL"),
             ),
         ):
@@ -1645,6 +1652,85 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
             ):
                 self.assertIn(symbol, debug)
             self.assertNotIn("RT_S_TO_F", debug)
+
+    def test_actc_angle_intrinsics_fold_and_select_only_the_dynamic_sibling(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            shared_lib = root / "LIB"
+            shared_lib.mkdir()
+            for name in (
+                "rt_f_deg_to_rad.obj",
+                "rt_f_rad_to_deg.obj",
+                "rt_f_mul.obj",
+                "rt_f_special.obj",
+            ):
+                (shared_lib / name.upper()).write_text(
+                    (
+                        self.root / "src" / "runtime" / "modules" / name
+                    ).read_text(encoding="ascii"),
+                    encoding="ascii",
+                )
+
+            self.run_tool(root, "actnew", "folded")
+            folded_project = root / "FOLDED"
+            (folded_project / "SRC" / "MAIN.ACT").write_text(
+                "PROC MAIN()\n"
+                "REAL radians=[DegToRad(180.0)]\n"
+                "REAL degrees=[RadToDeg(3.14159265358979323846)]\n"
+                "RETURN\n"
+                "ENDPROC\n",
+                encoding="ascii",
+            )
+            self.run_tool(folded_project, "actc", "main")
+            folded_object = (
+                folded_project / "OBJ" / "MAIN.OBJ"
+            ).read_text(encoding="ascii")
+            self.assertNotIn("\nu RT_F_DEG_TO_RAD\n", folded_object)
+            self.assertNotIn("\nu RT_F_RAD_TO_DEG\n", folded_object)
+            self.assertIn("DB0F4940", folded_object)
+            self.assertIn("00003443", folded_object)
+
+            for project_name, call, expected, absent in (
+                (
+                    "dynamicdeg",
+                    "DegToRad",
+                    "RT_F_DEG_TO_RAD",
+                    "RT_F_RAD_TO_DEG",
+                ),
+                (
+                    "dynamicrad",
+                    "RadToDeg",
+                    "RT_F_RAD_TO_DEG",
+                    "RT_F_DEG_TO_RAD",
+                ),
+            ):
+                with self.subTest(call=call):
+                    self.run_tool(root, "actnew", project_name)
+                    project = root / project_name.upper()
+                    (project / "SRC" / "MAIN.ACT").write_text(
+                        "PROC MAIN()\n"
+                        "REAL source=[180.0],result\n"
+                        f"result={call}(source)\n"
+                        "RETURN\n"
+                        "ENDPROC\n",
+                        encoding="ascii",
+                    )
+                    self.run_tool(project, "actc", "main")
+                    object_text = (
+                        project / "OBJ" / "MAIN.OBJ"
+                    ).read_text(encoding="ascii")
+                    self.assertIn(f"\nu {expected}\n", object_text)
+                    self.assertNotIn(f"\nu {absent}\n", object_text)
+                    self.run_tool(project, "alink", "main")
+                    debug = (
+                        project / "BIN" / "MAIN.DBG"
+                    ).read_text(encoding="ascii")
+                    self.assertIn(expected, debug)
+                    self.assertNotIn(absent, debug)
+                    self.assertIn("RT_F_MUL", debug)
+                    self.assertIn("RT_F_SPECIAL", debug)
 
     def test_actc_constant_real_expression_and_condition_fold_without_math_helpers(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

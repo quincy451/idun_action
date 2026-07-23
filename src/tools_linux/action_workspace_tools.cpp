@@ -3606,6 +3606,8 @@ struct RealExprNode {
         Ceiling,
         Round,
         Fraction,
+        DegreesToRadians,
+        RadiansToDegrees,
         Modulus,
         Hypotenuse,
         Minimum,
@@ -3835,7 +3837,8 @@ private:
         if (name != "REAL" && name != "FABS" && name != "FSQRT" &&
             name != "FTRUNC" && name != "FFLOOR" && name != "FCEIL" &&
             name != "FROUND" && name != "FFRAC" && name != "FMOD" &&
-            name != "FHYPOT" && name != "FMIN" && name != "FMAX") {
+            name != "FHYPOT" && name != "FMIN" && name != "FMAX" &&
+            name != "DEGTORAD" && name != "RADTODEG") {
             RealExprNode node;
             node.kind = RealExprNode::Kind::Call;
             node.name = std::move(name);
@@ -3880,6 +3883,10 @@ private:
             node.kind = RealExprNode::Kind::Round;
         } else if (name == "FFRAC") {
             node.kind = RealExprNode::Kind::Fraction;
+        } else if (name == "DEGTORAD") {
+            node.kind = RealExprNode::Kind::DegreesToRadians;
+        } else if (name == "RADTODEG") {
+            node.kind = RealExprNode::Kind::RadiansToDegrees;
         } else if (name == "FMOD") {
             node.kind = RealExprNode::Kind::Modulus;
         } else if (name == "FHYPOT") {
@@ -3951,6 +3958,14 @@ std::optional<double> evaluate_real_expr_node(
     if (node.kind == RealExprNode::Kind::Fraction) {
         const float value = static_cast<float>(*lhs);
         return static_cast<double>(static_cast<float>(value - std::trunc(value)));
+    }
+    if (node.kind == RealExprNode::Kind::DegreesToRadians) {
+        constexpr float factor = 0x1.1df46ap-6F;
+        return static_cast<double>(static_cast<float>(*lhs) * factor);
+    }
+    if (node.kind == RealExprNode::Kind::RadiansToDegrees) {
+        constexpr float factor = 0x1.ca5dcp+5F;
+        return static_cast<double>(static_cast<float>(*lhs) * factor);
     }
     auto rhs = evaluate_real_expr_node(expr, node.right, constants);
     if (!rhs) {
@@ -8312,6 +8327,8 @@ int cmd_actc(const std::vector<std::string>& args) {
                 upper.find("FHYPOT(") != std::string::npos ||
                 upper.find("FMIN(") != std::string::npos ||
                 upper.find("FMAX(") != std::string::npos ||
+                upper.find("DEGTORAD(") != std::string::npos ||
+                upper.find("RADTODEG(") != std::string::npos ||
                 upper.find('.') != std::string::npos) {
                 return true;
             }
@@ -9525,7 +9542,9 @@ int cmd_actc(const std::vector<std::string>& args) {
                 node.kind == RealExprNode::Kind::Floor ||
                 node.kind == RealExprNode::Kind::Ceiling ||
                 node.kind == RealExprNode::Kind::Round ||
-                node.kind == RealExprNode::Kind::Fraction) {
+                node.kind == RealExprNode::Kind::Fraction ||
+                node.kind == RealExprNode::Kind::DegreesToRadians ||
+                node.kind == RealExprNode::Kind::RadiansToDegrees) {
                 emit_set_real_pointer(lhs, 0x02);
                 emit_set_real_pointer(destination, 0x06);
                 const char* helper = "RT_F_TRUNC";
@@ -9541,6 +9560,10 @@ int cmd_actc(const std::vector<std::string>& args) {
                     helper = "RT_F_ROUND";
                 } else if (node.kind == RealExprNode::Kind::Fraction) {
                     helper = "RT_F_FRAC";
+                } else if (node.kind == RealExprNode::Kind::DegreesToRadians) {
+                    helper = "RT_F_DEG_TO_RAD";
+                } else if (node.kind == RealExprNode::Kind::RadiansToDegrees) {
+                    helper = "RT_F_RAD_TO_DEG";
                 }
                 emit_jsr_import(helper);
                 return destination;
