@@ -3614,6 +3614,7 @@ struct RealExprNode {
         RadiansToDegrees,
         Modulus,
         Hypotenuse,
+        Power,
         Minimum,
         Maximum,
     };
@@ -3844,7 +3845,8 @@ private:
             name != "FLOG2" && name != "FLOG10" &&
             name != "FTRUNC" && name != "FFLOOR" && name != "FCEIL" &&
             name != "FROUND" && name != "FFRAC" && name != "FMOD" &&
-            name != "FHYPOT" && name != "FMIN" && name != "FMAX" &&
+            name != "FHYPOT" && name != "FPOW" &&
+            name != "FMIN" && name != "FMAX" &&
             name != "DEGTORAD" && name != "RADTODEG") {
             RealExprNode node;
             node.kind = RealExprNode::Kind::Call;
@@ -3860,7 +3862,7 @@ private:
         const std::size_t argument = parse_expr();
         skip_ws();
         std::optional<std::size_t> second_argument;
-        if (name == "FMOD" || name == "FHYPOT" || name == "FMIN" ||
+        if (name == "FMOD" || name == "FHYPOT" || name == "FPOW" || name == "FMIN" ||
             name == "FMAX") {
             if (pos_ >= text_.size() || text_[pos_] != ',') {
                 throw ToolError("BAD REAL CALL");
@@ -3906,6 +3908,8 @@ private:
             node.kind = RealExprNode::Kind::Modulus;
         } else if (name == "FHYPOT") {
             node.kind = RealExprNode::Kind::Hypotenuse;
+        } else if (name == "FPOW") {
+            node.kind = RealExprNode::Kind::Power;
         } else if (name == "FMIN") {
             node.kind = RealExprNode::Kind::Minimum;
         } else if (name == "FMAX") {
@@ -3991,6 +3995,9 @@ std::optional<double> evaluate_real_expr_node(
     if (node.kind == RealExprNode::Kind::RadiansToDegrees) {
         constexpr float factor = 0x1.ca5dcp+5F;
         return static_cast<double>(static_cast<float>(*lhs) * factor);
+    }
+    if (node.kind == RealExprNode::Kind::Power) {
+        return std::nullopt;
     }
     auto rhs = evaluate_real_expr_node(expr, node.right, constants);
     if (!rhs) {
@@ -9627,6 +9634,8 @@ int cmd_actc(const std::vector<std::string>& args) {
                 helper = "RT_F_MOD";
             } else if (node.kind == RealExprNode::Kind::Hypotenuse) {
                 helper = "RT_F_HYPOT";
+            } else if (node.kind == RealExprNode::Kind::Power) {
+                helper = "RT_F_POW";
             } else if (node.kind == RealExprNode::Kind::Minimum) {
                 helper = "RT_F_MIN";
             } else if (node.kind == RealExprNode::Kind::Maximum) {

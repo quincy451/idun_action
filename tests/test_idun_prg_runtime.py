@@ -400,6 +400,11 @@ class TestIdunPrgRuntime(unittest.TestCase):
                 encoding="ascii",
             )
             self.run_tool(project, "actc", "main")
+            main_object = (project / "OBJ" / "MAIN.OBJ").read_text(
+                encoding="ascii"
+            )
+            self.assertIn("\nu RT_F_POW\n", main_object)
+            self.assertNotIn("\nx FPOW ", main_object)
             self.run_tool(project, "alink", "main")
 
             try:

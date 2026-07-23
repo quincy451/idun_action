@@ -1681,8 +1681,8 @@ Retired roadmap items for CP/M-era runner flows are no longer maintained.
 - Idun's generated-PRG MATH1 fixture now checks 17 binary32 results and
   exercises the shared FLog2 wrapper. Hardware-independent host, sanitizer,
   export, and VICE gates remain the release contract.
-- Current native inventories are 1,370 broad direct-PRG, 196 non-runtime
-  source-backed, and 304 compiled-runtime relocation-oracle cases. The native
+- At completion of that slice native inventories were 1,370 broad direct-PRG,
+  196 non-runtime source-backed, and 304 compiled-runtime relocation-oracle cases. The native
   suite contains 866 tests, including 252 overlay and 199 source-cache tests;
   Idun retains its 154-test host, 139-test sanitizer, and 21-test direct-PRG
   gates.
@@ -1692,3 +1692,28 @@ Retired roadmap items for CP/M-era runner flows are no longer maintained.
 - Native MATH1 now exposes twenty-one link-selected calls and lacks 22 public
   routines. Idun retains complete source-library behavior while sharing the
   same reachable-only target implementation for both base logarithms.
+
+## 2026-07-23 Shared MATH1 Power
+
+- Synchronized the independent 548-byte `RT_F_POW.OBJ` dependency root, math
+  generator, and shared manifest from native ActionC64U.
+- Linux ACTC recognizes `FPow(base,exponent)` as a binary REAL intrinsic and
+  imports `RT_F_POW` rather than compiling the former portable source body.
+  Constant calls deliberately use the target helper rather than host folding.
+- The helper preserves destination, base, and exponent and imports only
+  truncation, natural logarithm, multiplication, exponential, modulus, and
+  subtraction. Negative bases require an exactly integral exponent.
+- Idun's generated 17-result MATH1 PRG and the focused native direct PRG both
+  produce `1024` for `FPow(2,10)`. Exact native host execution also covers
+  domain edges and both input-alias forms.
+- Current native inventories are 1,371 broad direct-PRG, 196 non-runtime
+  source-backed, and 305 compiled-runtime relocation-oracle cases. The native
+  suite remains 866 tests, including 252 overlay and 199 source-cache tests;
+  Idun retains its 154-test host, 139-test sanitizer, and 21-test direct-PRG
+  gates.
+- Native pass 6 is 8,089 bytes with 103 bytes free; pass 7 is 6,870 bytes with
+  1,322 bytes free; passes L through U are respectively 6,091, 6,960, 7,082,
+  7,085, 7,109, 7,113, 7,296, 7,790, 8,109, and 7,439 bytes.
+- Native MATH1 now exposes twenty-two link-selected calls and lacks 21 public
+  routines. Idun retains complete source-library behavior while sharing the
+  same reachable-only target implementation for FPow.

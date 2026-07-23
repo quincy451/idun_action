@@ -27,7 +27,7 @@ The limits that remain are the intrinsic binary32 limits:
 Source forms include decimal and exponent literals, `INF`/`INFINITY`, `NAN`,
 `+`, `-`, `*`, `/`, comparisons, `REAL(integer)`, `INT(real)`, `FAbs`,
 `FSqrt`, `FSign`, `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`,
-`FHypot`, `FExp`, `FLn`, `FLog2`, `FLog10`, `FMin`, `FMax`, `FClamp`, `DegToRad`, `RadToDeg`, `PrintR`, and
+`FHypot`, `FPow`, `FExp`, `FLn`, `FLog2`, `FLog10`, `FMin`, `FMax`, `FClamp`, `DegToRad`, `RadToDeg`, `PrintR`, and
 `PrintRE`.
 
 Rules:
@@ -60,6 +60,10 @@ Rules:
 - `FHypot(left,right)` uses a scaled maximum/minimum calculation to avoid
   avoidable intermediate overflow and underflow; two zero inputs return
   positive zero, and infinity takes precedence when paired with NaN
+- `FPow(base,exponent)` returns `1.0` for a zero exponent, returns infinity for
+  zero raised to a negative exponent, evaluates positive bases through
+  `FExp(exponent*FLn(base))`, and requires an exactly integral exponent for
+  negative bases
 - `FExp(value)` uses binary32 `ln(2)` range reduction and a degree-8 polynomial;
   NaN returns canonical quiet NaN, positive overflow returns infinity, and
   negative underflow returns positive zero
@@ -101,6 +105,7 @@ ALINK resolves the following standalone helper symbols:
 - `rt_f_frac`
 - `rt_f_mod`
 - `rt_f_hypot`
+- `rt_f_pow`
 - `rt_f_deg_to_rad`
 - `rt_f_rad_to_deg`
 - `rt_f_min`
@@ -151,6 +156,9 @@ Specific return conventions are:
 - `rt_f_hypot` reads through `$02/$03` and `$04/$05`, writes through
   `$06/$07`, supports destination aliasing either operand, and imports the
   scaled absolute-value/minimum/maximum/divide/multiply/add/square-root closure
+- `rt_f_pow` reads through `$02/$03` and `$04/$05`, writes through `$06/$07`,
+  supports destination aliasing either operand, and imports the portable
+  truncation/logarithm/exponential/modulus/subtraction/multiplication closure
 - `rt_f_deg_to_rad` and `rt_f_rad_to_deg` read through `$02/$03`, write through
   `$06/$07`, and import `rt_f_mul`; each alias-safe 20-byte wrapper points
   `$04/$05` at its embedded scale factor
@@ -210,6 +218,8 @@ source:
   multiplication, subtraction, and special-value closure
 - `FHypot(a,b)` imports `rt_f_hypot` plus its absolute-value,
   minimum/maximum, division, multiplication, addition, and square-root closure
+- `FPow(a,b)` imports `rt_f_pow` plus its truncation, logarithm, exponential,
+  modulus, subtraction, multiplication, and transitive arithmetic closure
 - `FExp(r)` imports `rt_f_exp` plus its division, floor, conversion,
   multiplication, subtraction, and addition closure
 - `FLn(r)` imports `rt_f_ln` plus its subtraction, addition, division, and

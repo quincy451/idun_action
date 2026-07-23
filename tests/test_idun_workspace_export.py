@@ -162,6 +162,7 @@ class TestIdunWorkspaceExport(unittest.TestCase):
                 "RT_F_FRAC.OBJ",
                 "RT_F_MOD.OBJ",
                 "RT_F_HYPOT.OBJ",
+                "RT_F_POW.OBJ",
                 "RT_F_EXP.OBJ",
                 "RT_F_LN.OBJ",
                 "RT_F_LOG2.OBJ",
@@ -243,6 +244,20 @@ class TestIdunWorkspaceExport(unittest.TestCase):
             self.assertIn("r 57 u0", hypot_object)
             self.assertIn("r 432 u4", hypot_object)
             self.assertIn("n rt_f_hypot", hypot_object)
+            pow_object = (out / "LIB" / "RT_F_POW.OBJ").read_text(
+                encoding="ascii"
+            )
+            self.assertIn("x rt_f_pow 0 548", pow_object)
+            for dependency in (
+                "rt_f_trunc",
+                "rt_f_ln",
+                "rt_f_mul",
+                "rt_f_exp",
+                "rt_f_mod",
+                "rt_f_sub",
+            ):
+                self.assertIn(f"u {dependency}", pow_object)
+            self.assertIn("n rt_f_pow", pow_object)
             exp_object = (out / "LIB" / "RT_F_EXP.OBJ").read_text(
                 encoding="ascii"
             )
@@ -296,6 +311,8 @@ class TestIdunWorkspaceExport(unittest.TestCase):
             )
             self.assertIn("REAL FUNC DegToRad(REAL degrees)", math_header)
             self.assertIn("REAL FUNC RadToDeg(REAL radians)", math_header)
+            self.assertIn("REAL FUNC FPow(REAL base,exponent)", math_header)
+            self.assertNotIn("magnitude=FExp", math_header)
             self.assertNotIn(
                 "RETURN(degrees*(MATH_PI/180.0))",
                 math_header,

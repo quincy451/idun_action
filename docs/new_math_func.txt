@@ -9,12 +9,12 @@ Implementation status: complete in the Idun/Alpine fork. The source has 8
 public constants, 43 public routines, and 1 private helper. The resulting 51
 public help features are compiled and linked by the Linux ACTC/ALINK path and
 have generated-PRG VICE coverage. The native UDOS compiler currently exposes
-FAbs, FSqrt, FSign, FTrunc, FFloor, FCeil, FRound, FFrac, FMod, FHypot, FExp,
+FAbs, FSqrt, FSign, FTrunc, FFloor, FCeil, FRound, FFrac, FMod, FHypot, FPow, FExp,
 FLn, FLog2, FLog10, FMin, FMax, FClamp, DegToRad, RadToDeg, PrintR, and PrintRE. Both compilers
-lower FTrunc, FFloor, FCeil, FRound, FFrac, FMod, FHypot, FExp, FLn, FLog2, FLog10, DegToRad, and
+lower FTrunc, FFloor, FCeil, FRound, FFrac, FMod, FHypot, FPow, FExp, FLn, FLog2, FLog10, DegToRad, and
 RadToDeg to shared link-selected OBJs; the native
 selected FSign/FMin/FMax/FClamp semantics also match this source. General
-native REAL source lowering and the remaining 22 public routines are tracked in
+native REAL source lowering and the remaining 21 public routines are tracked in
 docs/udos_feature_parity.md.
 The native `INCLUDE "MATH1"` header now also exposes all 8 constants without
 allocating target storage or selecting a runtime object.
@@ -134,17 +134,17 @@ IEEE and domain behavior
 Porting checklist for the native C64U tree
 -----------------------------------------
 
-1. Keep the public signatures above synchronized; FTrunc, FFloor, FCeil, FRound, FFrac, FMod, FHypot, FExp, FLn, FLog2, and FLog10 are now
+1. Keep the public signatures above synchronized; FTrunc, FFloor, FCeil, FRound, FFrac, FMod, FHypot, FPow, FExp, FLn, FLog2, and FLog10 are now
    declarations backed by shared link-selected runtime objects in both products.
 2. Supply the same link-selected binary32 primitives for PrintR, PrintRE,
-   FAbs, FSqrt, FTrunc, FFloor, FCeil, FRound, FFrac, FMod, FHypot, FExp, FLn, FLog2, FLog10, add, subtract, multiply, divide, compare, INT
+   FAbs, FSqrt, FTrunc, FFloor, FCeil, FRound, FFrac, FMod, FHypot, FPow, FExp, FLn, FLog2, FLog10, add, subtract, multiply, divide, compare, INT
    conversion, and REAL conversion.
 3. Keep _MathWrapPi private; help/catalog builders intentionally ignore names
    beginning with an underscore.
 4. Add the constants and all public signatures to ACTEDIT/ACTHELP library help.
 5. Run known-value target tests for positive and negative FATan, all FATan2
    quadrants, FSin/FCos/FTan, logs, powers, and hyperbolic functions.  The Idun
-   fork's VICE regression executes sixteen representative results on a 6502.
+   fork's VICE regression executes seventeen representative results on a 6502.
 
 Small example
 -------------

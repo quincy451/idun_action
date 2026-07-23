@@ -1,7 +1,7 @@
 ; MATH1 IEEE-754 REAL32 library.
 ;
 ; The core operators, FAbs, FSqrt, FTrunc, FFloor, FCeil, FRound, FFrac, FMod,
-; FHypot, FExp, FLn, FLog2, FLog10, DegToRad, RadToDeg, and REAL printing are
+; FHypot, FPow, FExp, FLn, FLog2, FLog10, DegToRad, RadToDeg, and REAL printing are
 ; compiler/runtime primitives. The remaining routines are ordinary Action
 ; functions. Angles are in radians unless a function name explicitly mentions
 ; degrees.
@@ -28,6 +28,7 @@ REAL FUNC FRound(REAL value)
 REAL FUNC FFrac(REAL value)
 REAL FUNC FMod(REAL value,divisor)
 REAL FUNC FHypot(REAL x,y)
+REAL FUNC FPow(REAL base,exponent)
 REAL FUNC FExp(REAL value)
 REAL FUNC FLn(REAL value)
 REAL FUNC FLog2(REAL value)
@@ -76,34 +77,6 @@ REAL FUNC FClamp(REAL value,lower,upper)
         RETURN(NAN)
     FI
     RETURN(FMin(FMax(value,lower),upper))
-
-REAL FUNC FPow(REAL base,exponent)
-    REAL magnitude,whole,result
-    IF base<>base OR exponent<>exponent THEN
-        RETURN(NAN)
-    FI
-    IF exponent=0.0 THEN
-        RETURN(1.0)
-    FI
-    IF base=0.0 THEN
-        IF exponent<0.0 THEN
-            RETURN(INF)
-        FI
-        RETURN(base)
-    FI
-    IF base>0.0 THEN
-        RETURN(FExp(exponent*FLn(base)))
-    FI
-    whole=FTrunc(exponent)
-    IF whole<>exponent THEN
-        RETURN(NAN)
-    FI
-    magnitude=FExp(exponent*FLn(0.0-base))
-    result=FMod(FAbs(whole),2.0)
-    IF result=1.0 THEN
-        magnitude=0.0-magnitude
-    FI
-    RETURN(magnitude)
 
 REAL FUNC _MathWrapPi(REAL radians)
     REAL result
