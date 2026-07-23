@@ -1336,6 +1336,11 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 ("FROMOUTER", "TOOUTER"),
                 ("RT_F_ADD",),
             ),
+            (
+                "math1_angle_conversions_postfix.act",
+                ("DEGTORAD", "RADTODEG"),
+                ("RT_F_DIV", "RT_F_MUL"),
+            ),
         ):
             with self.subTest(fixture=fixture_name):
                 self._compile_and_link_real_function_fixture(

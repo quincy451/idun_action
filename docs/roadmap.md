@@ -1544,3 +1544,21 @@ Retired roadmap items for CP/M-era runner flows are no longer maintained.
   beyond four or depth four, unrestricted call trees, recursive/reentrant
   frames, mixed types, arbitrary signatures, and recursion remain native gaps;
   Idun's general compiler remains the behavioral reference.
+
+## 2026-07-22 Native Folded-REAL Function Parity
+
+- Native ActionC64U added pass U, `ACTC_OVLU.BIN` (id 30), for folded binary32
+  literals and one- or two-REAL-parameter functions in its bounded
+  straight-line REAL form.
+- Added byte-identical `math1_angle_conversions_postfix.act` fixtures. This
+  fork's ACTC/ALINK compiles and links project-local `DegToRad` and `RadToDeg`;
+  native ACTC emits pi as `DB 0F 49 40`, and the direct PRG prints pi followed
+  by `180` in VICE.
+- Native passes L through T remain byte-identical. Pass U is 6,456 bytes with
+  1,736 bytes free and SHA-256
+  `61ccf0f12458f2ce220d36f0677afb93ad34eee639957eecb377e4c342f4a275`.
+- Current native inventories are 1,363 broad direct-PRG and 195 non-runtime
+  source-backed shapes; the compiled-runtime relocation oracle remains 298.
+- Native dependency-sized packaging for these two public MATH1 routines and
+  the other 26 missing routines remains work; this fixture closes compiler
+  lowering parity only.

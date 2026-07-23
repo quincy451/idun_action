@@ -153,11 +153,14 @@ Remaining product work:
    under both toolchains. Native pass O accepts a third and fourth control or
    nesting to depth four; shared fixtures print `43` and `154`. Native pass P
    accepts immediate returns inside those bounded controls when a terminal
-   fallback return is present; shared fixtures print `33` and `154`. General or
-   recursive call graphs, recursive/reentrant local frames, loops, more than four
-   controls, deeper nesting, unrestricted user-call argument trees and nested call
-   expressions, mixed types, arbitrary
-   signatures, and recursive frames remain pending.
+   fallback return is present; shared fixtures print `33` and `154`. Passes Q
+   through T add bounded pre/post-test and plain loops, nearest-loop `EXIT`, and
+   CARD-counter `FOR` loops with constant or named bounds. Pass U accepts folded
+   binary32 literals and one- or two-REAL-parameter functions; the shared
+   `DegToRad`/`RadToDeg` fixture compiles and links in both products. General or
+   recursive call graphs, recursive/reentrant local frames, mixed controls,
+   unrestricted user-call argument trees and nested call expressions, mixed
+   types, arbitrary signatures, and recursive frames remain pending.
    Linux ACTC now lowers `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`,
    `FHypot`, `FMin`, and `FMax` to the same shared objects instead of embedding
    those MATH1 bodies. It retains all project routines and prunes unreachable MATH1/GFX1

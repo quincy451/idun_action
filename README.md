@@ -136,6 +136,9 @@ adds constant-bound local CARD-counter `FOR` loops; the shared ascending and
 descending fixture produces 4.0 and 7.0 in both products, and its native linked
 PRG displays `47`. Pass T adds named CARD initial/final bounds; the shared
 nested-loop fixture produces 7.0 twice and its native linked PRG displays `77`.
+Pass U adds folded binary32 literals and one-parameter REAL functions; the
+shared `DegToRad`/`RadToDeg` fixture compiles and links in both products, and
+the native direct PRG displays pi followed by `180`.
 Self and mutual cycles remain rejected.
 Native ACTC now lowers
 `FSign`, `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`, `FHypot`, `FMin`, and `FMax` for named REAL operands and a bounded,

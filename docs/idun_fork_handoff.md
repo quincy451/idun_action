@@ -410,8 +410,11 @@ produce 4.0 and 3.0 in both products. Pass S adds shared
 `real_function_for_postfix.act`; its ascending default-step and descending
 `STEP -2` CARD-counter loops produce 4.0 and 7.0 in both products. Pass T adds
 shared `real_function_dynamic_for_postfix.act`; named CARD initial/final bounds
-in nested loops produce 7.0 twice in both products. Current native inventories
-are 1,362 broad, 194 non-runtime source-backed, and 298
+in nested loops produce 7.0 twice in both products. Pass U adds shared
+`math1_angle_conversions_postfix.act`; folded pi and one-parameter
+`DegToRad`/`RadToDeg` compile and link in both products, and native VICE prints
+pi followed by `180`. Current native inventories
+are 1,363 broad, 195 non-runtime source-backed, and 298
 compiled-runtime relocation-oracle cases; pass L is 6,124 bytes with 2,068
 bytes free, pass M is 6,998 bytes with 1,194 bytes free, pass N is 7,120 bytes
 with 1,072 bytes free, pass O is 7,123 bytes with 1,069 bytes free, pass P is
@@ -419,7 +422,9 @@ with 1,072 bytes free, pass O is 7,123 bytes with 1,069 bytes free, pass P is
 pass R is 7,334 bytes with 858 bytes free under its 768-byte gate, and pass 7
 is 6,678 bytes with 1,514 bytes free. Pass S is 7,828 bytes with 364 bytes free
 under its 256-byte gate. Pass T is 8,147 bytes with 45 bytes free under its
-32-byte gate. The native MATH1 gap remains 28 public routines, and reentrant
+32-byte gate. Pass U is 6,456 bytes with 1,736 bytes free under its 1,536-byte
+gate. The native MATH1 gap remains 28 public routines until the angle bodies
+are packaged independently, and reentrant
 local frames, general `FOR` bound expressions/runtime steps, nested counter-to-REAL body
 composition, mixed loop/conditional nesting, returns from inside loops, more
 than four controls,

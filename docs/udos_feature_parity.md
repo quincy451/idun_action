@@ -72,7 +72,8 @@ cycles are rejected. Pass S adds up to four nested or sequential local
 CARD-counter `FOR` loops with constant initial/final values and a nonzero
 constant signed step, including wrap-safe ascending and descending
 termination. Pass T adds named CARD initial/final bounds and stages each once
-per loop entry. General bound expressions, runtime steps, nested counter-to-REAL body composition, mixed
+per loop entry. Pass U adds folded binary32 literal materialization and one- or
+two-REAL-parameter functions. General bound expressions, runtime steps, nested counter-to-REAL body composition, mixed
 loop/conditional nesting, returns from inside loops, more than four controls,
 deeper nesting,
 unrestricted user-call
@@ -373,7 +374,7 @@ remaining parity and acceptance work. Items 1 through 10 are implementation
 work; item 11 is the final emulated and physical acceptance phase.
 
 The native D64 is intentionally a valid UDOS boot plus standalone ALINK disk.
-The complete ACTC compiler, passes 0 through T, development tools, libraries,
+The complete ACTC compiler, passes 0 through U, development tools, libraries,
 examples, and assets live in `ACTION.DNP`, the primary C64 Ultimate workspace.
 New native parity work targets the DNP and must not produce a partial compiler
 on the capacity-constrained D64.
@@ -449,7 +450,7 @@ graphics, SID/sprite, REU, and common DBF code, must match the native snapshot.
 
 The 2026-07-22 current cross-product baseline passed:
 
-- 854 native ActionC64U unittests, including compiler-overlay capacity, OBJ1,
+- 857 native ActionC64U unittests, including compiler-overlay capacity, OBJ1,
   ALINK closure, IEEE-754, ACTEDIT, ACTDBG, Linux compatibility, export, and
   release-image checks;
 - 133 UDOS integration tests, with one intentional embedded-AUTOEXEC capacity
@@ -793,8 +794,10 @@ a guarded nearest-loop exit; both products again print `43`. Pass S then runs
 ascending default-step and descending `STEP -2` CARD-counter loops; both
 products store 4.0 and 7.0, and native VICE prints `47`. Pass T then stages
 named CARD initial/final bounds in nested loops; both products store 7.0 twice,
-and native VICE prints `77`. Current native
-inventories are 1,362 broad direct-PRG shapes, 194 non-runtime
+and native VICE prints `77`. Pass U then materializes folded pi in two
+one-parameter angle-conversion functions; both products compile and link the
+same fixture, while native VICE prints pi and `180`. Current native
+inventories are 1,363 broad direct-PRG shapes, 195 non-runtime
 source-backed object-emission shapes, and 298 compiled-runtime relocation-oracle
 cases. Native pass L is 6,124 bytes with 2,068 bytes free; pass M is 6,998 bytes
 with 1,194 bytes free; pass N is 7,120 bytes with 1,072 bytes free under its
@@ -803,8 +806,9 @@ pass P is 7,147 bytes with 1,045 bytes free under the same gate; pass Q is
 7,151 bytes with 1,041 bytes free under the same gate; pass R is 7,334 bytes
 with 858 bytes free under its dedicated 768-byte gate; pass S is 7,828 bytes
 with 364 bytes free under its dedicated 256-byte gate; pass T is 8,147 bytes
-with 45 bytes free under its dedicated 32-byte gate. The 28-routine MATH1
-gap is unchanged.
+with 45 bytes free under its dedicated 32-byte gate. Pass U is 6,456 bytes with
+1,736 bytes free under its dedicated 1,536-byte gate. The 28-routine MATH1 gap
+is unchanged until the angle functions ship as dependency-sized native modules.
 
 Pass 1 now contains only the streamed module-header validator. Moving the
 transform into `ACTC_OVLI.BIN` reduced pass 1 to 788 bytes. Integer folding,
@@ -820,7 +824,7 @@ label index, and emitter state occupy the reserved `$9E00-$9F1E` range. Pass J
 is 7,901 bytes with 291 bytes free under its 256-byte reserve; pass A is 7,418
 bytes with 774 bytes free under its 768-byte reserve; pass K is 5,877 bytes with
 2,315 bytes free. The complete
-244-test overlay suite and 198-test source-cache suite pass with this layout.
+246-test overlay suite and 198-test source-cache suite pass with this layout.
 
 Shipped and ordinary harness builds default to
 `ACTC_ENABLE_REAL_CONST_EVALUATOR=1`. The legacy all-resident body, layout, and
