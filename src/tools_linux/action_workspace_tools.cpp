@@ -3602,6 +3602,7 @@ struct RealExprNode {
         Absolute,
         SquareRoot,
         Sine,
+        Cosine,
         Exponential,
         Logarithm,
         Base2Logarithm,
@@ -3841,7 +3842,7 @@ private:
         }
 
         if (name != "REAL" && name != "FABS" && name != "FSQRT" &&
-            name != "FSIN" &&
+            name != "FSIN" && name != "FCOS" &&
             name != "FEXP" &&
             name != "FLN" &&
             name != "FLOG2" && name != "FLOG10" &&
@@ -3886,6 +3887,8 @@ private:
             node.kind = RealExprNode::Kind::SquareRoot;
         } else if (name == "FSIN") {
             node.kind = RealExprNode::Kind::Sine;
+        } else if (name == "FCOS") {
+            node.kind = RealExprNode::Kind::Cosine;
         } else if (name == "FEXP") {
             node.kind = RealExprNode::Kind::Exponential;
         } else if (name == "FLN") {
@@ -3967,6 +3970,9 @@ std::optional<double> evaluate_real_expr_node(
         return static_cast<double>(std::sqrt(static_cast<float>(*lhs)));
     }
     if (node.kind == RealExprNode::Kind::Sine) {
+        return std::nullopt;
+    }
+    if (node.kind == RealExprNode::Kind::Cosine) {
         return std::nullopt;
     }
     if (node.kind == RealExprNode::Kind::Exponential) {
@@ -9582,6 +9588,7 @@ int cmd_actc(const std::vector<std::string>& args) {
             if (node.kind == RealExprNode::Kind::Absolute ||
                 node.kind == RealExprNode::Kind::SquareRoot ||
                 node.kind == RealExprNode::Kind::Sine ||
+                node.kind == RealExprNode::Kind::Cosine ||
                 node.kind == RealExprNode::Kind::Exponential ||
                 node.kind == RealExprNode::Kind::Logarithm ||
                 node.kind == RealExprNode::Kind::Base2Logarithm ||
@@ -9602,6 +9609,8 @@ int cmd_actc(const std::vector<std::string>& args) {
                     helper = "RT_F_SQRT";
                 } else if (node.kind == RealExprNode::Kind::Sine) {
                     helper = "RT_F_SIN";
+                } else if (node.kind == RealExprNode::Kind::Cosine) {
+                    helper = "RT_F_COS";
                 } else if (node.kind == RealExprNode::Kind::Exponential) {
                     helper = "RT_F_EXP";
                 } else if (node.kind == RealExprNode::Kind::Logarithm) {

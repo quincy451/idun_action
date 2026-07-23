@@ -422,15 +422,15 @@ literals with pass-P controls. Shared
 REAL locals, multiplication, three comparisons, and three immediate returns;
 native and Idun generated-6502 execution both produce `-1`, `0`, and `1`.
 Current native inventories are
-1,372 broad, 196 non-runtime source-backed, and 306 compiled-runtime
-relocation-oracle cases; pass 6 is 8,096 bytes with 96 bytes free, pass 7 is
-6,896 bytes with 1,296 bytes free, pass L is 6,098 bytes with 2,094
-bytes free, pass M is 6,967 bytes with 1,225 bytes free, pass N is 7,089 bytes
-with 1,103 bytes free, pass O is 7,092 bytes with 1,100 bytes free, pass P is
-7,116 bytes with 1,076 bytes free, pass Q is 7,120 bytes with 1,072 bytes free,
-and pass R is 7,303 bytes with 889 bytes free under its 768-byte gate. Pass S is
-7,797 bytes with 395 bytes free under its 256-byte gate. Pass T is 8,116 bytes
-with 76 bytes free under its 32-byte gate. Pass U is 7,446 bytes with 746 bytes free under its 640-byte
+1,373 broad, 196 non-runtime source-backed, and 307 compiled-runtime
+relocation-oracle cases; pass 6 is 8,085 bytes with 107 bytes free, pass 7 is
+6,932 bytes with 1,260 bytes free, pass L is 6,105 bytes with 2,087
+bytes free, pass M is 6,974 bytes with 1,218 bytes free, pass N is 7,096 bytes
+with 1,096 bytes free, pass O is 7,099 bytes with 1,093 bytes free, pass P is
+7,123 bytes with 1,069 bytes free, pass Q is 7,127 bytes with 1,065 bytes free,
+and pass R is 7,310 bytes with 882 bytes free under its 768-byte gate. Pass S is
+7,804 bytes with 388 bytes free under its 256-byte gate. Pass T is 8,123 bytes
+with 69 bytes free under its 32-byte gate. Pass U is 7,453 bytes with 739 bytes free under its 640-byte
 gate. `RT_F_EXP.OBJ` is now synchronized as an independently selected
 1,465-byte dependency root; Idun and native ACTC both lower `FExp` to it, and
 native ALINK accepts its 233 relocations through the expanded 255-record table.
@@ -451,7 +451,11 @@ The shared 586-byte `RT_F_SIN.OBJ` and private 225-byte
 the same alias-safe range-reduction and degree-11 polynomial closure; the
 focused native direct PRG prints `0.909297...` for `FSin(2)` while pruning
 unrelated roots.
-The native MATH1 gap is now 20 public routines, and reentrant
+The shared 609-byte `RT_F_COS.OBJ` is now synchronized. Both compilers lower
+`FCos(value)` to the same alias-safe range-reduction and degree-10 even
+polynomial closure; the focused native direct PRG prints `-0.416146...` for
+`FCos(2)` while pruning unrelated roots.
+The native MATH1 gap is now 19 public routines, and reentrant
 local frames, general `FOR` bound expressions/runtime steps, nested counter-to-REAL body
 composition, mixed loop/conditional nesting, returns from inside loops, more
 than four controls,

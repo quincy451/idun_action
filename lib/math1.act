@@ -1,7 +1,7 @@
 ; MATH1 IEEE-754 REAL32 library.
 ;
 ; The core operators, FAbs, FSqrt, FTrunc, FFloor, FCeil, FRound, FFrac, FMod,
-; FHypot, FPow, FSin, FExp, FLn, FLog2, FLog10, DegToRad, RadToDeg, and REAL printing are
+; FHypot, FPow, FSin, FCos, FExp, FLn, FLog2, FLog10, DegToRad, RadToDeg, and REAL printing are
 ; compiler/runtime primitives. The remaining routines are ordinary Action
 ; functions. Angles are in radians unless a function name explicitly mentions
 ; degrees.
@@ -30,6 +30,7 @@ REAL FUNC FMod(REAL value,divisor)
 REAL FUNC FHypot(REAL x,y)
 REAL FUNC FPow(REAL base,exponent)
 REAL FUNC FSin(REAL radians)
+REAL FUNC FCos(REAL radians)
 REAL FUNC FExp(REAL value)
 REAL FUNC FLn(REAL value)
 REAL FUNC FLog2(REAL value)
@@ -78,39 +79,6 @@ REAL FUNC FClamp(REAL value,lower,upper)
         RETURN(NAN)
     FI
     RETURN(FMin(FMax(value,lower),upper))
-
-REAL FUNC _MathWrapPi(REAL radians)
-    REAL result
-    IF radians<>radians OR radians=INF OR radians=-INF THEN
-        RETURN(NAN)
-    FI
-    result=FMod(radians,MATH_TWO_PI)
-    IF result>MATH_PI THEN
-        result=result-MATH_TWO_PI
-    ELSEIF result<(0.0-MATH_PI) THEN
-        result=result+MATH_TWO_PI
-    FI
-    RETURN(result)
-
-REAL FUNC FCos(REAL radians)
-    REAL angle,square,result,sign
-    angle=_MathWrapPi(radians)
-    IF angle<>angle THEN
-        RETURN(NAN)
-    FI
-    sign=1.0
-    IF angle>MATH_HALF_PI THEN
-        angle=MATH_PI-angle
-        sign=-1.0
-    ELSEIF angle<(0.0-MATH_HALF_PI) THEN
-        angle=(0.0-MATH_PI)-angle
-        sign=-1.0
-    FI
-    square=angle*angle
-    result=1.0+square*(-0.5+square*(0.0416666418313980+
-           square*(-0.00138883618637919+square*(0.0000247601616382599+
-           square*(-0.000000260514921515579)))))
-    RETURN(sign*result)
 
 REAL FUNC FTan(REAL radians)
     RETURN(FSin(radians)/FCos(radians))

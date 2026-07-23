@@ -1742,3 +1742,29 @@ Retired roadmap items for CP/M-era runner flows are no longer maintained.
   6,967, 7,089, 7,092, 7,116, 7,120, 7,303, 7,797, 8,116, and 7,446 bytes.
 - Native MATH1 now exposes twenty-three link-selected calls and lacks 20 public
   routines. FCos is next after native pass-6 compaction.
+
+## 2026-07-23 Shared MATH1 Cosine
+
+- Synchronized the independent 609-byte `RT_F_COS.OBJ`, math generator, and
+  shared manifest from native ActionC64U.
+- Linux ACTC recognizes `FCos(value)` as a unary REAL intrinsic and imports
+  `RT_F_COS` rather than compiling the portable source body. Constant calls
+  deliberately use the target helper rather than host folding.
+- The helper shares the private wrap-to-pi dependency, folds to the central
+  half-pi interval, and evaluates the portable degree-10 even polynomial with
+  binary32 rounding after every operation. It preserves aliased source and
+  destination pointers and does not import the FSin root.
+- The focused native ACTC/ALINK/VICE PRG prints `-0.416146...` for `FCos(2)`.
+  Idun's generated MATH1 PRG executes both FSin and FCos through the shared
+  target objects.
+- Current native inventories are 1,373 broad direct-PRG, 196 non-runtime
+  source-backed, and 307 compiled-runtime relocation-oracle cases. The native
+  suite remains 866 tests, including 252 overlay and 199 source-cache tests;
+  Idun retains its 154-test host, 139-test sanitizer, and 21-test direct-PRG
+  gates.
+- Native pass 6 is 8,085 bytes with 107 bytes free; pass 7 is 6,932 bytes with
+  1,260 bytes free; passes L through U are respectively 6,105, 6,974, 7,096,
+  7,099, 7,123, 7,127, 7,310, 7,804, 8,123, and 7,453 bytes.
+- Native MATH1 now exposes twenty-four link-selected calls and lacks 19 public
+  routines. Idun retains complete source-library behavior while sharing the
+  same reachable-only target implementation for FCos.
