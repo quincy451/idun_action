@@ -27,7 +27,7 @@ The limits that remain are the intrinsic binary32 limits:
 Source forms include decimal and exponent literals, `INF`/`INFINITY`, `NAN`,
 `+`, `-`, `*`, `/`, comparisons, `REAL(integer)`, `INT(real)`, `FAbs`,
 `FSqrt`, `FSign`, `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`,
-`FHypot`, `FPow`, `FExp`, `FLn`, `FLog2`, `FLog10`, `FMin`, `FMax`, `FClamp`, `DegToRad`, `RadToDeg`, `PrintR`, and
+`FHypot`, `FPow`, `FExp`, `FLn`, `FLog2`, `FLog10`, `FSin`, `FMin`, `FMax`, `FClamp`, `DegToRad`, `RadToDeg`, `PrintR`, and
 `PrintRE`.
 
 Rules:
@@ -67,6 +67,10 @@ Rules:
 - `FExp(value)` uses binary32 `ln(2)` range reduction and a degree-8 polynomial;
   NaN returns canonical quiet NaN, positive overflow returns infinity, and
   negative underflow returns positive zero
+- `FSin(value)` reduces the input to binary32 `[-pi,pi]`, folds it to
+  `[-pi/2,pi/2]`, and evaluates the portable degree-11 odd polynomial with
+  binary32 rounding after every operation; NaN and either infinity return
+  canonical quiet NaN
 - `DegToRad(value)` multiplies by binary32 `0x3C8EFA35` (`pi/180`);
   `RadToDeg(value)` multiplies by binary32 `0x42652EE0` (`180/pi`). Both use
   ordinary binary32 multiplication behavior
@@ -106,6 +110,7 @@ ALINK resolves the following standalone helper symbols:
 - `rt_f_mod`
 - `rt_f_hypot`
 - `rt_f_pow`
+- `rt_f_sin`
 - `rt_f_deg_to_rad`
 - `rt_f_rad_to_deg`
 - `rt_f_min`
@@ -159,6 +164,10 @@ Specific return conventions are:
 - `rt_f_pow` reads through `$02/$03` and `$04/$05`, writes through `$06/$07`,
   supports destination aliasing either operand, and imports the portable
   truncation/logarithm/exponential/modulus/subtraction/multiplication closure
+- `rt_f_wrap_pi` is a private alias-safe unary dependency that reduces finite
+  input to binary32 `[-pi,pi]` through remainder and comparison arithmetic
+- `rt_f_sin` is an alias-safe unary root that imports `rt_f_wrap_pi`, folds to
+  `[-pi/2,pi/2]`, and evaluates the portable degree-11 odd polynomial
 - `rt_f_deg_to_rad` and `rt_f_rad_to_deg` read through `$02/$03`, write through
   `$06/$07`, and import `rt_f_mul`; each alias-safe 20-byte wrapper points
   `$04/$05` at its embedded scale factor

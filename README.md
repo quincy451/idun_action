@@ -146,7 +146,7 @@ intrinsics: constant calls fold in Linux ACTC, dynamic calls select one shared
 angle-conversion OBJ, and native ACTC selects the same module only when used.
 Self and mutual cycles remain rejected.
 Native ACTC now lowers
-`FSign`, `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`, `FHypot`, `FPow`, `FExp`, `FLn`, `FLog2`, `FLog10`,
+`FSign`, `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`, `FHypot`, `FPow`, `FExp`, `FLn`, `FLog2`, `FLog10`, `FSin`,
 `FMin`, `FMax`, `DegToRad`, and `RadToDeg` for named REAL operands and a bounded,
 storage-capturing `FClamp`
 ternary root through synchronized, independently selected target modules with
@@ -155,7 +155,7 @@ NaN/signed-zero/bound-order semantics. General native REAL expressions/functions
 MATH1, GFX1, resources, formatting, and help remain listed there explicitly.
 The native MATH1 include now supplies all eight constants without target code.
 Idun now lowers `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`,
-`FHypot`, `FPow`, `FExp`, `FLn`, `FLog2`, `FLog10`, `FMin`, `FMax`, `DegToRad`, and `RadToDeg` to the
+`FHypot`, `FPow`, `FExp`, `FLn`, `FLog2`, `FLog10`, `FSin`, `FMin`, `FMax`, `DegToRad`, and `RadToDeg` to the
 same independently selected target objects. Linux ACTC retains
 and validates every project routine, then prunes full-source MATH1/GFX1 library
 routines to the transitive graph those project routines reference. Bare routine

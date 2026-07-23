@@ -403,6 +403,8 @@ class TestIdunPrgRuntime(unittest.TestCase):
             main_object = (project / "OBJ" / "MAIN.OBJ").read_text(
                 encoding="ascii"
             )
+            self.assertIn("\nu RT_F_SIN\n", main_object)
+            self.assertNotIn("\nx FSIN ", main_object)
             self.assertIn("\nu RT_F_POW\n", main_object)
             self.assertNotIn("\nx FPOW ", main_object)
             self.run_tool(project, "alink", "main")
