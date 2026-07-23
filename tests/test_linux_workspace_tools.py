@@ -182,6 +182,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 self.assertRegex(math_object, rf"(?m)^x {symbol} \d+ \d+$")
             for symbol in (
                 "FLOG2",
+                "FLOG10",
                 "FASIN",
                 "FASINH",
                 "FATANH",
@@ -200,6 +201,8 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
             self.assertNotRegex(math_object, r"(?m)^x FHYPOT \d+ \d+$")
             self.assertNotRegex(math_object, r"(?m)^x FEXP \d+ \d+$")
             self.assertNotRegex(math_object, r"(?m)^x FLN \d+ \d+$")
+            self.assertNotRegex(math_object, r"(?m)^x FLOG2 \d+ \d+$")
+            self.assertNotRegex(math_object, r"(?m)^x FLOG10 \d+ \d+$")
             self.assertIn("\nu RT_F_TRUNC\n", math_object)
             self.assertNotIn("\nu RT_F_FLOOR\n", math_object)
             self.assertNotIn("\nu RT_F_CEIL\n", math_object)
@@ -1548,6 +1551,8 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 "rt_f_hypot.obj",
                 "rt_f_exp.obj",
                 "rt_f_ln.obj",
+                "rt_f_log2.obj",
+                "rt_f_log10.obj",
                 "rt_f_min.obj",
                 "rt_f_max.obj",
                 "rt_f_addsub_core.obj",
@@ -1581,7 +1586,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                     [
                         "PROC MAIN()",
                         "CARD n",
-                        "REAL a=[1.5],b=[2.0],sum,difference,product,quotient,root,absolute,truncated,floored,ceiled,rounded,fractional,modulus,hypotenuse,exponential,logarithm,minimum,maximum,fromint",
+                        "REAL a=[1.5],b=[2.0],sum,difference,product,quotient,root,absolute,truncated,floored,ceiled,rounded,fractional,modulus,hypotenuse,exponential,logarithm,logarithm2,logarithm10,minimum,maximum,fromint",
                         "n = 3",
                         "sum = a + b",
                         "difference = a - b",
@@ -1598,6 +1603,8 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                         "hypotenuse = FHypot(a,b)",
                         "exponential = FExp(a)",
                         "logarithm = FLn(a)",
+                        "logarithm2 = FLog2(a)",
+                        "logarithm10 = FLog10(a)",
                         "minimum = FMin(a,b)",
                         "maximum = FMax(a,b)",
                         "fromint = REAL(n)",
@@ -1630,6 +1637,8 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 "RT_F_HYPOT",
                 "RT_F_EXP",
                 "RT_F_LN",
+                "RT_F_LOG2",
+                "RT_F_LOG10",
                 "RT_F_MIN",
                 "RT_F_MAX",
                 "RT_I_TO_F",

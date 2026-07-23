@@ -1665,3 +1665,30 @@ Retired roadmap items for CP/M-era runner flows are no longer maintained.
 - Native MATH1 now exposes nineteen link-selected calls and lacks 24 public
   routines. Idun retains complete source-library behavior while sharing the
   same reachable-only target implementation for `FLn`.
+
+## 2026-07-23 Shared MATH1 Base Logarithms
+
+- Synchronized independent 71-byte `RT_F_LOG2.OBJ` and `RT_F_LOG10.OBJ`
+  dependency roots and their generator from native ActionC64U. Each stages
+  FLn into private storage and divides by an embedded binary32 `ln(2)` or
+  `ln(10)` denominator.
+- Linux ACTC recognizes both unary calls and selects the corresponding shared
+  wrapper only when referenced. `LIB/MATH1.ACT` declares both as primitives
+  instead of compiling duplicate portable bodies.
+- Each alias-safe wrapper imports only `RT_F_LN.OBJ` and `RT_F_DIV.OBJ`.
+  Focused native ACTC/ALINK/VICE PRGs print `3` for `FLog2(8)` and
+  `FLog10(1000)` while proving the unused sibling remains absent.
+- Idun's generated-PRG MATH1 fixture now checks 17 binary32 results and
+  exercises the shared FLog2 wrapper. Hardware-independent host, sanitizer,
+  export, and VICE gates remain the release contract.
+- Current native inventories are 1,370 broad direct-PRG, 196 non-runtime
+  source-backed, and 304 compiled-runtime relocation-oracle cases. The native
+  suite contains 866 tests, including 252 overlay and 199 source-cache tests;
+  Idun retains its 154-test host, 139-test sanitizer, and 21-test direct-PRG
+  gates.
+- Native pass 6 is 8,094 bytes with 98 bytes free; pass 7 is 6,840 bytes with
+  1,352 bytes free; passes L through U are respectively 6,084, 6,953, 7,075,
+  7,078, 7,102, 7,106, 7,289, 7,783, 8,102, and 7,432 bytes.
+- Native MATH1 now exposes twenty-one link-selected calls and lacks 22 public
+  routines. Idun retains complete source-library behavior while sharing the
+  same reachable-only target implementation for both base logarithms.

@@ -27,7 +27,7 @@ The limits that remain are the intrinsic binary32 limits:
 Source forms include decimal and exponent literals, `INF`/`INFINITY`, `NAN`,
 `+`, `-`, `*`, `/`, comparisons, `REAL(integer)`, `INT(real)`, `FAbs`,
 `FSqrt`, `FSign`, `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`,
-`FHypot`, `FExp`, `FLn`, `FMin`, `FMax`, `FClamp`, `DegToRad`, `RadToDeg`, `PrintR`, and
+`FHypot`, `FExp`, `FLn`, `FLog2`, `FLog10`, `FMin`, `FMax`, `FClamp`, `DegToRad`, `RadToDeg`, `PrintR`, and
 `PrintRE`.
 
 Rules:
@@ -214,6 +214,8 @@ source:
   multiplication, subtraction, and addition closure
 - `FLn(r)` imports `rt_f_ln` plus its subtraction, addition, division, and
   multiplication closure
+- `FLog2(r)` and `FLog10(r)` import `rt_f_log2` or `rt_f_log10`,
+  respectively; each wrapper imports only `rt_f_ln` and `rt_f_div`
 - `DegToRad(r)` and `RadToDeg(r)` each import only the selected angle wrapper
   plus its multiplication and special-value closure
 - `FMin(a,b)` and `FMax(a,b)` import only the selected helper plus its comparison

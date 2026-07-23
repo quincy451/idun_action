@@ -1,9 +1,10 @@
 ; MATH1 IEEE-754 REAL32 library.
 ;
 ; The core operators, FAbs, FSqrt, FTrunc, FFloor, FCeil, FRound, FFrac, FMod,
-; FHypot, FExp, FLn, DegToRad, RadToDeg, and REAL printing are compiler/runtime
-; primitives. The remaining routines are ordinary Action functions. Angles
-; are in radians unless a function name explicitly mentions degrees.
+; FHypot, FExp, FLn, FLog2, FLog10, DegToRad, RadToDeg, and REAL printing are
+; compiler/runtime primitives. The remaining routines are ordinary Action
+; functions. Angles are in radians unless a function name explicitly mentions
+; degrees.
 
 MODULE MATH1
 
@@ -29,6 +30,8 @@ REAL FUNC FMod(REAL value,divisor)
 REAL FUNC FHypot(REAL x,y)
 REAL FUNC FExp(REAL value)
 REAL FUNC FLn(REAL value)
+REAL FUNC FLog2(REAL value)
+REAL FUNC FLog10(REAL value)
 REAL FUNC DegToRad(REAL degrees)
 REAL FUNC RadToDeg(REAL radians)
 
@@ -73,12 +76,6 @@ REAL FUNC FClamp(REAL value,lower,upper)
         RETURN(NAN)
     FI
     RETURN(FMin(FMax(value,lower),upper))
-
-REAL FUNC FLog2(REAL value)
-    RETURN(FLn(value)/MATH_LN2)
-
-REAL FUNC FLog10(REAL value)
-    RETURN(FLn(value)/MATH_LN10)
 
 REAL FUNC FPow(REAL base,exponent)
     REAL magnitude,whole,result

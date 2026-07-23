@@ -55,11 +55,11 @@ class TestIdunForkLayout(unittest.TestCase):
         self.assertIn("The constant foundation is complete", parity)
         self.assertIn("round-to-nearest, ties-to-even", parity)
         self.assertIn("Dedicated pass K", parity)
-        self.assertIn("inventories are 1,368 broad direct-PRG shapes", flat_parity)
+        self.assertIn("inventories are 1,370 broad direct-PRG shapes", flat_parity)
         self.assertIn("196 non-runtime source-backed object-emission shapes", flat_parity)
-        self.assertIn("302 compiled-runtime relocation-oracle cases", flat_parity)
-        self.assertIn("nineteen link-selected callable builtins", parity)
-        self.assertIn("remaining 24 MATH1 routines", parity)
+        self.assertIn("304 compiled-runtime relocation-oracle cases", flat_parity)
+        self.assertIn("twenty-one link-selected callable builtins", parity)
+        self.assertIn("remaining 22 MATH1 routines", parity)
         self.assertIn("RT_F_FLOOR.OBJ", parity)
         self.assertIn("RT_F_CEIL.OBJ", parity)
         self.assertIn("RT_F_ROUND.OBJ", parity)
@@ -68,11 +68,13 @@ class TestIdunForkLayout(unittest.TestCase):
         self.assertIn("RT_F_HYPOT.OBJ", parity)
         self.assertIn("RT_F_EXP.OBJ", parity)
         self.assertIn("RT_F_LN.OBJ", parity)
-        self.assertIn("865 native ActionC64U unittests", parity)
+        self.assertIn("RT_F_LOG2.OBJ", parity)
+        self.assertIn("RT_F_LOG10.OBJ", parity)
+        self.assertIn("866 native ActionC64U unittests", parity)
         self.assertIn("154 Idun/Alpine unittests", parity)
         self.assertIn("139 Idun ASan/UBSan tests", parity)
         self.assertIn("21 Idun direct-PRG tests", parity)
-        self.assertIn("251-test overlay suite and 199-test source-cache suite", parity)
+        self.assertIn("252-test overlay suite and 199-test source-cache suite", parity)
         self.assertIn("Generalize native REAL", parity)
         self.assertIn("MATH1 reachable-only packaging", parity)
         self.assertIn("call-graph pruning", parity)
@@ -94,16 +96,16 @@ class TestIdunForkLayout(unittest.TestCase):
         self.assertIn("real_function_for_postfix.act", parity)
         self.assertIn("real_function_dynamic_for_postfix.act", parity)
         self.assertIn("real_function_literal_clamp_comma_locals_postfix.act", parity)
-        self.assertIn("pass L is 6,067 bytes with 2,125 bytes free", flat_parity)
-        self.assertIn("pass M is 6,936 bytes with 1,256 bytes free", flat_parity)
-        self.assertIn("pass N is 7,058 bytes with 1,134 bytes free", flat_parity)
-        self.assertIn("pass O is 7,061 bytes with 1,131 bytes free", flat_parity)
-        self.assertIn("pass P is 7,085 bytes with 1,107 bytes free", flat_parity)
-        self.assertIn("pass Q is 7,089 bytes with 1,103 bytes free", flat_parity)
-        self.assertIn("pass R is 7,272 bytes with 920 bytes free", flat_parity)
-        self.assertIn("pass S is 7,766 bytes with 426 bytes free", flat_parity)
-        self.assertIn("pass T is 8,085 bytes with 107 bytes free", flat_parity)
-        self.assertIn("Pass U is 7,415 bytes with 777 bytes free", flat_parity)
+        self.assertIn("pass L is 6,084 bytes with 2,108 bytes free", flat_parity)
+        self.assertIn("pass M is 6,953 bytes with 1,239 bytes free", flat_parity)
+        self.assertIn("pass N is 7,075 bytes with 1,117 bytes free", flat_parity)
+        self.assertIn("pass O is 7,078 bytes with 1,114 bytes free", flat_parity)
+        self.assertIn("pass P is 7,102 bytes with 1,090 bytes free", flat_parity)
+        self.assertIn("pass Q is 7,106 bytes with 1,086 bytes free", flat_parity)
+        self.assertIn("pass R is 7,289 bytes with 903 bytes free", flat_parity)
+        self.assertIn("pass S is 7,783 bytes with 409 bytes free", flat_parity)
+        self.assertIn("pass T is 8,102 bytes with 90 bytes free", flat_parity)
+        self.assertIn("Pass U is 7,432 bytes with 760 bytes free", flat_parity)
         self.assertIn("complete ACTC compiler, passes 0 through U", parity)
         self.assertIn("The portable products are therefore not yet at full feature parity", parity)
         self.assertNotIn("binary32 folding remains", parity)
@@ -112,9 +114,9 @@ class TestIdunForkLayout(unittest.TestCase):
             encoding="ascii"
         )
         flat_handoff = " ".join(handoff.split())
-        self.assertIn("Current native inventories are 1,368 broad", flat_handoff)
+        self.assertIn("Current native inventories are 1,370 broad", flat_handoff)
         self.assertIn("196 non-runtime source-backed", flat_handoff)
-        self.assertIn("302 compiled-runtime relocation-oracle cases", flat_handoff)
+        self.assertIn("304 compiled-runtime relocation-oracle cases", flat_handoff)
         self.assertIn("real_function_nested_postfix.act", handoff)
         self.assertIn("real_function_local_nested_postfix.act", handoff)
         self.assertIn("real_two_function_nested_postfix.act", handoff)
@@ -132,25 +134,27 @@ class TestIdunForkLayout(unittest.TestCase):
         self.assertIn("real_function_loops_postfix.act", handoff)
         self.assertIn("real_function_loop_exit_postfix.act", handoff)
         self.assertIn("real_function_for_postfix.act", handoff)
-        self.assertIn("Pass S is 7,766 bytes with 426 bytes free", flat_handoff)
+        self.assertIn("Pass S is 7,783 bytes with 409 bytes free", flat_handoff)
         self.assertIn("real_function_dynamic_for_postfix.act", handoff)
         self.assertIn("real_function_literal_clamp_comma_locals_postfix.act", handoff)
-        self.assertIn("Pass T is 8,085 bytes with 107 bytes free", flat_handoff)
+        self.assertIn("Pass T is 8,102 bytes with 90 bytes free", flat_handoff)
         self.assertIn(
             "pass 6 is 8,094 bytes with 98 bytes free",
             " ".join(handoff.split()),
         )
         self.assertIn(
-            "pass 7 is 6,587 bytes with 1,605 bytes free",
+            "pass 7 is 6,840 bytes with 1,352 bytes free",
             " ".join(handoff.split()),
         )
         self.assertIn(
-            "native MATH1 gap is now 24 public routines",
+            "native MATH1 gap is now 22 public routines",
             " ".join(handoff.split()),
         )
         self.assertIn("RT_F_HYPOT.OBJ", handoff)
         self.assertIn("RT_F_EXP.OBJ", handoff)
         self.assertIn("RT_F_LN.OBJ", handoff)
+        self.assertIn("RT_F_LOG2.OBJ", handoff)
+        self.assertIn("RT_F_LOG10.OBJ", handoff)
 
     def test_retirement_manifest_covers_every_preserved_udos_directory(self) -> None:
         manifest_path = self.root / "resources" / "retired_udos_tools.json"

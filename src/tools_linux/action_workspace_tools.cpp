@@ -3603,6 +3603,8 @@ struct RealExprNode {
         SquareRoot,
         Exponential,
         Logarithm,
+        Base2Logarithm,
+        Base10Logarithm,
         Truncate,
         Floor,
         Ceiling,
@@ -3839,6 +3841,7 @@ private:
         if (name != "REAL" && name != "FABS" && name != "FSQRT" &&
             name != "FEXP" &&
             name != "FLN" &&
+            name != "FLOG2" && name != "FLOG10" &&
             name != "FTRUNC" && name != "FFLOOR" && name != "FCEIL" &&
             name != "FROUND" && name != "FFRAC" && name != "FMOD" &&
             name != "FHYPOT" && name != "FMIN" && name != "FMAX" &&
@@ -3881,6 +3884,10 @@ private:
             node.kind = RealExprNode::Kind::Exponential;
         } else if (name == "FLN") {
             node.kind = RealExprNode::Kind::Logarithm;
+        } else if (name == "FLOG2") {
+            node.kind = RealExprNode::Kind::Base2Logarithm;
+        } else if (name == "FLOG10") {
+            node.kind = RealExprNode::Kind::Base10Logarithm;
         } else if (name == "FTRUNC") {
             node.kind = RealExprNode::Kind::Truncate;
         } else if (name == "FFLOOR") {
@@ -3955,6 +3962,10 @@ std::optional<double> evaluate_real_expr_node(
         return std::nullopt;
     }
     if (node.kind == RealExprNode::Kind::Logarithm) {
+        return std::nullopt;
+    }
+    if (node.kind == RealExprNode::Kind::Base2Logarithm ||
+        node.kind == RealExprNode::Kind::Base10Logarithm) {
         return std::nullopt;
     }
     if (node.kind == RealExprNode::Kind::Truncate) {
@@ -8334,6 +8345,8 @@ int cmd_actc(const std::vector<std::string>& args) {
                 upper.find("FSQRT(") != std::string::npos ||
                 upper.find("FEXP(") != std::string::npos ||
                 upper.find("FLN(") != std::string::npos ||
+                upper.find("FLOG2(") != std::string::npos ||
+                upper.find("FLOG10(") != std::string::npos ||
                 upper.find("FTRUNC(") != std::string::npos ||
                 upper.find("FFLOOR(") != std::string::npos ||
                 upper.find("FCEIL(") != std::string::npos ||
@@ -9556,6 +9569,8 @@ int cmd_actc(const std::vector<std::string>& args) {
                 node.kind == RealExprNode::Kind::SquareRoot ||
                 node.kind == RealExprNode::Kind::Exponential ||
                 node.kind == RealExprNode::Kind::Logarithm ||
+                node.kind == RealExprNode::Kind::Base2Logarithm ||
+                node.kind == RealExprNode::Kind::Base10Logarithm ||
                 node.kind == RealExprNode::Kind::Truncate ||
                 node.kind == RealExprNode::Kind::Floor ||
                 node.kind == RealExprNode::Kind::Ceiling ||
@@ -9574,6 +9589,10 @@ int cmd_actc(const std::vector<std::string>& args) {
                     helper = "RT_F_EXP";
                 } else if (node.kind == RealExprNode::Kind::Logarithm) {
                     helper = "RT_F_LN";
+                } else if (node.kind == RealExprNode::Kind::Base2Logarithm) {
+                    helper = "RT_F_LOG2";
+                } else if (node.kind == RealExprNode::Kind::Base10Logarithm) {
+                    helper = "RT_F_LOG10";
                 } else if (node.kind == RealExprNode::Kind::Floor) {
                     helper = "RT_F_FLOOR";
                 } else if (node.kind == RealExprNode::Kind::Ceiling) {
