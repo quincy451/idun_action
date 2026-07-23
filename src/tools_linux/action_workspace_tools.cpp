@@ -3601,6 +3601,7 @@ struct RealExprNode {
         Cast,
         Absolute,
         SquareRoot,
+        Exponential,
         Truncate,
         Floor,
         Ceiling,
@@ -3835,6 +3836,7 @@ private:
         }
 
         if (name != "REAL" && name != "FABS" && name != "FSQRT" &&
+            name != "FEXP" &&
             name != "FTRUNC" && name != "FFLOOR" && name != "FCEIL" &&
             name != "FROUND" && name != "FFRAC" && name != "FMOD" &&
             name != "FHYPOT" && name != "FMIN" && name != "FMAX" &&
@@ -3873,6 +3875,8 @@ private:
             node.kind = RealExprNode::Kind::Absolute;
         } else if (name == "FSQRT") {
             node.kind = RealExprNode::Kind::SquareRoot;
+        } else if (name == "FEXP") {
+            node.kind = RealExprNode::Kind::Exponential;
         } else if (name == "FTRUNC") {
             node.kind = RealExprNode::Kind::Truncate;
         } else if (name == "FFLOOR") {
@@ -3942,6 +3946,9 @@ std::optional<double> evaluate_real_expr_node(
     }
     if (node.kind == RealExprNode::Kind::SquareRoot) {
         return static_cast<double>(std::sqrt(static_cast<float>(*lhs)));
+    }
+    if (node.kind == RealExprNode::Kind::Exponential) {
+        return std::nullopt;
     }
     if (node.kind == RealExprNode::Kind::Truncate) {
         return static_cast<double>(std::trunc(static_cast<float>(*lhs)));
@@ -8318,6 +8325,7 @@ int cmd_actc(const std::vector<std::string>& args) {
             if (upper.find("REAL(") != std::string::npos ||
                 upper.find("FABS(") != std::string::npos ||
                 upper.find("FSQRT(") != std::string::npos ||
+                upper.find("FEXP(") != std::string::npos ||
                 upper.find("FTRUNC(") != std::string::npos ||
                 upper.find("FFLOOR(") != std::string::npos ||
                 upper.find("FCEIL(") != std::string::npos ||
@@ -9538,6 +9546,7 @@ int cmd_actc(const std::vector<std::string>& args) {
             }
             if (node.kind == RealExprNode::Kind::Absolute ||
                 node.kind == RealExprNode::Kind::SquareRoot ||
+                node.kind == RealExprNode::Kind::Exponential ||
                 node.kind == RealExprNode::Kind::Truncate ||
                 node.kind == RealExprNode::Kind::Floor ||
                 node.kind == RealExprNode::Kind::Ceiling ||
@@ -9552,6 +9561,8 @@ int cmd_actc(const std::vector<std::string>& args) {
                     helper = "RT_F_ABS";
                 } else if (node.kind == RealExprNode::Kind::SquareRoot) {
                     helper = "RT_F_SQRT";
+                } else if (node.kind == RealExprNode::Kind::Exponential) {
+                    helper = "RT_F_EXP";
                 } else if (node.kind == RealExprNode::Kind::Floor) {
                     helper = "RT_F_FLOOR";
                 } else if (node.kind == RealExprNode::Kind::Ceiling) {

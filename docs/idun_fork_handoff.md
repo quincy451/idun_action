@@ -422,7 +422,7 @@ literals with pass-P controls. Shared
 REAL locals, multiplication, three comparisons, and three immediate returns;
 native and Idun generated-6502 execution both produce `-1`, `0`, and `1`.
 Current native inventories are
-1,366 broad, 196 non-runtime source-backed, and 300 compiled-runtime
+1,367 broad, 196 non-runtime source-backed, and 301 compiled-runtime
 relocation-oracle cases; pass L is 6,124 bytes with 2,068
 bytes free, pass M is 6,998 bytes with 1,194 bytes free, pass N is 7,120 bytes
 with 1,072 bytes free, pass O is 7,123 bytes with 1,069 bytes free, pass P is
@@ -431,7 +431,10 @@ pass R is 7,334 bytes with 858 bytes free under its 768-byte gate, and pass 7
 is 6,678 bytes with 1,514 bytes free. Pass S is 7,828 bytes with 364 bytes free
 under its 256-byte gate. Pass T is 8,147 bytes with 45 bytes free under its
 32-byte gate. Pass U is 7,487 bytes with 705 bytes free under its 640-byte
-gate. The native MATH1 gap is now 26 public routines, and reentrant
+gate. `RT_F_EXP.OBJ` is now synchronized as an independently selected
+1,465-byte dependency root; Idun and native ACTC both lower `FExp` to it, and
+native ALINK accepts its 233 relocations through the expanded 255-record table.
+The native MATH1 gap is now 25 public routines, and reentrant
 local frames, general `FOR` bound expressions/runtime steps, nested counter-to-REAL body
 composition, mixed loop/conditional nesting, returns from inside loops, more
 than four controls,

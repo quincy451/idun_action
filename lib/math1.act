@@ -1,7 +1,7 @@
 ; MATH1 IEEE-754 REAL32 library.
 ;
 ; The core operators, FAbs, FSqrt, FTrunc, FFloor, FCeil, FRound, FFrac, FMod,
-; FHypot, DegToRad, RadToDeg, and REAL printing are compiler/runtime
+; FHypot, FExp, DegToRad, RadToDeg, and REAL printing are compiler/runtime
 ; primitives. The remaining routines are ordinary Action functions. Angles
 ; are in radians unless a function name explicitly mentions degrees.
 
@@ -27,6 +27,7 @@ REAL FUNC FRound(REAL value)
 REAL FUNC FFrac(REAL value)
 REAL FUNC FMod(REAL value,divisor)
 REAL FUNC FHypot(REAL x,y)
+REAL FUNC FExp(REAL value)
 REAL FUNC DegToRad(REAL degrees)
 REAL FUNC RadToDeg(REAL radians)
 
@@ -71,36 +72,6 @@ REAL FUNC FClamp(REAL value,lower,upper)
         RETURN(NAN)
     FI
     RETURN(FMin(FMax(value,lower),upper))
-
-REAL FUNC FExp(REAL value)
-    REAL exponent,reduced,result
-    IF value<>value THEN
-        RETURN(NAN)
-    FI
-    IF value=INF OR value>88.72283935546875 THEN
-        RETURN(INF)
-    FI
-    IF value=-INF OR value<-103.97208404541016 THEN
-        RETURN(0.0)
-    FI
-    exponent=FFloor(value/MATH_LN2)
-    reduced=value-exponent*MATH_LN2
-    ; Degree-8 Taylor polynomial on 0 <= reduced < ln(2).
-    result=1.0+reduced*(1.0+reduced*(0.5+reduced*(0.1666666716337204+
-           reduced*(0.0416666679084301+reduced*(0.0083333337679505+
-           reduced*(0.00138888892251998+reduced*(0.000198412701138295+
-           reduced*0.0000248015873015873)))))))
-    WHILE exponent>0.0
-    DO
-        result=result+result
-        exponent=exponent-1.0
-    OD
-    WHILE exponent<0.0
-    DO
-        result=result/2.0
-        exponent=exponent+1.0
-    OD
-    RETURN(result)
 
 REAL FUNC FLn(REAL value)
     REAL exponent,reduced,z,z2,term,result

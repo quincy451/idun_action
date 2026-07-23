@@ -55,22 +55,23 @@ class TestIdunForkLayout(unittest.TestCase):
         self.assertIn("The constant foundation is complete", parity)
         self.assertIn("round-to-nearest, ties-to-even", parity)
         self.assertIn("Dedicated pass K", parity)
-        self.assertIn("inventories are 1,366 broad direct-PRG shapes", flat_parity)
+        self.assertIn("inventories are 1,367 broad direct-PRG shapes", flat_parity)
         self.assertIn("196 non-runtime source-backed object-emission shapes", flat_parity)
-        self.assertIn("300 compiled-runtime relocation-oracle cases", flat_parity)
-        self.assertIn("seventeen link-selected callable builtins", parity)
-        self.assertIn("remaining 26 MATH1 routines", parity)
+        self.assertIn("301 compiled-runtime relocation-oracle cases", flat_parity)
+        self.assertIn("eighteen link-selected callable builtins", parity)
+        self.assertIn("remaining 25 MATH1 routines", parity)
         self.assertIn("RT_F_FLOOR.OBJ", parity)
         self.assertIn("RT_F_CEIL.OBJ", parity)
         self.assertIn("RT_F_ROUND.OBJ", parity)
         self.assertIn("RT_F_FRAC.OBJ", parity)
         self.assertIn("RT_F_MOD.OBJ", parity)
         self.assertIn("RT_F_HYPOT.OBJ", parity)
-        self.assertIn("863 native ActionC64U unittests", parity)
+        self.assertIn("RT_F_EXP.OBJ", parity)
+        self.assertIn("864 native ActionC64U unittests", parity)
         self.assertIn("154 Idun/Alpine unittests", parity)
         self.assertIn("139 Idun ASan/UBSan tests", parity)
         self.assertIn("21 Idun direct-PRG tests", parity)
-        self.assertIn("249-test overlay suite and 199-test source-cache suite", parity)
+        self.assertIn("250-test overlay suite and 199-test source-cache suite", parity)
         self.assertIn("Generalize native REAL", parity)
         self.assertIn("MATH1 reachable-only packaging", parity)
         self.assertIn("call-graph pruning", parity)
@@ -110,9 +111,9 @@ class TestIdunForkLayout(unittest.TestCase):
             encoding="ascii"
         )
         flat_handoff = " ".join(handoff.split())
-        self.assertIn("Current native inventories are 1,366 broad", flat_handoff)
+        self.assertIn("Current native inventories are 1,367 broad", flat_handoff)
         self.assertIn("196 non-runtime source-backed", flat_handoff)
-        self.assertIn("300 compiled-runtime relocation-oracle cases", flat_handoff)
+        self.assertIn("301 compiled-runtime relocation-oracle cases", flat_handoff)
         self.assertIn("real_function_nested_postfix.act", handoff)
         self.assertIn("real_function_local_nested_postfix.act", handoff)
         self.assertIn("real_two_function_nested_postfix.act", handoff)
@@ -143,10 +144,11 @@ class TestIdunForkLayout(unittest.TestCase):
             " ".join(handoff.split()),
         )
         self.assertIn(
-            "native MATH1 gap is now 26 public routines",
+            "native MATH1 gap is now 25 public routines",
             " ".join(handoff.split()),
         )
         self.assertIn("RT_F_HYPOT.OBJ", handoff)
+        self.assertIn("RT_F_EXP.OBJ", handoff)
 
     def test_retirement_manifest_covers_every_preserved_udos_directory(self) -> None:
         manifest_path = self.root / "resources" / "retired_udos_tools.json"

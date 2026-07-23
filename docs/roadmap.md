@@ -1614,3 +1614,22 @@ Retired roadmap items for CP/M-era runner flows are no longer maintained.
   not general native REAL or MATH1 parity. Private underscore identifiers,
   initialized groups, unrestricted nested expressions/calls, recursive or
   reentrant frames, and 26 public MATH1 routines remain native work.
+
+## 2026-07-23 Shared MATH1 Exponential
+
+- Synchronized the 1,465-byte `RT_F_EXP.OBJ` dependency root and its generator
+  from native ActionC64U. It implements binary32 `ln(2)` range reduction with
+  a degree-8 polynomial and imports only division, floor, REAL-to-INT
+  conversion, multiplication, subtraction, and addition.
+- Linux ACTC recognizes `FExp(REAL)` as a unary intrinsic and selects the
+  shared target object only when referenced. `LIB/MATH1.ACT` now declares the
+  intrinsic instead of compiling a duplicate portable body.
+- Native ACTC/ALINK/VICE prints `2.718281...` for `FExp(1)`. The object carries
+  233 relocations, covered by native ALINK's expanded 255-record relocation
+  table; no runtime launcher or linker-side compiler was added.
+- Current native inventories are 1,367 broad direct-PRG, 196 non-runtime
+  source-backed, and 301 compiled-runtime relocation-oracle cases. The native
+  suite contains 864 tests, including 250 overlay and 199 source-cache tests.
+- Native MATH1 now exposes eighteen link-selected calls and lacks 25 public
+  routines. Idun retains complete source-library behavior while sharing the
+  same reachable-only target implementation for `FExp`.

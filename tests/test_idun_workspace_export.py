@@ -162,6 +162,7 @@ class TestIdunWorkspaceExport(unittest.TestCase):
                 "RT_F_FRAC.OBJ",
                 "RT_F_MOD.OBJ",
                 "RT_F_HYPOT.OBJ",
+                "RT_F_EXP.OBJ",
                 "RT_F_DEG_TO_RAD.OBJ",
                 "RT_F_RAD_TO_DEG.OBJ",
                 "RT_F_MAX.OBJ",
@@ -239,6 +240,20 @@ class TestIdunWorkspaceExport(unittest.TestCase):
             self.assertIn("r 57 u0", hypot_object)
             self.assertIn("r 432 u4", hypot_object)
             self.assertIn("n rt_f_hypot", hypot_object)
+            exp_object = (out / "LIB" / "RT_F_EXP.OBJ").read_text(
+                encoding="ascii"
+            )
+            self.assertIn("x rt_f_exp 0 1465", exp_object)
+            for dependency in (
+                "rt_f_div",
+                "rt_f_floor",
+                "rt_f_to_i",
+                "rt_f_mul",
+                "rt_f_sub",
+                "rt_f_add",
+            ):
+                self.assertIn(f"u {dependency}", exp_object)
+            self.assertIn("n rt_f_exp", exp_object)
             deg_to_rad_object = (
                 out / "LIB" / "RT_F_DEG_TO_RAD.OBJ"
             ).read_text(encoding="ascii")

@@ -172,7 +172,6 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 encoding="ascii"
             )
             for symbol in (
-                "FEXP",
                 "FLN",
                 "FPOW",
                 "_MATHWRAPPI",
@@ -200,12 +199,14 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
             self.assertNotRegex(math_object, r"(?m)^x FFRAC \d+ \d+$")
             self.assertNotRegex(math_object, r"(?m)^x FMOD \d+ \d+$")
             self.assertNotRegex(math_object, r"(?m)^x FHYPOT \d+ \d+$")
+            self.assertNotRegex(math_object, r"(?m)^x FEXP \d+ \d+$")
             self.assertIn("\nu RT_F_TRUNC\n", math_object)
-            self.assertIn("\nu RT_F_FLOOR\n", math_object)
+            self.assertNotIn("\nu RT_F_FLOOR\n", math_object)
             self.assertNotIn("\nu RT_F_CEIL\n", math_object)
             self.assertNotIn("\nu RT_F_ROUND\n", math_object)
             self.assertNotIn("\nu RT_F_FRAC\n", math_object)
             self.assertIn("\nu RT_F_MOD\n", math_object)
+            self.assertIn("\nu RT_F_EXP\n", math_object)
             self.assertNotIn("\nu RT_F_DEG_TO_RAD\n", math_object)
             self.assertIn("\nu RT_F_RAD_TO_DEG\n", math_object)
             self.run_tool(math_project, "alink", "main")
@@ -1544,6 +1545,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 "rt_f_frac.obj",
                 "rt_f_mod.obj",
                 "rt_f_hypot.obj",
+                "rt_f_exp.obj",
                 "rt_f_min.obj",
                 "rt_f_max.obj",
                 "rt_f_addsub_core.obj",
@@ -1577,7 +1579,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                     [
                         "PROC MAIN()",
                         "CARD n",
-                        "REAL a=[1.5],b=[2.0],sum,difference,product,quotient,root,absolute,truncated,floored,ceiled,rounded,fractional,modulus,hypotenuse,minimum,maximum,fromint",
+                        "REAL a=[1.5],b=[2.0],sum,difference,product,quotient,root,absolute,truncated,floored,ceiled,rounded,fractional,modulus,hypotenuse,exponential,minimum,maximum,fromint",
                         "n = 3",
                         "sum = a + b",
                         "difference = a - b",
@@ -1592,6 +1594,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                         "fractional = FFrac(difference)",
                         "modulus = FMod(a,b)",
                         "hypotenuse = FHypot(a,b)",
+                        "exponential = FExp(a)",
                         "minimum = FMin(a,b)",
                         "maximum = FMax(a,b)",
                         "fromint = REAL(n)",
@@ -1622,6 +1625,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 "RT_F_FRAC",
                 "RT_F_MOD",
                 "RT_F_HYPOT",
+                "RT_F_EXP",
                 "RT_F_MIN",
                 "RT_F_MAX",
                 "RT_I_TO_F",

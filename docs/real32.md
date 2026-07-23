@@ -27,7 +27,7 @@ The limits that remain are the intrinsic binary32 limits:
 Source forms include decimal and exponent literals, `INF`/`INFINITY`, `NAN`,
 `+`, `-`, `*`, `/`, comparisons, `REAL(integer)`, `INT(real)`, `FAbs`,
 `FSqrt`, `FSign`, `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`,
-`FHypot`, `FMin`, `FMax`, `FClamp`, `DegToRad`, `RadToDeg`, `PrintR`, and
+`FHypot`, `FExp`, `FMin`, `FMax`, `FClamp`, `DegToRad`, `RadToDeg`, `PrintR`, and
 `PrintRE`.
 
 Rules:
@@ -60,6 +60,9 @@ Rules:
 - `FHypot(left,right)` uses a scaled maximum/minimum calculation to avoid
   avoidable intermediate overflow and underflow; two zero inputs return
   positive zero, and infinity takes precedence when paired with NaN
+- `FExp(value)` uses binary32 `ln(2)` range reduction and a degree-8 polynomial;
+  NaN returns canonical quiet NaN, positive overflow returns infinity, and
+  negative underflow returns positive zero
 - `DegToRad(value)` multiplies by binary32 `0x3C8EFA35` (`pi/180`);
   `RadToDeg(value)` multiplies by binary32 `0x42652EE0` (`180/pi`). Both use
   ordinary binary32 multiplication behavior
@@ -207,6 +210,8 @@ source:
   multiplication, subtraction, and special-value closure
 - `FHypot(a,b)` imports `rt_f_hypot` plus its absolute-value,
   minimum/maximum, division, multiplication, addition, and square-root closure
+- `FExp(r)` imports `rt_f_exp` plus its division, floor, conversion,
+  multiplication, subtraction, and addition closure
 - `DegToRad(r)` and `RadToDeg(r)` each import only the selected angle wrapper
   plus its multiplication and special-value closure
 - `FMin(a,b)` and `FMax(a,b)` import only the selected helper plus its comparison

@@ -9,20 +9,21 @@ Implementation status: complete in the Idun/Alpine fork. The source has 8
 public constants, 43 public routines, and 1 private helper. The resulting 51
 public help features are compiled and linked by the Linux ACTC/ALINK path and
 have generated-PRG VICE coverage. The native UDOS compiler currently exposes
-FAbs, FSqrt, FSign, FTrunc, FFloor, FCeil, FRound, FFrac, FMod, FHypot, FMin,
-FMax, FClamp, DegToRad, RadToDeg, PrintR, and PrintRE. Both compilers lower
-FTrunc, FFloor, FCeil, FRound, FFrac, FMod, FHypot, DegToRad, and RadToDeg to
-shared link-selected OBJs; the native
+FAbs, FSqrt, FSign, FTrunc, FFloor, FCeil, FRound, FFrac, FMod, FHypot, FExp,
+FMin, FMax, FClamp, DegToRad, RadToDeg, PrintR, and PrintRE. Both compilers
+lower FTrunc, FFloor, FCeil, FRound, FFrac, FMod, FHypot, FExp, DegToRad, and
+RadToDeg to shared link-selected OBJs; the native
 selected FSign/FMin/FMax/FClamp semantics also match this source. General
-native REAL source lowering and the remaining 26 public routines are tracked in
+native REAL source lowering and the remaining 25 public routines are tracked in
 docs/udos_feature_parity.md.
 The native `INCLUDE "MATH1"` header now also exposes all 8 constants without
 allocating target storage or selecting a runtime object.
 
 The constants and routines below are public after INCLUDE "MATH1".  The
-transcendental routines are portable Action implementations over the binary32
-add/subtract/multiply/divide, conversion, absolute-value, and square-root
-runtime.  They do not use the BASIC ROM floating-point package.
+transcendental routines use portable Action implementations or independently
+selected runtime modules over the binary32 add/subtract/multiply/divide,
+conversion, absolute-value, and square-root runtime. They do not use the BASIC
+ROM floating-point package.
 
 Constants
 ---------

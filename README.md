@@ -146,7 +146,7 @@ intrinsics: constant calls fold in Linux ACTC, dynamic calls select one shared
 angle-conversion OBJ, and native ACTC selects the same module only when used.
 Self and mutual cycles remain rejected.
 Native ACTC now lowers
-`FSign`, `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`, `FHypot`,
+`FSign`, `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`, `FHypot`, `FExp`,
 `FMin`, `FMax`, `DegToRad`, and `RadToDeg` for named REAL operands and a bounded,
 storage-capturing `FClamp`
 ternary root through synchronized, independently selected target modules with
@@ -154,8 +154,8 @@ complete MATH1
 NaN/signed-zero/bound-order semantics. General native REAL expressions/functions, the rest of
 MATH1, GFX1, resources, formatting, and help remain listed there explicitly.
 The native MATH1 include now supplies all eight constants without target code.
-Idun now lowers `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`, and
-`FHypot` to the same independently selected target objects. Linux ACTC retains
+Idun now lowers `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`,
+`FHypot`, and `FExp` to the same independently selected target objects. Linux ACTC retains
 and validates every project routine, then prunes full-source MATH1/GFX1 library
 routines to the transitive graph those project routines reference. Bare routine
 addresses, `OverlayCall` targets, globals, and declaration-time address
@@ -301,7 +301,7 @@ optional runtime expansion and physical validation:
 - prune unreachable routines from full-source library includes, or generate
   dependency-sized library objects, so `INCLUDE "MATH1"` does not embed all
   remaining unused function bodies in the application object; `FTrunc`,
-  `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`, and `FHypot` are the first seven routines moved to
+  `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`, `FHypot`, and `FExp` are the first eight routines moved to
   independently selected shared OBJs
 - add new REAL library functions only when a separate post-MATH1 API is specified
 - extend the direct REU surface beyond 16-bit-sized arrays and 8/16-bit
