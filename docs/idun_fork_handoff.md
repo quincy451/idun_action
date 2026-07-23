@@ -422,19 +422,23 @@ literals with pass-P controls. Shared
 REAL locals, multiplication, three comparisons, and three immediate returns;
 native and Idun generated-6502 execution both produce `-1`, `0`, and `1`.
 Current native inventories are
-1,367 broad, 196 non-runtime source-backed, and 301 compiled-runtime
-relocation-oracle cases; pass L is 6,124 bytes with 2,068
-bytes free, pass M is 6,998 bytes with 1,194 bytes free, pass N is 7,120 bytes
-with 1,072 bytes free, pass O is 7,123 bytes with 1,069 bytes free, pass P is
-7,147 bytes with 1,045 bytes free, pass Q is 7,151 bytes with 1,041 bytes free,
-pass R is 7,334 bytes with 858 bytes free under its 768-byte gate, and pass 7
-is 6,678 bytes with 1,514 bytes free. Pass S is 7,828 bytes with 364 bytes free
-under its 256-byte gate. Pass T is 8,147 bytes with 45 bytes free under its
-32-byte gate. Pass U is 7,487 bytes with 705 bytes free under its 640-byte
+1,368 broad, 196 non-runtime source-backed, and 302 compiled-runtime
+relocation-oracle cases; pass L is 6,067 bytes with 2,125
+bytes free, pass M is 6,936 bytes with 1,256 bytes free, pass N is 7,058 bytes
+with 1,134 bytes free, pass O is 7,061 bytes with 1,131 bytes free, pass P is
+7,085 bytes with 1,107 bytes free, pass Q is 7,089 bytes with 1,103 bytes free,
+pass R is 7,272 bytes with 920 bytes free under its 768-byte gate, and pass 7
+is 6,801 bytes with 1,391 bytes free. Pass S is 7,766 bytes with 426 bytes free
+under its 256-byte gate. Pass T is 8,085 bytes with 107 bytes free under its
+32-byte gate. Pass U is 7,415 bytes with 777 bytes free under its 640-byte
 gate. `RT_F_EXP.OBJ` is now synchronized as an independently selected
 1,465-byte dependency root; Idun and native ACTC both lower `FExp` to it, and
 native ALINK accepts its 233 relocations through the expanded 255-record table.
-The native MATH1 gap is now 25 public routines, and reentrant
+`RT_F_LN.OBJ` is synchronized as an independently selected 1,382-byte
+dependency root; both compilers lower `FLn` to it, production ALINK accepts its
+33 exports and 180 relocations, and the focused native direct PRG prints
+`0.693147...` for `FLn(2)`.
+The native MATH1 gap is now 24 public routines, and reentrant
 local frames, general `FOR` bound expressions/runtime steps, nested counter-to-REAL body
 composition, mixed loop/conditional nesting, returns from inside loops, more
 than four controls,

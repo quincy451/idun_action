@@ -146,7 +146,7 @@ intrinsics: constant calls fold in Linux ACTC, dynamic calls select one shared
 angle-conversion OBJ, and native ACTC selects the same module only when used.
 Self and mutual cycles remain rejected.
 Native ACTC now lowers
-`FSign`, `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`, `FHypot`, `FExp`,
+`FSign`, `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`, `FHypot`, `FExp`, `FLn`,
 `FMin`, `FMax`, `DegToRad`, and `RadToDeg` for named REAL operands and a bounded,
 storage-capturing `FClamp`
 ternary root through synchronized, independently selected target modules with
@@ -155,7 +155,8 @@ NaN/signed-zero/bound-order semantics. General native REAL expressions/functions
 MATH1, GFX1, resources, formatting, and help remain listed there explicitly.
 The native MATH1 include now supplies all eight constants without target code.
 Idun now lowers `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`,
-`FHypot`, and `FExp` to the same independently selected target objects. Linux ACTC retains
+`FHypot`, `FExp`, `FLn`, `FMin`, `FMax`, `DegToRad`, and `RadToDeg` to the
+same independently selected target objects. Linux ACTC retains
 and validates every project routine, then prunes full-source MATH1/GFX1 library
 routines to the transitive graph those project routines reference. Bare routine
 addresses, `OverlayCall` targets, globals, and declaration-time address
@@ -295,14 +296,11 @@ an additional 255-byte REU record-swap buffer.
 
 The Linux process conversion inventory is complete. Historical 6502/UDOS
 sources remain in Git for provenance, are formally retired, and are not built.
-Remaining Idun work includes one required library-packaging correction plus
-optional runtime expansion and physical validation:
+Remaining Idun work is optional runtime expansion plus physical validation:
 
-- prune unreachable routines from full-source library includes, or generate
-  dependency-sized library objects, so `INCLUDE "MATH1"` does not embed all
-  remaining unused function bodies in the application object; `FTrunc`,
-  `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`, `FHypot`, and `FExp` are the first eight routines moved to
-  independently selected shared OBJs
+- keep shared dependency-sized library objects synchronized as native adds
+  routines; project-rooted call-graph pruning already keeps unused remaining
+  MATH1/GFX1 source routines out of the application object
 - add new REAL library functions only when a separate post-MATH1 API is specified
 - extend the direct REU surface beyond 16-bit-sized arrays and 8/16-bit
   peek/poke

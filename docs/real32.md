@@ -27,7 +27,7 @@ The limits that remain are the intrinsic binary32 limits:
 Source forms include decimal and exponent literals, `INF`/`INFINITY`, `NAN`,
 `+`, `-`, `*`, `/`, comparisons, `REAL(integer)`, `INT(real)`, `FAbs`,
 `FSqrt`, `FSign`, `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`,
-`FHypot`, `FExp`, `FMin`, `FMax`, `FClamp`, `DegToRad`, `RadToDeg`, `PrintR`, and
+`FHypot`, `FExp`, `FLn`, `FMin`, `FMax`, `FClamp`, `DegToRad`, `RadToDeg`, `PrintR`, and
 `PrintRE`.
 
 Rules:
@@ -212,6 +212,8 @@ source:
   minimum/maximum, division, multiplication, addition, and square-root closure
 - `FExp(r)` imports `rt_f_exp` plus its division, floor, conversion,
   multiplication, subtraction, and addition closure
+- `FLn(r)` imports `rt_f_ln` plus its subtraction, addition, division, and
+  multiplication closure
 - `DegToRad(r)` and `RadToDeg(r)` each import only the selected angle wrapper
   plus its multiplication and special-value closure
 - `FMin(a,b)` and `FMax(a,b)` import only the selected helper plus its comparison
@@ -221,9 +223,9 @@ source:
   semantics into ordinary reachable code
 - `PrintR` and `PrintRE` import `rt_print_f`
 
-Programs that do not use REAL pay no REAL runtime code cost. Trigonometric and
-other transcendental functions are supplied by the portable MATH1 library and
-remain separate from the implemented binary32 core operations.
+Programs that do not use REAL pay no REAL runtime code cost. Remaining
+trigonometric and transcendental functions are supplied by the portable MATH1
+library and remain separate from the implemented binary32 core operations.
 
 ## Verification
 

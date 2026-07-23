@@ -1,7 +1,7 @@
 ; MATH1 IEEE-754 REAL32 library.
 ;
 ; The core operators, FAbs, FSqrt, FTrunc, FFloor, FCeil, FRound, FFrac, FMod,
-; FHypot, FExp, DegToRad, RadToDeg, and REAL printing are compiler/runtime
+; FHypot, FExp, FLn, DegToRad, RadToDeg, and REAL printing are compiler/runtime
 ; primitives. The remaining routines are ordinary Action functions. Angles
 ; are in radians unless a function name explicitly mentions degrees.
 
@@ -28,6 +28,7 @@ REAL FUNC FFrac(REAL value)
 REAL FUNC FMod(REAL value,divisor)
 REAL FUNC FHypot(REAL x,y)
 REAL FUNC FExp(REAL value)
+REAL FUNC FLn(REAL value)
 REAL FUNC DegToRad(REAL degrees)
 REAL FUNC RadToDeg(REAL radians)
 
@@ -72,47 +73,6 @@ REAL FUNC FClamp(REAL value,lower,upper)
         RETURN(NAN)
     FI
     RETURN(FMin(FMax(value,lower),upper))
-
-REAL FUNC FLn(REAL value)
-    REAL exponent,reduced,z,z2,term,result
-    IF value<>value OR value<0.0 THEN
-        RETURN(NAN)
-    FI
-    IF value=0.0 THEN
-        RETURN(-INF)
-    FI
-    IF value=INF THEN
-        RETURN(INF)
-    FI
-    exponent=0.0
-    reduced=value
-    WHILE reduced>MATH_SQRT2
-    DO
-        reduced=reduced/2.0
-        exponent=exponent+1.0
-    OD
-    WHILE reduced<0.7071067690849304
-    DO
-        reduced=reduced+reduced
-        exponent=exponent-1.0
-    OD
-    z=(reduced-1.0)/(reduced+1.0)
-    z2=z*z
-    term=z
-    result=term
-    term=term*z2
-    result=result+term/3.0
-    term=term*z2
-    result=result+term/5.0
-    term=term*z2
-    result=result+term/7.0
-    term=term*z2
-    result=result+term/9.0
-    term=term*z2
-    result=result+term/11.0
-    term=term*z2
-    result=result+term/13.0
-    RETURN((result+result)+exponent*MATH_LN2)
 
 REAL FUNC FLog2(REAL value)
     RETURN(FLn(value)/MATH_LN2)

@@ -1633,3 +1633,35 @@ Retired roadmap items for CP/M-era runner flows are no longer maintained.
 - Native MATH1 now exposes eighteen link-selected calls and lacks 25 public
   routines. Idun retains complete source-library behavior while sharing the
   same reachable-only target implementation for `FExp`.
+
+## 2026-07-23 Shared MATH1 Natural Logarithm
+
+- Synchronized the 1,382-byte `RT_F_LN.OBJ` dependency root and generator from
+  native ActionC64U. It normalizes positive normal and subnormal binary32
+  values, range-reduces around square root of two, evaluates the portable
+  six-term odd series, and imports only subtraction, addition, division, and
+  multiplication.
+- Linux ACTC recognizes `FLn(REAL)` as a unary intrinsic and selects the shared
+  target object only when referenced. `LIB/MATH1.ACT` now declares the
+  intrinsic instead of compiling the duplicate portable FLn body; its
+  `FLog2`, `FLog10`, and `FPow` callers continue to reach FLn through ordinary
+  source call-graph closure.
+- Exact host-machine checks cover 90 edge/random inputs plus in-place aliasing.
+  The generated object uses 33 exports and 180 relocations, within native
+  ALINK's fixed 36-export and 255-relocation tables.
+- Native ACTC/ALINK/VICE prints `0.693147...` for `FLn(2)` and proves unrelated
+  MATH1 objects remain unloaded. Idun's existing 16-result generated-PRG MATH1
+  fixture retains logarithm coverage.
+- Current native inventories are 1,368 broad direct-PRG, 196 non-runtime
+  source-backed, and 302 compiled-runtime relocation-oracle cases. The native
+  suite contains 865 tests, including 251 overlay and 199 source-cache tests;
+  Idun retains its 154-test host, 139-test sanitizer, and 21-test direct-PRG
+  gates.
+- Native compact body-pattern records and shared REAL-helper suffixes keep the
+  added intrinsic within every overlay reserve. Pass 6 is 8,077 bytes with 115
+  bytes free; pass 7 is 6,801 bytes with 1,391 bytes free; passes L through U
+  are respectively 6,067, 6,936, 7,058, 7,061, 7,085, 7,089, 7,272, 7,766,
+  8,085, and 7,415 bytes.
+- Native MATH1 now exposes nineteen link-selected calls and lacks 24 public
+  routines. Idun retains complete source-library behavior while sharing the
+  same reachable-only target implementation for `FLn`.

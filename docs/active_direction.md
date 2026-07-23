@@ -123,7 +123,7 @@ Remaining product work:
    routine-address expressions with checked signed addends on either side. It
    also folds bounded `REAL CONST` expressions with exact decimal conversion
    and binary32 round-to-nearest, ties-to-even after every operation.
-   Native named-REAL `FSign`, `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`, `FHypot`, `FExp`, `FMin`, and `FMax` calls plus its bounded
+   Native named-REAL `FSign`, `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`, `FHypot`, `FExp`, `FLn`, `FMin`, and `FMax` calls plus its bounded
    storage-capturing `FClamp` ternary root now use synchronized, independently
    selected target helpers with complete portable call semantics. The root can
    permute initializer, argument, destination, and print slots but remains a
@@ -165,7 +165,7 @@ Remaining product work:
    unrestricted user-call argument trees and nested call expressions, mixed
    types, arbitrary signatures, and recursive frames remain pending.
    Linux ACTC now lowers `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`,
-   `FHypot`, `FExp`, `FMin`, and `FMax` to the same shared objects instead of embedding
+   `FHypot`, `FExp`, `FLn`, `FMin`, and `FMax` to the same shared objects instead of embedding
    those MATH1 bodies. It retains all project routines and prunes unreachable MATH1/GFX1
    library bodies from their transitive project-rooted call graph while
    preserving bare routine-address and `OverlayCall` references. Linked
