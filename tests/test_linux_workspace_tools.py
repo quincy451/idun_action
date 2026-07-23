@@ -199,6 +199,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
             self.assertNotRegex(math_object, r"(?m)^x FPOW \d+ \d+$")
             self.assertNotRegex(math_object, r"(?m)^x FSIN \d+ \d+$")
             self.assertNotRegex(math_object, r"(?m)^x FCOS \d+ \d+$")
+            self.assertNotRegex(math_object, r"(?m)^x FTAN \d+ \d+$")
             self.assertNotRegex(math_object, r"(?m)^x _MATHWRAPPI \d+ \d+$")
             self.assertNotIn("\nu RT_F_TRUNC\n", math_object)
             self.assertNotIn("\nu RT_F_FLOOR\n", math_object)
@@ -209,6 +210,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
             self.assertIn("\nu RT_F_POW\n", math_object)
             self.assertIn("\nu RT_F_SIN\n", math_object)
             self.assertIn("\nu RT_F_COS\n", math_object)
+            self.assertNotIn("\nu RT_F_TAN\n", math_object)
             self.assertNotIn("\nu RT_F_EXP\n", math_object)
             self.assertIn("\nu RT_F_LN\n", math_object)
             self.assertNotIn("\nu RT_F_DEG_TO_RAD\n", math_object)
@@ -1552,6 +1554,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 "rt_f_pow.obj",
                 "rt_f_sin.obj",
                 "rt_f_cos.obj",
+                "rt_f_tan.obj",
                 "rt_f_wrap_pi.obj",
                 "rt_f_exp.obj",
                 "rt_f_ln.obj",
@@ -1590,7 +1593,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                     [
                         "PROC MAIN()",
                         "CARD n",
-                        "REAL a=[1.5],b=[2.0],sum,difference,product,quotient,root,absolute,truncated,floored,ceiled,rounded,fractional,modulus,hypotenuse,power,sine,cosine,exponential,logarithm,logarithm2,logarithm10,minimum,maximum,fromint",
+                        "REAL a=[1.5],b=[2.0],sum,difference,product,quotient,root,absolute,truncated,floored,ceiled,rounded,fractional,modulus,hypotenuse,power,sine,cosine,tangent,exponential,logarithm,logarithm2,logarithm10,minimum,maximum,fromint",
                         "n = 3",
                         "sum = a + b",
                         "difference = a - b",
@@ -1608,6 +1611,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                         "power = FPow(a,b)",
                         "sine = FSin(a)",
                         "cosine = FCos(a)",
+                        "tangent = FTan(a)",
                         "exponential = FExp(a)",
                         "logarithm = FLn(a)",
                         "logarithm2 = FLog2(a)",
@@ -1645,6 +1649,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 "RT_F_POW",
                 "RT_F_SIN",
                 "RT_F_COS",
+                "RT_F_TAN",
                 "RT_F_EXP",
                 "RT_F_LN",
                 "RT_F_LOG2",
@@ -1679,6 +1684,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 "RT_F_POW",
                 "RT_F_SIN",
                 "RT_F_COS",
+                "RT_F_TAN",
                 "RT_F_MIN",
                 "RT_F_MAX",
                 "RT_I_TO_F",

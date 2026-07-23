@@ -407,6 +407,8 @@ class TestIdunPrgRuntime(unittest.TestCase):
             self.assertNotIn("\nx FSIN ", main_object)
             self.assertIn("\nu RT_F_COS\n", main_object)
             self.assertNotIn("\nx FCOS ", main_object)
+            self.assertIn("\nu RT_F_TAN\n", main_object)
+            self.assertNotIn("\nx FTAN ", main_object)
             self.assertIn("\nu RT_F_POW\n", main_object)
             self.assertNotIn("\nx FPOW ", main_object)
             self.run_tool(project, "alink", "main")
