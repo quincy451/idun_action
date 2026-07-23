@@ -332,6 +332,14 @@ class TestIdunPrgRuntime(unittest.TestCase):
                 "real_function_dynamic_for_postfix.act",
                 {"LOWER": 7.0, "UPPER": 7.0},
             ),
+            (
+                "real_function_literal_clamp_comma_locals_postfix.act",
+                {
+                    "LOW_RESULT": -1.0,
+                    "ZERO_RESULT": 0.0,
+                    "HIGH_RESULT": 1.0,
+                },
+            ),
         ):
             with self.subTest(fixture=fixture_name):
                 self._assert_real_function_fixture_executes(

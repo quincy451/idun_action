@@ -156,8 +156,11 @@ Remaining product work:
    fallback return is present; shared fixtures print `33` and `154`. Passes Q
    through T add bounded pre/post-test and plain loops, nearest-loop `EXIT`, and
    CARD-counter `FOR` loops with constant or named bounds. Pass U accepts folded
-   binary32 literals and one- or two-REAL-parameter functions; the shared
-   `DegToRad`/`RadToDeg` fixture compiles and links in both products. General or
+   binary32 literals and one- or two-REAL-parameter functions together with up
+   to four pass-P conditional/early-return controls. The shared
+   `DegToRad`/`RadToDeg` fixture compiles and links in both products, and the
+   shared comma-local clamp fixture produces `-1`, `0`, and `1` in both
+   generated 6502 programs. General or
    recursive call graphs, recursive/reentrant local frames, mixed controls,
    unrestricted user-call argument trees and nested call expressions, mixed
    types, arbitrary signatures, and recursive frames remain pending.

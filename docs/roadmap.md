@@ -1588,3 +1588,29 @@ Retired roadmap items for CP/M-era runner flows are no longer maintained.
 - The native public MATH1 gap is now 26 routines. Idun keeps its complete
   source-library behavior as the reference while both products retain
   reachable-only target packaging.
+
+## 2026-07-23 Native Grouped REAL Local Parity
+
+- Synchronized
+  `real_function_literal_clamp_comma_locals_postfix.act` with native
+  ActionC64U. The fixture declares four REAL locals in one comma-grouped line,
+  multiplies a parameter by a folded literal, and uses three comparisons with
+  immediate returns.
+- Native pass U now combines folded binary32 materialization with pass-P
+  conditional/early-return lowering. Its 7,487-byte image leaves 705 bytes
+  under a dedicated 640-byte gate and has SHA-256
+  `4ac6d04fb682ac317b4919f9b1bf1e4aae2ac8442a21e0f76812f001195e2524`.
+  Native declaration validation rejects grouped duplicates, parameter
+  collisions, trailing commas, and grouped initializers.
+- Idun ACTC/ALINK compiles and links the byte-identical source with only
+  multiplication and comparison as REAL arithmetic imports. Idun generated
+  6502 execution and native VICE both store `-1`, `0`, and `1`.
+- Current native inventories are 1,366 broad direct-PRG, 196 non-runtime
+  source-backed, and 300 compiled-runtime relocation-oracle cases. The native
+  suite contains 863 tests, including 249 overlay and 199 source-cache tests;
+  Idun's existing 154-test host, 139-test sanitizer, and 21-test direct-PRG
+  gates retain this fixture through their shared compile/runtime cases.
+- This closes grouped uninitialized locals plus literal/control composition,
+  not general native REAL or MATH1 parity. Private underscore identifiers,
+  initialized groups, unrestricted nested expressions/calls, recursive or
+  reentrant frames, and 26 public MATH1 routines remain native work.

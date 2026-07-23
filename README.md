@@ -136,9 +136,12 @@ adds constant-bound local CARD-counter `FOR` loops; the shared ascending and
 descending fixture produces 4.0 and 7.0 in both products, and its native linked
 PRG displays `47`. Pass T adds named CARD initial/final bounds; the shared
 nested-loop fixture produces 7.0 twice and its native linked PRG displays `77`.
-Pass U adds folded binary32 literals and one-parameter REAL functions; the
-shared `DegToRad`/`RadToDeg` fixture compiles and links in both products, and
-the native direct PRG displays pi followed by `180`. Both names are now public
+Pass U adds folded binary32 literals and one-parameter REAL functions together
+with bounded conditional/early-return control; the shared
+`DegToRad`/`RadToDeg` fixture compiles and links in both products, and the
+native direct PRG displays pi followed by `180`. The shared comma-local clamp
+fixture also compiles, links, and stores `-1`, `0`, and `1` in both generated
+6502 programs. Both angle names are public
 intrinsics: constant calls fold in Linux ACTC, dynamic calls select one shared
 angle-conversion OBJ, and native ACTC selects the same module only when used.
 Self and mutual cycles remain rejected.

@@ -1348,6 +1348,11 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 ("LOCALD2R", "LOCALR2D"),
                 ("RT_F_DIV", "RT_F_MUL"),
             ),
+            (
+                "real_function_literal_clamp_comma_locals_postfix.act",
+                ("LIMIT",),
+                ("RT_F_CMP", "RT_F_MUL"),
+            ),
         ):
             with self.subTest(fixture=fixture_name):
                 self._compile_and_link_real_function_fixture(
