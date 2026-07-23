@@ -1520,3 +1520,27 @@ Retired roadmap items for CP/M-era runner flows are no longer maintained.
   four, unrestricted call trees, recursive/reentrant frames, mixed types,
   arbitrary signatures, and recursion remain native gaps; Idun's general
   compiler remains the behavioral reference.
+
+## 2026-07-22 Native Named CARD FOR-Bound Parity
+
+- Native ActionC64U added pass T, `ACTC_OVLT.BIN` (id 29), for named CARD
+  initial/final bounds in the bounded pass-S REAL-function `FOR` form. Bounds
+  are staged once per loop entry; steps remain nonzero signed constants.
+- Added byte-identical `real_function_dynamic_for_postfix.act` fixtures. Native
+  ACTC/ALINK/VICE and this fork's ACTC/ALINK generated-6502 path both execute
+  nested `FOR J=I TO 3` and `FOR L=1 TO K` forms, produce 7.0 twice, and the
+  native direct PRG displays `77`.
+- Pass S remains byte-identical at SHA-256
+  `0291077c9a1895313eb5fe1ad5b9914b3b4c8ebe64cd9c75634863d96e639128`.
+  Pass T is 8,147 bytes with 45 bytes free under its dedicated 32-byte gate and
+  has SHA-256
+  `e07b16dab80f22685e86c0b50c1018862ed5721eca1c07d66151ead5727fe3d3`.
+- Current native inventories are 1,362 broad direct-PRG and 194 non-runtime
+  source-backed shapes; the native unittest inventory is 854, the overlay suite
+  is 244 tests, the source-cache suite is 198 tests, and the compiled-runtime
+  oracle remains 298.
+- General `FOR` bound expressions, runtime steps, nested counter-to-REAL body
+  composition, mixed loop/conditional nesting, returns inside loops, controls
+  beyond four or depth four, unrestricted call trees, recursive/reentrant
+  frames, mixed types, arbitrary signatures, and recursion remain native gaps;
+  Idun's general compiler remains the behavioral reference.

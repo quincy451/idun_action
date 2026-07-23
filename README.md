@@ -134,7 +134,9 @@ nearest-loop `EXIT`. The byte-identical loop and loop-exit fixtures each
 produce 4.0 and 3.0 in both products; their linked PRGs display `43`. Pass S
 adds constant-bound local CARD-counter `FOR` loops; the shared ascending and
 descending fixture produces 4.0 and 7.0 in both products, and its native linked
-PRG displays `47`. Self and mutual cycles remain rejected.
+PRG displays `47`. Pass T adds named CARD initial/final bounds; the shared
+nested-loop fixture produces 7.0 twice and its native linked PRG displays `77`.
+Self and mutual cycles remain rejected.
 Native ACTC now lowers
 `FSign`, `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`, `FHypot`, `FMin`, and `FMax` for named REAL operands and a bounded,
 storage-capturing `FClamp`

@@ -1331,6 +1331,11 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 ("ASCEND", "DESCEND"),
                 ("RT_F_ADD",),
             ),
+            (
+                "real_function_dynamic_for_postfix.act",
+                ("FROMOUTER", "TOOUTER"),
+                ("RT_F_ADD",),
+            ),
         ):
             with self.subTest(fixture=fixture_name):
                 self._compile_and_link_real_function_fixture(

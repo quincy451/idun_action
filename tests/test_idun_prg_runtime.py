@@ -328,6 +328,10 @@ class TestIdunPrgRuntime(unittest.TestCase):
                 "real_function_for_postfix.act",
                 {"ASCENDING": 4.0, "DESCENDING": 7.0},
             ),
+            (
+                "real_function_dynamic_for_postfix.act",
+                {"LOWER": 7.0, "UPPER": 7.0},
+            ),
         ):
             with self.subTest(fixture=fixture_name):
                 self._assert_real_function_fixture_executes(
