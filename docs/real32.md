@@ -27,7 +27,7 @@ The limits that remain are the intrinsic binary32 limits:
 Source forms include decimal and exponent literals, `INF`/`INFINITY`, `NAN`,
 `+`, `-`, `*`, `/`, comparisons, `REAL(integer)`, `INT(real)`, `FAbs`,
 `FSqrt`, `FSign`, `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`,
-`FHypot`, `FPow`, `FExp`, `FLn`, `FLog2`, `FLog10`, `FSin`, `FCos`, `FTan`, `FMin`, `FMax`, `FClamp`, `DegToRad`, `RadToDeg`, `PrintR`, and
+`FHypot`, `FPow`, `FExp`, `FLn`, `FLog2`, `FLog10`, `FSin`, `FCos`, `FTan`, `FATan`, `FMin`, `FMax`, `FClamp`, `DegToRad`, `RadToDeg`, `PrintR`, and
 `PrintRE`.
 
 Rules:
@@ -78,6 +78,10 @@ Rules:
 - `FTan(value)` evaluates the shared binary32 sine and cosine paths and divides
   the rounded results; poles and exceptional values therefore follow ordinary
   division semantics
+- `FATan(value)` preserves signed zero, maps either infinity to signed
+  binary32 `pi/2`, and maps NaN to canonical quiet NaN; finite values use
+  reciprocal and quarter-pi range reductions followed by the portable odd
+  series through `x^13/13`, with binary32 rounding after each operation
 - `DegToRad(value)` multiplies by binary32 `0x3C8EFA35` (`pi/180`);
   `RadToDeg(value)` multiplies by binary32 `0x42652EE0` (`180/pi`). Both use
   ordinary binary32 multiplication behavior
@@ -124,6 +128,7 @@ ALINK resolves the following standalone helper symbols:
 - `rt_f_sin`
 - `rt_f_cos`
 - `rt_f_tan`
+- `rt_f_atan`
 - `rt_f_deg_to_rad`
 - `rt_f_rad_to_deg`
 - `rt_f_min`
@@ -192,6 +197,8 @@ Specific return conventions are:
   polynomial
 - `rt_f_tan` is an alias-safe unary root that imports `rt_f_sin`, `rt_f_cos`,
   and `rt_f_div`
+- `rt_f_atan` is an alias-safe unary root that imports only `rt_f_div`,
+  `rt_f_sub`, `rt_f_add`, and `rt_f_mul`
 - `rt_f_deg_to_rad` and `rt_f_rad_to_deg` read through `$02/$03`, write through
   `$06/$07`, and import `rt_f_mul`; each alias-safe 20-byte wrapper points
   `$04/$05` at its embedded scale factor
@@ -265,6 +272,8 @@ source:
   the required arithmetic closure
 - `FTan(r)` imports `rt_f_tan`, which reaches the shared sine, cosine,
   division, range-reduction, and arithmetic closure without duplicating it
+- `FATan(r)` imports `rt_f_atan` plus only its division, subtraction, addition,
+  multiplication, and transitive special-value closure
 - `DegToRad(r)` and `RadToDeg(r)` each import only the selected angle wrapper
   plus its multiplication and special-value closure
 - `FMin(a,b)` and `FMax(a,b)` import only the selected helper plus its comparison

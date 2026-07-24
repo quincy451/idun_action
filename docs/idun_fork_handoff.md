@@ -422,15 +422,15 @@ literals with pass-P controls. Shared
 REAL locals, multiplication, three comparisons, and three immediate returns;
 native and Idun generated-6502 execution both produce `-1`, `0`, and `1`.
 Current native inventories are
-1,374 broad, 196 non-runtime source-backed, and 308 compiled-runtime
-relocation-oracle cases; pass 6 is 8,092 bytes with 100 bytes free, pass 7 is
-6,965 bytes with 1,227 bytes free, pass L is 6,112 bytes with 2,080
-bytes free, pass M is 6,981 bytes with 1,211 bytes free, pass N is 7,103 bytes
-with 1,089 bytes free, pass O is 7,106 bytes with 1,086 bytes free, pass P is
-7,130 bytes with 1,062 bytes free, pass Q is 7,134 bytes with 1,058 bytes free,
-and pass R is 7,317 bytes with 875 bytes free under its 768-byte gate. Pass S is
-7,811 bytes with 381 bytes free under its 256-byte gate. Pass T is 8,130 bytes
-with 62 bytes free under its 32-byte gate. Pass U is 7,460 bytes with 732 bytes free under its 640-byte
+1,375 broad, 196 non-runtime source-backed, and 309 compiled-runtime
+relocation-oracle cases; pass 6 is 8,052 bytes with 140 bytes free, pass 7 is
+6,999 bytes with 1,193 bytes free, pass L is 6,120 bytes with 2,072
+bytes free, pass M is 6,989 bytes with 1,203 bytes free, pass N is 7,111 bytes
+with 1,081 bytes free, pass O is 7,114 bytes with 1,078 bytes free, pass P is
+7,138 bytes with 1,054 bytes free, pass Q is 7,142 bytes with 1,050 bytes free,
+and pass R is 7,325 bytes with 867 bytes free under its 768-byte gate. Pass S is
+7,819 bytes with 373 bytes free under its 256-byte gate. Pass T is 8,138 bytes
+with 54 bytes free under its 32-byte gate. Pass U is 7,468 bytes with 724 bytes free under its 640-byte
 gate. `RT_F_EXP.OBJ` is now synchronized as an independently selected
 1,465-byte dependency root; Idun and native ACTC both lower `FExp` to it, and
 native ALINK accepts its 233 relocations through the expanded 255-record table.
@@ -460,7 +460,12 @@ The shared 113-byte `RT_F_TAN.OBJ` is now synchronized. Both compilers lower
 and lets ALINK deduplicate their shared closure. Native VICE prints
 `-2.185040...` for `FTan(2)`, and Idun's generated PRG executes
 `FTan(pi/4)`.
-The native MATH1 gap is now 18 public routines, and reentrant
+The shared 1,032-byte `RT_F_ATAN.OBJ` is now synchronized. Both compilers lower
+`FATan(value)` to this alias-safe root, which preserves signed zero, maps
+infinities to signed binary32 pi/2, canonicalizes NaN, and imports only
+division, subtraction, addition, and multiplication. Native VICE prints
+`1.107148...` for `FATan(2)`, and Idun's generated PRG executes `FATan(-2)`.
+The native MATH1 gap is now 17 public routines, and reentrant
 local frames, general `FOR` bound expressions/runtime steps, nested counter-to-REAL body
 composition, mixed loop/conditional nesting, returns from inside loops, more
 than four controls,

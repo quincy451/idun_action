@@ -1,7 +1,7 @@
 ; MATH1 IEEE-754 REAL32 library.
 ;
 ; The core operators, FAbs, FSqrt, FTrunc, FFloor, FCeil, FRound, FFrac, FMod,
-; FHypot, FPow, FSin, FCos, FTan, FExp, FLn, FLog2, FLog10, DegToRad, RadToDeg, and REAL printing are
+; FHypot, FPow, FSin, FCos, FTan, FATan, FExp, FLn, FLog2, FLog10, DegToRad, RadToDeg, and REAL printing are
 ; compiler/runtime primitives. The remaining routines are ordinary Action
 ; functions. Angles are in radians unless a function name explicitly mentions
 ; degrees.
@@ -32,6 +32,7 @@ REAL FUNC FPow(REAL base,exponent)
 REAL FUNC FSin(REAL radians)
 REAL FUNC FCos(REAL radians)
 REAL FUNC FTan(REAL radians)
+REAL FUNC FATan(REAL value)
 REAL FUNC FExp(REAL value)
 REAL FUNC FLn(REAL value)
 REAL FUNC FLog2(REAL value)
@@ -80,57 +81,6 @@ REAL FUNC FClamp(REAL value,lower,upper)
         RETURN(NAN)
     FI
     RETURN(FMin(FMax(value,lower),upper))
-
-REAL FUNC FATan(REAL value)
-    REAL magnitude,reduced,square,term,result,offset,sign
-    BYTE inverted
-    IF value<>value THEN
-        RETURN(NAN)
-    FI
-    IF value=INF THEN
-        RETURN(MATH_HALF_PI)
-    FI
-    IF value=-INF THEN
-        RETURN(0.0-MATH_HALF_PI)
-    FI
-    sign=1.0
-    magnitude=value
-    IF magnitude<0.0 THEN
-        sign=-1.0
-        magnitude=0.0-magnitude
-    FI
-    offset=0.0
-    inverted=0
-    IF magnitude>1.0 THEN
-        reduced=1.0/magnitude
-        inverted=1
-    ELSE
-        reduced=magnitude
-    FI
-    IF reduced>0.4142135679721832 THEN
-        reduced=(reduced-1.0)/(reduced+1.0)
-        offset=MATH_QUARTER_PI
-    FI
-    square=reduced*reduced
-    term=reduced
-    result=term
-    term=term*square
-    result=result-term/3.0
-    term=term*square
-    result=result+term/5.0
-    term=term*square
-    result=result-term/7.0
-    term=term*square
-    result=result+term/9.0
-    term=term*square
-    result=result-term/11.0
-    term=term*square
-    result=result+term/13.0
-    result=offset+result
-    IF inverted<>0 THEN
-        result=MATH_HALF_PI-result
-    FI
-    RETURN(sign*result)
 
 REAL FUNC FATan2(REAL y,x)
     IF x<>x OR y<>y THEN

@@ -166,6 +166,7 @@ class TestIdunWorkspaceExport(unittest.TestCase):
                 "RT_F_SIN.OBJ",
                 "RT_F_COS.OBJ",
                 "RT_F_TAN.OBJ",
+                "RT_F_ATAN.OBJ",
                 "RT_F_WRAP_PI.OBJ",
                 "RT_F_EXP.OBJ",
                 "RT_F_LN.OBJ",
@@ -295,6 +296,14 @@ class TestIdunWorkspaceExport(unittest.TestCase):
             for dependency in ("rt_f_sin", "rt_f_cos", "rt_f_div"):
                 self.assertIn(f"u {dependency}", tan_object)
             self.assertIn("n rt_f_tan", tan_object)
+            atan_object = (out / "LIB" / "RT_F_ATAN.OBJ").read_text(
+                encoding="ascii"
+            )
+            self.assertIn("x rt_f_atan 0 1032", atan_object)
+            for dependency in ("rt_f_div", "rt_f_sub", "rt_f_add", "rt_f_mul"):
+                self.assertIn(f"u {dependency}", atan_object)
+            self.assertNotIn("u rt_f_cmp", atan_object)
+            self.assertIn("n rt_f_atan", atan_object)
             wrap_object = (out / "LIB" / "RT_F_WRAP_PI.OBJ").read_text(
                 encoding="ascii"
             )
@@ -359,6 +368,8 @@ class TestIdunWorkspaceExport(unittest.TestCase):
             self.assertIn("REAL FUNC FSin(REAL radians)", math_header)
             self.assertIn("REAL FUNC FCos(REAL radians)", math_header)
             self.assertIn("REAL FUNC FTan(REAL radians)", math_header)
+            self.assertIn("REAL FUNC FATan(REAL value)", math_header)
+            self.assertNotIn("REAL magnitude,reduced,square,term,result", math_header)
             self.assertNotIn("RETURN(FSin(radians)/FCos(radians))", math_header)
             self.assertNotIn("magnitude=FExp", math_header)
             self.assertNotIn("result=angle*(1.0+square", math_header)
