@@ -1818,3 +1818,29 @@ Retired roadmap items for CP/M-era runner flows are no longer maintained.
   7,114, 7,138, 7,142, 7,325, 7,819, 8,138, and 7,468 bytes.
 - Native MATH1 now exposes twenty-six link-selected calls and lacks 17 public
   routines. FATan2 is the next dependency-ordered public routine.
+
+## 2026-07-23 Shared MATH1 Two-Argument Arctangent
+
+- Synchronized the independent 493-byte `RT_F_ATAN2.OBJ`, math generator, and
+  shared manifest from native ActionC64U.
+- Linux ACTC recognizes `FATan2(y,x)` as a binary REAL intrinsic and imports
+  `RT_F_ATAN2` rather than compiling the portable source body. The native
+  compiler selects the same root only when referenced.
+- The alias-safe helper implements canonical-NaN, signed-zero, zero-axis,
+  infinity, and all four quadrant rules. Ordinary finite operands use
+  `RT_F_DIV`, `RT_F_ATAN`, and an add/subtract pi correction.
+- The exact 6502 verifier covers edge/random inputs and both input-alias forms.
+  The focused native ACTC/ALINK/VICE PRG prints `0.785398...` for
+  `FATan2(1,1)`, while Idun's generated MATH1 PRG executes
+  `FATan2(-1,-1)`.
+- Current native inventories are 1,376 broad direct-PRG, 196 non-runtime
+  source-backed, and 310 compiled-runtime relocation-oracle cases. The native
+  suite remains 866 tests, including 252 overlay and 199 source-cache tests;
+  Idun retains its 154-test host, 139-test sanitizer, and 21-test direct-PRG
+  gates.
+- Native pass 6 is 8,061 bytes with 131 bytes free; pass 7 is 7,031 bytes with
+  1,161 bytes free; pass K is 5,899 bytes with 2,293 bytes free; passes L
+  through U are respectively 6,129, 6,998, 7,120, 7,123, 7,147, 7,151, 7,334,
+  7,828, 8,147, and 7,477 bytes.
+- Native MATH1 now exposes twenty-seven link-selected calls and lacks 16 public
+  routines. FASin is the next dependency-ordered public routine.

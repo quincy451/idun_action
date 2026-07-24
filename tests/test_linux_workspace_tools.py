@@ -171,8 +171,8 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
             math_object = (math_project / "OBJ" / "MAIN.OBJ").read_text(
                 encoding="ascii"
             )
-            self.assertRegex(math_object, r"(?m)^x FATAN2 \d+ \d+$")
             for symbol in (
+                "FATAN2",
                 "FATAN",
                 "FLOG2",
                 "FLOG10",
@@ -211,7 +211,8 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
             self.assertIn("\nu RT_F_SIN\n", math_object)
             self.assertIn("\nu RT_F_COS\n", math_object)
             self.assertNotIn("\nu RT_F_TAN\n", math_object)
-            self.assertIn("\nu RT_F_ATAN\n", math_object)
+            self.assertNotIn("\nu RT_F_ATAN\n", math_object)
+            self.assertIn("\nu RT_F_ATAN2\n", math_object)
             self.assertNotIn("\nu RT_F_EXP\n", math_object)
             self.assertIn("\nu RT_F_LN\n", math_object)
             self.assertNotIn("\nu RT_F_DEG_TO_RAD\n", math_object)
@@ -1557,6 +1558,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 "rt_f_cos.obj",
                 "rt_f_tan.obj",
                 "rt_f_atan.obj",
+                "rt_f_atan2.obj",
                 "rt_f_wrap_pi.obj",
                 "rt_f_exp.obj",
                 "rt_f_ln.obj",
@@ -1595,7 +1597,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                     [
                         "PROC MAIN()",
                         "CARD n",
-                        "REAL a=[1.5],b=[2.0],sum,difference,product,quotient,root,absolute,truncated,floored,ceiled,rounded,fractional,modulus,hypotenuse,power,sine,cosine,tangent,arctangent,exponential,logarithm,logarithm2,logarithm10,minimum,maximum,fromint",
+                        "REAL a=[1.5],b=[2.0],sum,difference,product,quotient,root,absolute,truncated,floored,ceiled,rounded,fractional,modulus,hypotenuse,power,sine,cosine,tangent,arctangent,arctangent2,exponential,logarithm,logarithm2,logarithm10,minimum,maximum,fromint",
                         "n = 3",
                         "sum = a + b",
                         "difference = a - b",
@@ -1615,6 +1617,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                         "cosine = FCos(a)",
                         "tangent = FTan(a)",
                         "arctangent = FATan(a)",
+                        "arctangent2 = FATan2(a,b)",
                         "exponential = FExp(a)",
                         "logarithm = FLn(a)",
                         "logarithm2 = FLog2(a)",
@@ -1654,6 +1657,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 "RT_F_COS",
                 "RT_F_TAN",
                 "RT_F_ATAN",
+                "RT_F_ATAN2",
                 "RT_F_EXP",
                 "RT_F_LN",
                 "RT_F_LOG2",
@@ -1690,6 +1694,7 @@ class TestLinuxWorkspaceTools(unittest.TestCase):
                 "RT_F_COS",
                 "RT_F_TAN",
                 "RT_F_ATAN",
+                "RT_F_ATAN2",
                 "RT_F_MIN",
                 "RT_F_MAX",
                 "RT_I_TO_F",

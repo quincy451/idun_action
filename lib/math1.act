@@ -1,7 +1,7 @@
 ; MATH1 IEEE-754 REAL32 library.
 ;
 ; The core operators, FAbs, FSqrt, FTrunc, FFloor, FCeil, FRound, FFrac, FMod,
-; FHypot, FPow, FSin, FCos, FTan, FATan, FExp, FLn, FLog2, FLog10, DegToRad, RadToDeg, and REAL printing are
+; FHypot, FPow, FSin, FCos, FTan, FATan, FATan2, FExp, FLn, FLog2, FLog10, DegToRad, RadToDeg, and REAL printing are
 ; compiler/runtime primitives. The remaining routines are ordinary Action
 ; functions. Angles are in radians unless a function name explicitly mentions
 ; degrees.
@@ -33,6 +33,7 @@ REAL FUNC FSin(REAL radians)
 REAL FUNC FCos(REAL radians)
 REAL FUNC FTan(REAL radians)
 REAL FUNC FATan(REAL value)
+REAL FUNC FATan2(REAL y,x)
 REAL FUNC FExp(REAL value)
 REAL FUNC FLn(REAL value)
 REAL FUNC FLog2(REAL value)
@@ -81,27 +82,6 @@ REAL FUNC FClamp(REAL value,lower,upper)
         RETURN(NAN)
     FI
     RETURN(FMin(FMax(value,lower),upper))
-
-REAL FUNC FATan2(REAL y,x)
-    IF x<>x OR y<>y THEN
-        RETURN(NAN)
-    FI
-    IF x>0.0 THEN
-        RETURN(FATan(y/x))
-    FI
-    IF x<0.0 THEN
-        IF y>=0.0 THEN
-            RETURN(FATan(y/x)+MATH_PI)
-        FI
-        RETURN(FATan(y/x)-MATH_PI)
-    FI
-    IF y>0.0 THEN
-        RETURN(MATH_HALF_PI)
-    FI
-    IF y<0.0 THEN
-        RETURN(0.0-MATH_HALF_PI)
-    FI
-    RETURN(y)
 
 REAL FUNC FASin(REAL value)
     IF value<>value OR value>1.0 OR value<(0.0-1.0) THEN

@@ -27,7 +27,7 @@ The limits that remain are the intrinsic binary32 limits:
 Source forms include decimal and exponent literals, `INF`/`INFINITY`, `NAN`,
 `+`, `-`, `*`, `/`, comparisons, `REAL(integer)`, `INT(real)`, `FAbs`,
 `FSqrt`, `FSign`, `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`,
-`FHypot`, `FPow`, `FExp`, `FLn`, `FLog2`, `FLog10`, `FSin`, `FCos`, `FTan`, `FATan`, `FMin`, `FMax`, `FClamp`, `DegToRad`, `RadToDeg`, `PrintR`, and
+`FHypot`, `FPow`, `FExp`, `FLn`, `FLog2`, `FLog10`, `FSin`, `FCos`, `FTan`, `FATan`, `FATan2`, `FMin`, `FMax`, `FClamp`, `DegToRad`, `RadToDeg`, `PrintR`, and
 `PrintRE`.
 
 Rules:
@@ -82,6 +82,11 @@ Rules:
   binary32 `pi/2`, and maps NaN to canonical quiet NaN; finite values use
   reciprocal and quarter-pi range reductions followed by the portable odd
   series through `x^13/13`, with binary32 rounding after each operation
+- `FATan2(y,x)` maps a NaN operand to canonical quiet NaN, preserves the
+  IEEE-754 signed-zero quadrants, returns signed `pi/2` when `x` is zero and
+  `y` is nonzero, and returns signed `pi/4` or `3*pi/4` for pairs of
+  infinities; ordinary finite values evaluate `FATan(y/x)` and apply the
+  appropriate signed `pi` correction
 - `DegToRad(value)` multiplies by binary32 `0x3C8EFA35` (`pi/180`);
   `RadToDeg(value)` multiplies by binary32 `0x42652EE0` (`180/pi`). Both use
   ordinary binary32 multiplication behavior
@@ -274,6 +279,9 @@ source:
   division, range-reduction, and arithmetic closure without duplicating it
 - `FATan(r)` imports `rt_f_atan` plus only its division, subtraction, addition,
   multiplication, and transitive special-value closure
+- `FATan2(y,x)` imports `rt_f_atan2`; that root directly imports `rt_f_div`,
+  `rt_f_atan`, `rt_f_add`, and `rt_f_sub`, and ALINK selects only their
+  transitive arithmetic closure
 - `DegToRad(r)` and `RadToDeg(r)` each import only the selected angle wrapper
   plus its multiplication and special-value closure
 - `FMin(a,b)` and `FMax(a,b)` import only the selected helper plus its comparison

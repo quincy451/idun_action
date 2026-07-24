@@ -3605,6 +3605,7 @@ struct RealExprNode {
         Cosine,
         Tangent,
         ArcTangent,
+        ArcTangent2,
         Exponential,
         Logarithm,
         Base2Logarithm,
@@ -3845,7 +3846,7 @@ private:
 
         if (name != "REAL" && name != "FABS" && name != "FSQRT" &&
             name != "FSIN" && name != "FCOS" && name != "FTAN" &&
-            name != "FATAN" &&
+            name != "FATAN" && name != "FATAN2" &&
             name != "FEXP" &&
             name != "FLN" &&
             name != "FLOG2" && name != "FLOG10" &&
@@ -3868,8 +3869,8 @@ private:
         const std::size_t argument = parse_expr();
         skip_ws();
         std::optional<std::size_t> second_argument;
-        if (name == "FMOD" || name == "FHYPOT" || name == "FPOW" || name == "FMIN" ||
-            name == "FMAX") {
+        if (name == "FMOD" || name == "FHYPOT" || name == "FPOW" ||
+            name == "FATAN2" || name == "FMIN" || name == "FMAX") {
             if (pos_ >= text_.size() || text_[pos_] != ',') {
                 throw ToolError("BAD REAL CALL");
             }
@@ -3896,6 +3897,8 @@ private:
             node.kind = RealExprNode::Kind::Tangent;
         } else if (name == "FATAN") {
             node.kind = RealExprNode::Kind::ArcTangent;
+        } else if (name == "FATAN2") {
+            node.kind = RealExprNode::Kind::ArcTangent2;
         } else if (name == "FEXP") {
             node.kind = RealExprNode::Kind::Exponential;
         } else if (name == "FLN") {
@@ -4022,7 +4025,8 @@ std::optional<double> evaluate_real_expr_node(
         constexpr float factor = 0x1.ca5dcp+5F;
         return static_cast<double>(static_cast<float>(*lhs) * factor);
     }
-    if (node.kind == RealExprNode::Kind::Power) {
+    if (node.kind == RealExprNode::Kind::Power ||
+        node.kind == RealExprNode::Kind::ArcTangent2) {
         return std::nullopt;
     }
     auto rhs = evaluate_real_expr_node(expr, node.right, constants);
@@ -8387,6 +8391,7 @@ int cmd_actc(const std::vector<std::string>& args) {
                 upper.find("FFRAC(") != std::string::npos ||
                 upper.find("FMOD(") != std::string::npos ||
                 upper.find("FHYPOT(") != std::string::npos ||
+                upper.find("FATAN2(") != std::string::npos ||
                 upper.find("FMIN(") != std::string::npos ||
                 upper.find("FMAX(") != std::string::npos ||
                 upper.find("DEGTORAD(") != std::string::npos ||
@@ -9674,6 +9679,8 @@ int cmd_actc(const std::vector<std::string>& args) {
                 helper = "RT_F_HYPOT";
             } else if (node.kind == RealExprNode::Kind::Power) {
                 helper = "RT_F_POW";
+            } else if (node.kind == RealExprNode::Kind::ArcTangent2) {
+                helper = "RT_F_ATAN2";
             } else if (node.kind == RealExprNode::Kind::Minimum) {
                 helper = "RT_F_MIN";
             } else if (node.kind == RealExprNode::Kind::Maximum) {

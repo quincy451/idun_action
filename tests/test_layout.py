@@ -192,6 +192,7 @@ class TestRepoLayout(unittest.TestCase):
             "rt_f_cos",
             "rt_f_tan",
             "rt_f_atan",
+            "rt_f_atan2",
             "rt_f_exp",
             "rt_f_ln",
             "rt_f_log2",
