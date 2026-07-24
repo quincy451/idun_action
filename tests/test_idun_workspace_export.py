@@ -172,6 +172,7 @@ class TestIdunWorkspaceExport(unittest.TestCase):
                 "RT_F_ACOS.OBJ",
                 "RT_F_SEC.OBJ",
                 "RT_F_CSC.OBJ",
+                "RT_F_COT.OBJ",
                 "RT_F_WRAP_PI.OBJ",
                 "RT_F_EXP.OBJ",
                 "RT_F_LN.OBJ",
@@ -354,6 +355,14 @@ class TestIdunWorkspaceExport(unittest.TestCase):
                 self.assertIn(f"u {dependency}", csc_object)
             self.assertNotIn("u rt_f_cmp", csc_object)
             self.assertIn("n rt_f_csc", csc_object)
+            cot_object = (out / "LIB" / "RT_F_COT.OBJ").read_text(
+                encoding="ascii"
+            )
+            self.assertIn("x rt_f_cot 0 113", cot_object)
+            for dependency in ("rt_f_cos", "rt_f_sin", "rt_f_div"):
+                self.assertIn(f"u {dependency}", cot_object)
+            self.assertNotIn("u rt_f_cmp", cot_object)
+            self.assertIn("n rt_f_cot", cot_object)
             wrap_object = (out / "LIB" / "RT_F_WRAP_PI.OBJ").read_text(
                 encoding="ascii"
             )

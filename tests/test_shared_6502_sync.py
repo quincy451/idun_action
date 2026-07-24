@@ -3,6 +3,8 @@ from __future__ import annotations
 import importlib.util
 import os
 import shutil
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -43,6 +45,18 @@ class TestShared6502Sync(unittest.TestCase):
 
     def test_checkout_matches_shared_6502_manifest(self) -> None:
         self.assertEqual([], self.sync.verify_manifest(self.root))
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(self.root / "tools" / "generate_math_runtime.py"),
+                "--check",
+            ],
+            cwd=self.root,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
 
     def test_only_os_specific_dbf_adapters_are_excluded(self) -> None:
         self.assertEqual(

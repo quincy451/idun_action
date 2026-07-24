@@ -1947,3 +1947,34 @@ Retired roadmap items for CP/M-era runner flows are no longer maintained.
   7,817, 8,136, and 7,464 bytes.
 - Native MATH1 now exposes thirty-one link-selected calls and lacks 12 public
   routines. FCot is the next dependency-ordered public routine.
+
+## 2026-07-24 Shared MATH1 Cotangent
+
+- Synchronized the independent 113-byte `RT_F_COT.OBJ`, math generator, and
+  shared manifest from native ActionC64U.
+- Regenerated the retained `src/runtime/udos_modules` mirror for all 16 newer
+  transcendental roots. The active shared-runtime test now runs the generator
+  freshness check, so a missing mirror artifact fails the host suite.
+- Linux ACTC recognizes `FCot(value)` as a unary REAL intrinsic and imports
+  `RT_F_COT` rather than compiling the portable source body. Native ACTC
+  selects the same root only when referenced.
+- The alias-safe helper evaluates source-defined binary32
+  `FCos(value)/FSin(value)` in source order. It directly imports only cosine,
+  sine, and division, yielding a 4,327-byte linked closure without tangent,
+  secant, cosecant, or power wrappers.
+- Exact 6502 verification covers 2,087 edge/random inputs and every in-place
+  alias case. The focused native ACTC/ALINK/VICE PRG prints
+  `-0.457657426595...` for `FCot(2)`, while Idun's generated MATH1 PRG
+  executes `FCot(MATH_QUARTER_PI)`.
+- Validation passes the complete 1,381-shape native direct-PRG matrix, all 68
+  launches in the live native math-runtime target, 133 UDOS tests with one
+  documented skip, 866 ActionC64U tests, and Idun's 154 host, 139 sanitizer,
+  and 21 direct-PRG tests with one documented VICE skip.
+- Current native inventories are 1,381 broad direct-PRG, 196 non-runtime
+  source-backed, and 315 compiled-runtime relocation-oracle cases.
+- Native pass 6 is 8,095 bytes with 97 bytes free; pass 7 is 7,195 bytes with
+  997 bytes free; pass K is 5,899 bytes with 2,293 bytes free; passes L
+  through U are respectively 6,125, 6,993, 7,115, 7,118, 7,142, 7,146, 7,329,
+  7,823, 8,142, and 7,470 bytes.
+- Native MATH1 now exposes thirty-two link-selected calls and lacks 11 public
+  routines. FASec is the next dependency-ordered public routine.

@@ -27,7 +27,7 @@ The limits that remain are the intrinsic binary32 limits:
 Source forms include decimal and exponent literals, `INF`/`INFINITY`, `NAN`,
 `+`, `-`, `*`, `/`, comparisons, `REAL(integer)`, `INT(real)`, `FAbs`,
 `FSqrt`, `FSign`, `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`,
-`FHypot`, `FPow`, `FExp`, `FLn`, `FLog2`, `FLog10`, `FSin`, `FCos`, `FTan`, `FATan`, `FATan2`, `FASin`, `FACos`, `FSec`, `FCsc`, `FMin`, `FMax`, `FClamp`, `DegToRad`, `RadToDeg`, `PrintR`, and
+`FHypot`, `FPow`, `FExp`, `FLn`, `FLog2`, `FLog10`, `FSin`, `FCos`, `FTan`, `FATan`, `FATan2`, `FASin`, `FACos`, `FSec`, `FCsc`, `FCot`, `FMin`, `FMax`, `FClamp`, `DegToRad`, `RadToDeg`, `PrintR`, and
 `PrintRE`.
 
 Rules:
@@ -101,6 +101,10 @@ Rules:
 - `FCsc(value)` evaluates binary32 `1.0/FSin(value)` in source order. It
   inherits FSin range reduction and ordinary binary32 division behavior,
   including signed infinities if a computed sine is signed zero
+- `FCot(value)` evaluates binary32 `FCos(value)/FSin(value)` in source order.
+  It inherits both trigonometric range-reduction paths and ordinary binary32
+  division behavior, including signed infinities if the computed sine is
+  signed zero
 - `DegToRad(value)` multiplies by binary32 `0x3C8EFA35` (`pi/180`);
   `RadToDeg(value)` multiplies by binary32 `0x42652EE0` (`180/pi`). Both use
   ordinary binary32 multiplication behavior
@@ -306,6 +310,9 @@ source:
   and `rt_f_div`, and ALINK selects only their 3,699-byte transitive closure
 - `FCsc(r)` imports `rt_f_csc`; its 71-byte root directly imports `rt_f_sin`
   and `rt_f_div`, and ALINK selects only their 3,676-byte transitive closure
+- `FCot(r)` imports `rt_f_cot`; its 113-byte root directly imports `rt_f_cos`,
+  `rt_f_sin`, and `rt_f_div`, and ALINK selects only their 4,327-byte
+  transitive closure
 - `DegToRad(r)` and `RadToDeg(r)` each import only the selected angle wrapper
   plus its multiplication and special-value closure
 - `FMin(a,b)` and `FMax(a,b)` import only the selected helper plus its comparison

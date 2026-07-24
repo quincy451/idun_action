@@ -7,10 +7,15 @@ import shutil
 
 def main() -> int:
     root = Path(__file__).resolve().parents[1]
-    build = root / "build"
-    if build.is_dir():
-        shutil.rmtree(build)
-    print(build)
+    targets = [
+        root / "build",
+        root / ".pytest_cache",
+        *sorted(root.rglob("__pycache__"), reverse=True),
+    ]
+    for target in targets:
+        if target.is_dir():
+            shutil.rmtree(target)
+            print(target)
     return 0
 
 

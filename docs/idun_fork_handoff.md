@@ -51,10 +51,10 @@ RAM-backed `/tmp`, and executable replacement is atomic.
 
 ## Verified Results
 
-- 153 active Linux/tool/target tests pass on the local x86-64 host. The prior
+- 154 active Linux/tool/target tests pass on the local x86-64 host. The prior
   150-test baseline also passes natively on the Alpine/aarch64 Idun Pi; rerun
   the new shared finite-REAL fixture there at the next source deployment.
-- 138 hardware-free tests also pass under AddressSanitizer and
+- 139 hardware-free tests also pass under AddressSanitizer and
   UndefinedBehaviorSanitizer.
 - 21 direct-PRG tests pass in local VICE with the documented VICE 3.7 long-DBF
   skip. The prior 20-test set passes on the Idun Pi; deploy and run the new
@@ -231,7 +231,7 @@ VICE launches, the 32-shape native MATH1 source matrix, and its eight full-range
 helper probes pass. The broad native link inventory is 1,331 shapes and its
 compiled-runtime object/relocation oracle covers 290 cases. The shared manifest
 and Idun export/standalone-link tests guard this snapshot. The current Idun
-host suite passes 153 tests, the sanitizer suite passes 138, and the 21-test
+host suite passes 154 tests, the sanitizer suite passes 139, and the 21-test
 direct-PRG gate passes with only the documented VICE 3.7 DBF/REU skip. Both
 host and static Alpine/AArch64 exports verify 31 commands and 260 help topics.
 This refresh is hardware-independent and has not yet been redeployed to the Pi;
@@ -422,13 +422,13 @@ literals with pass-P controls. Shared
 REAL locals, multiplication, three comparisons, and three immediate returns;
 native and Idun generated-6502 execution both produce `-1`, `0`, and `1`.
 Current native inventories are
-1,380 broad, 196 non-runtime source-backed, and 314 compiled-runtime
-relocation-oracle cases; pass 6 is 8,091 bytes with 101 bytes free, pass 7 is
-7,162 bytes with 1,030 bytes free, pass L is 6,119 bytes with 2,073
-bytes free, pass M is 6,987 bytes with 1,205 bytes free, pass N is 7,109 bytes with 1,083 bytes free, pass O is 7,112 bytes with 1,080 bytes free, pass P is
-7,136 bytes with 1,056 bytes free, pass Q is 7,140 bytes with 1,052 bytes free,
-and pass R is 7,323 bytes with 869 bytes free under its 768-byte gate. Pass S is
-7,817 bytes with 375 bytes free under its 256-byte gate. Pass T is 8,136 bytes with 56 bytes free under its 32-byte gate. Pass U is 7,464 bytes with 728 bytes free under its 640-byte
+1,381 broad, 196 non-runtime source-backed, and 315 compiled-runtime
+relocation-oracle cases; pass 6 is 8,095 bytes with 97 bytes free, pass 7 is
+7,195 bytes with 997 bytes free, pass L is 6,125 bytes with 2,067
+bytes free, pass M is 6,993 bytes with 1,199 bytes free, pass N is 7,115 bytes with 1,077 bytes free, pass O is 7,118 bytes with 1,074 bytes free, pass P is
+7,142 bytes with 1,050 bytes free, pass Q is 7,146 bytes with 1,046 bytes free,
+and pass R is 7,329 bytes with 863 bytes free under its 768-byte gate. Pass S is
+7,823 bytes with 369 bytes free under its 256-byte gate. Pass T is 8,142 bytes with 50 bytes free under its 32-byte gate. Pass U is 7,470 bytes with 722 bytes free under its 640-byte
 gate. `RT_F_EXP.OBJ` is now synchronized as an independently selected
 1,465-byte dependency root; Idun and native ACTC both lower `FExp` to it, and
 native ALINK accepts its 233 relocations through the expanded 255-record table.
@@ -491,7 +491,13 @@ and divides binary32 one by that result. It directly imports only
 `RT_F_SIN.OBJ` and `RT_F_DIV.OBJ`; the focused native direct PRG prints
 `1.099750...` for `FCsc(2)`, and Idun's generated PRG executes
 `FCsc(MATH_HALF_PI)`.
-The native MATH1 gap is now 12 public routines, and reentrant
+The shared 113-byte `RT_F_COT.OBJ` is now synchronized. Both compilers lower
+`FCot(value)` to this alias-safe root, which evaluates FCos and then FSin in
+separate private cells before dividing the binary32 results. It directly
+imports only `RT_F_COS.OBJ`, `RT_F_SIN.OBJ`, and `RT_F_DIV.OBJ`; the focused
+native direct PRG prints `-0.457657...` for `FCot(2)`, and Idun's generated PRG
+executes `FCot(MATH_QUARTER_PI)`.
+The native MATH1 gap is now 11 public routines, and reentrant
 local frames, general `FOR` bound expressions/runtime steps, nested counter-to-REAL body
 composition, mixed loop/conditional nesting, returns from inside loops, more
 than four controls,
