@@ -158,6 +158,9 @@ Current status:
 - `rt_f_asec.obj` is a 96-byte alias-safe unary dependency root. It snapshots
   the source, evaluates binary32 `FACos(1.0/value)` through private storage,
   and imports only `rt_f_div.obj` and `rt_f_acos.obj`.
+- `rt_f_acsc.obj` is a 96-byte alias-safe unary dependency root. It snapshots
+  the source, evaluates binary32 `FASin(1.0/value)` through private storage,
+  and imports only `rt_f_div.obj` and `rt_f_asin.obj`.
 - `rt_f_exp.obj` reads a REAL32 value through `$02/$03`, writes through
   `$06/$07`, and implements the portable MATH1 range-reduced degree-8
   exponential. It is safe when source and destination alias and imports only
