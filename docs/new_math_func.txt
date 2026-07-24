@@ -10,11 +10,11 @@ public constants, 43 public routines, and no private source helper. The resultin
 public help features are compiled and linked by the Linux ACTC/ALINK path and
 have generated-PRG VICE coverage. The native UDOS compiler currently exposes
 FAbs, FSqrt, FSign, FTrunc, FFloor, FCeil, FRound, FFrac, FMod, FHypot, FPow, FExp,
-FLn, FLog2, FLog10, FSin, FCos, FTan, FATan, FATan2, FASin, FMin, FMax, FClamp, DegToRad, RadToDeg, PrintR, and PrintRE. Both compilers
-lower FTrunc, FFloor, FCeil, FRound, FFrac, FMod, FHypot, FPow, FExp, FLn, FLog2, FLog10, FSin, FCos, FTan, FATan, FATan2, FASin, DegToRad, and
+FLn, FLog2, FLog10, FSin, FCos, FTan, FATan, FATan2, FASin, FACos, FMin, FMax, FClamp, DegToRad, RadToDeg, PrintR, and PrintRE. Both compilers
+lower FTrunc, FFloor, FCeil, FRound, FFrac, FMod, FHypot, FPow, FExp, FLn, FLog2, FLog10, FSin, FCos, FTan, FATan, FATan2, FASin, FACos, DegToRad, and
 RadToDeg to shared link-selected OBJs; the native
 selected FSign/FMin/FMax/FClamp semantics also match this source. General
-native REAL source lowering and the remaining 15 public routines are tracked in
+native REAL source lowering and the remaining 14 public routines are tracked in
 docs/udos_feature_parity.md.
 Range reduction remains private target runtime code.
 The native `INCLUDE "MATH1"` header now also exposes all 8 constants without
@@ -110,6 +110,8 @@ IEEE and domain behavior
 - FASin/FACos require -1 through 1.
 - FASin preserves signed zero, returns signed pi/2 at the endpoints, and
   returns canonical quiet NaN for NaN or an out-of-domain magnitude.
+- FACos evaluates binary32 pi/2 minus FASin in target operation order, returns
+  positive zero at +1 and binary32 pi at -1, and shares the FASin domain policy.
 - FACosh requires a value at least 1.
 - FATanh accepts -1 through 1; endpoints return signed infinity.
 - FPow accepts a negative base only when the exponent is an exact integer.
@@ -137,16 +139,16 @@ IEEE and domain behavior
 Porting checklist for the native C64U tree
 -----------------------------------------
 
-1. Keep the public signatures above synchronized; FTrunc, FFloor, FCeil, FRound, FFrac, FMod, FHypot, FPow, FExp, FLn, FLog2, FLog10, FSin, FCos, FTan, FATan, FATan2, and FASin are now
+1. Keep the public signatures above synchronized; FTrunc, FFloor, FCeil, FRound, FFrac, FMod, FHypot, FPow, FExp, FLn, FLog2, FLog10, FSin, FCos, FTan, FATan, FATan2, FASin, and FACos are now
    declarations backed by shared link-selected runtime objects in both products.
 2. Supply the same link-selected binary32 primitives for PrintR, PrintRE,
-   FAbs, FSqrt, FTrunc, FFloor, FCeil, FRound, FFrac, FMod, FHypot, FPow, FExp, FLn, FLog2, FLog10, FSin, FCos, FTan, FATan, FATan2, FASin, add, subtract, multiply, divide, compare, INT
+   FAbs, FSqrt, FTrunc, FFloor, FCeil, FRound, FFrac, FMod, FHypot, FPow, FExp, FLn, FLog2, FLog10, FSin, FCos, FTan, FATan, FATan2, FASin, FACos, add, subtract, multiply, divide, compare, INT
    conversion, and REAL conversion.
 3. Keep RT_F_WRAP_PI private target runtime code rather than a public MATH1
    source routine.
 4. Add the constants and all public signatures to ACTEDIT/ACTHELP library help.
 5. Run known-value target tests for positive and negative FATan, all FATan2
-   quadrants, FASin endpoints/domain cases, FSin/FCos/FTan, logs, powers, and
+   quadrants, FASin/FACos endpoints/domain cases, FSin/FCos/FTan, logs, powers, and
    hyperbolic functions.  The Idun
    fork's VICE regression executes seventeen representative results on a 6502.
 

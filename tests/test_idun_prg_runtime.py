@@ -415,6 +415,8 @@ class TestIdunPrgRuntime(unittest.TestCase):
             self.assertNotIn("\nx FATAN2 ", main_object)
             self.assertIn("\nu RT_F_ASIN\n", main_object)
             self.assertNotIn("\nx FASIN ", main_object)
+            self.assertIn("\nu RT_F_ACOS\n", main_object)
+            self.assertNotIn("\nx FACOS ", main_object)
             self.assertIn("\nu RT_F_POW\n", main_object)
             self.assertNotIn("\nx FPOW ", main_object)
             self.run_tool(project, "alink", "main")

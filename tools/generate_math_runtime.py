@@ -3420,6 +3420,57 @@ def asin_module() -> ObjectBuilder:
     return b
 
 
+def acos_module() -> ObjectBuilder:
+    """Build the portable MATH1 inverse-cosine wrapper."""
+    b = ObjectBuilder("rt_f_acos")
+
+    pointer_targets = ("destination", "angle", "half_pi")
+    pointer_offsets = {
+        target: index * 2 for index, target in enumerate(pointer_targets)
+    }
+
+    def load_local_pointer(target: str, destination: int) -> None:
+        b.immediate(0xA0, pointer_offsets[target])
+        b.immediate(0xA2, destination)
+        b.local_reference(0x20, "setp")
+
+    # FASin writes private storage so the final subtraction remains alias-safe.
+    b.zero_page(0xA5, 0x06)
+    b.local_reference(0x8D, "pt")
+    b.zero_page(0xA5, 0x07)
+    b.local_reference(0x8D, "pth")
+    load_local_pointer("angle", 0x06)
+    b.jsr("rt_f_asin")
+    load_local_pointer("half_pi", 0x02)
+    load_local_pointer("angle", 0x04)
+    load_local_pointer("destination", 0x06)
+    b.jsr("rt_f_sub")
+    b.emit(0x60)
+
+    b.label("setp")
+    b.local_reference(0xB9, "pt")
+    b.emit(0x95, 0x00, 0xC8)
+    b.local_reference(0xB9, "pt")
+    b.emit(0x95, 0x01, 0x60)
+
+    b.label("pt")
+    b.emit(0x00)
+    b.label("pth")
+    b.emit(0x00)
+    for target in pointer_targets[1:]:
+        offset = len(b.code)
+        b.emit(0x00, 0x00)
+        b.local_relocations.append((offset, target))
+
+    b.label("angle")
+    b.emit(0x00, 0x00, 0x00, 0x00)
+    b.label("half_pi")
+    b.emit(*MATH_HALF_PI_BITS.to_bytes(4, "little"))
+
+    b.export("rt_f_acos")
+    return b
+
+
 def float_to_int_module() -> ObjectBuilder:
     """Build finite binary32 to signed 16-bit truncation toward zero."""
     b = ObjectBuilder("rt_f_to_i")
@@ -5430,6 +5481,7 @@ def main() -> int:
             atan_module(),
             atan2_module(),
             asin_module(),
+            acos_module(),
             deg_to_rad_module(),
             rad_to_deg_module(),
             minmax_module("rt_f_min", maximum=False),

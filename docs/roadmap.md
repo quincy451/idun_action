@@ -1867,3 +1867,29 @@ Retired roadmap items for CP/M-era runner flows are no longer maintained.
   7,836, 8,155, and 7,485 bytes.
 - Native MATH1 now exposes twenty-eight link-selected calls and lacks 15 public
   routines. FACos is the next dependency-ordered public routine.
+
+## 2026-07-23 Shared MATH1 Inverse Cosine
+
+- Synchronized the independent 71-byte `RT_F_ACOS.OBJ`, math generator, and
+  shared manifest from native ActionC64U.
+- Linux ACTC recognizes `FACos(value)` as a unary REAL intrinsic and imports
+  `RT_F_ACOS` rather than compiling the portable source body. The native
+  compiler selects the same root only when referenced.
+- The alias-safe helper evaluates source-defined binary32
+  `pi/2-FASin(value)`. It imports only inverse sine and subtraction, yielding a
+  4,627-byte linked closure with no comparison, tangent, or power root.
+- Exact 6502 verification covers edge/random inputs and in-place aliasing. The
+  focused native ACTC/ALINK/VICE PRG prints `3.141592...` for `FACos(-1)`,
+  while Idun's generated MATH1 PRG exercises `FACos(-0.5)`.
+- Validation passes the complete 1,378-shape native direct-PRG matrix, the live
+  native math-runtime matrix, 133 UDOS tests with one documented skip, 866
+  ActionC64U tests, and Idun's 154 host, 139 sanitizer, and 21 direct-PRG tests
+  with one documented VICE skip.
+- Current native inventories are 1,378 broad direct-PRG, 196 non-runtime
+  source-backed, and 312 compiled-runtime relocation-oracle cases.
+- Native pass 6 is 8,077 bytes with 115 bytes free; pass 7 is 7,096 bytes with
+  1,096 bytes free; pass K is 5,899 bytes with 2,293 bytes free; passes L
+  through U are respectively 6,141, 7,010, 7,132, 7,135, 7,159, 7,163, 7,346,
+  7,840, 8,159, and 7,489 bytes.
+- Native MATH1 now exposes twenty-nine link-selected calls and lacks 14 public
+  routines. FSec is the next dependency-ordered public routine.
