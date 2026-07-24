@@ -27,7 +27,7 @@ The limits that remain are the intrinsic binary32 limits:
 Source forms include decimal and exponent literals, `INF`/`INFINITY`, `NAN`,
 `+`, `-`, `*`, `/`, comparisons, `REAL(integer)`, `INT(real)`, `FAbs`,
 `FSqrt`, `FSign`, `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`,
-`FHypot`, `FPow`, `FExp`, `FLn`, `FLog2`, `FLog10`, `FSin`, `FCos`, `FTan`, `FATan`, `FATan2`, `FASin`, `FACos`, `FSec`, `FCsc`, `FCot`, `FASec`, `FACsc`, `FMin`, `FMax`, `FClamp`, `DegToRad`, `RadToDeg`, `PrintR`, and
+`FHypot`, `FPow`, `FExp`, `FLn`, `FLog2`, `FLog10`, `FSin`, `FCos`, `FTan`, `FATan`, `FATan2`, `FASin`, `FACos`, `FSec`, `FCsc`, `FCot`, `FASec`, `FACsc`, `FACot`, `FMin`, `FMax`, `FClamp`, `DegToRad`, `RadToDeg`, `PrintR`, and
 `PrintRE`.
 
 Rules:
@@ -323,6 +323,8 @@ source:
 - `FACsc(r)` imports `rt_f_acsc`; its 96-byte root directly imports
   `rt_f_div` and `rt_f_asin`, and ALINK selects only their 4,652-byte
   transitive closure
+- `FACot(r)` imports `rt_f_acot`; its 28-byte root directly imports only
+  `rt_f_atan2`, and ALINK selects only their 3,858-byte transitive closure
 - `DegToRad(r)` and `RadToDeg(r)` each import only the selected angle wrapper
   plus its multiplication and special-value closure
 - `FMin(a,b)` and `FMax(a,b)` import only the selected helper plus its comparison
@@ -332,9 +334,9 @@ source:
   semantics into ordinary reachable code
 - `PrintR` and `PrintRE` import `rt_print_f`
 
-Programs that do not use REAL pay no REAL runtime code cost. FACsc and all
+Programs that do not use REAL pay no REAL runtime code cost. FACot and all
 earlier trigonometric roots are independently link-selected; the remaining
-nine public MATH1 routines are supplied by the portable library until shared
+eight public MATH1 routines are supplied by the portable library until shared
 runtime objects replace those bodies.
 
 ## Verification

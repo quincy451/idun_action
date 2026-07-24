@@ -10,11 +10,11 @@ public constants, 43 public routines, and no private source helper. The resultin
 public help features are compiled and linked by the Linux ACTC/ALINK path and
 have generated-PRG VICE coverage. The native UDOS compiler currently exposes
 FAbs, FSqrt, FSign, FTrunc, FFloor, FCeil, FRound, FFrac, FMod, FHypot, FPow, FExp,
-FLn, FLog2, FLog10, FSin, FCos, FTan, FATan, FATan2, FASin, FACos, FSec, FCsc, FCot, FASec, FACsc, FMin, FMax, FClamp, DegToRad, RadToDeg, PrintR, and PrintRE. Both compilers
-lower FTrunc, FFloor, FCeil, FRound, FFrac, FMod, FHypot, FPow, FExp, FLn, FLog2, FLog10, FSin, FCos, FTan, FATan, FATan2, FASin, FACos, FSec, FCsc, FCot, FASec, FACsc, DegToRad, and
+FLn, FLog2, FLog10, FSin, FCos, FTan, FATan, FATan2, FASin, FACos, FSec, FCsc, FCot, FASec, FACsc, FACot, FMin, FMax, FClamp, DegToRad, RadToDeg, PrintR, and PrintRE. Both compilers
+lower FTrunc, FFloor, FCeil, FRound, FFrac, FMod, FHypot, FPow, FExp, FLn, FLog2, FLog10, FSin, FCos, FTan, FATan, FATan2, FASin, FACos, FSec, FCsc, FCot, FASec, FACsc, FACot, DegToRad, and
 RadToDeg to shared link-selected OBJs; the native
 selected FSign/FMin/FMax/FClamp semantics also match this source. General
-native REAL source lowering and the remaining 9 public routines are tracked in
+native REAL source lowering and the remaining 8 public routines are tracked in
 docs/udos_feature_parity.md.
 Range reduction remains private target runtime code.
 The native `INCLUDE "MATH1"` header now also exposes all 8 constants without
@@ -22,6 +22,9 @@ allocating target storage or selecting a runtime object.
 FACsc is a 96-byte alias-safe unary dependency root that snapshots its source,
 evaluates binary32 `FASin(1.0/value)`, and directly selects only FASin and
 division, yielding a 4,652-byte closure only when reachable.
+FACot is a 28-byte alias-safe unary dependency root that evaluates binary32
+`FATan2(1.0,value)` and directly selects only FATan2, yielding a 3,858-byte
+closure only when reachable.
 
 The constants and routines below are public after INCLUDE "MATH1".  The
 transcendental routines use portable Action implementations or independently

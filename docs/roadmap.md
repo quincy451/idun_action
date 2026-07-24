@@ -2032,3 +2032,30 @@ Retired roadmap items for CP/M-era runner flows are no longer maintained.
   7,160, 7,343, 7,837, 8,156, and 7,484 bytes.
 - Native MATH1 now exposes thirty-four link-selected calls and lacks 9 public
   routines. FACot is the next dependency-ordered public routine.
+
+## 2026-07-24 Shared MATH1 Inverse Cotangent
+
+- Synchronized the independent 28-byte `RT_F_ACOT.OBJ`, math generator, and
+  shared manifest from native ActionC64U.
+- Linux ACTC recognizes `FACot(value)` as a unary REAL intrinsic and imports
+  `RT_F_ACOT` rather than compiling the portable source body. Native ACTC
+  selects the same root only when referenced.
+- The alias-safe helper copies the source pointer into the inverse-tangent x
+  slot, supplies an embedded binary32 one as y, and evaluates source-defined
+  `FATan2(1.0,value)`. It directly imports only `RT_F_ATAN2`, yielding a
+  3,858-byte linked closure without division or unrelated wrapper roots.
+- Exact 6502 verification covers 2,087 edge/random inputs and every in-place
+  alias case. The focused native ACTC/ALINK/VICE PRG prints `0.785398...` for
+  `FACot(1)`, and Idun's generated 23-result MATH1 PRG executes the same call.
+- Validation passes the complete 1,384-shape native direct-PRG matrix, all 71
+  launches in the live native math-runtime target, UDOS `make test`, 133 UDOS
+  tests with one documented skip, 866 ActionC64U tests, and Idun's 154 host,
+  139 sanitizer, and 21 direct-PRG tests with one documented VICE skip.
+- Current native inventories are 1,384 broad direct-PRG, 196 non-runtime
+  source-backed, and 318 compiled-runtime relocation-oracle cases.
+- Native pass 6 is 8,096 bytes with exactly 96 bytes free; pass 7 is 7,294
+  bytes with 898 bytes free; pass K is 5,899 bytes with 2,293 bytes free;
+  passes L through U are respectively 6,134, 7,002, 7,124, 7,127, 7,151,
+  7,155, 7,338, 7,832, 8,151, and 7,479 bytes.
+- Native MATH1 now exposes thirty-five link-selected calls and lacks 8 public
+  routines. FVersin is the next dependency-ordered public routine.

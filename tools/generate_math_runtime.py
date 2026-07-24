@@ -3760,6 +3760,36 @@ def acsc_module() -> ObjectBuilder:
     return b
 
 
+def acot_module() -> ObjectBuilder:
+    """Build the portable MATH1 inverse-cotangent wrapper."""
+    b = ObjectBuilder("rt_f_acot")
+
+    # FATan2 receives y at $02 and x at $04. Preserve the caller's source
+    # pointer as x before replacing $02 with the embedded binary32 one.
+    b.zero_page(0xA5, 0x02)
+    b.zero_page(0x85, 0x04)
+    b.zero_page(0xA5, 0x03)
+    b.zero_page(0x85, 0x05)
+    b.local_reference(0xAD, "one_ptr")
+    b.zero_page(0x85, 0x02)
+    b.local_reference(0xAD, "one_ptr_high")
+    b.zero_page(0x85, 0x03)
+    b.jsr("rt_f_atan2")
+    b.emit(0x60)
+
+    b.label("one_ptr")
+    pointer_offset = len(b.code)
+    b.emit(0x00)
+    b.label("one_ptr_high")
+    b.emit(0x00)
+    b.local_relocations.append((pointer_offset, "one"))
+    b.label("one")
+    b.emit(*0x3F800000.to_bytes(4, "little"))
+
+    b.export("rt_f_acot")
+    return b
+
+
 def float_to_int_module() -> ObjectBuilder:
     """Build finite binary32 to signed 16-bit truncation toward zero."""
     b = ObjectBuilder("rt_f_to_i")
@@ -5776,6 +5806,7 @@ def main() -> int:
             cot_module(),
             asec_module(),
             acsc_module(),
+            acot_module(),
             deg_to_rad_module(),
             rad_to_deg_module(),
             minmax_module("rt_f_min", maximum=False),

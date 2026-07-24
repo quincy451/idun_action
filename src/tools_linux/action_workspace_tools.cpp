@@ -3613,6 +3613,7 @@ struct RealExprNode {
         Cotangent,
         ArcSecant,
         ArcCosecant,
+        ArcCotangent,
         Exponential,
         Logarithm,
         Base2Logarithm,
@@ -3860,6 +3861,7 @@ private:
             name != "FCOT" &&
             name != "FASEC" &&
             name != "FACSC" &&
+            name != "FACOT" &&
             name != "FEXP" &&
             name != "FLN" &&
             name != "FLOG2" && name != "FLOG10" &&
@@ -3926,6 +3928,8 @@ private:
             node.kind = RealExprNode::Kind::ArcSecant;
         } else if (name == "FACSC") {
             node.kind = RealExprNode::Kind::ArcCosecant;
+        } else if (name == "FACOT") {
+            node.kind = RealExprNode::Kind::ArcCotangent;
         } else if (name == "FEXP") {
             node.kind = RealExprNode::Kind::Exponential;
         } else if (name == "FLN") {
@@ -4037,6 +4041,9 @@ std::optional<double> evaluate_real_expr_node(
         return std::nullopt;
     }
     if (node.kind == RealExprNode::Kind::ArcCosecant) {
+        return std::nullopt;
+    }
+    if (node.kind == RealExprNode::Kind::ArcCotangent) {
         return std::nullopt;
     }
     if (node.kind == RealExprNode::Kind::Exponential) {
@@ -8447,6 +8454,7 @@ int cmd_actc(const std::vector<std::string>& args) {
                 upper.find("FCOT(") != std::string::npos ||
                 upper.find("FASEC(") != std::string::npos ||
                 upper.find("FACSC(") != std::string::npos ||
+                upper.find("FACOT(") != std::string::npos ||
                 upper.find("FMIN(") != std::string::npos ||
                 upper.find("FMAX(") != std::string::npos ||
                 upper.find("DEGTORAD(") != std::string::npos ||
@@ -9671,6 +9679,7 @@ int cmd_actc(const std::vector<std::string>& args) {
                 node.kind == RealExprNode::Kind::Cotangent ||
                 node.kind == RealExprNode::Kind::ArcSecant ||
                 node.kind == RealExprNode::Kind::ArcCosecant ||
+                node.kind == RealExprNode::Kind::ArcCotangent ||
                 node.kind == RealExprNode::Kind::Exponential ||
                 node.kind == RealExprNode::Kind::Logarithm ||
                 node.kind == RealExprNode::Kind::Base2Logarithm ||
@@ -9711,6 +9720,8 @@ int cmd_actc(const std::vector<std::string>& args) {
                     helper = "RT_F_ASEC";
                 } else if (node.kind == RealExprNode::Kind::ArcCosecant) {
                     helper = "RT_F_ACSC";
+                } else if (node.kind == RealExprNode::Kind::ArcCotangent) {
+                    helper = "RT_F_ACOT";
                 } else if (node.kind == RealExprNode::Kind::Exponential) {
                     helper = "RT_F_EXP";
                 } else if (node.kind == RealExprNode::Kind::Logarithm) {

@@ -381,6 +381,13 @@ class TestIdunWorkspaceExport(unittest.TestCase):
                 self.assertIn(f"u {dependency}", acsc_object)
             self.assertNotIn("u rt_f_cmp", acsc_object)
             self.assertIn("n rt_f_acsc", acsc_object)
+            acot_object = (out / "LIB" / "RT_F_ACOT.OBJ").read_text(
+                encoding="ascii"
+            )
+            self.assertIn("x rt_f_acot 0 28", acot_object)
+            self.assertIn("u rt_f_atan2", acot_object)
+            self.assertNotIn("u rt_f_cmp", acot_object)
+            self.assertIn("n rt_f_acot", acot_object)
             wrap_object = (out / "LIB" / "RT_F_WRAP_PI.OBJ").read_text(
                 encoding="ascii"
             )
