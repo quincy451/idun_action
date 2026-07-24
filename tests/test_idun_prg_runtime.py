@@ -374,8 +374,8 @@ class TestIdunPrgRuntime(unittest.TestCase):
                 "REAL r4=$C210,r5=$C214,r6=$C218,r7=$C21C\n"
                 "REAL r8=$C220,r9=$C224,r10=$C228,r11=$C22C\n"
                 "REAL r12=$C230,r13=$C234,r14=$C238,r15=$C23C\n"
-                "REAL r16=$C240,r17=$C244\n"
-                "BYTE done=$C248\n"
+                "REAL r16=$C240,r17=$C244,r18=$C248\n"
+                "BYTE done=$C24C\n"
                 "r0=FSin(MATH_HALF_PI)\n"
                 "r1=FCos(MATH_PI)\n"
                 "r2=FTan(MATH_QUARTER_PI)\n"
@@ -394,6 +394,7 @@ class TestIdunPrgRuntime(unittest.TestCase):
                 "r15=FATanh(0.5)\n"
                 "r16=FLog2(8.0)\n"
                 "r17=FSec(0.0)\n"
+                "r18=FCsc(MATH_HALF_PI)\n"
                 "done=1\n"
                 "DO\n"
                 "OD\n"
@@ -420,6 +421,8 @@ class TestIdunPrgRuntime(unittest.TestCase):
             self.assertNotIn("\nx FACOS ", main_object)
             self.assertIn("\nu RT_F_SEC\n", main_object)
             self.assertNotIn("\nx FSEC ", main_object)
+            self.assertIn("\nu RT_F_CSC\n", main_object)
+            self.assertNotIn("\nx FCSC ", main_object)
             self.assertIn("\nu RT_F_POW\n", main_object)
             self.assertNotIn("\nx FPOW ", main_object)
             self.run_tool(project, "alink", "main")
@@ -431,20 +434,20 @@ class TestIdunPrgRuntime(unittest.TestCase):
                 self.skipTest(str(exc))
             try:
                 vice_context.load_prg(project / "BIN" / "MAIN.PRG")
-                vice_context.monitor.memory_set(0xC200, bytes(73))
+                vice_context.monitor.memory_set(0xC200, bytes(77))
                 vice_context.monitor.resume()
                 deadline = time.monotonic() + 12.0
-                snapshot = bytes(73)
+                snapshot = bytes(77)
                 while time.monotonic() < deadline:
                     time.sleep(0.05)
-                    snapshot = vice_context.monitor.memory_get(0xC200, 0xC248)
-                    if snapshot[72] == 1:
+                    snapshot = vice_context.monitor.memory_get(0xC200, 0xC24C)
+                    if snapshot[76] == 1:
                         break
-                self.assertEqual(snapshot[72], 1, "MATH1 test PRG did not finish")
+                self.assertEqual(snapshot[76], 1, "MATH1 test PRG did not finish")
             finally:
                 vice_context.stop()
 
-            actual = struct.unpack("<18f", snapshot[:72])
+            actual = struct.unpack("<19f", snapshot[:76])
             expected = (
                 1.0,
                 -1.0,
@@ -463,6 +466,7 @@ class TestIdunPrgRuntime(unittest.TestCase):
                 math.tanh(1.0),
                 math.atanh(0.5),
                 3.0,
+                1.0,
                 1.0,
             )
             for index, (observed, wanted) in enumerate(zip(actual, expected)):

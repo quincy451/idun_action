@@ -3609,6 +3609,7 @@ struct RealExprNode {
         ArcSine,
         ArcCosine,
         Secant,
+        Cosecant,
         Exponential,
         Logarithm,
         Base2Logarithm,
@@ -3852,6 +3853,7 @@ private:
             name != "FATAN" && name != "FATAN2" && name != "FASIN" &&
             name != "FACOS" &&
             name != "FSEC" &&
+            name != "FCSC" &&
             name != "FEXP" &&
             name != "FLN" &&
             name != "FLOG2" && name != "FLOG10" &&
@@ -3910,6 +3912,8 @@ private:
             node.kind = RealExprNode::Kind::ArcCosine;
         } else if (name == "FSEC") {
             node.kind = RealExprNode::Kind::Secant;
+        } else if (name == "FCSC") {
+            node.kind = RealExprNode::Kind::Cosecant;
         } else if (name == "FEXP") {
             node.kind = RealExprNode::Kind::Exponential;
         } else if (name == "FLN") {
@@ -4009,6 +4013,9 @@ std::optional<double> evaluate_real_expr_node(
         return std::nullopt;
     }
     if (node.kind == RealExprNode::Kind::Secant) {
+        return std::nullopt;
+    }
+    if (node.kind == RealExprNode::Kind::Cosecant) {
         return std::nullopt;
     }
     if (node.kind == RealExprNode::Kind::Exponential) {
@@ -8415,6 +8422,7 @@ int cmd_actc(const std::vector<std::string>& args) {
                 upper.find("FASIN(") != std::string::npos ||
                 upper.find("FACOS(") != std::string::npos ||
                 upper.find("FSEC(") != std::string::npos ||
+                upper.find("FCSC(") != std::string::npos ||
                 upper.find("FMIN(") != std::string::npos ||
                 upper.find("FMAX(") != std::string::npos ||
                 upper.find("DEGTORAD(") != std::string::npos ||
@@ -9635,6 +9643,7 @@ int cmd_actc(const std::vector<std::string>& args) {
                 node.kind == RealExprNode::Kind::ArcSine ||
                 node.kind == RealExprNode::Kind::ArcCosine ||
                 node.kind == RealExprNode::Kind::Secant ||
+                node.kind == RealExprNode::Kind::Cosecant ||
                 node.kind == RealExprNode::Kind::Exponential ||
                 node.kind == RealExprNode::Kind::Logarithm ||
                 node.kind == RealExprNode::Kind::Base2Logarithm ||
@@ -9667,6 +9676,8 @@ int cmd_actc(const std::vector<std::string>& args) {
                     helper = "RT_F_ACOS";
                 } else if (node.kind == RealExprNode::Kind::Secant) {
                     helper = "RT_F_SEC";
+                } else if (node.kind == RealExprNode::Kind::Cosecant) {
+                    helper = "RT_F_CSC";
                 } else if (node.kind == RealExprNode::Kind::Exponential) {
                     helper = "RT_F_EXP";
                 } else if (node.kind == RealExprNode::Kind::Logarithm) {
