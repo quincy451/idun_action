@@ -3606,6 +3606,7 @@ struct RealExprNode {
         Tangent,
         ArcTangent,
         ArcTangent2,
+        ArcSine,
         Exponential,
         Logarithm,
         Base2Logarithm,
@@ -3846,7 +3847,7 @@ private:
 
         if (name != "REAL" && name != "FABS" && name != "FSQRT" &&
             name != "FSIN" && name != "FCOS" && name != "FTAN" &&
-            name != "FATAN" && name != "FATAN2" &&
+            name != "FATAN" && name != "FATAN2" && name != "FASIN" &&
             name != "FEXP" &&
             name != "FLN" &&
             name != "FLOG2" && name != "FLOG10" &&
@@ -3899,6 +3900,8 @@ private:
             node.kind = RealExprNode::Kind::ArcTangent;
         } else if (name == "FATAN2") {
             node.kind = RealExprNode::Kind::ArcTangent2;
+        } else if (name == "FASIN") {
+            node.kind = RealExprNode::Kind::ArcSine;
         } else if (name == "FEXP") {
             node.kind = RealExprNode::Kind::Exponential;
         } else if (name == "FLN") {
@@ -3989,6 +3992,9 @@ std::optional<double> evaluate_real_expr_node(
         return std::nullopt;
     }
     if (node.kind == RealExprNode::Kind::ArcTangent) {
+        return std::nullopt;
+    }
+    if (node.kind == RealExprNode::Kind::ArcSine) {
         return std::nullopt;
     }
     if (node.kind == RealExprNode::Kind::Exponential) {
@@ -8392,6 +8398,7 @@ int cmd_actc(const std::vector<std::string>& args) {
                 upper.find("FMOD(") != std::string::npos ||
                 upper.find("FHYPOT(") != std::string::npos ||
                 upper.find("FATAN2(") != std::string::npos ||
+                upper.find("FASIN(") != std::string::npos ||
                 upper.find("FMIN(") != std::string::npos ||
                 upper.find("FMAX(") != std::string::npos ||
                 upper.find("DEGTORAD(") != std::string::npos ||
@@ -9609,6 +9616,7 @@ int cmd_actc(const std::vector<std::string>& args) {
                 node.kind == RealExprNode::Kind::Cosine ||
                 node.kind == RealExprNode::Kind::Tangent ||
                 node.kind == RealExprNode::Kind::ArcTangent ||
+                node.kind == RealExprNode::Kind::ArcSine ||
                 node.kind == RealExprNode::Kind::Exponential ||
                 node.kind == RealExprNode::Kind::Logarithm ||
                 node.kind == RealExprNode::Kind::Base2Logarithm ||
@@ -9635,6 +9643,8 @@ int cmd_actc(const std::vector<std::string>& args) {
                     helper = "RT_F_TAN";
                 } else if (node.kind == RealExprNode::Kind::ArcTangent) {
                     helper = "RT_F_ATAN";
+                } else if (node.kind == RealExprNode::Kind::ArcSine) {
+                    helper = "RT_F_ASIN";
                 } else if (node.kind == RealExprNode::Kind::Exponential) {
                     helper = "RT_F_EXP";
                 } else if (node.kind == RealExprNode::Kind::Logarithm) {
