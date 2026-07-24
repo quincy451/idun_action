@@ -27,7 +27,7 @@ The limits that remain are the intrinsic binary32 limits:
 Source forms include decimal and exponent literals, `INF`/`INFINITY`, `NAN`,
 `+`, `-`, `*`, `/`, comparisons, `REAL(integer)`, `INT(real)`, `FAbs`,
 `FSqrt`, `FSign`, `FTrunc`, `FFloor`, `FCeil`, `FRound`, `FFrac`, `FMod`,
-`FHypot`, `FPow`, `FExp`, `FLn`, `FLog2`, `FLog10`, `FSin`, `FCos`, `FTan`, `FATan`, `FATan2`, `FASin`, `FACos`, `FSec`, `FCsc`, `FCot`, `FMin`, `FMax`, `FClamp`, `DegToRad`, `RadToDeg`, `PrintR`, and
+`FHypot`, `FPow`, `FExp`, `FLn`, `FLog2`, `FLog10`, `FSin`, `FCos`, `FTan`, `FATan`, `FATan2`, `FASin`, `FACos`, `FSec`, `FCsc`, `FCot`, `FASec`, `FMin`, `FMax`, `FClamp`, `DegToRad`, `RadToDeg`, `PrintR`, and
 `PrintRE`.
 
 Rules:
@@ -105,6 +105,8 @@ Rules:
   It inherits both trigonometric range-reduction paths and ordinary binary32
   division behavior, including signed infinities if the computed sine is
   signed zero
+- `FASec(value)` evaluates binary32 `FACos(1.0/value)` in source order. It
+  inherits ordinary division behavior and FACos domain handling
 - `DegToRad(value)` multiplies by binary32 `0x3C8EFA35` (`pi/180`);
   `RadToDeg(value)` multiplies by binary32 `0x42652EE0` (`180/pi`). Both use
   ordinary binary32 multiplication behavior
@@ -312,6 +314,9 @@ source:
   and `rt_f_div`, and ALINK selects only their 3,676-byte transitive closure
 - `FCot(r)` imports `rt_f_cot`; its 113-byte root directly imports `rt_f_cos`,
   `rt_f_sin`, and `rt_f_div`, and ALINK selects only their 4,327-byte
+  transitive closure
+- `FASec(r)` imports `rt_f_asec`; its 96-byte root directly imports
+  `rt_f_div` and `rt_f_acos`, and ALINK selects only their 4,723-byte
   transitive closure
 - `DegToRad(r)` and `RadToDeg(r)` each import only the selected angle wrapper
   plus its multiplication and special-value closure

@@ -109,6 +109,70 @@ Current status:
   value, minimum, maximum, division, multiplication, addition, and square root.
   The destination may alias either input. Two zero inputs produce positive
   zero, and infinity takes precedence when paired with NaN.
+- `rt_f_pow.obj` reads base and exponent pointers through `$02/$03` and
+  `$04/$05`, writes through `$06/$07`, and implements the portable MATH1 power
+  policy through truncation, natural logarithm, exponential, modulus, and
+  arithmetic dependencies. The destination may alias either input. Negative
+  bases require an exactly integral exponent; nonintegral cases produce NaN.
+- `rt_f_wrap_pi.obj` is a private 225-byte unary dependency that preserves
+  aliased source/destination pointers and reduces finite values to binary32
+  `[-pi,pi]` through remainder, comparison, subtraction, and addition.
+- `rt_f_sin.obj` is a 586-byte unary dependency root. It imports
+  `rt_f_wrap_pi.obj`, folds the reduced angle to `[-pi/2,pi/2]`, and evaluates
+  the portable degree-11 odd polynomial with binary32 rounding after every
+  multiply and add. NaN and infinite inputs produce canonical quiet NaN.
+- `rt_f_cos.obj` is a 609-byte unary dependency root. It imports
+  `rt_f_wrap_pi.obj`, folds the reduced angle to the central half-pi interval,
+  and evaluates the portable degree-10 even polynomial with binary32 rounding
+  after every multiply and add. NaN and infinite inputs produce canonical
+  quiet NaN.
+- `rt_f_tan.obj` is a 113-byte alias-safe unary dependency root. It snapshots
+  the source and destination, evaluates `rt_f_sin.obj` and `rt_f_cos.obj` into
+  private storage, and divides those results through `rt_f_div.obj`.
+- `rt_f_atan.obj` is a 1,032-byte alias-safe unary dependency root. It
+  preserves signed zero, maps infinities to signed binary32 pi/2, canonicalizes
+  NaN, and evaluates the portable range-reduced odd series. It imports only
+  `rt_f_div.obj`, `rt_f_sub.obj`, `rt_f_add.obj`, and `rt_f_mul.obj`.
+- `rt_f_atan2.obj` is a 493-byte alias-safe binary dependency root. It reads
+  `y` and `x` through `$02/$03` and `$04/$05`, writes through `$06/$07`,
+  implements signed-zero, infinity, NaN, and all four quadrant rules, and
+  imports only `rt_f_div.obj`, `rt_f_atan.obj`, `rt_f_add.obj`, and
+  `rt_f_sub.obj`.
+- `rt_f_asin.obj` is a 220-byte alias-safe unary dependency root. It rejects
+  NaN and magnitudes above one, evaluates `x*x`, `1-x*x`, square root, and
+  FATan2 in binary32 source order, and imports only `rt_f_mul.obj`,
+  `rt_f_sub.obj`, `rt_f_sqrt.obj`, and `rt_f_atan2.obj`.
+- `rt_f_acos.obj` is a 71-byte alias-safe unary dependency root. It evaluates
+  FASin into private storage, subtracts that result from embedded binary32
+  pi/2, and imports only `rt_f_asin.obj` and `rt_f_sub.obj`.
+- `rt_f_sec.obj` is a 71-byte alias-safe unary dependency root. It evaluates
+  FCos into private storage, divides embedded binary32 one by that result, and
+  imports only `rt_f_cos.obj` and `rt_f_div.obj`.
+- `rt_f_csc.obj` is a 71-byte alias-safe unary dependency root. It evaluates
+  FSin into private storage, divides embedded binary32 one by that result, and
+  imports only `rt_f_sin.obj` and `rt_f_div.obj`.
+- `rt_f_cot.obj` is a 113-byte alias-safe unary dependency root. It preserves
+  the source, evaluates FCos and FSin into separate private cells, divides
+  cosine by sine, and imports only `rt_f_cos.obj`, `rt_f_sin.obj`, and
+  `rt_f_div.obj`.
+- `rt_f_asec.obj` is a 96-byte alias-safe unary dependency root. It snapshots
+  the source, evaluates binary32 `FACos(1.0/value)` through private storage,
+  and imports only `rt_f_div.obj` and `rt_f_acos.obj`.
+- `rt_f_exp.obj` reads a REAL32 value through `$02/$03`, writes through
+  `$06/$07`, and implements the portable MATH1 range-reduced degree-8
+  exponential. It is safe when source and destination alias and imports only
+  division, floor, REAL-to-INT conversion, multiplication, subtraction, and
+  addition dependencies.
+- `rt_f_ln.obj` reads a REAL32 value through `$02/$03`, writes through
+  `$06/$07`, and implements portable MATH1 exponent/significand range reduction
+  plus the six-term odd logarithm series. It is safe when source and destination
+  alias, imports only subtraction, addition, division, and multiplication, and
+  returns negative infinity for either zero sign and canonical NaN for negative
+  nonzero inputs.
+- `rt_f_log2.obj` and `rt_f_log10.obj` are separate alias-safe unary wrappers
+  that stage `rt_f_ln.obj` into private storage and divide by embedded binary32
+  `ln(2)` and `ln(10)` constants. Each wrapper selects only itself, natural
+  logarithm, division, and the resulting arithmetic closure.
 - `rt_f_deg_to_rad.obj` and `rt_f_rad_to_deg.obj` are separate 20-byte,
   alias-safe unary wrappers around `rt_f_mul.obj`. They embed binary32
   `pi/180` and `180/pi`, respectively, so ALINK includes only the conversion

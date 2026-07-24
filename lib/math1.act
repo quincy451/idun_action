@@ -39,6 +39,7 @@ REAL FUNC FACos(REAL value)
 REAL FUNC FSec(REAL radians)
 REAL FUNC FCsc(REAL radians)
 REAL FUNC FCot(REAL radians)
+REAL FUNC FASec(REAL value)
 REAL FUNC FExp(REAL value)
 REAL FUNC FLn(REAL value)
 REAL FUNC FLog2(REAL value)
@@ -87,9 +88,6 @@ REAL FUNC FClamp(REAL value,lower,upper)
         RETURN(NAN)
     FI
     RETURN(FMin(FMax(value,lower),upper))
-
-REAL FUNC FASec(REAL value)
-    RETURN(FACos(1.0/value))
 
 REAL FUNC FACsc(REAL value)
     RETURN(FASin(1.0/value))

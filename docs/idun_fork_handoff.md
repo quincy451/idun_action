@@ -422,13 +422,13 @@ literals with pass-P controls. Shared
 REAL locals, multiplication, three comparisons, and three immediate returns;
 native and Idun generated-6502 execution both produce `-1`, `0`, and `1`.
 Current native inventories are
-1,381 broad, 196 non-runtime source-backed, and 315 compiled-runtime
-relocation-oracle cases; pass 6 is 8,095 bytes with 97 bytes free, pass 7 is
-7,195 bytes with 997 bytes free, pass L is 6,125 bytes with 2,067
-bytes free, pass M is 6,993 bytes with 1,199 bytes free, pass N is 7,115 bytes with 1,077 bytes free, pass O is 7,118 bytes with 1,074 bytes free, pass P is
-7,142 bytes with 1,050 bytes free, pass Q is 7,146 bytes with 1,046 bytes free,
-and pass R is 7,329 bytes with 863 bytes free under its 768-byte gate. Pass S is
-7,823 bytes with 369 bytes free under its 256-byte gate. Pass T is 8,142 bytes with 50 bytes free under its 32-byte gate. Pass U is 7,470 bytes with 722 bytes free under its 640-byte
+1,382 broad, 196 non-runtime source-backed, and 316 compiled-runtime
+relocation-oracle cases; pass 6 is 8,094 bytes with 98 bytes free, pass 7 is
+7,229 bytes with 963 bytes free, pass L is 6,132 bytes with 2,060
+bytes free, pass M is 7,000 bytes with 1,192 bytes free, pass N is 7,122 bytes with 1,070 bytes free, pass O is 7,125 bytes with 1,067 bytes free, pass P is
+7,149 bytes with 1,043 bytes free, pass Q is 7,153 bytes with 1,039 bytes free,
+and pass R is 7,336 bytes with 856 bytes free under its 768-byte gate. Pass S is
+7,830 bytes with 362 bytes free under its 256-byte gate. Pass T is 8,149 bytes with 43 bytes free under its 32-byte gate. Pass U is 7,477 bytes with 715 bytes free under its 640-byte
 gate. `RT_F_EXP.OBJ` is now synchronized as an independently selected
 1,465-byte dependency root; Idun and native ACTC both lower `FExp` to it, and
 native ALINK accepts its 233 relocations through the expanded 255-record table.
@@ -497,7 +497,14 @@ separate private cells before dividing the binary32 results. It directly
 imports only `RT_F_COS.OBJ`, `RT_F_SIN.OBJ`, and `RT_F_DIV.OBJ`; the focused
 native direct PRG prints `-0.457657...` for `FCot(2)`, and Idun's generated PRG
 executes `FCot(MATH_QUARTER_PI)`.
-The native MATH1 gap is now 11 public routines, and reentrant
+The shared 96-byte `RT_F_ASEC.OBJ` is now synchronized. Both compilers lower
+`FASec(value)` to this alias-safe root, which snapshots its source and evaluates
+binary32 `FACos(1.0/value)` through private storage. It directly imports only
+`RT_F_DIV.OBJ` and `RT_F_ACOS.OBJ`; ALINK selects their 4,723-byte transitive
+closure while pruning sibling wrapper roots. The focused native direct PRG
+prints `1.047197...` for `FASec(2)`, and Idun's generated PRG executes the same
+call.
+The native MATH1 gap is now 10 public routines, and reentrant
 local frames, general `FOR` bound expressions/runtime steps, nested counter-to-REAL body
 composition, mixed loop/conditional nesting, returns from inside loops, more
 than four controls,
